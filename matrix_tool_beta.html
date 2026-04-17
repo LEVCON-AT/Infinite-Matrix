@@ -258,10 +258,22 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 .sr-item{padding:9px 13px;border-bottom:0.5px solid var(--border);cursor:pointer;transition:background 0.1s;}
 .sr-item:last-child{border-bottom:none;}
 .sr-item:hover{background:var(--bg2);}
-.sr-name{font-size:13px;color:var(--text);font-weight:500;}
+.sr-name{font-size:13px;color:var(--text);font-weight:500;display:flex;align-items:center;gap:6px;}
 .sr-from{font-size:11px;color:var(--text3);margin-top:2px;}
 .sr-mark{background:var(--bluebg);color:var(--bluetxt);border-radius:2px;padding:0 2px;}
 .sr-item.sr-active{background:var(--bluebg);}
+.sr-ico{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;}
+/* Feature glyphs on the right side of a cell-match (no subCmd): shows which features exist */
+.sr-glyphs{margin-left:auto;display:inline-flex;align-items:center;gap:2px;flex-shrink:0;}
+.sr-feat-glyph{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;cursor:pointer;transition:background 0.1s;}
+.sr-feat-glyph:hover{background:var(--bg3);}
+/* Zone B: sub-content under a single-match ^alias result when subCmd is present */
+.sr-zone-b{padding:4px 0 8px 0;animation:fadeSlideIn 180ms cubic-bezier(.4,0,.2,1);}
+.sr-divider{height:1px;background:var(--border);margin:0 13px 6px 13px;}
+.sr-subitem{padding:5px 13px 5px 30px;font-size:12px;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:6px;transition:background 0.1s;}
+.sr-subitem:hover{background:var(--bg2);}
+.sr-subitem .sr-ico{width:13px;height:13px;}
+.sr-subitem-progress{color:var(--text3);font-size:11px;margin-left:auto;font-variant-numeric:tabular-nums;}
 .empty-big{font-size:26px;margin-bottom:8px;}
 #minimap-panel{display:none;position:absolute;top:38px;right:0;width:200px;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--rl);padding:10px;z-index:60;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
 #minimap-panel.open{display:block;}
@@ -316,6 +328,10 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 .freq-group-item:hover{background:var(--bluebg);color:var(--bluetxt);}
 .freq-toggle{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text3);cursor:pointer;padding:3px 8px;border-radius:var(--r);border:0.5px solid var(--border2);background:var(--bg);transition:all 0.15s;margin-left:8px;}
 .freq-toggle:hover,.freq-toggle.active{background:var(--bluebg);color:var(--bluetxt);border-color:var(--bluebg);}
+.freq-chevron{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;font-size:10px;color:var(--text3);cursor:pointer;user-select:none;transition:transform 0.15s,color 0.1s;margin-right:4px;vertical-align:-1px;}
+.freq-chevron:hover{color:var(--text);}
+.freq-chevron.expanded{transform:rotate(90deg);}
+.freq-chevron-spacer{display:inline-block;width:14px;height:14px;margin-right:4px;vertical-align:-1px;}
 
 /* ── KEYBOARD HELP ── */
 .kb-grid{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;}
@@ -557,10 +573,11 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,[contenteditable
 
 /* A3: Simple modal + Stammdaten */
 .smodal-overlay{animation:overlayIn 0.18s ease-out;}
-.smodal{animation:modalIn 0.22s cubic-bezier(0.16,1,0.3,1);}
+.smodal,.sb-confirm{animation:modalIn 0.22s cubic-bezier(0.16,1,0.3,1);}
 .smodal-overlay.closing{animation:overlayOut 0.15s ease-in forwards;}
-.smodal-overlay.closing .smodal{animation:modalOut 0.15s ease-in forwards;}
-.smodal-overlay.closing .sdmodal{animation:modalOut 0.15s ease-in forwards;}
+.smodal-overlay.closing .smodal,
+.smodal-overlay.closing .sdmodal,
+.smodal-overlay.closing .sb-confirm{animation:modalOut 0.15s ease-in forwards;}
 
 /* A4: Checkbox pop */
 .cl-check.anim-done,.task-check.anim-done{animation:checkPop 0.35s cubic-bezier(0.16,1,0.3,1);}
@@ -944,19 +961,26 @@ function migrateNodeAliasesToCells(){
 }
 function rebuildAliasIndex(){
   aliasIndex={};
+  // Keys are normalized to lowercase so legacy uppercase aliases (e.g. imported "S1", "HH")
+  // remain reachable, since handleCommandInput/parseCommand lowercase the user input.
+  // The original casing is preserved in value.alias for display.
+  function put(aliasStr,value){
+    if(!aliasStr)return;
+    aliasIndex[String(aliasStr).toLowerCase()]={...value,alias:aliasStr};
+  }
   function walkNode(nodeId){
     const n=nodes[nodeId];if(!n||nodeId.startsWith('cell-'))return;
-    if(n.alias)aliasIndex[n.alias]={type:n.type,nodeId};
+    if(n.alias)put(n.alias,{type:n.type,nodeId});
     if(n.type==='board'){
-      (n.data.kbCards||[]).forEach(c=>{if(c.alias)aliasIndex[c.alias]={type:'card',nodeId,boardId:nodeId,cardId:c.id};});
-      (n.data.links||[]).forEach(l=>{if(l.alias)aliasIndex[l.alias]={type:l.type==='mail'?'mail':'link',nodeId,boardId:nodeId,linkId:l.id};});
+      (n.data.kbCards||[]).forEach(c=>{if(c.alias)put(c.alias,{type:'card',nodeId,boardId:nodeId,cardId:c.id});});
+      (n.data.links||[]).forEach(l=>{if(l.alias)put(l.alias,{type:l.type==='mail'?'mail':'link',nodeId,boardId:nodeId,linkId:l.id});});
     }
     if(n.type==='matrix'){
       Object.entries(n.data.cells).forEach(([key,c])=>{
         // Cell-level alias (1 alias for all 4 tabs)
         if(c.alias){
           const sep=key.indexOf('-');
-          aliasIndex[c.alias]={type:'cell',parentId:nodeId,rowId:key.slice(0,sep),colId:key.slice(sep+1)};
+          put(c.alias,{type:'cell',parentId:nodeId,rowId:key.slice(0,sep),colId:key.slice(sep+1)});
         }
         if(c.boardId)walkNode(c.boardId);
         if(c.matrixId)walkNode(c.matrixId);
@@ -1111,6 +1135,10 @@ let sbCtrlDown=false;
 // Tracks the last manually-toggled node (chevron or Ctrl+click) for targeted expand animation
 let _sbLastExpandedId=null;
 const SB_STATE_KEY='imatrix-sidebar-state';
+
+// Intervallmatrix aggregate-view state (session-only, not persisted)
+let _freqExpanded=new Set();  // dataIds of expanded aggregate rows
+let _freqAggCache=null;        // last-rendered aggregate tree, used by flyout lookups
 
 // ── File System Access API ──
 let fileHandle=null; // active file handle (null = localStorage mode)
@@ -4098,47 +4126,160 @@ const FREQ_CATEGORIES=[
   {key:'nodate',label:'Ohne Zeit',test:c=>!c.deadline&&(!c.recur||c.recur.type==='none')},
 ];
 
-function renderFrequencyMatrix(allCards,startNodeId){
-  // Collect unique boards (rows) from allCards
-  const boardMap={};
-  allCards.forEach(({card,boardId,boardLabel,path,cellInfo})=>{
-    if(!boardMap[boardId])boardMap[boardId]={id:boardId,label:boardLabel,path:path||[],cellInfo:cellInfo||null,cards:[]};
-    boardMap[boardId].cards.push(card);
-  });
-  const boards=Object.values(boardMap);
-  if(boards.length===0)return'<div style="padding:12px;font-size:12px;color:var(--text3);text-align:center;">Keine Aufgaben</div>';
+// ── Intervallmatrix: Aggregations-Helper ──
+// True when a card should be counted (same filter as renderTaskOverview).
+function _freqCardActive(c){
+  if(c.archived||c.done)return false;
+  if(c.recur&&c.recur.endType==='count'&&c.recur.endCount&&c.recur.startDate){
+    const sd=day0(c.recur.startDate);const now=today0();
+    let cnt=0;const d=new Date(sd);
+    while(d<=now){if(recurFiresOn(c.recur,d))cnt++;d.setDate(d.getDate()+1);}
+    if(cnt>=c.recur.endCount)return false;
+  }
+  return true;
+}
 
-  // Determine which frequency columns have data
-  const activeCols=FREQ_CATEGORIES.filter(cat=>allCards.some(({card})=>cat.test(card)));
-  if(activeCols.length===0)return'';
+// Returns [{card, boardId, cellInfo}] of all active cards under a cell, including sub-matrix descendants.
+function _freqAggregateCell(cell,cellInfo){
+  const out=[];
+  if(cell.boardId){
+    const b=nodes[cell.boardId];
+    if(b&&b.data&&b.data.kbCards){
+      b.data.kbCards.filter(_freqCardActive).forEach(c=>out.push({card:c,boardId:cell.boardId,cellInfo}));
+    }
+  }
+  if(cell.matrixId){
+    const sm=nodes[cell.matrixId];
+    if(sm&&sm.data&&sm.data.cells){
+      (sm.data.rows||[]).forEach(r=>(sm.data.cols||[]).forEach(co=>{
+        const sc=sm.data.cells[`${r.id}-${co.id}`];
+        if(!sc)return;
+        const scInfo={alias:sc.alias||'',rowLabel:r.label,colLabel:co.label,parentId:cell.matrixId,rowId:r.id,colId:co.id};
+        out.push(..._freqAggregateCell(sc,scInfo));
+      }));
+    }
+  }
+  return out;
+}
 
+// Builds an aggregate-row tree for a matrix (cells without active cards anywhere below are filtered out).
+function _freqBuildAggregates(matrixId,depth){
+  const m=nodes[matrixId];
+  if(!m||m.type!=='matrix')return [];
+  const result=[];
+  (m.data.rows||[]).forEach(row=>(m.data.cols||[]).forEach(col=>{
+    const cell=m.data.cells[`${row.id}-${col.id}`];
+    if(!cell)return;
+    const cellInfo={alias:cell.alias||'',rowLabel:row.label,colLabel:col.label,parentId:matrixId,rowId:row.id,colId:col.id};
+    const cards=_freqAggregateCell(cell,cellInfo);
+    if(cards.length===0)return;
+    const children=cell.matrixId?_freqBuildAggregates(cell.matrixId,depth+1):[];
+    result.push({
+      dataId:`cell-${matrixId}-${row.id}-${col.id}`,
+      parentId:matrixId,rowId:row.id,colId:col.id,
+      label:`${row.label} / ${col.label}`,
+      alias:cell.alias||'',
+      depth,cards,children,
+      expandable:children.length>0,
+    });
+  }));
+  return result;
+}
+
+function renderFrequencyMatrix(startNodeId){
+  const aggregates=_freqBuildAggregates(startNodeId||rootId,0);
+  _freqAggCache=aggregates;
+  // Flatten respecting _freqExpanded state
+  const rows=[];
+  (function flatten(items){
+    items.forEach(a=>{
+      rows.push(a);
+      if(a.expandable&&_freqExpanded.has(a.dataId))flatten(a.children);
+    });
+  })(aggregates);
+  // Columns computed from top-level cards (each top-level already aggregates its subtree)
+  const topCards=aggregates.flatMap(a=>a.cards);
+  const activeCols=FREQ_CATEGORIES.filter(cat=>topCards.some(({card})=>cat.test(card)));
+  if(rows.length===0||activeCols.length===0){
+    return '<div style="padding:12px;font-size:12px;color:var(--text3);text-align:center;">Keine Aufgaben</div>';
+  }
   const cw=appSettings.colWidthEm||7;
-  const gc=`${cw}em repeat(${activeCols.length},minmax(${cw}em,1fr))`;
+  const gc=`minmax(${cw*2}em,auto) repeat(${activeCols.length},minmax(${cw}em,1fr))`;
   let h=`<div style="overflow-x:auto;margin-top:8px;"><div class="freq-grid" style="grid-template-columns:${gc};min-width:fit-content;">`;
-  // Header row
   h+=`<div class="freq-hd corner"></div>`;
   activeCols.forEach(cat=>{h+=`<div class="freq-hd">${cat.label}</div>`;});
-  // Data rows
-  boards.forEach(board=>{
-    // Row header: board name (clickable → navigate)
-    const pathStr=board.path.filter(p=>p.type==='matrix').map(p=>esc(p.label)).join(' › ');
-    h+=`<div class="freq-row-hd" onclick="navigateToBoardFromFreq('${board.id}')" title="${esc(pathStr?pathStr+' › '+board.label:board.label)}">${cardOriginHTML(board.cellInfo,board.path,board.id)}${esc(board.label)}</div>`;
-    // Cells
+  rows.forEach(agg=>{
+    const indent=agg.depth*14;
+    const expanded=_freqExpanded.has(agg.dataId);
+    const chev=agg.expandable
+      ?`<span class="freq-chevron${expanded?' expanded':''}" onclick="event.stopPropagation();_freqToggleExpand('${agg.dataId}')">▸</span>`
+      :`<span class="freq-chevron-spacer"></span>`;
+    const aliasHtml=agg.alias?`<span class="alias-tag" style="margin-right:4px;">${esc(agg.alias)}</span>`:'';
+    const labelEsc=esc(agg.label).replace(/'/g,"\\'");
+    h+=`<div class="freq-row-hd" style="padding-left:${9+indent}px;" onclick="_freqDrillDown('${agg.parentId}','${agg.rowId}','${agg.colId}','${labelEsc}')" title="Drill-Down">${chev}${aliasHtml}${esc(agg.label)}</div>`;
     activeCols.forEach(cat=>{
-      const matching=board.cards.filter(c=>cat.test(c));
+      const matching=agg.cards.filter(({card})=>cat.test(card));
       const count=matching.length;
-      if(count===0){
-        h+=`<div class="freq-cell"></div>`;
-      } else {
+      if(count===0){h+=`<div class="freq-cell"></div>`;}
+      else{
         const intensity=count<=2?'freq-1':count<=5?'freq-2':'freq-3';
-        h+=`<div class="freq-cell"><span class="freq-badge ${intensity}" onclick="showFreqFlyout(event,'${board.id}','${cat.key}')">${count}</span></div>`;
+        h+=`<div class="freq-cell"><span class="freq-badge ${intensity}" onclick="event.stopPropagation();_freqShowAggFlyout(event,'${agg.dataId}','${cat.key}')">${count}</span></div>`;
       }
     });
   });
-  h+=`</div></div>`;
-  // Flyout container
-  h+=`<div id="freq-flyout-container"></div>`;
+  h+=`</div></div><div id="freq-flyout-container"></div>`;
   return h;
+}
+
+// ── Intervallmatrix: Interaction handlers ──
+function _freqToggleExpand(dataId){
+  if(_freqExpanded.has(dataId))_freqExpanded.delete(dataId);
+  else _freqExpanded.add(dataId);
+  render();
+}
+function _freqDrillDown(parentId,rowId,colId,label){
+  // Open the cell; use default tab (matrix when sub-matrix exists, else board).
+  const parent=nodes[parentId];
+  const cell=parent?.data?.cells?.[`${rowId}-${colId}`];
+  const tab=cell?.matrixId?'matrix':(cell?.boardId?'board':'matrix');
+  openCell(parentId,rowId,colId,label,tab);
+}
+function _freqShowAggFlyout(e,dataId,catKey){
+  e.stopPropagation();
+  const agg=_freqFindAggInCache(_freqAggCache,dataId);
+  if(!agg)return;
+  const cat=FREQ_CATEGORIES.find(c=>c.key===catKey);
+  if(!cat)return;
+  const matching=agg.cards.filter(({card})=>cat.test(card));
+  if(matching.length===0)return;
+  _freqShowFlyoutImpl(e,matching,`${agg.label} · ${cat.label}`);
+}
+function _freqFindAggInCache(aggs,dataId){
+  if(!aggs)return null;
+  for(const a of aggs){
+    if(a.dataId===dataId)return a;
+    const f=_freqFindAggInCache(a.children,dataId);
+    if(f)return f;
+  }
+  return null;
+}
+function _freqShowFlyoutImpl(e,cards,title){
+  let h=`<div class="freq-flyout" style="left:${Math.min(e.clientX,window.innerWidth-380)}px;top:${Math.min(e.clientY,window.innerHeight-300)}px;">`;
+  h+=`<div class="freq-flyout-hd">${esc(title)} <span>(${cards.length})</span></div>`;
+  h+=`<div class="freq-group">`;
+  cards.forEach(({card,boardId,cellInfo})=>{
+    const origin=cellInfo?(cellInfo.alias||`${cellInfo.rowLabel}/${cellInfo.colLabel}`):'';
+    const detail=card.recur?.type==='weekly'&&card.recur?.weekdays?` (${card.recur.weekdays.map(d=>WEEKDAY_SHORT[d]).join(',')})`
+      :card.recur?.type==='monthly'?` (${card.recur?.day||1}.)`
+      :card.deadline?` · ${fmtDate(card.deadline)}`:'';
+    const originHtml=origin?`<span class="origin-alias" style="margin-right:6px;">${esc(origin)}</span>`:'';
+    h+=`<div class="freq-group-item" onclick="event.stopPropagation();closeFreqFlyout();openCard('${boardId}','${card.id}')">${originHtml}${esc(card.name||'(ohne Name)')}${detail}</div>`;
+  });
+  h+=`</div></div>`;
+  const container=document.getElementById('freq-flyout-container');
+  if(container)container.innerHTML=h;
+  const close=ev=>{if(!ev.target.closest('.freq-flyout')){closeFreqFlyout();document.removeEventListener('click',close);}};
+  setTimeout(()=>document.addEventListener('click',close),0);
 }
 
 function cardOriginHTML(cellInfo,path,boardId){
@@ -4301,7 +4442,7 @@ function renderTaskOverview(startNodeId){
       ${!_freqView?`<button class="btn edit-only" style="font-size:11px;margin-left:auto;" onclick="addDailyCol()">+ Spalte</button>`:''}
     </div>`;
   if(_freqView){
-    h+=renderFrequencyMatrix(allCards,startNodeId||rootId);
+    h+=renderFrequencyMatrix(startNodeId||rootId);
     h+=`</div>`;
     return h;
   }
@@ -5303,6 +5444,138 @@ function onSearchInput(val){
     doSearch(val);
   }
 }
+
+// Resolve the icon, color, label and type-text for one entry in the ^alias result list.
+// For cells, icon and color adapt to the active subCmd (i/b/c/m) or — if none —
+// to the cell's default feature (what openCell would actually open).
+function _resolveAliasResultInfo(alias,target,subCmd){
+  const FEAT_COLORS={matrix:'var(--blue)',board:'var(--teal)',info:'var(--amber)',checklists:'var(--purple)'};
+  const out={icon:'',color:'var(--text2)',label:alias,typeLabel:''};
+  if(target.type==='matrix'){
+    const n=nodes[target.nodeId];
+    out.icon=SB_ICONS.matrix;out.color='var(--blue)';
+    out.label=n?.label||alias;out.typeLabel='Matrix';
+    return out;
+  }
+  if(target.type==='board'){
+    const n=nodes[target.nodeId];
+    const def=getCellFeatureDef('board');
+    out.icon=def.icoSm;out.color='var(--teal)';
+    out.label=n?.label||alias;out.typeLabel='Board';
+    return out;
+  }
+  if(target.type==='card'){
+    const n=nodes[target.nodeId];
+    const card=n?.data.kbCards.find(c=>c.id===target.cardId);
+    out.icon=`<svg width="11" height="11" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2" width="11" height="10" rx="1.3" stroke="currentColor" stroke-width="1.3"/><line x1="3.5" y1="5.5" x2="10.5" y2="5.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="3.5" y1="8.5" x2="8.5" y2="8.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>`;
+    out.color='var(--amber)';
+    out.label=card?.name||alias;out.typeLabel='Karte';
+    return out;
+  }
+  if(target.type==='link'){
+    const n=nodes[target.nodeId];
+    const link=n?.data.links.find(l=>l.id===target.linkId);
+    out.icon=ICO.link(11);out.color='var(--text2)';
+    out.label=link?.label||alias;out.typeLabel='Link';
+    return out;
+  }
+  if(target.type==='mail'){
+    const n=nodes[target.nodeId];
+    const link=n?.data.links.find(l=>l.id===target.linkId);
+    out.icon=ICO.mail(11);out.color='var(--text2)';
+    out.label=link?.label||alias;out.typeLabel='Mailvorlage';
+    return out;
+  }
+  if(target.type==='cell'){
+    const parent=nodes[target.parentId];
+    const row=parent?.data.rows.find(r=>r.id===target.rowId);
+    const col=parent?.data.cols.find(c=>c.id===target.colId);
+    out.label=(row&&col)?`${row.label} / ${col.label}`:alias;
+    const cell=parent?.data.cells[`${target.rowId}-${target.colId}`];
+    // Adaptive feature: explicit subCmd wins, else the cell's default (what openCell picks)
+    let featKey=null;
+    if(subCmd==='i')featKey='info';
+    else if(subCmd==='b')featKey='board';
+    else if(subCmd==='m')featKey='matrix';
+    else if(subCmd==='c')featKey='checklists';
+    else{featKey=cell?.boardId?'board':(cell?.matrixId?'matrix':null);}
+    const def=featKey?getCellFeatureDef(featKey):null;
+    if(def){out.icon=def.icoSm;out.color=FEAT_COLORS[featKey]||'var(--text2)';}
+    else{out.icon=SB_ICONS.cellBox;out.color='var(--text2)';}
+    out.typeLabel='Zelle';
+    // Right-side feature glyphs (only meaningful when no subCmd — list of available features)
+    const SUB_CHAR={info:'i',board:'b',matrix:'m',checklists:'c'};
+    out.cellFeatures=cell?getActiveFeatures(cell).map(f=>({
+      key:f.key,icon:f.icoSm,color:FEAT_COLORS[f.key]||'var(--text2)',subCmd:SUB_CHAR[f.key],label:f.label
+    })):[];
+    return out;
+  }
+  return out;
+}
+
+// Render the Zone-B sub-items under a single cell-match when subCmd (i/b/m/c) is present.
+// - i: links & mails of the cell's board
+// - b: open cards of the board
+// - m: sub-cells of the cell's sub-matrix
+// - c: static checklists on the board, with progress (done/total)
+// Items with aliases route via executeCommand so the normal nav-flow + closeSearch applies.
+function _renderAliasResultZoneB(cellAlias,target,subCmd){
+  const parent=nodes[target.parentId];
+  if(!parent)return'';
+  const cell=parent.data.cells[`${target.rowId}-${target.colId}`];
+  if(!cell)return'';
+  const CARD_ICO=`<svg width="11" height="11" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2" width="11" height="10" rx="1.3" stroke="currentColor" stroke-width="1.3"/><line x1="3.5" y1="5.5" x2="10.5" y2="5.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="3.5" y1="8.5" x2="8.5" y2="8.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>`;
+  const items=[];
+  if(subCmd==='i'){
+    const board=cell.boardId?nodes[cell.boardId]:null;
+    const links=board?.data?.links||[];
+    links.forEach(l=>{
+      const isMail=l.type==='mail';
+      const icon=isMail?ICO.mail(11):ICO.link(11);
+      const aliasTag=l.alias?`<span class="alias-tag">${esc(l.alias)}</span>`:'';
+      const onClick=l.alias?`executeCommand('${esc(l.alias)}')`:(isMail?`window.location.href=buildMailto(nodes['${cell.boardId}'].data.links.find(x=>x.id==='${l.id}'))`:`window.open('${esc(l.url||'')}','_blank')`);
+      items.push(`<div class="sr-subitem" onclick="${onClick}"><span class="sr-ico" style="color:var(--text2)">${icon}</span>${aliasTag}<span>${esc(l.label||(isMail?'(Mail)':'(Link)'))}</span></div>`);
+    });
+  }else if(subCmd==='b'){
+    const board=cell.boardId?nodes[cell.boardId]:null;
+    const cards=(board?.data?.kbCards||[]).filter(c=>!c.archived);
+    cards.forEach(c=>{
+      const aliasTag=c.alias?`<span class="alias-tag">${esc(c.alias)}</span>`:'';
+      const onClick=c.alias?`executeCommand('${esc(cellAlias)} k ${esc(c.alias)}')`:`closeSearch();openCard('${cell.boardId}','${c.id}')`;
+      items.push(`<div class="sr-subitem" onclick="${onClick}"><span class="sr-ico" style="color:var(--amber)">${CARD_ICO}</span>${aliasTag}<span>${esc(c.name||'(ohne Name)')}</span></div>`);
+    });
+  }else if(subCmd==='m'){
+    const submat=cell.matrixId?nodes[cell.matrixId]:null;
+    if(submat&&submat.type==='matrix'){
+      Object.entries(submat.data.cells).forEach(([k,c])=>{
+        const sep=k.indexOf('-');const rid=k.slice(0,sep),cid=k.slice(sep+1);
+        const row=submat.data.rows.find(r=>r.id===rid);
+        const col=submat.data.cols.find(cc=>cc.id===cid);
+        if(!row||!col)return;
+        const label=`${row.label} / ${col.label}`;
+        const aliasTag=c.alias?`<span class="alias-tag">${esc(c.alias)}</span>`:'';
+        const onClick=c.alias?`executeCommand('${esc(c.alias)}')`:`closeSearch();openCell('${submat.id}','${rid}','${cid}','${esc(label).replace(/'/g,"\\'")}','matrix')`;
+        items.push(`<div class="sr-subitem" onclick="${onClick}"><span class="sr-ico" style="color:var(--text2)">${SB_ICONS.cellBox}</span>${aliasTag}<span>${esc(label)}</span></div>`);
+      });
+    }
+  }else if(subCmd==='c'){
+    const board=cell.boardId?nodes[cell.boardId]:null;
+    const lists=board?.data?.checklists||[];
+    const clDef=getCellFeatureDef('checklists');
+    const clIcon=clDef?clDef.icoSm:'';
+    lists.forEach(cl=>{
+      const items_=cl.items||[];
+      const done=items_.filter(i=>i.done).length;
+      const total=items_.length;
+      const progress=total>0?`<span class="sr-subitem-progress">${done}/${total}</span>`:'';
+      const onClick=`executeCommand('${esc(cellAlias)} c')`;
+      items.push(`<div class="sr-subitem" onclick="${onClick}"><span class="sr-ico" style="color:var(--purple)">${clIcon}</span><span>${esc(cl.label||'(ohne Name)')}</span>${progress}</div>`);
+    });
+  }
+  if(items.length===0)return'';
+  return `<div class="sr-zone-b">${items.join('')}</div>`;
+}
+
 function handleCommandInput(raw){
   const el=document.getElementById('searchresults');
   if(!raw||raw.trim()===''){
@@ -5382,15 +5655,25 @@ function handleCommandInput(raw){
         h+=`<div class="sr-item"><div class="sr-name" style="color:var(--text3);">^n kürzel — Kürzel eingeben</div></div>`;
       }
     }
+    const singleMatch=matches.length===1;
     matches.forEach(([alias,target])=>{
-      const n=nodes[target.nodeId];
-      const label=target.type==='card'?(n?.data.kbCards.find(c=>c.id===target.cardId)?.name||alias)
-        :target.type==='link'||target.type==='mail'?(n?.data.links.find(l=>l.id===target.linkId)?.label||alias)
-        :(n?.label||alias);
-      const typeLabel=target.type==='board'?'Board':target.type==='matrix'?'Matrix':target.type==='card'?'Karte':target.type==='mail'?'Mailvorlage':'Link';
+      const info=_resolveAliasResultInfo(alias,target,parts[1]);
+      const displayAlias=target.alias||alias;
       const sub=parts[1]||'';const card=parts[2]||'';
       const cmd=esc(alias+(sub?' '+sub:'')+(card?' '+card:''));
-      h+=`<div class="sr-item" onclick="executeCommand('${cmd}')"><div class="sr-name"><span class="alias-tag">${esc(alias)}</span> ${esc(label)}</div><div class="sr-from">${typeLabel}</div></div>`;
+      // Right-side glyphs: only for cell-matches without subCmd — show available features,
+      // each clickable for direct jump to that feature.
+      let glyphsHtml='';
+      if(!sub&&target.type==='cell'&&info.cellFeatures&&info.cellFeatures.length){
+        glyphsHtml=`<span class="sr-glyphs">${info.cellFeatures.map(f=>
+          `<span class="sr-feat-glyph" style="color:${f.color}" title="${esc(f.label)}" onclick="event.stopPropagation();executeCommand('${esc(alias)} ${f.subCmd}')">${f.icon}</span>`
+        ).join('')}</span>`;
+      }
+      h+=`<div class="sr-item" onclick="executeCommand('${cmd}')"><div class="sr-name"><span class="sr-ico" style="color:${info.color}">${info.icon}</span><span class="alias-tag">${esc(displayAlias)}</span> ${esc(info.label)}${glyphsHtml}</div><div class="sr-from">${info.typeLabel}</div></div>`;
+      // Zone B: only when exactly one match, target is a cell, and subCmd is one of i/b/m/c
+      if(singleMatch&&target.type==='cell'&&['i','b','m','c'].includes(sub)){
+        h+=_renderAliasResultZoneB(alias,target,sub);
+      }
     });
     el.innerHTML=h;
   } else {
