@@ -199,6 +199,10 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 .daily-item:last-child{border-bottom:none;}
 .daily-item .di-name{flex:1;}
 .daily-item .di-from{font-size:10px;color:var(--text3);margin-top:1px;}
+.card-origin{cursor:pointer;margin-right:0.4em;opacity:0.65;transition:opacity 0.15s;display:inline-block;}
+.card-origin:hover{opacity:1;}
+.origin-alias{font-family:monospace;font-size:0.9em;padding:0.05em 0.4em;border-radius:var(--rs);background:var(--bg3);color:var(--text2);}
+.origin-label{font-size:0.9em;color:var(--text3);font-style:italic;}
 .recur-icon{font-size:10px;color:var(--teal);flex-shrink:0;margin-top:2px;}
 .task-check{width:14px;height:14px;border-radius:3px;border:1.5px solid var(--border2);flex-shrink:0;cursor:pointer;position:relative;transition:all 0.1s;}
 .task-check:hover{border-color:var(--teal);background:var(--tealbg);}
@@ -212,6 +216,8 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 .modal-label{font-size:11px;color:var(--text2);margin-bottom:3px;display:block;}
 .modal-input{width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--bg);color:var(--text);margin-bottom:10px;font-family:inherit;outline:none;}
 .modal-input:focus{border-color:var(--blue);}
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.8);cursor:pointer;}
+[data-theme="dark"] input[type="date"]{color-scheme:dark;}
 .modal-textarea{width:100%;font-size:12px;padding:7px 9px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--bg);color:var(--text);margin-bottom:10px;font-family:inherit;outline:none;resize:vertical;min-height:60px;}
 .modal-textarea:focus{border-color:var(--blue);}
 .modal-select{width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--bg);color:var(--text);margin-bottom:10px;font-family:inherit;outline:none;}
@@ -321,11 +327,191 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 .kb-desc{font-size:12px;color:var(--text);padding:2px 0;}
 .kb-desc-fixed{font-size:12px;color:var(--text2);padding:2px 0;}
 
-/* ── COMMAND ERROR ── */
+/* ── COMMAND ERROR / SUCCESS ── */
 @keyframes cmdError{0%,100%{transform:none}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+@keyframes cmdSuccess{0%{box-shadow:0 0 0 0 var(--teal)}70%{box-shadow:0 0 0 6px rgba(29,158,117,0)}100%{box-shadow:0 0 0 0 rgba(29,158,117,0)}}
 #searchinput.cmd-error{animation:cmdError 0.3s ease;border-color:var(--red)!important;color:var(--red);}
+#searchinput.cmd-success{animation:cmdSuccess 0.6s ease;border-color:var(--teal)!important;color:var(--tealtxt);}
 .cmd-help{font-size:11px;font-family:monospace;padding:10px 12px;line-height:1.8;}
 .cmd-help b{color:var(--bluetxt);}
+
+/* ── SIDEBAR ── */
+#main-layout{display:flex;flex:1;min-height:0;}
+body.has-sidebar-right #main-layout{flex-direction:row-reverse;}
+body.has-sidebar #content{max-width:none;margin:0;}
+body.has-sidebar #minimap-panel,body.has-sidebar #mapbtn{display:none !important;}
+#sidebar{
+  position:relative;flex-shrink:0;
+  width:var(--sb-w,280px);min-width:0;max-width:520px;
+  background:var(--bg);border-right:0.5px solid var(--border2);
+  display:flex;flex-direction:column;overflow:hidden;
+  transition:width 220ms cubic-bezier(.4,0,.2,1),min-width 220ms cubic-bezier(.4,0,.2,1);
+  --sb-alias-w:52px;--sb-depth-indent:14px;--sb-rails-w:24px;
+}
+body.has-sidebar-right #sidebar{border-right:none;border-left:0.5px solid var(--border2);}
+body.sb-state-full #sidebar{min-width:200px;}
+body.sb-state-rails #sidebar{width:var(--sb-rails-w,24px)!important;min-width:0;max-width:var(--sb-rails-w,24px);cursor:pointer;}
+body.sb-state-rails #sidebar .sb-resize-handle{display:none;}
+body.sb-state-rails #sidebar .sb-node{pointer-events:none;}
+body.sb-state-rails #sidebar .sb-node-chevron,body.sb-state-rails #sidebar .sb-node-alias,body.sb-state-rails #sidebar .sb-node-icon,body.sb-state-rails #sidebar .sb-node-title,body.sb-state-rails #sidebar .sb-row-actions{opacity:0;pointer-events:none;}
+body.sb-state-rails #sidebar .sb-tree-wrap{padding:32px 0 16px 0;}
+body.sb-collapsed #sidebar{width:0!important;min-width:0;border:none;}
+.sb-node-chevron,.sb-node-alias,.sb-node-icon,.sb-node-title,.sb-row-actions{transition:opacity 160ms ease;}
+.sb-header{padding:10px 10px 6px;border-bottom:0.5px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;gap:6px;
+  max-height:320px;opacity:1;overflow:hidden;
+  transition:max-height 220ms cubic-bezier(.4,0,.2,1),opacity 160ms ease,padding-top 220ms cubic-bezier(.4,0,.2,1),padding-bottom 220ms cubic-bezier(.4,0,.2,1),border-bottom-color 160ms ease;}
+body.sb-state-rails #sidebar .sb-header,body.sb-collapsed #sidebar .sb-header{max-height:0;opacity:0;padding-top:0;padding-bottom:0;border-bottom-color:transparent;pointer-events:none;}
+.sb-header-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.sb-header-title{font-size:11px;font-weight:600;color:var(--text2);letter-spacing:.4px;text-transform:uppercase;}
+#sb-inline-toggle{width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border:0.5px solid var(--border2);border-radius:var(--rs);background:var(--bg2);color:var(--text2);cursor:pointer;padding:0;flex-shrink:0;transition:background .12s,color .12s,border-color .12s;}
+#sb-inline-toggle:hover{background:var(--bluebg);color:var(--bluetxt);border-color:var(--blue);}
+#sb-rail-cap{position:absolute;top:0;left:0;right:0;height:28px;display:none;align-items:center;justify-content:center;background:var(--bg2);border:none;border-bottom:0.5px solid var(--border);color:var(--text2);cursor:pointer;padding:0;z-index:3;transition:background .12s,color .12s;}
+#sb-rail-cap:hover{background:var(--bluebg);color:var(--bluetxt);}
+body.sb-state-rails #sb-rail-cap{display:inline-flex;}
+.sb-search-wrap{position:relative;}
+#sb-search{width:100%;font-size:12px;padding:5px 8px 5px 24px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--bg2);color:var(--text);outline:none;}
+#sb-search:focus{border-color:var(--blue);}
+.sb-search-icon{position:absolute;left:7px;top:50%;transform:translateY(-50%);pointer-events:none;opacity:0.55;color:var(--text3);}
+.sb-chips{display:flex;gap:4px;flex-wrap:wrap;}
+.sb-chip{font-size:10px;padding:3px 8px;border-radius:20px;border:0.5px solid var(--border2);background:var(--bg);color:var(--text2);cursor:pointer;line-height:1.3;transition:all .12s;}
+.sb-chip:hover{border-color:var(--blue);color:var(--text);}
+.sb-chip.active{background:var(--bluebg);color:var(--bluetxt);border-color:var(--bluebg);}
+.sb-adv-filter{font-size:11px;}
+.sb-adv-filter summary{font-size:11px;color:var(--text2);cursor:pointer;padding:2px 0;user-select:none;}
+.sb-adv-filter summary:hover{color:var(--text);}
+.sb-filter-grid{display:grid;grid-template-columns:auto 1fr;gap:4px 8px;margin-top:4px;align-items:start;}
+.sb-filter-grid label{font-size:10px;color:var(--text2);padding-top:3px;}
+.sb-pills-wrap{display:flex;flex-wrap:wrap;gap:3px;}
+.sb-pill{font-size:10px;padding:2px 7px;border-radius:20px;border:0.5px solid var(--border2);background:var(--bg);color:var(--text2);cursor:pointer;line-height:1.3;}
+.sb-pill.active{background:var(--bluebg);color:var(--bluetxt);border-color:var(--bluebg);}
+.sb-pill.prio-high.active{background:var(--redbg);color:var(--redtxt);border-color:var(--redbg);}
+.sb-pill.prio-medium.active{background:var(--amberbg);color:var(--ambertxt);border-color:var(--amberbg);}
+.sb-pill.prio-low.active{background:var(--tealbg);color:var(--tealtxt);border-color:var(--tealbg);}
+.sb-clear-filter{font-size:10px;padding:3px 8px;border-radius:var(--r);border:0.5px solid var(--border2);background:var(--bg);color:var(--text2);cursor:pointer;align-self:flex-start;}
+.sb-clear-filter:hover{border-color:var(--red);color:var(--red);}
+.sb-tree-wrap{flex:1;overflow-y:auto;overflow-x:hidden;position:relative;padding:6px 6px 16px;}
+.sb-tree{position:relative;z-index:1;}
+.sb-connections{position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:2;}
+.sb-connections path{fill:none;stroke-width:1.2;stroke-linecap:round;stroke-linejoin:round;}
+.sb-connections path.ln-rail{stroke:var(--border2);opacity:0.9;}
+.sb-connections path.ln-split{opacity:0.55;}
+.sb-connections path.ln-split.ln-matrix{stroke:var(--blue);}
+.sb-connections path.ln-split.ln-board{stroke:var(--teal);}
+.sb-connections path.ln-split.ln-cell{stroke:var(--amber);}
+.sb-connections circle.sb-dot{stroke:var(--bg);stroke-width:1.5;transition:r 0.12s;}
+.sb-connections circle.sb-dot.dot-matrix{fill:var(--blue);}
+.sb-connections circle.sb-dot.dot-board{fill:var(--teal);}
+.sb-connections circle.sb-dot.dot-cell{fill:var(--amber);}
+.sb-connections circle.sb-dot.dot-info{fill:var(--amber);}
+.sb-connections circle.sb-dot.dot-checklists{fill:var(--purple);}
+.sb-connections circle.sb-dot.dot-cellbox{fill:var(--text2);}
+.sb-connections circle.sb-dot.dot-active{stroke-width:2;}
+.sb-node{
+  display:grid;
+  grid-template-columns:14px var(--sb-alias-w,52px) 16px 1fr auto;
+  column-gap:4px;align-items:center;
+  padding:2px 6px 2px 0;font-size:12px;color:var(--text);
+  border-radius:var(--rs);cursor:pointer;position:relative;
+  line-height:1.6;white-space:nowrap;min-height:22px;
+}
+.sb-node:hover{background:var(--bg2);}
+.sb-node.active{background:var(--bluebg);color:var(--bluetxt);font-weight:500;}
+.sb-node.drag-over{background:var(--tealbg);color:var(--tealtxt);box-shadow:inset 0 0 0 1px var(--teal);}
+.sb-node.active-outside-filter{font-style:italic;opacity:0.7;}
+.sb-node.sb-matrix{font-weight:500;}
+.sb-node.sb-cell{font-weight:400;}
+.sb-node.sb-feature{color:var(--text2);font-size:11px;}
+.sb-node.sb-feature .sb-node-title{color:var(--text2);}
+.sb-node.sb-feature.active{color:var(--text);font-weight:500;}
+.sb-node.filter-hit{box-shadow:inset 2px 0 0 var(--amber);}
+@keyframes sbRowSlideIn{
+  from{opacity:0;transform:translateX(-6px) scaleY(.85);}
+  to{opacity:1;transform:translateX(0) scaleY(1);}
+}
+.sb-node.sb-anim-enter{animation:sbRowSlideIn 180ms cubic-bezier(.16,1,.3,1);transform-origin:left center;}
+.sb-node.hidden{display:none;}
+.sb-node-chevron{font-size:10px;color:var(--text3);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;user-select:none;transition:transform 0.15s;width:14px;height:14px;border-radius:var(--rs);}
+.sb-node-chevron:hover{color:var(--text);background:var(--bg2);}
+.sb-node-chevron.expanded{transform:rotate(90deg);}
+.sb-node[data-expandable="0"] .sb-node-chevron{visibility:hidden;}
+.sb-node-alias{font-family:monospace;font-size:10px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;text-align:left;padding-left:2px;}
+.sb-node.active .sb-node-alias{color:var(--bluetxt);opacity:0.75;}
+.sb-node-icon{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;flex-shrink:0;}
+.sb-node-icon.ico-matrix{color:var(--blue);}
+.sb-node-icon.ico-board{color:var(--teal);}
+.sb-node-icon.ico-cell{color:var(--amber);}
+.sb-node-icon.ico-info{color:var(--amber);}
+.sb-node-icon.ico-checklists{color:var(--purple);}
+.sb-node-icon.ico-cellbox{color:var(--text2);opacity:0.75;}
+.sb-node-title{overflow:hidden;text-overflow:ellipsis;}
+.sb-row-actions{display:inline-flex;gap:2px;opacity:0;transition:opacity 0.12s;}
+.sb-node:hover .sb-row-actions,.sb-node:focus-within .sb-row-actions{opacity:1;}
+body:not(.editing) .sb-row-actions{display:none;}
+.sb-row-actions button{background:transparent;border:none;padding:2px 4px;border-radius:var(--rs);color:var(--text2);cursor:pointer;font-size:11px;line-height:1;}
+.sb-row-actions button:hover{background:var(--bg);color:var(--text);}
+.sb-resize-handle{position:absolute;top:0;right:-3px;width:6px;height:100%;cursor:col-resize;z-index:10;}
+body.has-sidebar-right .sb-resize-handle{right:auto;left:-3px;}
+.sb-resize-handle:hover,.sb-resize-handle.active{background:var(--blue);opacity:0.3;}
+/* Edge-toggle — only visible in collapsed state, sits outside the (0-width) sidebar. */
+#sb-edge-toggle{
+  position:absolute;top:8px;
+  width:22px;height:28px;
+  background:var(--bg);
+  border:0.5px solid var(--border2);
+  border-radius:0 var(--r) var(--r) 0;
+  color:var(--text2);cursor:pointer;
+  display:none;align-items:center;justify-content:center;
+  padding:0;z-index:55;
+  box-shadow:2px 0 6px rgba(0,0,0,.06);
+  transition:background .12s,color .12s,border-color .12s,opacity 160ms ease;
+}
+#sb-edge-toggle:hover{color:var(--blue);border-color:var(--blue);background:var(--bluebg);}
+body.has-sidebar.sb-collapsed #sb-edge-toggle{display:inline-flex;left:0;}
+body.has-sidebar-right.sb-collapsed #sb-edge-toggle{left:auto;right:0;border-radius:var(--r) 0 0 var(--r);border-right:none;border-left:0.5px solid var(--border2);box-shadow:-2px 0 6px rgba(0,0,0,.06);}
+/* Canvas-padding im collapsed-State: Edge-Button sitzt in der Randzone, nicht über Inhalt */
+body.has-sidebar-left.sb-collapsed #content{padding-left:26px;}
+body.has-sidebar-right.sb-collapsed #content{padding-right:26px;}
+#content{transition:padding-left 220ms cubic-bezier(.4,0,.2,1),padding-right 220ms cubic-bezier(.4,0,.2,1);}
+/* Ensure main-layout is positioned (anchor for absolute button) */
+#main-layout{position:relative;}
+.sb-context-menu{position:fixed;z-index:260;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--rl);box-shadow:0 4px 16px rgba(0,0,0,0.15);padding:4px 0;min-width:160px;animation:popIn 0.12s cubic-bezier(0.16,1,0.3,1);}
+.sb-context-menu button{display:flex;align-items:center;gap:8px;width:100%;padding:7px 12px;border:none;background:transparent;font-size:12px;color:var(--text);cursor:pointer;text-align:left;}
+.sb-context-menu button:hover{background:var(--bg2);}
+.sb-context-menu button.danger{color:var(--red);}
+.sb-context-menu button.danger:hover{background:var(--redbg);}
+#sb-peek{position:fixed;z-index:250;width:280px;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--rl);box-shadow:0 6px 20px rgba(0,0,0,0.18);padding:12px;animation:popIn 0.14s cubic-bezier(0.16,1,0.3,1);pointer-events:none;font-size:11px;}
+.sb-confirm{background:var(--bg);border-radius:var(--rl);border:0.5px solid var(--border2);width:520px;max-width:96vw;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;}
+.sb-confirm-hd{padding:14px 18px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.sb-confirm-hd h3{font-size:14px;font-weight:500;flex:1;}
+.sb-confirm-sub{font-size:11px;color:var(--text2);padding:8px 18px 4px;flex-shrink:0;}
+.sb-confirm-list{overflow-y:auto;padding:4px 10px 10px;flex:1;min-height:0;}
+.sb-confirm-row{display:grid;grid-template-columns:18px auto 1fr auto 1fr;gap:8px;align-items:center;padding:5px 8px;border-radius:var(--rs);font-size:12px;}
+.sb-confirm-row:hover{background:var(--bg2);}
+.sb-confirm-row .cr-icon{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;}
+.sb-confirm-row .cr-icon.ic-matrix{color:var(--blue);}
+.sb-confirm-row .cr-icon.ic-board{color:var(--teal);}
+.sb-confirm-row .cr-icon.ic-info{color:var(--amber);}
+.sb-confirm-row .cr-icon.ic-checklists{color:var(--purple);}
+.sb-confirm-row .cr-kind{font-size:9px;color:var(--text3);font-family:monospace;text-transform:uppercase;letter-spacing:0.5px;}
+.sb-confirm-row .cr-old{color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
+.sb-confirm-row .cr-arrow{color:var(--text3);font-size:10px;}
+.sb-confirm-row .cr-new{color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sb-confirm-actions{padding:12px 18px;border-top:0.5px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;}
+#sb-peek .peek-title{font-size:12px;font-weight:500;color:var(--text);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#sb-peek .peek-sub{font-size:10px;color:var(--text3);margin-bottom:8px;}
+#sb-peek .peek-grid{display:grid;gap:2px;margin-top:4px;}
+#sb-peek .peek-grid-cell{aspect-ratio:1;border-radius:2px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--text3);}
+#sb-peek .peek-cols{display:flex;flex-direction:column;gap:4px;}
+#sb-peek .peek-col{display:flex;align-items:center;gap:6px;font-size:11px;}
+#sb-peek .peek-col .pc-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+#sb-peek .peek-col .pc-count{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--text2);font-size:10px;}
+#sb-peek .peek-features{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;}
+#sb-peek .peek-feat-badge{font-size:10px;padding:2px 6px;border-radius:var(--rs);}
+@media (max-width:900px){
+  body.has-sidebar #sidebar{position:fixed;top:0;bottom:0;left:0;z-index:60;box-shadow:2px 0 12px rgba(0,0,0,0.12);}
+  body.has-sidebar.has-sidebar-right #sidebar{left:auto;right:0;box-shadow:-2px 0 12px rgba(0,0,0,0.12);}
+  body.has-sidebar.sb-collapsed #sidebar{display:none;}
+}
 
 /* ── FOCUS STYLES ── */
 *:focus{outline:none;}
@@ -335,6 +521,7 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 .tab:focus-visible{outline:none;box-shadow:inset 0 -2px 0 var(--blue);color:var(--text);}
 .bcs:focus-visible{outline-offset:0;background:var(--bluebg);}
 .mm-node:focus-visible{outline-offset:0;background:var(--bg2);}
+.sb-node:focus-visible{outline-offset:-1px;outline:1.5px solid var(--blue);}
 .btn:focus-visible{outline-offset:1px;}
 input:focus-visible,select:focus-visible,textarea:focus-visible,[contenteditable]:focus-visible{outline:none;border-color:var(--blue);}
 
@@ -481,7 +668,43 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,[contenteditable
       <div id="minimap-panel"><div style="font-size:11px;font-weight:500;color:var(--text2);margin-bottom:6px;">Struktur</div><div id="mmtree"></div></div>
     </div>
   </div>
-  <div id="content"><div id="panel"></div></div>
+  <div id="main-layout">
+    <aside id="sidebar" aria-label="Navigation" onclick="sbRailsClick(event)">
+      <div class="sb-header">
+        <div class="sb-header-top">
+          <span class="sb-header-title">Struktur</span>
+          <button id="sb-inline-toggle" type="button" onclick="event.stopPropagation();sbToggle();" title="Sidebar umschalten (Shift+N)" aria-label="Sidebar-Ansicht wechseln"></button>
+        </div>
+        <div class="sb-search-wrap">
+          <span class="sb-search-icon"></span>
+          <input id="sb-search" placeholder="Struktur filtern…" autocomplete="off" oninput="sbOnSearchInput(this.value)" />
+        </div>
+        <div class="sb-chips" id="sb-chips">
+          <button class="sb-chip" data-chip="matrices" onclick="sbToggleChip('matrices')">Matrizen</button>
+          <button class="sb-chip" data-chip="tasks" onclick="sbToggleChip('tasks')">Aufgaben</button>
+          <button class="sb-chip" data-chip="checklists" onclick="sbToggleChip('checklists')">Checklisten</button>
+          <button class="sb-chip" data-chip="infos" onclick="sbToggleChip('infos')">Infos</button>
+        </div>
+        <details class="sb-adv-filter" id="sb-adv-filter">
+          <summary>Erweiterte Filter</summary>
+          <div class="sb-filter-grid">
+            <label>Personen</label><div class="sb-pills-wrap" id="sb-who-pills"></div>
+            <label>Priorität</label><div class="sb-pills-wrap" id="sb-prio-pills"></div>
+            <label>Deadline</label><div class="sb-pills-wrap" id="sb-dl-pills"></div>
+          </div>
+        </details>
+        <button class="sb-clear-filter" id="sb-clear-filter" onclick="sbClearFilter()" style="display:none;">Filter zurücksetzen</button>
+      </div>
+      <button id="sb-rail-cap" type="button" onclick="event.stopPropagation();sbToggle();" title="Sidebar ausklappen" aria-label="Sidebar ausklappen"></button>
+      <div class="sb-tree-wrap" id="sb-tree-wrap">
+        <svg class="sb-connections" id="sb-connections" aria-hidden="true"></svg>
+        <div class="sb-tree" id="sb-tree"></div>
+      </div>
+      <div class="sb-resize-handle" id="sb-resize-handle" tabindex="0" role="separator" aria-orientation="vertical" title="Ziehen zum Resize"></div>
+    </aside>
+    <div id="content"><div id="panel"></div></div>
+    <button id="sb-edge-toggle" type="button" onclick="sbToggle()" ondragenter="sbTabDragEnter(event)" title="Sidebar öffnen (Shift+N)" aria-label="Sidebar öffnen"></button>
+  </div>
 </div>
 <div id="mc"></div><!-- simple modal -->
 <div id="cardmodal"></div><!-- card detail -->
@@ -579,6 +802,15 @@ const DEFAULT_SETTINGS={
   encryption:false,
   dateLocale:'de-AT',
   cardTitleLines:2,
+  // Sidebar (Navigation)
+  sidebarEnabled:true,
+  sidebarPosition:'left',      // 'left'|'right'
+  sidebarWidth:280,            // px (200..520)
+  sidebarAutoScroll:true,
+  sidebarShowIcons:true,
+  sidebarShowAliases:true,
+  sidebarShowCellLeaves:true,  // Cells mit Features aber ohne Board/Matrix
+  peekEnabled:true,
   // Visibility: 'edit'=only in edit mode, 'always'=always visible, 'never'=hidden
   vis:{
     addRowCol:'edit',     // + Zeile / + Spalte
@@ -630,6 +862,25 @@ const CELL_FEATURES=[
 ];
 function getCellFeatureDef(key){return CELL_FEATURES.find(f=>f.key===key);}
 function getTabLabel(cell,key){return(cell.tabLabels&&cell.tabLabels[key])||getCellFeatureDef(key).label;}
+// Display order for feature rows/tabs: Infos, Aufgaben, Checklisten, Matrix (Matrix last)
+const FEATURE_DISPLAY_ORDER=['info','board','checklists','matrix'];
+// Returns the active features for a cell as union of:
+//   - Explicit: cell.features[] (user-activated, visible even if empty content)
+//   - Implicit: features whose backing data exists (board.data.infoFields/checklists/kbCards or matrixId)
+// Non-destructive (does NOT mutate cell.features). Used by both sidebar and cell-page rendering for consistency.
+// Returns features in FEATURE_DISPLAY_ORDER (info, board, checklists, matrix).
+function getActiveFeatures(cell){
+  if(!cell)return [];
+  const active=new Set(cell.features||[]);
+  if(cell.boardId&&nodes[cell.boardId]){
+    const b=nodes[cell.boardId].data||{};
+    if((b.kbCards||[]).some(c=>!c.archived))active.add('board');
+    if((b.infoFields||[]).length>0||(b.links||[]).length>0)active.add('info');
+    if((b.checklists||[]).length>0)active.add('checklists');
+  }
+  if(cell.matrixId)active.add('matrix');
+  return FEATURE_DISPLAY_ORDER.filter(k=>active.has(k)).map(k=>getCellFeatureDef(k));
+}
 function setTabLabel(parentId,rowId,colId,key,val){const cell=getCell(parentId,`${rowId}-${colId}`);if(!cell.tabLabels)cell.tabLabels={};cell.tabLabels[key]=val.trim()||getCellFeatureDef(key).label;save();render();}
 
 // ── SVG Icon Library ──
@@ -769,6 +1020,9 @@ const DEFAULT_KEYBINDINGS={
   removeBoard:{shift:true,ctrl:false,alt:true,key:'B',label:'Shift+Alt+B'},
   removeInfo:{shift:true,ctrl:false,alt:true,key:'I',label:'Shift+Alt+I'},
   removeChecklists:{shift:true,ctrl:false,alt:true,key:'C',label:'Shift+Alt+C'},
+  toggleSidebar:{shift:true,ctrl:false,alt:false,key:'N',label:'Shift+N'},
+  focusSidebarSearch:{shift:true,ctrl:false,alt:true,key:'F',label:'Shift+Alt+F'},
+  sidebarExpandAll:{shift:true,ctrl:false,alt:false,key:'A',label:'Shift+A'},
 };
 const KB_ACTIONS={
   save:'Speichern',edit:'Bearbeiten',freqview:'Intervallmatrix',
@@ -776,6 +1030,9 @@ const KB_ACTIONS={
   sectionDown:'Nächster Abschnitt',sectionUp:'Vorheriger Abschnitt',
   removeMatrix:'Matrix entfernen',removeBoard:'Aufgaben entfernen',
   removeInfo:'Info entfernen',removeChecklists:'Checklisten entfernen',
+  toggleSidebar:'Sidebar ein-/ausblenden',
+  focusSidebarSearch:'Sidebar-Filter fokussieren',
+  sidebarExpandAll:'Sidebar expand/collapse alles',
 };
 let keyBindings=JSON.parse(JSON.stringify(DEFAULT_KEYBINDINGS));
 function saveKeyBindings(){save();}
@@ -840,6 +1097,20 @@ const DATA_VERSION=1;
 let stack=[], editMode=false, mmOpen=false;
 let currentTab={}; // nodeId -> tab name
 let rootId;
+// ── Sidebar state ──
+// sbState cycles: 'full' → 'rails' → 'collapsed' → 'full' via Shift+N
+//   full:      Complete sidebar (~280px) with header, filters, tree.
+//   rails:     Narrow (~width of max depth rails+dots) — only SVG visible, click returns to full.
+//   collapsed: Hidden, only toggle-tab at edge visible.
+let sbState='full';
+let sbExpanded=new Set();
+let sbFilter={text:'',chips:{matrices:false,tasks:false,checklists:false,infos:false},whoSet:new Set(),prio:new Set(),deadline:null};
+let sbPeekEl=null,sbPeekTimer=null,sbPeekCurrentId=null;
+let sbParentMap=new Map();
+let sbCtrlDown=false;
+// Tracks the last manually-toggled node (chevron or Ctrl+click) for targeted expand animation
+let _sbLastExpandedId=null;
+const SB_STATE_KEY='imatrix-sidebar-state';
 
 // ── File System Access API ──
 let fileHandle=null; // active file handle (null = localStorage mode)
@@ -1107,7 +1378,8 @@ function render(){
   try{
     // Apply visibility classes
     Object.keys(DEFAULT_SETTINGS.vis).forEach(k=>{document.body.classList.toggle('vis-'+k,(appSettings.vis||{})[k]==='always');});
-    renderBC(); renderMM();
+    renderBC();
+    if(appSettings.sidebarEnabled){renderSidebar();}else{renderMM();sbApplyBodyClasses();}
     const _eb=document.getElementById('editbtn');
     _eb.innerHTML=editMode?ICO.check():ICO.edit();
     _eb.style.color=editMode?'var(--amber)':'';
@@ -1175,6 +1447,8 @@ function navTo(i){
   const leaving=stack[i+1];
   const _cr=leaving&&leaving.cellRef?leaving.cellRef:null;
   stack=stack.slice(0,i+1);
+  // Auto-collapse sidebar's manual expansions on navigation
+  if(typeof sbExpanded!=='undefined')sbExpanded.clear();
   renderAnimated('out');
   if(_cr){
     // After animation + render, focus the cell we came from
@@ -1204,25 +1478,26 @@ function toggleMM(){mmOpen=!mmOpen;document.getElementById('minimap-panel').clas
 function mmDragEnter(){if(!_dragCardId)return;if(!mmOpen){mmOpen=true;document.getElementById('minimap-panel').classList.add('open');renderMM();}}
 function mmDragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';const n=e.target.closest('.mm-node');if(n)n.classList.add('drag-over');}
 function mmDragLeave(e){const n=e.target.closest('.mm-node');if(n&&!n.contains(e.relatedTarget))n.classList.remove('drag-over');}
-function mmDrop(e,targetBoardId){
-  e.preventDefault();
-  const n=e.target.closest('.mm-node');if(n)n.classList.remove('drag-over');
-  if(!_dragCardId||!_dragBoardId||!targetBoardId)return;
-  if(_dragBoardId===targetBoardId)return; // same board, ignore
+function _dropCardOntoBoard(srcBoardId,cardId,targetBoardId){
+  if(!srcBoardId||!cardId||!targetBoardId)return;
+  if(srcBoardId===targetBoardId)return;
   const tgt=nodes[targetBoardId];if(!tgt||tgt.type!=='board')return;
   const cols=tgt.data.kbCols;
-  const srcBoardId=_dragBoardId,cardId=_dragCardId;
   if(cols.length<=1){
-    // Single column or empty → move directly
     moveCardToBoard(srcBoardId,cardId,targetBoardId,null);
   } else {
-    // Multiple columns → show column picker
     const opts=cols.map(c=>[c.id,c.label]);
     smodal('Zielspalte wählen',[{label:'Spalte',id:'c',sel:opts.map(o=>o[0]),sellabels:opts.map(o=>o[1]),v:opts[0][0]}],v=>{
       const col=cols.find(c=>c.id===v.c);
       moveCardToBoard(srcBoardId,cardId,targetBoardId,col?col.label:null);
     });
   }
+}
+function mmDrop(e,targetBoardId){
+  e.preventDefault();
+  const n=e.target.closest('.mm-node');if(n)n.classList.remove('drag-over');
+  if(!_dragCardId||!_dragBoardId||!targetBoardId)return;
+  _dropCardOntoBoard(_dragBoardId,_dragCardId,targetBoardId);
 }
 function toggleGearMenu(){
   const menu=document.getElementById('gearmenu');if(!menu)return;
@@ -1273,6 +1548,1226 @@ function mmNav(nodeId){
   const path=findPath(stack[0].nodeId,nodeId,[]);if(!path)return;
   stack=path.map(id=>({nodeId:id,label:nodes[id].label,cellRef:null}));
   mmOpen=false;document.getElementById('minimap-panel').classList.remove('open');renderAnimated('in');
+}
+
+// ═══════════════════════════════════════════════════════
+// SIDEBAR (Navigation)
+// ═══════════════════════════════════════════════════════
+const SB_ICONS={
+  matrix:'<svg width="13" height="13" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="7.5" y="1" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="1" y="7.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="7.5" y="7.5" width="5.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>',
+  board:'<svg width="13" height="13" viewBox="0 0 14 14" fill="none"><rect x="1.3" y="1.3" width="11.4" height="11.4" rx="1.4" stroke="currentColor" stroke-width="1.2"/><line x1="5.2" y1="1.8" x2="5.2" y2="12.2" stroke="currentColor" stroke-width="1.1"/><line x1="8.8" y1="1.8" x2="8.8" y2="12.2" stroke="currentColor" stroke-width="1.1"/></svg>',
+  cell:'<svg width="13" height="13" viewBox="0 0 14 14" fill="none"><line x1="2" y1="4" x2="12" y2="4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="2" y1="7" x2="12" y2="7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="2" y1="10" x2="9" y2="10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
+  // Generic cell-container icon (distinct from matrix/board/info/checklists). Used for multi-feature cells.
+  cellBox:'<svg width="13" height="13" viewBox="0 0 14 14" fill="none"><rect x="2" y="2" width="10" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3"/><circle cx="7" cy="7" r="1.6" fill="currentColor"/></svg>',
+};
+
+// Find the parent cell of a given node (board or sub-matrix)
+function _sbFindParentCell(nodeId){
+  for(const[pid,p]of Object.entries(nodes)){
+    if(p.type!=='matrix'||!p.data||!p.data.cells)continue;
+    for(const[key,cell]of Object.entries(p.data.cells)){
+      if(cell.boardId===nodeId||cell.matrixId===nodeId){
+        return {parentId:pid,key,cell};
+      }
+    }
+  }
+  return null;
+}
+// Determine dominant feature for a Board node (for icon selection)
+// Priority: board > checklists > info. Fallback: 'board'.
+function _sbBoardDominantFeature(nodeId){
+  const parent=_sbFindParentCell(nodeId);
+  if(!parent||!parent.cell.features)return 'board';
+  const f=parent.cell.features;
+  if(f.includes('board'))return 'board';
+  if(f.includes('checklists'))return 'checklists';
+  if(f.includes('info'))return 'info';
+  return 'board';
+}
+
+function sbApplyBodyClasses(){
+  const b=document.body.classList;
+  const enabled=!!appSettings.sidebarEnabled;
+  b.toggle('has-sidebar',enabled);
+  b.toggle('has-sidebar-left',enabled&&appSettings.sidebarPosition!=='right');
+  b.toggle('has-sidebar-right',enabled&&appSettings.sidebarPosition==='right');
+  b.toggle('sb-state-full',enabled&&sbState==='full');
+  b.toggle('sb-state-rails',enabled&&sbState==='rails');
+  b.toggle('sb-collapsed',enabled&&sbState==='collapsed');
+  const sb=document.getElementById('sidebar');
+  if(sb){sb.style.setProperty('--sb-w',(appSettings.sidebarWidth||280)+'px');}
+  // Also set on body so external anchors like #sb-cycle-btn (sibling of sidebar) can read these vars
+  document.body.style.setProperty('--sb-w',(appSettings.sidebarWidth||280)+'px');
+  // Icons for the three chevron-buttons (inline in header, rail-cap, and edge/outside).
+  // Rule: in full/rails, chevron points *toward* the edge (next click = close further).
+  //       in collapsed, edge-button points *toward* content (next click = reopen).
+  if(typeof ICO!=='undefined'){
+    const isRight=appSettings.sidebarPosition==='right';
+    const setIcon=(id,pointRight)=>{const el=document.getElementById(id);if(el)el.innerHTML=pointRight?ICO.arrowR(11):ICO.arrowL(11);};
+    // Inline (full) + rail-cap (rails): close-direction → left-sidebar ‹ / right-sidebar ›
+    setIcon('sb-inline-toggle',isRight);
+    setIcon('sb-rail-cap',isRight);
+    // Edge (collapsed): open-direction → left-sidebar › / right-sidebar ‹
+    setIcon('sb-edge-toggle',!isRight);
+  }
+}
+
+function sbLoadPersist(){
+  try{
+    const raw=localStorage.getItem(SB_STATE_KEY);if(!raw)return;
+    const p=JSON.parse(raw);
+    if(Array.isArray(p.expanded))sbExpanded=new Set(p.expanded);
+    if(p.filter){
+      sbFilter.text=p.filter.text||'';
+      sbFilter.chips=Object.assign({matrices:false,tasks:false,checklists:false,infos:false},p.filter.chips||{});
+      sbFilter.whoSet=new Set(p.filter.whoSet||[]);
+      sbFilter.prio=new Set(p.filter.prio||[]);
+      sbFilter.deadline=p.filter.deadline||null;
+    }
+    // Migrate legacy sbOpen boolean to sbState tri-state
+    if(p.sbState&&['full','rails','collapsed'].includes(p.sbState))sbState=p.sbState;
+    else if(typeof p.sbOpen==='boolean')sbState=p.sbOpen?'full':'collapsed';
+  }catch(e){}
+}
+function sbSavePersist(){
+  try{
+    const p={
+      expanded:[...sbExpanded],
+      filter:{
+        text:sbFilter.text,
+        chips:sbFilter.chips,
+        whoSet:[...sbFilter.whoSet],
+        prio:[...sbFilter.prio],
+        deadline:sbFilter.deadline
+      },
+      sbState
+    };
+    localStorage.setItem(SB_STATE_KEY,JSON.stringify(p));
+  }catch(e){}
+}
+
+// Path of dataIds from root to currently focused entry (for force-show under filter + expand).
+// Returns dataIds like: 'matrix-n1', 'cell-n1-n7-n10', 'feat-n1-n7-n10-matrix', ...
+function sbComputeActivePath(){
+  const set=new Set();
+  if(stack[0])set.add('matrix-'+stack[0].nodeId);
+  for(const s of stack){
+    if(!s)continue;
+    if(s.cellRef){
+      const cellDataId='cell-'+s.cellRef.parentId+'-'+s.cellRef.rowId+'-'+s.cellRef.colId;
+      set.add(cellDataId);
+      // Also add active feature (based on currentTab)
+      const tab=currentTab[s.nodeId];
+      if(tab){
+        set.add('feat-'+s.cellRef.parentId+'-'+s.cellRef.rowId+'-'+s.cellRef.colId+'-'+tab);
+      }
+    }
+  }
+  // After jumps via ^alias, `stack` only contains [root, target] — intermediate
+  // ancestors between root-matrix and target are not in the stack. Walk the parent
+  // chain from the active entry up to root so the full tree-path is also expanded.
+  // Requires sbParentMap to be populated by a prior sbWalkCellTree call.
+  const top=sbActiveTopId();
+  if(top){
+    let cur=sbParentMap.get(top);
+    while(cur){set.add(cur);cur=sbParentMap.get(cur);}
+  }
+  return set;
+}
+// All descendant dataIds under the currently focused top entry — for auto-expand only.
+// Only active when we're on a specific cell (not on the root matrix), to avoid expanding
+// the entire tree when the user hasn't drilled into anything.
+function sbComputeActiveSubtree(){
+  const set=new Set();
+  const topDataId=sbActiveTopId();
+  if(!topDataId)return set;
+  // At root matrix level: do NOT auto-expand subtree — keep top-level cells collapsed
+  if(topDataId.startsWith('matrix-'))return set;
+  // Walk the WHOLE cell tree, collecting descendants of topDataId based on sbParentMap.
+  // sbParentMap is populated by the most recent sbWalkCellTree call.
+  // For robustness, we also rebuild the tree here if needed.
+  const entries=[];
+  const rootMid=stack[0]?stack[0].nodeId:rootId;
+  sbWalkCellTree(rootMid,e=>entries.push(e));
+  // Build a reverse: parentDataId → [childDataIds]
+  const childrenMap=new Map();
+  entries.forEach(e=>{
+    if(e.parentDataId){
+      if(!childrenMap.has(e.parentDataId))childrenMap.set(e.parentDataId,[]);
+      childrenMap.get(e.parentDataId).push(e.dataId);
+    }
+  });
+  function addSubtree(dataId){
+    set.add(dataId);
+    const children=childrenMap.get(dataId)||[];
+    children.forEach(addSubtree);
+  }
+  addSubtree(topDataId);
+  return set;
+}
+
+// Returns the dataId of the currently focused entry in the cell-centric sidebar.
+// If we're on a cell page, returns the feat-dataId when a tab is active, else the cell-dataId.
+// If we're on a matrix page (top-level), returns the matrix-dataId.
+function sbActiveTopId(){
+  const top=stack[stack.length-1];if(!top)return null;
+  if(top.cellRef){
+    const cellDataId='cell-'+top.cellRef.parentId+'-'+top.cellRef.rowId+'-'+top.cellRef.colId;
+    const parent=nodes[top.cellRef.parentId];
+    if(parent&&parent.type==='matrix'){
+      const key=top.cellRef.rowId+'-'+top.cellRef.colId;
+      const cell=parent.data.cells[key];
+      if(cell){
+        const activeKeys=getActiveFeatures(cell).map(f=>f.key);
+        const isSingle=activeKeys.length===1;
+        if(!isSingle){
+          const tab=currentTab[top.nodeId];
+          if(tab&&activeKeys.includes(tab)){
+            return 'feat-'+top.cellRef.parentId+'-'+top.cellRef.rowId+'-'+top.cellRef.colId+'-'+tab;
+          }
+        }
+      }
+    }
+    return cellDataId;
+  }
+  // No cell in stack → we're at a matrix page (usually root)
+  return 'matrix-'+top.nodeId;
+}
+
+// Cell-centric walker: produces entries in visual order.
+// Entry types:
+//   {kind:'matrix', dataId:'matrix-{id}', matrixId, label, depth:0}          — root only
+//   {kind:'cell', dataId:'cell-{M}-{R}-{C}', parentMatrixId, rowId, colId, cell, row, col,
+//                 alias, label:'row / col', depth, features, isSingle, singleIsMatrix, parentDataId}
+//   {kind:'feature', dataId:'feat-{M}-{R}-{C}-{TYPE}', cellDataId, parentMatrixId, rowId, colId,
+//                    cell, type, tabLabel, depth, parentDataId}
+function sbWalkCellTree(rootMatrixId,visitor){
+  sbParentMap.clear();
+  function walk(mid,depth,parentDataId){
+    const m=nodes[mid];
+    if(!m||m.type!=='matrix')return;
+    let curParentDataId=parentDataId;
+    if(depth===0){
+      const matrixDataId='matrix-'+mid;
+      visitor({kind:'matrix',dataId:matrixDataId,matrixId:mid,label:m.label,depth:0,parentDataId:null});
+      curParentDataId=matrixDataId;
+    }
+    Object.entries(m.data.cells||{}).forEach(([key,cell])=>{
+      const [rowId,colId]=key.split('-');
+      const row=(m.data.rows||[]).find(r=>r.id===rowId);
+      const col=(m.data.cols||[]).find(c=>c.id===colId);
+      if(!row||!col)return;
+      const activeFeatures=getActiveFeatures(cell);
+      if(activeFeatures.length===0)return; // skip cells with no features (explicit or implicit)
+      const cellDataId='cell-'+mid+'-'+rowId+'-'+colId;
+      const cellDepth=depth+(depth===0?1:1);
+      const isSingle=activeFeatures.length===1;
+      const singleIsMatrix=isSingle&&activeFeatures[0].key==='matrix';
+      sbParentMap.set(cellDataId,curParentDataId);
+      visitor({
+        kind:'cell',dataId:cellDataId,parentMatrixId:mid,rowId,colId,cell,row,col,
+        alias:cell.alias||'',label:row.label+' / '+col.label,depth:cellDepth,
+        features:activeFeatures,isSingle,singleIsMatrix,parentDataId:curParentDataId
+      });
+      if(singleIsMatrix){
+        // Skip feature-row; recurse sub-matrix directly as cell's children
+        if(cell.matrixId)walk(cell.matrixId,cellDepth,cellDataId);
+      }else if(!isSingle){
+        // Multi-feature: render each feature
+        activeFeatures.forEach(feat=>{
+          const featDataId='feat-'+mid+'-'+rowId+'-'+colId+'-'+feat.key;
+          const tabLabel=getTabLabel(cell,feat.key);
+          sbParentMap.set(featDataId,cellDataId);
+          visitor({
+            kind:'feature',dataId:featDataId,cellDataId,parentMatrixId:mid,rowId,colId,cell,
+            type:feat.key,tabLabel,depth:cellDepth+1,parentDataId:cellDataId
+          });
+          if(feat.key==='matrix'&&cell.matrixId){
+            walk(cell.matrixId,cellDepth+1,featDataId);
+          }
+        });
+      }
+      // else: single non-matrix → leaf, no children
+    });
+  }
+  walk(rootMatrixId,0,null);
+}
+
+function sbCollectWhoValues(){
+  const set=new Set();
+  for(const id in nodes){
+    const n=nodes[id];
+    if(n&&n.type==='board'&&n.data&&n.data.kbCards){
+      n.data.kbCards.forEach(c=>{
+        if(Array.isArray(c.who))c.who.forEach(w=>{if(w)set.add(w);});
+      });
+    }
+  }
+  return [...set].sort((a,b)=>a.localeCompare(b));
+}
+
+// Check if a cell has a given feature-chip characteristic. Uses getActiveFeatures (union of
+// explicit + implicit), so a cell with board data but no explicit 'info' feature still counts
+// for the 'infos' chip.
+function sbCellHasFeature(cell,feat){
+  if(!cell)return false;
+  const activeKeys=getActiveFeatures(cell).map(f=>f.key);
+  if(feat==='matrices')return activeKeys.includes('matrix');
+  if(feat==='checklists')return activeKeys.includes('checklists');
+  if(feat==='infos')return activeKeys.includes('info');
+  if(feat==='tasks')return activeKeys.includes('board');
+  return false;
+}
+function sbNodeCardsMatching(node,predicate){
+  if(!node||node.type!=='board'||!node.data||!node.data.kbCards)return false;
+  return node.data.kbCards.some(c=>!c.archived&&predicate(c));
+}
+function sbDeadlineMatch(card,mode){
+  if(!card.deadline)return false;
+  const d=day0(card.deadline);const t=today0();
+  if(mode==='today')return d.getTime()===t.getTime();
+  if(mode==='overdue')return d.getTime()<t.getTime()&&!card.done;
+  if(mode==='week'){
+    const end=new Date(t);end.setDate(end.getDate()+7);
+    return d.getTime()>=t.getTime()&&d.getTime()<=end.getTime();
+  }
+  return false;
+}
+// Does a cell have cards matching a predicate (for who/prio/deadline filters)?
+function sbCellCardsMatching(cell,predicate){
+  if(!cell||!cell.boardId)return false;
+  const b=nodes[cell.boardId];
+  if(!b||b.type!=='board'||!b.data||!b.data.kbCards)return false;
+  return b.data.kbCards.some(c=>!c.archived&&predicate(c));
+}
+// Filter match for cell entries (matrix/feature entries inherit visibility from parent cell)
+function sbMatchesFilter(entry){
+  if(entry.kind!=='cell')return true; // matrix/feature rows: no independent filter match
+  const cell=entry.cell;const ca=entry.alias;
+  const f=sbFilter;
+  const hasAnyFilter=f.text||f.chips.matrices||f.chips.tasks||f.chips.checklists||f.chips.infos||f.whoSet.size||f.prio.size||f.deadline;
+  if(!hasAnyFilter)return true;
+  // Text filter: cell alias + row/col label + tab labels + any feature default labels
+  if(f.text){
+    const q=f.text.toLowerCase();
+    const tabLabels=(entry.features||[]).map(ft=>getTabLabel(cell,ft.key)).join(' ');
+    const txt=[ca,entry.label||'',tabLabels].join(' ').toLowerCase();
+    if(!txt.includes(q))return false;
+  }
+  if(f.chips.matrices && !sbCellHasFeature(cell,'matrices'))return false;
+  if(f.chips.tasks && !sbCellHasFeature(cell,'tasks'))return false;
+  if(f.chips.checklists && !sbCellHasFeature(cell,'checklists'))return false;
+  if(f.chips.infos && !sbCellHasFeature(cell,'infos'))return false;
+  if(f.whoSet.size){
+    if(!sbCellCardsMatching(cell,c=>Array.isArray(c.who)&&c.who.some(w=>f.whoSet.has(w))))return false;
+  }
+  if(f.prio.size){
+    if(!sbCellCardsMatching(cell,c=>c.priority&&f.prio.has(c.priority)))return false;
+  }
+  if(f.deadline){
+    if(!sbCellCardsMatching(cell,c=>sbDeadlineMatch(c,f.deadline)))return false;
+  }
+  return true;
+}
+
+let _sbFilterActivePathAncestors=new Set();
+let _sbFilterMatched=new Set();
+function sbComputeFilterSets(rootMatrixId){
+  _sbFilterMatched.clear();_sbFilterActivePathAncestors.clear();
+  const hasAnyFilter=sbFilter.text||sbFilter.chips.matrices||sbFilter.chips.tasks||sbFilter.chips.checklists||sbFilter.chips.infos||sbFilter.whoSet.size||sbFilter.prio.size||sbFilter.deadline;
+  if(!hasAnyFilter)return;
+  const entries=[];
+  sbWalkCellTree(rootMatrixId,e=>entries.push(e));
+  entries.forEach(e=>{
+    if(e.kind==='cell'&&sbMatchesFilter(e)){
+      _sbFilterMatched.add(e.dataId);
+      let p=sbParentMap.get(e.dataId);
+      while(p){_sbFilterActivePathAncestors.add(p);p=sbParentMap.get(p);}
+    }
+  });
+}
+
+function sbRenderTree(rootMatrixId){
+  const hasAnyFilter=sbFilter.text||sbFilter.chips.matrices||sbFilter.chips.tasks||sbFilter.chips.checklists||sbFilter.chips.infos||sbFilter.whoSet.size||sbFilter.prio.size||sbFilter.deadline;
+  sbComputeFilterSets(rootMatrixId);
+
+  // Walk first so sbParentMap is populated before sbComputeActivePath runs
+  // (it relies on sbParentMap to resolve ancestor chains after ^alias jumps).
+  const entries=[];
+  sbWalkCellTree(rootMatrixId,e=>entries.push(e));
+
+  const activePath=sbComputeActivePath();
+  const activeSubtree=hasAnyFilter?new Set():sbComputeActiveSubtree();
+  const activeTopId=sbActiveTopId();
+  const showIcons=appSettings.sidebarShowIcons;
+  const showAliases=appSettings.sidebarShowAliases;
+
+  // Build parent → children map based on parentDataId
+  const childrenMap=new Map();
+  entries.forEach(e=>{
+    if(!e.parentDataId)return;
+    if(!childrenMap.has(e.parentDataId))childrenMap.set(e.parentDataId,[]);
+    childrenMap.get(e.parentDataId).push(e.dataId);
+  });
+  const entryById=new Map();
+  entries.forEach(e=>entryById.set(e.dataId,e));
+
+  function isExpandedFor(e){
+    // Matrix root: always expanded
+    if(e.kind==='matrix')return true;
+    // Cell: expandable when multi-feature OR single-matrix (sub-cells beneath)
+    // Feature: expandable only when type==='matrix'
+    return sbExpanded.has(e.dataId)||activePath.has(e.dataId)||activeSubtree.has(e.dataId)||(hasAnyFilter&&_sbFilterActivePathAncestors.has(e.dataId));
+  }
+  function isExpandable(e){
+    if(e.kind==='matrix')return false; // root is implicit
+    if(e.kind==='cell')return !e.isSingle||e.singleIsMatrix;
+    if(e.kind==='feature')return e.type==='matrix';
+    return false;
+  }
+
+  let html='';
+  function renderEntry(e){
+    const dataId=e.dataId;
+    const depth=e.depth;
+    const parentDataId=e.parentDataId;
+    const expandable=isExpandable(e);
+    const expanded=isExpandedFor(e);
+    const isActive=(dataId===activeTopId);
+    // Filter visibility — only activePath force-shows, NOT activeSubtree
+    let hiddenByFilter=false;
+    if(hasAnyFilter){
+      // Matrix root always visible. Cell rows hidden unless matched/ancestor/forced. Feature rows: inherit from cell.
+      if(e.kind==='cell'){
+        const inPath=_sbFilterActivePathAncestors.has(dataId)||_sbFilterMatched.has(dataId);
+        const forced=activePath.has(dataId);
+        if(!inPath&&!forced)hiddenByFilter=true;
+      }else if(e.kind==='feature'){
+        // Show feature if parent cell is matched/ancestor/forced
+        const cellDataId=e.cellDataId;
+        const inPath=_sbFilterActivePathAncestors.has(cellDataId)||_sbFilterMatched.has(cellDataId);
+        const forced=activePath.has(cellDataId);
+        if(!inPath&&!forced)hiddenByFilter=true;
+      }
+    }
+    if(hiddenByFilter)return;
+    const isActiveOutsideFilter=(hasAnyFilter&&!_sbFilterMatched.has(dataId)&&!_sbFilterActivePathAncestors.has(dataId)&&(isActive||activePath.has(dataId)));
+    const isFilterHit=hasAnyFilter&&e.kind==='cell'&&_sbFilterMatched.has(dataId);
+
+    const paddingLeft=(depth+1)*14+6;
+    const classes=['sb-node'];
+    if(e.kind==='matrix')classes.push('sb-matrix');
+    else if(e.kind==='cell')classes.push('sb-cell');
+    else if(e.kind==='feature')classes.push('sb-feature');
+    if(isActive)classes.push('active');
+    if(isActiveOutsideFilter)classes.push('active-outside-filter');
+    if(isFilterHit)classes.push('filter-hit');
+    // Targeted expand animation: animate descendants of the just-toggled node
+    if(_sbLastExpandedId){
+      let p=parentDataId;
+      while(p){if(p===_sbLastExpandedId){classes.push('sb-anim-enter');break;}p=sbParentMap.get(p);}
+    }
+    const chevronChar=expandable?'▸':'';
+    const chevronCls='sb-node-chevron'+(expanded?' expanded':'');
+
+    // Alias text (shown only on cells)
+    let aliasText='';
+    if(e.kind==='matrix')aliasText=showAliases?'home':'';
+    else if(e.kind==='cell'&&showAliases)aliasText=e.alias||'';
+    const aliasHtml=showAliases?`<span class="sb-node-alias" title="${esc(aliasText)}">${esc(aliasText)}</span>`:'';
+
+    // Icon + dot-type based on entry kind
+    let iconHtml='<span class="sb-node-icon"></span>';
+    let dotTypeCls='matrix';
+    let primaryFeatureKey=null;
+    if(e.kind==='matrix'){
+      dotTypeCls='matrix';
+      if(showIcons)iconHtml=`<span class="sb-node-icon ico-matrix">${SB_ICONS.matrix}</span>`;
+    }else if(e.kind==='cell'){
+      // For single-feature cells: inline feature icon (colored).
+      // For multi-feature cells: generic cell-box icon (neutral) — features shown as rows below.
+      if(e.isSingle){
+        primaryFeatureKey=e.features[0].key;
+        const def=getCellFeatureDef(primaryFeatureKey);
+        dotTypeCls=primaryFeatureKey==='matrix'?'matrix':primaryFeatureKey;
+        if(showIcons&&def)iconHtml=`<span class="sb-node-icon ico-${primaryFeatureKey}">${def.icoSm}</span>`;
+      }else{
+        // Multi-feature: generic cell icon, neutral gray color
+        dotTypeCls='cellbox';
+        if(showIcons)iconHtml=`<span class="sb-node-icon ico-cellbox">${SB_ICONS.cellBox}</span>`;
+      }
+    }else if(e.kind==='feature'){
+      const def=getCellFeatureDef(e.type);
+      dotTypeCls=e.type==='matrix'?'matrix':e.type;
+      if(showIcons&&def)iconHtml=`<span class="sb-node-icon ico-${e.type}">${def.icoSm}</span>`;
+    }
+
+    // Label text
+    let labelText='';
+    if(e.kind==='matrix')labelText=e.label;
+    else if(e.kind==='cell')labelText=e.label;
+    else if(e.kind==='feature')labelText=e.tabLabel;
+
+    // Drop target: boards (feature-row type=board, OR single-board cell)
+    let isDropTarget=false, dropBoardId=null;
+    if(e.kind==='feature'&&e.type==='board'&&e.cell.boardId){isDropTarget=true;dropBoardId=e.cell.boardId;}
+    else if(e.kind==='cell'&&e.isSingle&&e.features[0].key==='board'&&e.cell.boardId){isDropTarget=true;dropBoardId=e.cell.boardId;}
+    const dropAttrs=isDropTarget?` ondragover="sbDragOver(event)" ondragleave="sbDragLeave(event)" ondrop="sbDrop(event,'${dropBoardId}')"`:'';
+
+    // Context menu: only for cells in edit mode (rename/delete not meaningful on matrix/feature rows here)
+    const ctxAttr=e.kind==='cell'?` oncontextmenu="sbContextMenu(event,'${dataId}')"`:'';
+    // Row actions (edit-mode) only shown on cells
+    const actionsHtml=(e.kind==='cell')?`<span class="sb-row-actions">
+      <button title="Umbenennen" onclick="event.stopPropagation();sbRename('${dataId}')" tabindex="-1">✎</button>
+      <button title="Löschen" onclick="event.stopPropagation();sbDelete('${dataId}')" tabindex="-1">×</button>
+    </span>`:'<span></span>';
+
+    const chevronHandler=`event.stopPropagation();sbToggleExpand('${dataId}',false)`;
+    html+=`<div class="${classes.join(' ')}" data-id="${dataId}" data-depth="${depth}" data-dot-type="${dotTypeCls}" data-expandable="${expandable?1:0}" tabindex="0" role="treeitem" aria-level="${depth+1}" aria-expanded="${expandable?expanded:false}" style="padding-left:${paddingLeft}px" onclick="sbNodeClick(event,'${dataId}')"${ctxAttr} onkeydown="sbNodeKey(event,'${dataId}')" onmouseenter="sbNodeMouseEnter(event,'${dataId}')" onmouseleave="sbNodeMouseLeave(event)" onfocus="sbNodeFocus(event,'${dataId}')" onblur="sbNodeBlur(event)"${dropAttrs}>
+      <span class="${chevronCls}" onclick="${chevronHandler}">${chevronChar}</span>
+      ${aliasHtml}
+      ${iconHtml}
+      <span class="sb-node-title" title="${esc(labelText)}">${esc(labelText)}</span>
+      ${actionsHtml}
+    </div>`;
+
+    // Render children if expanded (matrix is always expanded; cell/feature only when expandable+expanded)
+    const shouldRenderChildren=(e.kind==='matrix')||(expandable&&expanded);
+    if(shouldRenderChildren){
+      const kids=childrenMap.get(dataId)||[];
+      kids.forEach(kid=>{
+        const ke=entryById.get(kid);
+        if(ke)renderEntry(ke);
+      });
+    }
+  }
+  // Only render the root matrix entry; its descendants are rendered recursively via expansion
+  const rootEntry=entries.find(e=>e.kind==='matrix');
+  if(rootEntry)renderEntry(rootEntry);
+  return html;
+}
+
+function sbRenderPillUIs(){
+  // Who pills
+  const whoWrap=document.getElementById('sb-who-pills');
+  if(whoWrap){
+    const vals=sbCollectWhoValues();
+    if(vals.length===0){whoWrap.innerHTML='<span style="font-size:10px;color:var(--text3);">— keine Personen —</span>';}
+    else whoWrap.innerHTML=vals.map(v=>`<button class="sb-pill${sbFilter.whoSet.has(v)?' active':''}" onclick="sbToggleWho('${esc(v).replace(/'/g,'&#39;')}')">${esc(v)}</button>`).join('');
+  }
+  // Prio pills
+  const prioWrap=document.getElementById('sb-prio-pills');
+  if(prioWrap){
+    const opts=[['high','Hoch'],['medium','Mittel'],['low','Niedrig']];
+    prioWrap.innerHTML=opts.map(([v,l])=>`<button class="sb-pill prio-${v}${sbFilter.prio.has(v)?' active':''}" onclick="sbTogglePrio('${v}')">${l}</button>`).join('');
+  }
+  // Deadline pills
+  const dlWrap=document.getElementById('sb-dl-pills');
+  if(dlWrap){
+    const opts=[['today','Heute'],['week','Diese Woche'],['overdue','Überfällig']];
+    dlWrap.innerHTML=opts.map(([v,l])=>`<button class="sb-pill${sbFilter.deadline===v?' active':''}" onclick="sbSetDeadline('${v}')">${l}</button>`).join('');
+  }
+}
+
+function sbUpdateFilterUI(){
+  // Chips
+  document.querySelectorAll('#sb-chips .sb-chip').forEach(c=>{
+    const k=c.dataset.chip;c.classList.toggle('active',!!sbFilter.chips[k]);
+  });
+  // Search input
+  const si=document.getElementById('sb-search');if(si&&si.value!==sbFilter.text)si.value=sbFilter.text;
+  // Clear button
+  const cb=document.getElementById('sb-clear-filter');
+  const hasAnyFilter=sbFilter.text||sbFilter.chips.matrices||sbFilter.chips.tasks||sbFilter.chips.checklists||sbFilter.chips.infos||sbFilter.whoSet.size||sbFilter.prio.size||sbFilter.deadline;
+  if(cb)cb.style.display=hasAnyFilter?'':'none';
+  sbRenderPillUIs();
+}
+
+function renderSidebar(){
+  sbApplyBodyClasses();
+  if(!appSettings.sidebarEnabled)return;
+  const rootNodeId=stack[0]?stack[0].nodeId:rootId;
+  if(!rootNodeId||!nodes[rootNodeId])return;
+  const tree=document.getElementById('sb-tree');
+  if(!tree)return;
+  tree.innerHTML=sbRenderTree(rootNodeId);
+  sbUpdateFilterUI();
+  // Compute rails width based on max visible depth (for rails-mode)
+  sbUpdateRailsWidth();
+  // SVG connections
+  requestAnimationFrame(()=>{
+    sbDrawConnections();
+    sbAutoScrollToActive();
+    // After sb-anim-enter finishes (max-height 0→40 over 180ms), element heights stabilize.
+    // Re-draw so dots land on the true row centers.
+    const firstAnimated=document.querySelector('.sb-tree .sb-node.sb-anim-enter');
+    if(firstAnimated){
+      const once=(ev)=>{
+        if(ev.target!==firstAnimated)return;
+        firstAnimated.removeEventListener('animationend',once);
+        sbDrawConnections();
+      };
+      firstAnimated.addEventListener('animationend',once);
+    }
+  });
+}
+// Compute dynamic rails-mode width from max visible depth. Sets --sb-rails-w CSS var which
+// the sidebar width transitions to when in rails mode.
+function sbUpdateRailsWidth(){
+  const sb=document.getElementById('sidebar');
+  if(!sb)return;
+  const nodeEls=document.querySelectorAll('.sb-node');
+  let maxDepth=0;
+  nodeEls.forEach(n=>{
+    const d=parseInt(n.dataset.depth||'0',10);
+    if(d>maxDepth)maxDepth=d;
+  });
+  // dot center x = depth*14 + 8; add right padding for dot radius + breathing room
+  const INDENT=14,DOT_X=8,RIGHT_PAD=14;
+  const w=Math.max(24,maxDepth*INDENT+DOT_X+RIGHT_PAD);
+  sb.style.setProperty('--sb-rails-w',w+'px');
+  document.body.style.setProperty('--sb-rails-w',w+'px');
+}
+
+let _sbScrolled=false;
+function sbAutoScrollToActive(){
+  if(!appSettings.sidebarAutoScroll)return;
+  const activeTopId=sbActiveTopId();
+  if(!activeTopId)return;
+  const el=document.querySelector(`.sb-node[data-id="${activeTopId}"]`);
+  if(el)el.scrollIntoView({block:'center',behavior:_sbScrolled?'smooth':'auto'});
+  _sbScrolled=true;
+}
+
+function sbDrawConnections(){
+  const svg=document.getElementById('sb-connections');
+  const wrap=document.getElementById('sb-tree-wrap');
+  const tree=document.getElementById('sb-tree');
+  if(!svg||!wrap||!tree)return;
+  const nodeEls=Array.from(tree.querySelectorAll('.sb-node'));
+  const h=tree.scrollHeight;const w=tree.clientWidth;
+  // Bail out during sidebar collapse/expand transition when tree width is ~0;
+  // a later transitionend-driven redraw will catch it when widths are final.
+  if(w<=1||h<=1)return;
+  svg.setAttribute('width',w);
+  svg.setAttribute('height',h);
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);
+  svg.setAttribute('preserveAspectRatio','xMinYMin meet');
+  svg.style.width=w+'px';
+  svg.style.height=h+'px';
+  // Align SVG coordinate origin with the tree's content origin so that cy values
+  // derived from `el.offsetTop` (relative to .sb-tree) land on the actual row
+  // centers. Without this, sb-tree-wrap's padding offsets the SVG by 6px.
+  svg.style.top=tree.offsetTop+'px';
+  svg.style.left=tree.offsetLeft+'px';
+  // Metadata per node
+  const INDENT=14,DOT_IN_SLOT=8;
+  const activeTopId=sbActiveTopId();
+  const meta=new Map();
+  nodeEls.forEach(el=>{
+    const id=el.dataset.id;
+    const depth=parseInt(el.dataset.depth||'0',10);
+    const top=el.offsetTop;const height=el.offsetHeight;
+    const cy=top+height/2;
+    const cx=depth*INDENT+DOT_IN_SLOT; // dot center-x
+    meta.set(id,{cx,cy,depth,el});
+  });
+  const useColors=nodeEls.length<=500;
+  // Group children by parent (preserving visual order)
+  const byParent=new Map();
+  nodeEls.forEach(el=>{
+    const id=el.dataset.id;
+    const parent=sbParentMap.get(id);if(!parent)return;
+    if(!byParent.has(parent))byParent.set(parent,[]);
+    byParent.get(parent).push(id);
+  });
+  // Helper: find the greatest cy among a node's descendants (recursive through byParent)
+  function lastDescendantCy(nodeId){
+    const children=byParent.get(nodeId);
+    if(!children||children.length===0){
+      const m=meta.get(nodeId);return m?m.cy:-Infinity;
+    }
+    let maxY=-Infinity;
+    children.forEach(cid=>{const y=lastDescendantCy(cid);if(y>maxY)maxY=y;});
+    return maxY;
+  }
+  // Pass A: Rails
+  //   - "Own rail": per parent-with-children, a vertical rail through the parent's own dot,
+  //     extending down to the last descendant's cy (shows depth-level presence, DevOps-style)
+  //   - "Sibling rail": per parent, a vertical rail at child-x from first child cy to last child cy
+  //     (connects siblings at their own depth — in most cases this overlaps with one of the
+  //     deeper parent's own rails, which is harmless)
+  // Pass B: Split-curves per parent (colored by first child's type)
+  let rails='';
+  let splits='';
+  byParent.forEach((childIds,parentId)=>{
+    const pm=meta.get(parentId);if(!pm)return;
+    const firstId=childIds[0],lastId=childIds[childIds.length-1];
+    const firstMeta=meta.get(firstId),lastMeta=meta.get(lastId);
+    if(!firstMeta||!lastMeta)return;
+    // Own rail through parent's dot
+    const ownLastY=lastDescendantCy(parentId);
+    if(ownLastY>pm.cy+3){
+      rails+=`<path class="ln-rail" d="M ${pm.cx} ${pm.cy} L ${pm.cx} ${ownLastY}"/>`;
+    }
+    // Sibling rail between first and last child (only if >1 children, otherwise redundant)
+    const railX=firstMeta.cx;
+    if(childIds.length>1&&lastMeta.cy>firstMeta.cy){
+      rails+=`<path class="ln-rail" d="M ${railX} ${firstMeta.cy} L ${railX} ${lastMeta.cy}"/>`;
+    }
+    // Split-curve: from parent-dot bottom → smooth curve → rail top (first child y)
+    const px=pm.cx,py=pm.cy;
+    const cy=firstMeta.cy;
+    const d=`M ${px} ${py+3} C ${px} ${cy}, ${railX} ${cy-6}, ${railX} ${cy}`;
+    const n=nodes[firstId];
+    let cls='ln-matrix';
+    if(n){
+      if(n.type==='board')cls='ln-board';
+      else if(n.type==='cell')cls='ln-cell';
+    }else if(String(firstId).startsWith('cell-'))cls='ln-cell';
+    if(!useColors)cls='';
+    splits+=`<path class="ln-split ${cls}" d="${d}"/>`;
+  });
+  // Pass B: Dots (colored per node type), on top of rails
+  let dots='';
+  nodeEls.forEach(el=>{
+    const id=el.dataset.id;
+    const m=meta.get(id);if(!m)return;
+    // Pull the stored dotTypeCls from the DOM node for cell-leaves (data-dot-type),
+    // otherwise derive from node type
+    const dtAttr=el.dataset.dotType;
+    let cls='dot-matrix';
+    if(dtAttr){cls='dot-'+dtAttr;}
+    else{
+      const n=nodes[id];
+      if(n){
+        if(n.type==='board')cls='dot-board';
+        else if(n.type==='cell')cls='dot-cell';
+      }else if(String(id).startsWith('cell-'))cls='dot-cell';
+    }
+    const isActive=(id===activeTopId);
+    const r=isActive?4.2:3;
+    const activeCls=isActive?' dot-active':'';
+    dots+=`<circle class="sb-dot ${cls}${activeCls}" cx="${m.cx}" cy="${m.cy}" r="${r}"/>`;
+  });
+  svg.innerHTML=rails+splits+dots;
+}
+
+// Path-finding helpers (shared with mmNav semantics)
+function sbFindMatrixPath(from,tgt,path){
+  if(from===tgt)return[...path,from];
+  const n=nodes[from];if(!n||n.type!=='matrix')return null;
+  for(const[k,c]of Object.entries(n.data.cells)){
+    for(const cid of[c.boardId,c.matrixId]){
+      if(!cid)continue;
+      const r=sbFindMatrixPath(cid,tgt,[...path,from]);
+      if(r)return r;
+    }
+  }return null;
+}
+
+// Navigate to a dataId: 'matrix-X', 'cell-M-R-C', or 'feat-M-R-C-TYPE'
+function sbNav(dataId){
+  if(!dataId)return;
+  // Auto-collapse manually-expanded branches on nav (user requested behavior).
+  // Current cell + descendants will re-expand via activeSubtree on render.
+  sbExpanded.clear();
+  _sbLastExpandedId=null;
+  // If in rails mode, promote to full for context during navigation
+  if(sbState==='rails')sbSetState('full');
+  // Matrix entry (root)
+  let m=/^matrix-(.+)$/.exec(dataId);
+  if(m){
+    const target=nodes[m[1]];if(!target||target.type!=='matrix')return;
+    const path=sbFindMatrixPath(stack[0].nodeId,m[1],[]);
+    if(!path)return;
+    stack=path.map(id=>({nodeId:id,label:nodes[id].label,cellRef:null}));
+    renderAnimated('in');
+    return;
+  }
+  // Feature entry
+  m=/^feat-(.+?)-([^-]+)-([^-]+)-([^-]+)$/.exec(dataId);
+  if(m){
+    const parentMatrixId=m[1],rowId=m[2],colId=m[3],tab=m[4];
+    _sbOpenCellAt(parentMatrixId,rowId,colId,tab);
+    return;
+  }
+  // Cell entry
+  m=/^cell-(.+?)-([^-]+)-([^-]+)$/.exec(dataId);
+  if(m){
+    const parentMatrixId=m[1],rowId=m[2],colId=m[3];
+    const parent=nodes[parentMatrixId];if(!parent||parent.type!=='matrix')return;
+    const cell=parent.data.cells[rowId+'-'+colId];if(!cell||!cell.features||!cell.features.length)return;
+    // Default tab = first feature in CELL_FEATURES order
+    const firstFeature=CELL_FEATURES.find(f=>cell.features.includes(f.key));
+    const tab=firstFeature?firstFeature.key:cell.features[0];
+    _sbOpenCellAt(parentMatrixId,rowId,colId,tab);
+    return;
+  }
+}
+function _sbOpenCellAt(parentMatrixId,rowId,colId,tab){
+  const parent=nodes[parentMatrixId];if(!parent||parent.type!=='matrix')return;
+  const cell=parent.data.cells[rowId+'-'+colId];if(!cell)return;
+  const rowLbl=(parent.data.rows.find(r=>r.id===rowId)||{}).label||'';
+  const colLbl=(parent.data.cols.find(co=>co.id===colId)||{}).label||'';
+  const label=(rowLbl&&colLbl?rowLbl+' / '+colLbl:(rowLbl||colLbl||'Zelle'));
+  const parentPath=sbFindMatrixPath(stack[0].nodeId,parentMatrixId,[]);
+  if(parentPath){
+    stack=parentPath.map(id=>({nodeId:id,label:nodes[id].label,cellRef:null}));
+    openCell(parentMatrixId,rowId,colId,label,tab);
+  }
+}
+
+function sbNodeClick(e,nodeId){
+  if(e.ctrlKey&&e.shiftKey){
+    sbToggleExpand(nodeId,true);return;
+  }
+  if(e.ctrlKey){
+    sbToggleExpand(nodeId,false);return;
+  }
+  sbNav(nodeId);
+}
+function sbNodeKey(e,nodeId){
+  if(e.key==='Enter'||e.key===' '){e.preventDefault();sbNav(nodeId);return;}
+  if(e.key==='ArrowRight'){
+    const el=e.currentTarget;
+    if(el.dataset.expandable==='1'&&!sbExpanded.has(nodeId)){e.preventDefault();sbExpanded.add(nodeId);sbSavePersist();renderSidebar();}
+  }
+  if(e.key==='ArrowLeft'){
+    if(sbExpanded.has(nodeId)){e.preventDefault();sbExpanded.delete(nodeId);sbSavePersist();renderSidebar();}
+  }
+  if(e.key==='ArrowDown'){
+    e.preventDefault();
+    const all=Array.from(document.querySelectorAll('.sb-node'));
+    const idx=all.findIndex(x=>x.dataset.id===nodeId);
+    if(idx>=0&&idx<all.length-1)all[idx+1].focus();
+  }
+  if(e.key==='ArrowUp'){
+    e.preventDefault();
+    const all=Array.from(document.querySelectorAll('.sb-node'));
+    const idx=all.findIndex(x=>x.dataset.id===nodeId);
+    if(idx>0)all[idx-1].focus();
+  }
+}
+function sbNodeMouseEnter(e,nodeId){
+  if(sbCtrlDown&&appSettings.peekEnabled){
+    sbPeekShow(nodeId,e.currentTarget);
+  }
+}
+function sbNodeMouseLeave(e){
+  sbPeekHide();
+}
+function sbNodeFocus(e,nodeId){
+  if(sbCtrlDown&&appSettings.peekEnabled){
+    sbPeekShow(nodeId,e.currentTarget);
+  }
+}
+function sbNodeBlur(){
+  sbPeekHide();
+}
+function sbToggleExpand(nodeId,siblingsToo){
+  let willExpand=false;
+  if(siblingsToo){
+    // Toggle all siblings at same depth
+    const parent=sbParentMap.get(nodeId);
+    if(!parent)return;
+    const siblings=[];
+    sbParentMap.forEach((pid,cid)=>{if(pid===parent)siblings.push(cid);});
+    const anyCollapsed=siblings.some(s=>!sbExpanded.has(s));
+    willExpand=anyCollapsed;
+    siblings.forEach(s=>{if(anyCollapsed)sbExpanded.add(s);else sbExpanded.delete(s);});
+    _sbLastExpandedId=anyCollapsed?parent:null; // expand children of parent get animated
+  } else {
+    if(sbExpanded.has(nodeId)){sbExpanded.delete(nodeId);_sbLastExpandedId=null;}
+    else{sbExpanded.add(nodeId);_sbLastExpandedId=nodeId;willExpand=true;}
+  }
+  sbSavePersist();
+  renderSidebar();
+  // Clear the flag after animations have had time to start
+  setTimeout(()=>{_sbLastExpandedId=null;},50);
+}
+// Expand all expandable entries in the tree; toggle behavior: if >=80% already expanded, collapse instead
+function sbToggleExpandAll(){
+  if(!appSettings.sidebarEnabled||sbState!=='full'){showCmdError();return;}
+  const rootMid=stack[0]?stack[0].nodeId:rootId;
+  // Gather all expandable dataIds
+  const expandables=[];
+  sbWalkCellTree(rootMid,e=>{
+    if(e.kind==='cell'){
+      // expandable if multi-feature OR single-matrix (shows sub-cells)
+      if(!e.isSingle||e.singleIsMatrix)expandables.push(e.dataId);
+    }else if(e.kind==='feature'&&e.type==='matrix'){
+      expandables.push(e.dataId);
+    }
+  });
+  const expandedCount=expandables.filter(id=>sbExpanded.has(id)).length;
+  const threshold=Math.max(1,Math.floor(expandables.length*0.8));
+  if(expandedCount>=threshold){
+    // Collapse all
+    sbExpanded.clear();
+    _sbLastExpandedId=null;
+  }else{
+    // Expand all (with animation root at rootMid)
+    expandables.forEach(id=>sbExpanded.add(id));
+    _sbLastExpandedId='matrix-'+rootMid;
+  }
+  sbSavePersist();
+  renderSidebar();
+  setTimeout(()=>{_sbLastExpandedId=null;},50);
+}
+// Cycle through 3 states: full → rails → collapsed → full
+function sbToggle(){
+  const order=['full','rails','collapsed'];
+  const idx=order.indexOf(sbState);
+  sbState=order[(idx+1)%order.length];
+  sbSavePersist();
+  sbApplyBodyClasses();
+  if(sbState!=='collapsed')renderSidebar();
+}
+function sbSetState(newState){
+  if(!['full','rails','collapsed'].includes(newState))return;
+  if(sbState===newState)return;
+  sbState=newState;
+  sbSavePersist();
+  sbApplyBodyClasses();
+  if(newState!=='collapsed')renderSidebar();
+}
+// Click anywhere in rails-mode sidebar returns to full mode
+function sbRailsClick(e){
+  if(sbState==='rails'){e.preventDefault();e.stopPropagation();sbSetState('full');}
+}
+function sbTabDragEnter(e){
+  if(_dragCardId&&sbState==='collapsed'){sbSetState('full');}
+}
+
+// Drag & Drop for sidebar
+function sbDragOver(e){
+  e.preventDefault();
+  if(e.dataTransfer)e.dataTransfer.dropEffect='move';
+  const n=e.target.closest('.sb-node');if(n)n.classList.add('drag-over');
+}
+function sbDragLeave(e){
+  const n=e.target.closest('.sb-node');
+  if(n&&!n.contains(e.relatedTarget))n.classList.remove('drag-over');
+}
+function sbDrop(e,targetBoardId){
+  e.preventDefault();
+  const n=e.target.closest('.sb-node');if(n)n.classList.remove('drag-over');
+  if(!_dragCardId||!_dragBoardId||!targetBoardId)return;
+  _dropCardOntoBoard(_dragBoardId,_dragCardId,targetBoardId);
+}
+
+// Filter actions
+let _sbSearchDebounce=null;
+function sbOnSearchInput(v){
+  if(_sbSearchDebounce)clearTimeout(_sbSearchDebounce);
+  _sbSearchDebounce=setTimeout(()=>{sbFilter.text=v||'';sbSavePersist();renderSidebar();},120);
+}
+function sbToggleChip(k){
+  sbFilter.chips[k]=!sbFilter.chips[k];
+  sbSavePersist();renderSidebar();
+}
+function sbToggleWho(v){
+  if(sbFilter.whoSet.has(v))sbFilter.whoSet.delete(v);else sbFilter.whoSet.add(v);
+  sbSavePersist();renderSidebar();
+}
+function sbTogglePrio(v){
+  if(sbFilter.prio.has(v))sbFilter.prio.delete(v);else sbFilter.prio.add(v);
+  sbSavePersist();renderSidebar();
+}
+function sbSetDeadline(v){
+  sbFilter.deadline=sbFilter.deadline===v?null:v;
+  sbSavePersist();renderSidebar();
+}
+function sbClearFilter(){
+  sbFilter={text:'',chips:{matrices:false,tasks:false,checklists:false,infos:false},whoSet:new Set(),prio:new Set(),deadline:null};
+  sbSavePersist();renderSidebar();
+}
+
+// Peek Preview
+function sbPeekShow(nodeId,anchorEl){
+  if(!appSettings.peekEnabled)return;
+  if(sbPeekCurrentId===nodeId&&sbPeekEl)return;
+  sbPeekHide();
+  sbPeekCurrentId=nodeId;
+  const el=document.createElement('div');
+  el.id='sb-peek';
+  el.innerHTML=sbPeekContent(nodeId);
+  document.body.appendChild(el);
+  sbPeekEl=el;
+  // Position
+  const rect=anchorEl.getBoundingClientRect();
+  const peekW=280;const peekH=el.offsetHeight||200;
+  let left;
+  if(appSettings.sidebarPosition==='right'){
+    left=rect.left-peekW-8;
+    if(left<8)left=rect.right+8;
+  } else {
+    left=rect.right+8;
+    if(left+peekW>window.innerWidth-8)left=rect.left-peekW-8;
+  }
+  let top=rect.top;
+  if(top+peekH>window.innerHeight-8)top=window.innerHeight-peekH-8;
+  if(top<8)top=8;
+  el.style.left=left+'px';
+  el.style.top=top+'px';
+}
+function sbPeekHide(){
+  if(sbPeekEl){sbPeekEl.remove();sbPeekEl=null;}
+  sbPeekCurrentId=null;
+}
+function sbPeekContent(dataId){
+  // Matrix entry
+  let mm=/^matrix-(.+)$/.exec(dataId);
+  if(mm){
+    const n=nodes[mm[1]];if(!n||n.type!=='matrix')return '';
+    const cols=n.data.cols.length||1,rows=n.data.rows.length||1;
+    const maxC=Math.min(cols,5),maxR=Math.min(rows,5);
+    let grid='';
+    for(let r=0;r<maxR;r++){
+      for(let c=0;c<maxC;c++){
+        const row=n.data.rows[r],col=n.data.cols[c];
+        if(!row||!col){grid+='<div class="peek-grid-cell"></div>';continue;}
+        const cell=n.data.cells[row.id+'-'+col.id];
+        let bg='var(--bg3)';
+        if(cell){
+          if(cell.matrixId)bg='var(--blue)';
+          else if(cell.boardId)bg='var(--teal)';
+          else if(cell.features&&cell.features.length)bg='var(--amber)';
+        }
+        grid+=`<div class="peek-grid-cell" style="background:${bg};"></div>`;
+      }
+    }
+    return `<div class="peek-title">${esc(n.label)}</div>
+      <div class="peek-sub">Matrix · ${rows}×${cols}</div>
+      <div class="peek-grid" style="grid-template-columns:repeat(${maxC},1fr);">${grid}</div>`;
+  }
+  // Cell or feature entry
+  const isCell=/^cell-(.+?)-([^-]+)-([^-]+)$/.exec(dataId);
+  const isFeat=/^feat-(.+?)-([^-]+)-([^-]+)-([^-]+)$/.exec(dataId);
+  if(isCell||isFeat){
+    const [parentId,rowId,colId]=isCell?[isCell[1],isCell[2],isCell[3]]:[isFeat[1],isFeat[2],isFeat[3]];
+    const parent=nodes[parentId];if(!parent)return '';
+    const cell=parent.data.cells[rowId+'-'+colId];if(!cell)return '';
+    const rowLbl=(parent.data.rows.find(r=>r.id===rowId)||{}).label||'';
+    const colLbl=(parent.data.cols.find(co=>co.id===colId)||{}).label||'';
+    if(isFeat){
+      // Feature peek: show that tab's content summary
+      const type=isFeat[4];
+      if(type==='matrix'&&cell.matrixId){
+        const sub=nodes[cell.matrixId];
+        if(sub){
+          const cols=sub.data.cols.length,rows=sub.data.rows.length;
+          return `<div class="peek-title">${esc(getTabLabel(cell,'matrix'))}</div>
+            <div class="peek-sub">Sub-Matrix · ${rows}×${cols} Zellen</div>`;
+        }
+      }
+      if(cell.boardId){
+        const b=nodes[cell.boardId];
+        if(b){
+          if(type==='board'){
+            const cards=(b.data.kbCards||[]).filter(c=>!c.archived);
+            const cols=b.data.kbCols||[];
+            const colHtml=cols.map(col=>{
+              const count=cards.filter(c=>c.colId===col.id).length;
+              const color=col.color||'var(--text3)';
+              return `<div class="peek-col"><span class="pc-dot" style="background:${color};"></span><span>${esc(col.label)}</span><span class="pc-count">${count}</span></div>`;
+            }).join('');
+            return `<div class="peek-title">${esc(getTabLabel(cell,'board'))}</div>
+              <div class="peek-sub">Aufgaben · ${cards.length}</div>
+              <div class="peek-cols">${colHtml}</div>`;
+          }
+          if(type==='info'){
+            const infos=(b.data.infoFields||[]).length;
+            const links=(b.data.links||[]).length;
+            return `<div class="peek-title">${esc(getTabLabel(cell,'info'))}</div>
+              <div class="peek-sub">Info · ${infos} Felder · ${links} Links</div>`;
+          }
+          if(type==='checklists'){
+            const cl=(b.data.checklists||[]).length;
+            return `<div class="peek-title">${esc(getTabLabel(cell,'checklists'))}</div>
+              <div class="peek-sub">Checklisten · ${cl}</div>`;
+          }
+        }
+      }
+    }
+    // Cell peek: show feature badges
+    const feats=(cell.features||[]).map(f=>{
+      const bg={matrix:'var(--bluebg)',board:'var(--tealbg)',info:'var(--amberbg)',checklists:'var(--purplebg)'}[f]||'var(--bg3)';
+      const tx={matrix:'var(--bluetxt)',board:'var(--tealtxt)',info:'var(--ambertxt)',checklists:'var(--purpletxt)'}[f]||'var(--text)';
+      return `<span class="peek-feat-badge" style="background:${bg};color:${tx};">${getTabLabel(cell,f)}</span>`;
+    }).join('');
+    return `<div class="peek-title">${esc(rowLbl+' / '+colLbl)}</div>
+      <div class="peek-sub">Zelle · ${cell.alias?esc(cell.alias):'kein Kürzel'}</div>
+      <div class="peek-features">${feats||'<span style="color:var(--text3);font-size:10px;">(keine Features)</span>'}</div>`;
+  }
+  const n=nodes[dataId];if(!n)return '';
+  if(n.type==='matrix'){
+    const cols=n.data.cols.length||1;
+    const rows=n.data.rows.length||1;
+    const maxC=Math.min(cols,5),maxR=Math.min(rows,5);
+    let grid='';
+    for(let r=0;r<maxR;r++){
+      for(let c=0;c<maxC;c++){
+        const row=n.data.rows[r],col=n.data.cols[c];
+        if(!row||!col){grid+='<div class="peek-grid-cell"></div>';continue;}
+        const cell=n.data.cells[row.id+'-'+col.id];
+        let bg='var(--bg3)';
+        if(cell){
+          if(cell.matrixId)bg='var(--blue)';
+          else if(cell.boardId)bg='var(--teal)';
+          else if(cell.features&&cell.features.length)bg='var(--amber)';
+        }
+        grid+=`<div class="peek-grid-cell" style="background:${bg};"></div>`;
+      }
+    }
+    const extra=cols>5||rows>5?`<div class="peek-sub" style="margin-top:6px;">${rows}×${cols} (Ausschnitt ${maxR}×${maxC})</div>`:'';
+    return `<div class="peek-title">${esc(n.label)}</div>
+      <div class="peek-sub">Matrix · ${rows} Zeilen × ${cols} Spalten</div>
+      <div class="peek-grid" style="grid-template-columns:repeat(${maxC},1fr);">${grid}</div>${extra}`;
+  }
+  if(n.type==='board'){
+    const cols=n.data.kbCols||[];
+    const cards=(n.data.kbCards||[]).filter(c=>!c.archived);
+    const colHtml=cols.map(col=>{
+      const count=cards.filter(c=>c.colId===col.id).length;
+      const color=col.color||'var(--text3)';
+      return `<div class="peek-col"><span class="pc-dot" style="background:${color};"></span><span>${esc(col.label)}</span><span class="pc-count">${count}</span></div>`;
+    }).join('');
+    const cl=(n.data.checklists||[]).length;
+    const inf=(n.data.infoFields||[]).length+(n.data.links||[]).length;
+    return `<div class="peek-title">${esc(n.label)}</div>
+      <div class="peek-sub">Board · ${cards.length} Aufgabe${cards.length===1?'':'n'}${cl?' · '+cl+' Checkliste'+(cl===1?'':'n'):''}${inf?' · '+inf+' Info-Element':''}</div>
+      <div class="peek-cols">${colHtml||'<span style="color:var(--text3);font-size:10px;">(keine Spalten)</span>'}</div>`;
+  }
+  return '';
+}
+
+// Context menu
+function sbContextMenu(e,nodeId){
+  if(!editMode)return; // only in edit mode
+  if(String(nodeId).startsWith('cell-'))return; // pseudo-cells can't be renamed here
+  e.preventDefault();
+  // Close existing
+  document.querySelectorAll('.sb-context-menu').forEach(m=>m.remove());
+  const n=nodes[nodeId];if(!n)return;
+  const menu=document.createElement('div');
+  menu.className='sb-context-menu';
+  menu.style.left=e.clientX+'px';
+  menu.style.top=e.clientY+'px';
+  menu.innerHTML=`
+    <button onclick="document.querySelectorAll('.sb-context-menu').forEach(m=>m.remove());sbRename('${nodeId}')">${ICO.edit(12)} Umbenennen</button>
+    <button class="danger" onclick="document.querySelectorAll('.sb-context-menu').forEach(m=>m.remove());sbDelete('${nodeId}')">${ICO.close(12)} Löschen</button>
+  `;
+  document.body.appendChild(menu);
+  // Clamp to viewport
+  const r=menu.getBoundingClientRect();
+  if(r.right>window.innerWidth-8)menu.style.left=(window.innerWidth-r.width-8)+'px';
+  if(r.bottom>window.innerHeight-8)menu.style.top=(window.innerHeight-r.height-8)+'px';
+  // Dismiss on outside click
+  setTimeout(()=>{
+    const close=ev=>{if(!ev.target.closest('.sb-context-menu')){menu.remove();document.removeEventListener('click',close);}};
+    document.addEventListener('click',close);
+  },0);
+}
+// Parse cell dataId → {parentMatrixId, rowId, colId, cell}
+function _sbParseCellDataId(dataId){
+  const m=/^cell-(.+?)-([^-]+)-([^-]+)$/.exec(dataId);
+  if(!m)return null;
+  const parentMatrixId=m[1],rowId=m[2],colId=m[3];
+  const parent=nodes[parentMatrixId];if(!parent||parent.type!=='matrix')return null;
+  const cell=parent.data.cells[rowId+'-'+colId];if(!cell)return null;
+  return {parentMatrixId,rowId,colId,cell,parent};
+}
+function sbRename(dataId){
+  const p=_sbParseCellDataId(dataId);if(!p)return;
+  // Rename the row + col labels (user can pick which? For now: show current label and on accept update both via simple prompt)
+  // Simpler approach: allow renaming the Board/Matrix node.label that lives in this cell
+  const tgtNode=p.cell.boardId?nodes[p.cell.boardId]:(p.cell.matrixId?nodes[p.cell.matrixId]:null);
+  if(!tgtNode){alert('Keine Node zum Umbenennen in dieser Zelle.');return;}
+  smodal('Node-Label umbenennen',[{label:'Neuer Name',id:'l',v:tgtNode.label}],v=>{
+    if(!v.l||!v.l.trim())return;
+    renameMatrixNode(tgtNode.id,v.l);
+    render();
+  });
+}
+function sbDelete(dataId){
+  const p=_sbParseCellDataId(dataId);if(!p)return;
+  const {parentMatrixId,rowId,colId,cell}=p;
+  if(!confirm(`Alle Inhalte der Zelle „${p.parent.data.rows.find(r=>r.id===rowId)?.label} / ${p.parent.data.cols.find(c=>c.id===colId)?.label}" löschen?`))return;
+  if(cell.boardId){delete nodes[cell.boardId];cell.boardId=null;}
+  if(cell.matrixId){removeTree(cell.matrixId);cell.matrixId=null;}
+  cell.features=[];
+  // Pop stack if it points inside this cell
+  while(stack.length>1){
+    const top=stack[stack.length-1];
+    if(top.cellRef&&top.cellRef.parentId===parentMatrixId&&top.cellRef.rowId===rowId&&top.cellRef.colId===colId){stack.pop();}
+    else break;
+  }
+  save();render();
+}
+
+// Resize handle
+function sbInitResize(){
+  const h=document.getElementById('sb-resize-handle');
+  if(!h||h._bound)return;
+  h._bound=true;
+  let dragging=false;let startX=0,startW=0;
+  h.addEventListener('mousedown',e=>{
+    dragging=true;startX=e.clientX;startW=appSettings.sidebarWidth||280;
+    h.classList.add('active');
+    document.body.style.userSelect='none';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    let dx=e.clientX-startX;
+    if(appSettings.sidebarPosition==='right')dx=-dx;
+    let w=startW+dx;
+    w=Math.max(200,Math.min(520,w));
+    appSettings.sidebarWidth=w;
+    const sb=document.getElementById('sidebar');
+    if(sb)sb.style.setProperty('--sb-w',w+'px');
+  });
+  document.addEventListener('mouseup',()=>{
+    if(dragging){dragging=false;h.classList.remove('active');document.body.style.userSelect='';saveSettings();sbDrawConnections();}
+  });
+}
+
+function initSidebar(){
+  if(initSidebar._done)return;initSidebar._done=true;
+  sbLoadPersist();
+  // Bind search input
+  const si=document.getElementById('sb-search');
+  if(si){
+    si.value=sbFilter.text||'';
+    si.addEventListener('input',e=>sbOnSearchInput(e.target.value));
+    si.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Escape'){e.target.blur();}});
+  }
+  // Set search icon
+  const si_ic=document.querySelector('.sb-search-icon');
+  if(si_ic)si_ic.innerHTML=ICO.search(11);
+  // Cycle-button icon is managed by sbApplyBodyClasses (state-dependent)
+  sbInitResize();
+  // Ctrl tracking for peek
+  document.addEventListener('keydown',e=>{if(e.key==='Control')sbCtrlDown=true;});
+  document.addEventListener('keyup',e=>{if(e.key==='Control'){sbCtrlDown=false;sbPeekHide();}});
+  window.addEventListener('blur',()=>{sbCtrlDown=false;sbPeekHide();});
+  // Redraw connections on resize
+  window.addEventListener('resize',()=>{if(appSettings.sidebarEnabled)sbDrawConnections();});
+  // Redraw after sidebar width transition (collapsed↔rails↔full) so rails/dots
+  // stabilize at final widths — initial sbDrawConnections during the transition
+  // measures mid-animation widths and would produce a 0-size SVG.
+  const sbEl=document.getElementById('sidebar');
+  if(sbEl)sbEl.addEventListener('transitionend',e=>{
+    if(e.target!==sbEl)return;
+    if(e.propertyName!=='width')return;
+    if(sbState==='collapsed')return;
+    sbDrawConnections();
+  });
+  // Scroll redraws (lines stay aligned)
+  const wrap=document.getElementById('sb-tree-wrap');
+  if(wrap)wrap.addEventListener('scroll',()=>{/* SVG is inside wrap so scroll comes free */});
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1339,11 +2834,11 @@ function cellHTML(nodeId,row,col){
   const cell=getCell(nodeId,key);
   const hb=!!cell.boardId, hm=!!cell.matrixId;
   const lbl=esc(row.label+' / '+col.label);
-  const features=cell.features||[];
-
   // Build segments for active features (ordered by CELL_FEATURES)
+  // Uses getActiveFeatures for union of explicit + implicit (content-driven)
   let segments='', ghostBtns='';
-  const activeFeatures=CELL_FEATURES.filter(f=>features.includes(f.key));
+  const activeFeatures=getActiveFeatures(cell);
+  const features=activeFeatures.map(f=>f.key); // key-list for legacy .includes() checks
   const useQuad=appSettings.quadrantLayout;
   const _cp=appSettings.cellPadding||0.25;
   const _cg=appSettings.cellGap||0.15;
@@ -2606,8 +4101,8 @@ const FREQ_CATEGORIES=[
 function renderFrequencyMatrix(allCards,startNodeId){
   // Collect unique boards (rows) from allCards
   const boardMap={};
-  allCards.forEach(({card,boardId,boardLabel,path})=>{
-    if(!boardMap[boardId])boardMap[boardId]={id:boardId,label:boardLabel,path:path||[],cards:[]};
+  allCards.forEach(({card,boardId,boardLabel,path,cellInfo})=>{
+    if(!boardMap[boardId])boardMap[boardId]={id:boardId,label:boardLabel,path:path||[],cellInfo:cellInfo||null,cards:[]};
     boardMap[boardId].cards.push(card);
   });
   const boards=Object.values(boardMap);
@@ -2627,7 +4122,7 @@ function renderFrequencyMatrix(allCards,startNodeId){
   boards.forEach(board=>{
     // Row header: board name (clickable → navigate)
     const pathStr=board.path.filter(p=>p.type==='matrix').map(p=>esc(p.label)).join(' › ');
-    h+=`<div class="freq-row-hd" onclick="navigateToBoardFromFreq('${board.id}')" title="${esc(pathStr?pathStr+' › '+board.label:board.label)}">${esc(board.label)}</div>`;
+    h+=`<div class="freq-row-hd" onclick="navigateToBoardFromFreq('${board.id}')" title="${esc(pathStr?pathStr+' › '+board.label:board.label)}">${cardOriginHTML(board.cellInfo,board.path,board.id)}${esc(board.label)}</div>`;
     // Cells
     activeCols.forEach(cat=>{
       const matching=board.cards.filter(c=>cat.test(c));
@@ -2646,6 +4141,17 @@ function renderFrequencyMatrix(allCards,startNodeId){
   return h;
 }
 
+function cardOriginHTML(cellInfo,path,boardId){
+  if(!cellInfo)return'';
+  const pathStr=(path||[]).filter(p=>p.type==='matrix').map(p=>p.label).join(' › ');
+  const cellLbl=(cellInfo.rowLabel||cellInfo.colLabel)?`${cellInfo.rowLabel} / ${cellInfo.colLabel}`:'';
+  const tooltip=pathStr?(cellLbl?`${pathStr} › ${cellLbl}`:pathStr):cellLbl;
+  const display=cellInfo.alias
+    ?`<span class="origin-alias">${esc(cellInfo.alias)}</span>`
+    :cellLbl?`<span class="origin-label">${esc(cellLbl)}</span>`:'';
+  if(!display)return'';
+  return `<span class="card-origin" title="${esc(tooltip)}" onclick="event.stopPropagation();navigateToBoardFromFreq('${boardId}')">${display}</span>`;
+}
 function navigateToBoardFromFreq(boardId){
   // Find parent matrix cell that contains this board and navigate
   for(const[nid,n]of Object.entries(nodes)){
@@ -2691,7 +4197,7 @@ function renderTaskOverview(startNodeId){
   const today=today0();
   // Collect all cards from all boards in tree
   const allCards=[];
-  function collectBoards(nodeId,path){
+  function collectBoards(nodeId,path,cellInfo){
     const n=nodes[nodeId];if(!n)return;
     const curPath=[...path,{id:nodeId,label:n.label,type:n.type}];
     if(n.type==='board'){
@@ -2705,16 +4211,29 @@ function renderTaskOverview(startNodeId){
           if(count>=c.recur.endCount)return false;
         }
         return true;
-      }).forEach(c=>{allCards.push({card:c,boardId:n.id,boardLabel:n.label,path:curPath});});
+      }).forEach(c=>{
+        let boardLbl=n.label;
+        if(cellInfo){
+          const parentCell=getCell(cellInfo.parentId,`${cellInfo.rowId}-${cellInfo.colId}`);
+          if(parentCell&&parentCell.tabLabels&&parentCell.tabLabels.board)boardLbl=parentCell.tabLabels.board;
+          else boardLbl='Aufgaben';
+        }
+        allCards.push({card:c,boardId:n.id,boardLabel:boardLbl,path:curPath,cellInfo});
+      });
     }
     if(n.type==='matrix'){
-      Object.values(n.data.cells).forEach(cell=>{
-        if(cell.boardId)collectBoards(cell.boardId,curPath);
-        if(cell.matrixId)collectBoards(cell.matrixId,curPath);
+      Object.entries(n.data.cells).forEach(([key,cell])=>{
+        const sep=key.indexOf('-');
+        const rowId=key.slice(0,sep),colId=key.slice(sep+1);
+        const row=n.data.rows.find(r=>r.id===rowId);
+        const col=n.data.cols.find(c=>c.id===colId);
+        const info={alias:cell.alias||'',rowLabel:row?row.label:'',colLabel:col?col.label:'',parentId:nodeId,rowId,colId};
+        if(cell.boardId)collectBoards(cell.boardId,curPath,info);
+        if(cell.matrixId)collectBoards(cell.matrixId,curPath,info);
       });
     }
   }
-  collectBoards(startNodeId||rootId,[]);
+  collectBoards(startNodeId||rootId,[],null);
 
   // For each daily col, filter by explicit colType config
   function getTimeRange(type){
@@ -2824,7 +4343,7 @@ function renderTaskOverview(startNodeId){
     if(items.length===0){
       h+=`<div style="padding:10px 12px;font-size:12px;color:var(--text3);">Nichts fällig</div>`;
     } else {
-      items.forEach(({card,boardId,boardLabel})=>{
+      items.forEach(({card,boardId,boardLabel,path,cellInfo})=>{
         const isRecur=card.recur&&card.recur.type!=='none';
         const dlDate=card.deadline?new Date(card.deadline):null;
         const isOverdue=dlDate&&!card.done&&day0(dlDate)<today;
@@ -2833,7 +4352,7 @@ function renderTaskOverview(startNodeId){
           <div style="flex:1;min-width:0;cursor:pointer;" tabindex="0" role="link" onclick="openCardFromDaily('${boardId}','${card.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();openCardFromDaily('${boardId}','${card.id}');}">
             <div class="di-name" style="display:flex;align-items:flex-start;${isOverdue?'color:var(--red);':''}">${isOverdue?ICO.warn(10)+' ':''}${esc(card.name)||'(ohne Name)'}</div>
             <div class="di-from">
-              ${esc(boardLabel)}${card.deadline?' · '+fmtDate(card.deadline):''}${isOverdue?' · <span style="color:var(--red);">überfällig</span>':''}
+              ${cardOriginHTML(cellInfo,path,boardId)}${esc(boardLabel)}${card.deadline?' · '+fmtDate(card.deadline):''}${isOverdue?' · <span style="color:var(--red);">überfällig</span>':''}
               ${isRecur?`<span style="color:var(--teal);">· ${ICO.recur(10)} ${recurLabel(card.recur,true)}</span>`:''}
             </div>
           </div>
@@ -3237,41 +4756,48 @@ function addFeature(cell,feat){if(!cell.features)cell.features=[];if(!cell.featu
 function _applyAlias(cell,hasAlias,val){
   if(!hasAlias&&val&&val.trim()){const r=validateAlias(val.trim());if(r.valid)cell.alias=r.alias;}
 }
+function _featTitle(key,text){
+  const def=getCellFeatureDef(key);
+  if(!def)return text;
+  const ico=(def.icoLg||def.icoSm||'').replace(/stroke="currentColor"/g,`stroke="${def.txt}"`);
+  return `<span style="display:inline-flex;align-items:center;gap:8px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:var(--rs);background:${def.bg};color:${def.txt};">${ico}</span><span>${text}</span></span>`;
+}
 function iconClick(nodeId,rowId,colId,type,label){
   const key=`${rowId}-${colId}`;const cell=getCell(nodeId,key);
   const _restoreFocus=()=>{setTimeout(()=>{const c=document.querySelector(`.mcell[data-node="${nodeId}"][data-row="${rowId}"][data-col="${colId}"]`);if(c)c.focus();},FOCUS_RESTORE_MS);};
   const hasAlias=!!cell.alias;
   const aliasField={label:'Kürzel',id:'a',ph:'z.B. abc',v:cell.alias||'',ro:hasAlias};
+  // Unified default name: always "{row} / {col}" (the passed `label`)
+  const defaultName=label;
 
   if(type==='matrix'){
     if(!cell.matrixId){
-      smodal('Neue Sub-Matrix anlegen',[{label:'Name',id:'l',ph:label,v:label},aliasField],v=>{
+      smodal(_featTitle('matrix','Neue Sub-Matrix anlegen'),[{label:'Name',id:'l',ph:defaultName,v:defaultName},aliasField],v=>{
         _applyAlias(cell,hasAlias,v.a);
-        const id=mkMatrix(v.l||label);
+        const id=mkMatrix(v.l||defaultName);
         cell.matrixId=id;addFeature(cell,'matrix');save();rebuildAliasIndex();
-        openCell(nodeId,rowId,colId,v.l||label,'matrix');
+        openCell(nodeId,rowId,colId,v.l||defaultName,'matrix');
       },_restoreFocus);
     } else {addFeature(cell,'matrix');openCell(nodeId,rowId,colId,nodes[cell.matrixId].label,'matrix');}
   } else if(type==='board'||type==='info'||type==='checklists'){
     const tab=type;
-    const nameDefaults={board:'Aufgaben',info:'Info',checklists:'Checklisten'};
-    const nameV=nameDefaults[type]||label;
     if(!cell.boardId){
       // Board existiert noch nicht → anlegen
-      smodal('Neues Board anlegen',[{label:'Name',id:'l',ph:nameV,v:nameV},aliasField],v=>{
+      smodal(_featTitle(type,'Neues Board anlegen'),[{label:'Name',id:'l',ph:defaultName,v:defaultName},aliasField],v=>{
         _applyAlias(cell,hasAlias,v.a);
-        const id=mkBoard(v.l||nameV);
+        const id=mkBoard(v.l||defaultName);
         cell.boardId=id;addFeature(cell,type);save();rebuildAliasIndex();
-        openCell(nodeId,rowId,colId,v.l||nameV,tab);
+        openCell(nodeId,rowId,colId,v.l||defaultName,tab);
       },_restoreFocus);
     } else if(!cell.features||!cell.features.includes(type)){
       // Board existiert, aber Feature noch nicht aktiviert → Dialog
-      const boardLabel=nodes[cell.boardId].label;
       const titles={board:'Aufgaben hinzufügen',info:'Info hinzufügen',checklists:'Checklisten hinzufügen'};
-      smodal(titles[type]||'Feature hinzufügen',[{label:'Name',id:'l',ph:nameV,v:nameV},{label:'Kürzel',id:'a',ph:'',v:cell.alias||'',ro:true}],v=>{
-        if(v.l&&v.l.trim())nodes[cell.boardId].label=v.l.trim();
+      smodal(_featTitle(type,titles[type]||'Feature hinzufügen'),[{label:'Name',id:'l',ph:defaultName,v:defaultName},{label:'Kürzel',id:'a',ph:'',v:cell.alias||'',ro:true}],v=>{
+        const newLabel=v.l&&v.l.trim()?v.l.trim():defaultName;
+        if(!cell.tabLabels)cell.tabLabels={};
+        cell.tabLabels[type]=newLabel;
         addFeature(cell,type);save();rebuildAliasIndex();
-        openCell(nodeId,rowId,colId,nodes[cell.boardId].label,tab);
+        openCell(nodeId,rowId,colId,newLabel,tab);
       },_restoreFocus);
     } else {
       // Feature bereits angelegt → direkt öffnen
@@ -3615,7 +5141,19 @@ function showSettings(tab){
   const tabActive=`style="padding:7px 14px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--blue);border-bottom:2px solid var(--blue);transition:all 0.15s;"`;
 
   let body='';
-  if(t==='general'){
+  if(t==='nav'){
+    body=`
+    ${settingSection('Sidebar')}
+    ${settingCheck('sidebarEnabled','Sidebar aktivieren')}
+    ${settingSelect('sidebarPosition','Position',[['left','Links'],['right','Rechts']])}
+    ${settingNumber('sidebarWidth','Breite (px)',200,520,10)}
+    ${settingCheck('sidebarShowIcons','Icons anzeigen')}
+    ${settingCheck('sidebarShowAliases','Kürzel anzeigen')}
+    ${settingCheck('sidebarShowCellLeaves','Zellen mit Features als Blätter anzeigen')}
+    ${settingCheck('sidebarAutoScroll','Auto-Scroll auf aktive Node')}
+    ${settingSection('Preview')}
+    ${settingCheck('peekEnabled','Peek-Preview bei Ctrl+Hover / Ctrl+Fokus')}`;
+  } else if(t==='general'){
     body=`
     ${settingSection('Zellen-Darstellung')}
     ${settingCheck('quadrantLayout','Quadranten-Ansicht')}
@@ -3653,6 +5191,7 @@ function showSettings(tab){
       <h3 style="font-size:14px;font-weight:500;margin-bottom:10px;">${ICO.gear(14)} Einstellungen</h3>
       <div style="display:flex;gap:0;border-bottom:0.5px solid var(--border);">
         <button ${t==='general'?tabActive:tabStyle} onclick="showSettings('general')">Allgemein</button>
+        <button ${t==='nav'?tabActive:tabStyle} onclick="showSettings('nav')">Navigation</button>
         <button ${t==='edit'?tabActive:tabStyle} onclick="showSettings('edit')">Bearbeitung</button>
       </div>
     </div>
@@ -3783,6 +5322,8 @@ function handleCommandInput(raw){
       <div><b>^w</b> / <b>^w kürzel</b> — Intervallmatrix</div>
       <div><b>^s</b> — Einstellungen</div>
       <div><b>^k</b> — Tastenkürzel</div>
+      <div><b>^c</b> [kürzel] [-all] — Labels auf „Zeile / Spalte" zurücksetzen</div>
+      <div><b>^c tab</b> [kürzel] [-all] — Tab-Bezeichnungen auf Standard (Info/Aufgaben/…)</div>
       <div style="margin-top:6px;font-size:10px;color:var(--text3);">Trenner <b>|</b> für mehrere Suchbegriffe</div>
     </div>`;
     return;
@@ -3795,6 +5336,36 @@ function handleCommandInput(raw){
   if(scopeMap[firstPart]&&parts.length>1){
     const query=parts.slice(1).join(' ');
     doScopedSearch(scopeMap[firstPart],query);
+    return;
+  }
+  // ^c live-preview (label cleanup)
+  if(firstPart==='c'){
+    el.style.display='block';el.classList.add('sr-anim');
+    // Parse arguments (same logic as parseCommand)
+    let alias=null,recursive=false,mode='node';
+    let startIdx=1;
+    if(parts[1]==='tab'){mode='tab';startIdx=2;}
+    for(let i=startIdx;i<parts.length;i++){
+      if(parts[i]==='-all')recursive=true;
+      else if(!alias)alias=parts[i];
+    }
+    const scopeStr=recursive?'aktuelle Ebene + darunter':'nur aktuelle Ebene';
+    const aliasStr=alias?` mit Kürzel <b>${esc(alias)}</b>`:'';
+    if(mode==='tab'){
+      el.innerHTML=`<div class="cmd-help">
+        <div style="font-weight:500;margin-bottom:4px;">${ICO.edit(12)} Tab-Bezeichnungen auf Standard zurücksetzen</div>
+        <div style="color:var(--text2);">Setzt angepasste Tab-Labels zurück auf „Info / Aufgaben / Checklisten / Sub-Matrix"${aliasStr}.</div>
+        <div style="color:var(--text3);margin-top:4px;">Scope: ${scopeStr}${recursive?'':' (<b>-all</b> für Unterstrukturen)'}</div>
+        <div style="color:var(--text3);font-size:10px;margin-top:6px;">Enter bestätigt — zeigt Preview-Dialog.</div>
+      </div>`;
+    }else{
+      el.innerHTML=`<div class="cmd-help">
+        <div style="font-weight:500;margin-bottom:4px;">${ICO.edit(12)} Labels zurücksetzen</div>
+        <div style="color:var(--text2);">Setzt Board/Matrix-Namen zurück auf „Zeile / Spalte"${aliasStr}.</div>
+        <div style="color:var(--text3);margin-top:4px;">Scope: ${scopeStr}${recursive?'':' (<b>-all</b> für Unterstrukturen)'}</div>
+        <div style="color:var(--text3);font-size:10px;margin-top:6px;"><b>^c tab …</b> für Tab-Bezeichnungen. Enter bestätigt — zeigt Preview-Dialog.</div>
+      </div>`;
+    }
     return;
   }
   // Preview matching aliases
@@ -3827,6 +5398,203 @@ function handleCommandInput(raw){
     el.innerHTML=`<div style="padding:12px;font-size:12px;color:var(--text3);text-align:center;">Kein Kürzel gefunden</div>`;
   }
 }
+// Custom confirm dialog for label-cleanup, design-matched to app style.
+// Enter → OK, ESC → Cancel. OK button gets focus.
+function sbConfirmChangesDialog(opts){
+  const {scopeStr,aliasStr,changes,onConfirm}=opts;
+  const nodeChanges=changes.filter(c=>c.kind==='node');
+  const tabChanges=changes.filter(c=>c.kind==='tab');
+  const sumParts=[];
+  if(nodeChanges.length)sumParts.push(`${nodeChanges.length} Node-Label${nodeChanges.length===1?'':'s'}`);
+  if(tabChanges.length)sumParts.push(`${tabChanges.length} Tab-Label${tabChanges.length===1?'':'s'}`);
+  const summary=sumParts.join(' + ');
+  function rowIconFor(c){
+    // Determine icon based on change kind + node/type info
+    if(c.kind==='tab'||c.kind==='tabReset'){
+      const def=getCellFeatureDef(c.type);
+      return {cls:'ic-'+c.type, svg:def?def.icoSm:''};
+    }
+    // node kind: figure out by nodeId's type
+    const n=nodes[c.nodeId];
+    if(!n)return {cls:'ic-board',svg:SB_ICONS.board};
+    if(n.type==='matrix')return {cls:'ic-matrix',svg:SB_ICONS.matrix};
+    // board → dominant-feature
+    const dom=_sbBoardDominantFeature(c.nodeId);
+    const def=getCellFeatureDef(dom);
+    if(def&&dom!=='board')return {cls:'ic-'+dom,svg:def.icoSm};
+    return {cls:'ic-board',svg:SB_ICONS.board};
+  }
+  const rows=changes.map(c=>{
+    const ico=rowIconFor(c);
+    const kindTxt=(c.kind==='tab'||c.kind==='tabReset')?'Tab':'Label';
+    return `<div class="sb-confirm-row">
+      <span class="cr-icon ${ico.cls}">${ico.svg}</span>
+      <span class="cr-kind">${kindTxt}</span>
+      <span class="cr-old" title="${esc(c.oldLabel)}">${esc(c.oldLabel)}</span>
+      <span class="cr-arrow">→</span>
+      <span class="cr-new" title="${esc(c.newLabel)}">${esc(c.newLabel)}</span>
+    </div>`;
+  }).join('');
+  const h=`<div class="smodal-overlay" onclick="sbCloseConfirm(event)">
+    <div class="sb-confirm" onclick="event.stopPropagation()">
+      <div class="sb-confirm-hd">
+        ${ICO.edit(14)}
+        <h3>Labels zurücksetzen</h3>
+      </div>
+      <div class="sb-confirm-sub">${summary}${aliasStr} auf <b>${scopeStr}</b> — Individuell angepasste Tab-Bezeichnungen bleiben erhalten.</div>
+      <div class="sb-confirm-list">${rows}</div>
+      <div class="sb-confirm-actions">
+        <button class="btn-c" onclick="sbCloseConfirm()">Abbrechen</button>
+        <button class="btn-p" id="sb-confirm-ok" autofocus>OK (Enter)</button>
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('mc').innerHTML=h;
+  _sbConfirmOnConfirm=onConfirm;
+  // Focus OK
+  setTimeout(()=>{const ok=document.getElementById('sb-confirm-ok');if(ok)ok.focus();},20);
+  // Enter/ESC handler
+  const mc=document.getElementById('mc');
+  mc.onkeydown=e=>{
+    if(e.key==='Enter'){e.preventDefault();sbCloseConfirm(null,true);}
+    else if(e.key==='Escape'){e.preventDefault();sbCloseConfirm();}
+  };
+  // Button click wiring
+  setTimeout(()=>{
+    const ok=document.getElementById('sb-confirm-ok');
+    if(ok)ok.addEventListener('click',()=>sbCloseConfirm(null,true));
+  },0);
+}
+let _sbConfirmOnConfirm=null;
+function sbCloseConfirm(e,confirmed){
+  if(e&&e.target&&!e.target.classList.contains('smodal-overlay'))return;
+  const overlay=document.querySelector('#mc .smodal-overlay');
+  const cb=_sbConfirmOnConfirm;_sbConfirmOnConfirm=null;
+  if(overlay){overlay.classList.add('closing');setTimeout(()=>{document.getElementById('mc').innerHTML='';if(confirmed&&cb)cb();},150);}
+  else{document.getElementById('mc').innerHTML='';if(confirmed&&cb)cb();}
+}
+
+// ── Label Cleanup (^c command) ──
+// Resets node.label on Boards and Sub-Matrices to "{rowLabel} / {colLabel}" based on
+// the cell they live in. Leaves cell.tabLabels UNTOUCHED (user customizations preserved).
+// Root matrix is protected (no parent cell → not a candidate).
+function _currentMatrixForCleanup(){
+  const top=stack[stack.length-1];if(!top)return null;
+  if(top.cellRef){return nodes[top.cellRef.parentId]||null;}
+  const n=nodes[top.nodeId];
+  return(n&&n.type==='matrix')?n:null;
+}
+function runLabelCleanup(filterAlias,recursive,mode){
+  mode=mode||'node';
+  const start=_currentMatrixForCleanup();
+  if(!start){showCmdError();return;}
+  // Track whether the alias filter matched any cell at all (so we can distinguish
+  // "alias not found" (error) vs "alias found but nothing to change" (success))
+  let aliasSeen=!filterAlias;
+  // Two kinds of changes:
+  //  - 'node': reset nodes[id].label (Board/Matrix node display name)
+  //  - 'tab':  reset cell.tabLabels[type] (tab display in cell view) — but ONLY if the
+  //            current value looks non-customized (empty, feature-default, or synced to old node.label).
+  //            Truly custom tab labels stay untouched.
+  const changes=[];
+  const visited=new Set();
+  function isNotCustomized(tabVal,oldNodeLabel,featureDefault){
+    if(!tabVal||!tabVal.trim())return true;                 // empty/undefined
+    if(oldNodeLabel&&tabVal===oldNodeLabel)return true;     // in-sync with old node.label
+    if(featureDefault&&tabVal===featureDefault)return true; // feature-default
+    return false;
+  }
+  function collectTabUpdates(cell,type,target,oldNodeLabel){
+    if(!cell.features||!cell.features.includes(type))return;
+    const def=getCellFeatureDef(type);const featureDefault=def?def.label:'';
+    const cur=(cell.tabLabels&&cell.tabLabels[type])||'';
+    if(cur===target)return; // already correct
+    if(!isNotCustomized(cur,oldNodeLabel,featureDefault))return; // user-customized → keep
+    changes.push({kind:'tab',cell,type,oldLabel:cur||featureDefault,newLabel:target});
+  }
+  function walk(matrix){
+    if(!matrix||matrix.type!=='matrix'||visited.has(matrix.id))return;
+    visited.add(matrix.id);
+    const rowById=Object.fromEntries((matrix.data.rows||[]).map(r=>[r.id,r]));
+    const colById=Object.fromEntries((matrix.data.cols||[]).map(c=>[c.id,c]));
+    Object.entries(matrix.data.cells||{}).forEach(([key,cell])=>{
+      const [rowId,colId]=key.split('-');
+      const row=rowById[rowId],col=colById[colId];
+      if(!row||!col)return;
+      const target=`${row.label} / ${col.label}`;
+      const aliasMatches=!filterAlias||(cell.alias&&cell.alias.toLowerCase()===filterAlias.toLowerCase());
+      if(aliasMatches){
+        aliasSeen=true;
+        if(mode==='tab'){
+          // Tab-reset mode: clear custom tabLabels → fall back to feature-defaults
+          // Only for tab-keys where (a) a custom value exists AND (b) it differs from the default
+          ['matrix','board','info','checklists'].forEach(t=>{
+            const cur=cell.tabLabels&&cell.tabLabels[t];
+            if(!cur||!cur.trim())return; // already default
+            const def=getCellFeatureDef(t);const featDef=def?def.label:'';
+            if(cur===featDef)return; // already equal to default
+            changes.push({kind:'tabReset',cell,type:t,oldLabel:cur,newLabel:featDef});
+          });
+        }else{
+          // Node mode (default): reset node.label + smart-sync tabLabels
+          if(cell.boardId&&nodes[cell.boardId]){
+            const oldLbl=nodes[cell.boardId].label;
+            if(oldLbl!==target){
+              changes.push({kind:'node',nodeId:cell.boardId,oldLabel:oldLbl,newLabel:target});
+            }
+            ['board','info','checklists'].forEach(t=>collectTabUpdates(cell,t,target,oldLbl));
+          }
+          if(cell.matrixId&&nodes[cell.matrixId]){
+            const oldLbl=nodes[cell.matrixId].label;
+            if(oldLbl!==target){
+              changes.push({kind:'node',nodeId:cell.matrixId,oldLabel:oldLbl,newLabel:target});
+            }
+            collectTabUpdates(cell,'matrix',target,oldLbl);
+          }
+        }
+      }
+      if(recursive&&cell.matrixId&&nodes[cell.matrixId]){
+        walk(nodes[cell.matrixId]);
+      }
+    });
+  }
+  walk(start);
+  if(changes.length===0){
+    if(filterAlias&&!aliasSeen){
+      // Alias truly not found → error indicator
+      showCmdError();
+    }else{
+      // Alias found (or no filter) but nothing needs changing → success indicator
+      showCmdSuccess();
+    }
+    return;
+  }
+  const scopeStr=recursive?'aktuelle Ebene + darunter':'aktuelle Ebene';
+  const aliasStr=filterAlias?` mit Kürzel „${filterAlias}"`:'';
+  sbConfirmChangesDialog({
+    scopeStr, aliasStr, changes,
+    onConfirm:()=>{
+      changes.forEach(c=>{
+        if(c.kind==='node'){
+          const n=nodes[c.nodeId];
+          if(n){
+            n.label=c.newLabel;
+            stack.forEach(s=>{if(s.nodeId===c.nodeId)s.label=c.newLabel;});
+          }
+        }else if(c.kind==='tab'){
+          if(!c.cell.tabLabels)c.cell.tabLabels={};
+          c.cell.tabLabels[c.type]=c.newLabel;
+        }else if(c.kind==='tabReset'){
+          // Delete the custom tabLabel entry so getTabLabel falls back to feature-default
+          if(c.cell.tabLabels)delete c.cell.tabLabels[c.type];
+        }
+      });
+      rebuildAliasIndex();
+      save();
+      render();
+    }
+  });
+}
 function parseCommand(raw){
   const parts=raw.trim().toLowerCase().split(/\s+/);
   if(!parts[0])return null;
@@ -3852,6 +5620,19 @@ function parseCommand(raw){
   }
   if(parts[0]==='k'){
     return{type:'keybindings'};
+  }
+  // Cleanup labels: c [tab] [alias] [-all]
+  //   - default mode (no 'tab' modifier): reset node.label + smart-sync tabLabels
+  //   - 'tab' modifier: reset tabLabels to feature-defaults (Info/Aufgaben/Checklisten/Sub-Matrix)
+  if(parts[0]==='c'){
+    let alias=null,recursive=false,mode='node';
+    let startIdx=1;
+    if(parts[1]==='tab'){mode='tab';startIdx=2;}
+    for(let i=startIdx;i<parts.length;i++){
+      if(parts[i]==='-all')recursive=true;
+      else if(!alias)alias=parts[i];
+    }
+    return{type:'cleanup',alias,recursive,mode};
   }
   // Navigation: kürzel [subCmd] [cardAlias]
   const alias=parts[0];
@@ -3881,6 +5662,11 @@ function executeCommand(raw){
     if(!targetBoardId)return showCmdError();
     closeSearch();
     if(!moveCardToBoard(cardTarget.boardId,cardTarget.cardId,targetBoardId,cmd.colName))showCmdError();
+    return;
+  }
+  if(cmd.type==='cleanup'){
+    closeSearch();
+    runLabelCleanup(cmd.alias,cmd.recursive,cmd.mode||'node');
     return;
   }
   if(cmd.type==='new'){
@@ -4019,6 +5805,11 @@ function showCmdError(){
   const inp=document.getElementById('searchinput');if(!inp)return;
   inp.classList.add('cmd-error');
   setTimeout(()=>{inp.classList.remove('cmd-error');},CMD_ERROR_MS);
+}
+function showCmdSuccess(){
+  const inp=document.getElementById('searchinput');if(!inp)return;
+  inp.classList.add('cmd-success');
+  setTimeout(()=>{inp.classList.remove('cmd-success');},600);
 }
 function doScopedSearch(scope,query){
   const el=document.getElementById('searchresults');
@@ -4254,6 +6045,8 @@ document.addEventListener('click',e=>{
     mmOpen=false;
     document.getElementById('minimap-panel').classList.remove('open');
   }
+  // Close sidebar peek if click outside
+  if(sbPeekEl&&!e.target.closest('#sb-peek')){sbPeekHide();}
 });
 
 // ═══════════════════════════════════════════════════════
@@ -4319,6 +6112,15 @@ document.addEventListener('keydown',e=>{
   if(!_typing&&matchShortcut(e,'save')){e.preventDefault();flushToFile();return;}
   if(!_typing&&matchShortcut(e,'edit')){e.preventDefault();toggleEdit();return;}
   if(!_typing&&matchShortcut(e,'freqview')){e.preventDefault();executeCommand('w');return;}
+  if(!_typing&&matchShortcut(e,'toggleSidebar')){e.preventDefault();sbToggle();return;}
+  if(!_typing&&matchShortcut(e,'sidebarExpandAll')){e.preventDefault();sbToggleExpandAll();return;}
+  if(matchShortcut(e,'focusSidebarSearch')){
+    e.preventDefault();
+    if(!appSettings.sidebarEnabled){appSettings.sidebarEnabled=true;saveSettings();}
+    if(!sbOpen){sbOpen=true;sbApplyBodyClasses();renderSidebar();}
+    setTimeout(()=>{const s=document.getElementById('sb-search');if(s){s.focus();s.select();}},50);
+    return;
+  }
   // Remove feature shortcuts (edit mode + cell focused)
   if(editMode&&!_typing&&_ae&&_ae.classList.contains('mcell')){
     const _rmMap={removeMatrix:'matrix',removeBoard:'board',removeInfo:'info',removeChecklists:'checklists'};
@@ -4374,6 +6176,7 @@ document.getElementById('gear-kb').innerHTML=ICO.keyboard(12)+' Tastenkürzel';
 document.getElementById('gear-settings').innerHTML=ICO.gear(12)+' Einstellungen';
 document.getElementById('gear-reset').innerHTML=ICO.reset(12)+' Reset';
 
+initSidebar();
 render();
 // Warn before closing with unsaved file changes
 window.addEventListener('beforeunload',e=>{if(fileDirty){e.preventDefault();e.returnValue='';}});
