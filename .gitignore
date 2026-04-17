@@ -1,2 +1,28 @@
+# Personal data (nie commiten — enthält Nutzerinhalte)
 matrix-data.json
+*.imx
+backup_*.json
+backup_delete_*.json
+
+# Claude Code lokale Einstellungen
 .claude/
+
+# Archive / alte Versionen
+Archiv/
+*.bak
+
+# OS-Artefakte
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor-Artefakte
+*~
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Node (falls später mal)
+node_modules/
+package-lock.json

@@ -414,6 +414,9 @@ body.sb-state-rails #sb-rail-cap{display:inline-flex;}
 .sb-connections path.ln-split.ln-matrix{stroke:var(--blue);}
 .sb-connections path.ln-split.ln-board{stroke:var(--teal);}
 .sb-connections path.ln-split.ln-cell{stroke:var(--amber);}
+.sb-connections path.ln-split.ln-info{stroke:var(--amber);}
+.sb-connections path.ln-split.ln-checklists{stroke:var(--purple);}
+.sb-connections path.ln-split.ln-cellbox{stroke:var(--text2);}
 .sb-connections circle.sb-dot{stroke:var(--bg);stroke-width:1.5;transition:r 0.12s;}
 .sb-connections circle.sb-dot.dot-matrix{fill:var(--blue);}
 .sb-connections circle.sb-dot.dot-board{fill:var(--teal);}
@@ -658,7 +661,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,[contenteditable
       <span id="savedot"><svg viewBox="0 0 16 16" fill="none"><path d="M2 2h8l4 4v8H2V2z" stroke="currentColor" stroke-width="1.4"/><path d="M5 2v4h6V2" stroke="currentColor" stroke-width="1.2"/><path d="M4 9h8v5H4V9z" stroke="currentColor" stroke-width="1.2"/></svg></span>
       <div style="position:relative;flex-shrink:0;">
         <span id="searchicon" style="position:absolute;left:7px;top:50%;transform:translateY(-50%);pointer-events:none;opacity:0.5;color:var(--text3);"></span>
-        <input id="searchinput" type="text" placeholder="Suche oder ^Kommando..." style="font-size:12px;padding:4px 8px 4px 22px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--bg2);color:var(--text);outline:none;width:160px;font-family:inherit;transition:width 0.2s ease;" oninput="onSearchInput(this.value)" onkeydown="searchInputKey(event)" onfocus="this.style.width='240px'" onblur="this.style.width='160px';setTimeout(()=>{if(!document.getElementById('searchinput').value)closeSearch();},150)"/>
+        <input id="searchinput" type="text" placeholder="Suche, ^Kommando oder Alt+↑↓" style="font-size:12px;padding:4px 8px 4px 22px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--bg2);color:var(--text);outline:none;width:200px;font-family:inherit;transition:width 0.2s ease;" oninput="onSearchInput(this.value)" onkeydown="searchInputKey(event)" onclick="onSearchFocus()" onfocus="this.style.width='260px';onSearchFocus()" onblur="this.style.width='200px';setTimeout(()=>{if(!document.getElementById('searchinput').value)closeSearch();},150)"/>
         <div id="searchresults" style="display:none;position:absolute;top:32px;right:0;width:320px;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--rl);z-index:80;max-height:360px;overflow-y:auto;box-shadow:0 2px 8px rgba(0,0,0,0.1);"></div>
       </div>
     </div>
@@ -672,7 +675,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,[contenteditable
           <button class="gear-item" id="filebtn"></button>
           <button class="gear-item" id="saveasbtn" onclick="saveFileAs();toggleGearMenu();"></button>
           <button class="gear-item" onclick="exportJSON();toggleGearMenu();" id="gear-export"></button>
-          <label class="gear-item" style="cursor:pointer;" id="gear-import"><input type="file" accept=".json" style="display:none;" onchange="importJSON(event);toggleGearMenu();"></label>
+          <label class="gear-item" style="cursor:pointer;" id="gear-import"><input type="file" accept=".json,.imx" style="display:none;" onchange="importJSON(event);toggleGearMenu();"></label>
           <div class="gear-sep"></div>
           <button class="gear-item" onclick="openStammdaten();toggleGearMenu();" id="gear-tags"></button>
           <button class="gear-item" onclick="showKeyboardHelp();toggleGearMenu();" id="gear-kb"></button>
@@ -798,6 +801,8 @@ const VIS_LABELS={
   addInfoField:'Felder/Links/Checklisten anlegen',
   deleteItems:'Lösch-Buttons (×)',
   dailyColEdit:'Tagesübersicht-Spalten bearbeiten',
+  sbCtxFeature:'Sidebar: Feature-Anlage',
+  sbCtxContent:'Sidebar: Inhalts-Anlage',
 };
 const VIS_OPTIONS=[['edit','Nur Edit-Modus'],['always','Immer sichtbar'],['never','Ausgeblendet']];
 // ── App Settings (persistent) ──
@@ -843,6 +848,8 @@ const DEFAULT_SETTINGS={
     addInfoField:'edit',  // + Feld / + Link / + Checkliste
     deleteItems:'edit',   // Lösch-Buttons (X) auf Elementen
     dailyColEdit:'edit',  // Zahnrad/Pfeile/Löschen bei Tagesübersicht-Spalten
+    sbCtxFeature:'edit',  // Sidebar-Kontextmenü: Feature-Anlage bei Zellen
+    sbCtxContent:'always',// Sidebar-Kontextmenü: Inhalts-Anlage bei Features (Karten/Checklisten/Links/Mails)
   },
 };
 let appSettings=JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
@@ -1047,6 +1054,7 @@ const DEFAULT_KEYBINDINGS={
   toggleSidebar:{shift:true,ctrl:false,alt:false,key:'N',label:'Shift+N'},
   focusSidebarSearch:{shift:true,ctrl:false,alt:true,key:'F',label:'Shift+Alt+F'},
   sidebarExpandAll:{shift:true,ctrl:false,alt:false,key:'A',label:'Shift+A'},
+  focusSwap:{shift:false,ctrl:false,alt:false,key:'S',label:'S'},
 };
 const KB_ACTIONS={
   save:'Speichern',edit:'Bearbeiten',freqview:'Intervallmatrix',
@@ -1056,7 +1064,8 @@ const KB_ACTIONS={
   removeInfo:'Info entfernen',removeChecklists:'Checklisten entfernen',
   toggleSidebar:'Sidebar ein-/ausblenden',
   focusSidebarSearch:'Sidebar-Filter fokussieren',
-  sidebarExpandAll:'Sidebar expand/collapse alles',
+  sidebarExpandAll:'Sidebar expand/collapse (Rails: Temp-Öffnen)',
+  focusSwap:'Fokus: Sidebar ↔ Canvas wechseln',
 };
 let keyBindings=JSON.parse(JSON.stringify(DEFAULT_KEYBINDINGS));
 function saveKeyBindings(){save();}
@@ -1140,6 +1149,44 @@ const SB_STATE_KEY='imatrix-sidebar-state';
 let _freqExpanded=new Set();  // dataIds of expanded aggregate rows
 let _freqAggCache=null;        // last-rendered aggregate tree, used by flyout lookups
 
+// Unified search/command history (Alt+ArrowUp/Down). Stores the raw input string including
+// the leading '^' for commands, plain text for regular searches. Capped at 25.
+// Persisted via localStorage for immediate responsiveness AND included in the JSON payload
+// (getPayload/loadData) so import/export carries the history too.
+const SEARCH_HISTORY_KEY='imatrix-search-history';
+const SEARCH_HISTORY_MAX=25;
+let _searchHistory=[];
+let _searchHistoryCursor=-1;      // -1 means "not navigating"; otherwise index into _searchHistory
+let _searchHistoryDraft='';        // saved input state before navigation began
+try{const raw=localStorage.getItem(SEARCH_HISTORY_KEY);if(raw){const arr=JSON.parse(raw);if(Array.isArray(arr))_searchHistory=arr.slice(-SEARCH_HISTORY_MAX);}}catch(e){}
+function _pushSearchHistory(raw){
+  if(!raw||!raw.trim())return;
+  if(raw.trim().length<2)return; // too short to be a meaningful history entry
+  // Dedup against the most recent entry
+  if(_searchHistory[_searchHistory.length-1]===raw)return;
+  _searchHistory.push(raw);
+  if(_searchHistory.length>SEARCH_HISTORY_MAX)_searchHistory=_searchHistory.slice(-SEARCH_HISTORY_MAX);
+  try{localStorage.setItem(SEARCH_HISTORY_KEY,JSON.stringify(_searchHistory));}catch(e){}
+  _searchHistoryCursor=-1;_searchHistoryDraft='';
+}
+function _navSearchHistory(dir){
+  const inp=document.getElementById('searchinput');
+  if(!inp||_searchHistory.length===0)return;
+  if(_searchHistoryCursor===-1){
+    _searchHistoryDraft=inp.value;
+    _searchHistoryCursor=_searchHistory.length;
+  }
+  _searchHistoryCursor=Math.max(0,Math.min(_searchHistory.length,_searchHistoryCursor+dir));
+  if(_searchHistoryCursor>=_searchHistory.length){
+    inp.value=_searchHistoryDraft;
+    _searchHistoryCursor=-1;
+  }else{
+    inp.value=_searchHistory[_searchHistoryCursor];
+  }
+  onSearchInput(inp.value);
+  setTimeout(()=>{inp.setSelectionRange(inp.value.length,inp.value.length);},0);
+}
+
 // ── File System Access API ──
 let fileHandle=null; // active file handle (null = localStorage mode)
 let fileDirty=false;
@@ -1148,8 +1195,8 @@ const FILE_DEBOUNCE_MS=2000;
 const FILE_OPTS={types:[{description:'Matrix JSON',accept:{'application/json':['.json']}}]};
 const hasFileAPI=typeof window.showOpenFilePicker==='function';
 
-function getPayload(){return JSON.stringify({version:DATA_VERSION,nodes,nid,rootId,globalTags,globalPeople,dailyCols,keyBindings});}
-function getPayloadPretty(){return JSON.stringify({version:DATA_VERSION,nodes,nid,rootId,globalTags,globalPeople,dailyCols,keyBindings},null,2);}
+function getPayload(){return JSON.stringify({version:DATA_VERSION,nodes,nid,rootId,globalTags,globalPeople,dailyCols,keyBindings,searchHistory:_searchHistory});}
+function getPayloadPretty(){return JSON.stringify({version:DATA_VERSION,nodes,nid,rootId,globalTags,globalPeople,dailyCols,keyBindings,searchHistory:_searchHistory},null,2);}
 
 function showSaveStatus(text,color,duration){
   const d=document.getElementById('savedot');if(!d)return;
@@ -1197,6 +1244,27 @@ async function getEncPw(){
   const pw=prompt('Passwort für Verschlüsselung:');
   if(pw)_encPw=pw;
   return pw;
+}
+function hasEncPw(){return !!_encPw;}
+function setEncPasswordDialog(){
+  smodal('Verschlüsselungs-Passwort setzen',[
+    {label:'Neues Passwort',id:'p1',type:'password',ph:'mindestens 4 Zeichen'},
+    {label:'Passwort bestätigen',id:'p2',type:'password'}
+  ],v=>{
+    const p1=(v.p1||'').trim();
+    if(p1.length<4){alert('Passwort muss mindestens 4 Zeichen haben.');showSettings();return;}
+    if(p1!==(v.p2||'').trim()){alert('Passwörter stimmen nicht überein.');showSettings();return;}
+    _encPw=p1;
+    showSaveStatus('✓ Passwort gesetzt','var(--teal)',SAVE_INDICATOR_MS);
+    showSettings();
+  },()=>showSettings());
+}
+function clearEncPassword(){
+  if(!_encPw){showSettings();return;}
+  if(!confirm('Passwort aus dem Session-Speicher löschen? Beim nächsten verschlüsselten Speichern wirst du erneut gefragt.'))return;
+  _encPw=null;
+  showSaveStatus('Passwort gelöscht','var(--amber)',SAVE_INDICATOR_MS);
+  showSettings();
 }
 
 function save(){
@@ -1302,6 +1370,10 @@ function loadData(d){
   globalPeople=d.globalPeople||[];
   dailyCols=d.dailyCols||[];
   if(d.keyBindings){Object.keys(DEFAULT_KEYBINDINGS).forEach(k=>{if(d.keyBindings[k])keyBindings[k]=d.keyBindings[k];});}
+  if(Array.isArray(d.searchHistory)){
+    _searchHistory=d.searchHistory.slice(-SEARCH_HISTORY_MAX);
+    try{localStorage.setItem(SEARCH_HISTORY_KEY,JSON.stringify(_searchHistory));}catch(e){}
+  }
   stack=[{nodeId:rootId,label:nodes[rootId].label,cellRef:null}];
   migrateNodeAliasesToCells();
   rebuildAliasIndex();
@@ -1319,9 +1391,12 @@ async function exportJSON(){
     return;
   }
   let content=getPayloadPretty();
-  if(appSettings.encryption){const pw=await getEncPw();if(!pw)return;content=await encryptPayload(content,pw);}
-  const blob=new Blob([content],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='matrix-backup.json';a.click();
+  let encrypted=false;
+  if(appSettings.encryption){const pw=await getEncPw();if(!pw)return;content=await encryptPayload(content,pw);encrypted=true;}
+  const blob=new Blob([content],{type:encrypted?'application/octet-stream':'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='matrix-backup.'+(encrypted?'imx':'json');
+  a.click();
 }
 function validateImport(d){
   if(!d||typeof d!=='object')return false;
@@ -1426,7 +1501,7 @@ function render(){
     const _ge=document.getElementById('gear-export');
     const _gi=document.getElementById('gear-import');
     if(_ge)_ge.innerHTML=ICO.download(12)+(_isSubLevel?' Export Knoten':' Export JSON');
-    if(_gi){const _lbl=_isSubLevel?' Import Knoten':' Import JSON';_gi.innerHTML='';_gi.insertAdjacentHTML('afterbegin',ICO.upload(12)+_lbl);const _inp=_gi.querySelector('input');if(!_inp){_gi.insertAdjacentHTML('beforeend','<input type="file" accept=".json" style="display:none;" onchange="importJSON(event);toggleGearMenu();">');}}
+    if(_gi){const _lbl=_isSubLevel?' Import Knoten':' Import JSON';_gi.innerHTML='';_gi.insertAdjacentHTML('afterbegin',ICO.upload(12)+_lbl);const _inp=_gi.querySelector('input');if(!_inp){_gi.insertAdjacentHTML('beforeend','<input type="file" accept=".json,.imx" style="display:none;" onchange="importJSON(event);toggleGearMenu();">');}}
     // Scroll-fade masks on horizontally scrollable containers
     initScrollFade();
     // Auto-focus first cell on matrix pages
@@ -2042,8 +2117,8 @@ function sbRenderTree(rootMatrixId){
     else if(e.kind==='cell'&&e.isSingle&&e.features[0].key==='board'&&e.cell.boardId){isDropTarget=true;dropBoardId=e.cell.boardId;}
     const dropAttrs=isDropTarget?` ondragover="sbDragOver(event)" ondragleave="sbDragLeave(event)" ondrop="sbDrop(event,'${dropBoardId}')"`:'';
 
-    // Context menu: only for cells in edit mode (rename/delete not meaningful on matrix/feature rows here)
-    const ctxAttr=e.kind==='cell'?` oncontextmenu="sbContextMenu(event,'${dataId}')"`:'';
+    // Context menu: cells (feature-add + rename/delete) and feature rows (content-add)
+    const ctxAttr=(e.kind==='cell'||e.kind==='feature')?` oncontextmenu="sbContextMenu(event,'${dataId}')"`:'';
     // Row actions (edit-mode) only shown on cells
     const actionsHtml=(e.kind==='cell')?`<span class="sb-row-actions">
       <button title="Umbenennen" onclick="event.stopPropagation();sbRename('${dataId}')" tabindex="-1">✎</button>
@@ -2118,7 +2193,13 @@ function renderSidebar(){
   if(!rootNodeId||!nodes[rootNodeId])return;
   const tree=document.getElementById('sb-tree');
   if(!tree)return;
+  // Preserve the tree-wrap's scrollTop across the innerHTML swap. Without this,
+  // replacing tree.innerHTML resets the scroll position to 0, making the subsequent
+  // auto-scroll-to-active visible as a "jump" (the ruck effect).
+  const wrap=document.getElementById('sb-tree-wrap');
+  const savedScrollTop=wrap?wrap.scrollTop:0;
   tree.innerHTML=sbRenderTree(rootNodeId);
+  if(wrap)wrap.scrollTop=savedScrollTop;
   sbUpdateFilterUI();
   // Compute rails width based on max visible depth (for rails-mode)
   sbUpdateRailsWidth();
@@ -2160,10 +2241,13 @@ function sbUpdateRailsWidth(){
 let _sbScrolled=false;
 function sbAutoScrollToActive(){
   if(!appSettings.sidebarAutoScroll)return;
+  if(_sbSkipNextAutoScroll){_sbSkipNextAutoScroll=false;return;}
   const activeTopId=sbActiveTopId();
   if(!activeTopId)return;
   const el=document.querySelector(`.sb-node[data-id="${activeTopId}"]`);
-  if(el)el.scrollIntoView({block:'center',behavior:_sbScrolled?'smooth':'auto'});
+  // 'nearest' only scrolls when the active element is actually out of view — prevents
+  // the tree from jumping when the user has scrolled elsewhere or re-renders preserve position.
+  if(el)el.scrollIntoView({block:'nearest',behavior:_sbScrolled?'smooth':'auto'});
   _sbScrolled=true;
 }
 
@@ -2243,17 +2327,13 @@ function sbDrawConnections(){
     if(childIds.length>1&&lastMeta.cy>firstMeta.cy){
       rails+=`<path class="ln-rail" d="M ${railX} ${firstMeta.cy} L ${railX} ${lastMeta.cy}"/>`;
     }
-    // Split-curve: from parent-dot bottom → smooth curve → rail top (first child y)
+    // Split-curve: from parent-dot bottom → smooth curve → rail top (first child y).
+    // Arc colour = first-child's dot-type so the bow visually matches the dot it leads to.
     const px=pm.cx,py=pm.cy;
     const cy=firstMeta.cy;
     const d=`M ${px} ${py+3} C ${px} ${cy}, ${railX} ${cy-6}, ${railX} ${cy}`;
-    const n=nodes[firstId];
-    let cls='ln-matrix';
-    if(n){
-      if(n.type==='board')cls='ln-board';
-      else if(n.type==='cell')cls='ln-cell';
-    }else if(String(firstId).startsWith('cell-'))cls='ln-cell';
-    if(!useColors)cls='';
+    const firstDt=firstMeta.el?.dataset?.dotType||'matrix';
+    const cls=useColors?('ln-'+firstDt):'';
     splits+=`<path class="ln-split ${cls}" d="${d}"/>`;
   });
   // Pass B: Dots (colored per node type), on top of rails
@@ -2357,6 +2437,14 @@ function sbNodeClick(e,nodeId){
 }
 function sbNodeKey(e,nodeId){
   if(e.key==='Enter'||e.key===' '){e.preventDefault();sbNav(nodeId);return;}
+  // "+" opens the context menu on the focused row (cell or feature)
+  if(e.key==='+'){
+    e.preventDefault();
+    const el=e.currentTarget;
+    const rect=el.getBoundingClientRect();
+    sbContextMenu({clientX:rect.right-10,clientY:rect.top+rect.height/2,preventDefault:()=>{}},nodeId);
+    return;
+  }
   if(e.key==='ArrowRight'){
     const el=e.currentTarget;
     if(el.dataset.expandable==='1'&&!sbExpanded.has(nodeId)){e.preventDefault();sbExpanded.add(nodeId);sbSavePersist();renderSidebar();}
@@ -2416,7 +2504,11 @@ function sbToggleExpand(nodeId,siblingsToo){
 }
 // Expand all expandable entries in the tree; toggle behavior: if >=80% already expanded, collapse instead
 function sbToggleExpandAll(){
-  if(!appSettings.sidebarEnabled||sbState!=='full'){showCmdError();return;}
+  if(!appSettings.sidebarEnabled){showCmdError();return;}
+  // In rails-mode: Shift+A expands the sidebar temporarily (like a rail-click) —
+  // a subsequent click outside collapses it back to rails automatically.
+  if(sbState==='rails'){sbSetState('full');_sbRailExpanded=true;return;}
+  if(sbState!=='full'){showCmdError();return;}
   const rootMid=stack[0]?stack[0].nodeId:rootId;
   // Gather all expandable dataIds
   const expandables=[];
@@ -2444,10 +2536,27 @@ function sbToggleExpandAll(){
   setTimeout(()=>{_sbLastExpandedId=null;},50);
 }
 // Cycle through 3 states: full → rails → collapsed → full
+// Rail-expansion tracking: true when the sidebar was expanded from rails via a
+// sidebar-click (sbRailsClick) — in this mode, clicking anywhere OUTSIDE the
+// sidebar collapses it back to rails. Cleared when the state changes for any
+// other reason (cycle-btn, keyboard shortcut, explicit setState call).
+let _sbRailExpanded=false;
+// Focus-swap state: remember the last-focused element per region so the 'S' shortcut
+// can jump back to where the user was, not always the first focusable.
+let _lastSidebarFocus=null;
+let _lastCanvasFocus=null;
+// When true, the next sbAutoScrollToActive call is skipped — used to avoid the
+// visible scroll-ruck when the sidebar is mid-width-transition. The transitionend
+// listener triggers the auto-scroll once dimensions have settled.
+let _sbSkipNextAutoScroll=false;
+
 function sbToggle(){
+  _sbRailExpanded=false;
   const order=['full','rails','collapsed'];
   const idx=order.indexOf(sbState);
   sbState=order[(idx+1)%order.length];
+  // Width will transition; skip the initial auto-scroll to avoid the visible jump.
+  _sbSkipNextAutoScroll=true;
   sbSavePersist();
   sbApplyBodyClasses();
   if(sbState!=='collapsed')renderSidebar();
@@ -2455,14 +2564,37 @@ function sbToggle(){
 function sbSetState(newState){
   if(!['full','rails','collapsed'].includes(newState))return;
   if(sbState===newState)return;
+  _sbRailExpanded=false;
+  _sbSkipNextAutoScroll=true;
   sbState=newState;
   sbSavePersist();
   sbApplyBodyClasses();
   if(newState!=='collapsed')renderSidebar();
 }
+// Swap keyboard focus between the canvas and the sidebar.
+// Jumps back to the last-focused element per region (tracked via focusin).
+// Falls back to the first sensible focus target if none is remembered.
+function focusSwap(){
+  const ae=document.activeElement;
+  const inSidebar=ae&&ae.closest&&ae.closest('#sidebar');
+  if(inSidebar){
+    const target=(_lastCanvasFocus&&document.contains(_lastCanvasFocus))
+      ?_lastCanvasFocus
+      :(document.querySelector('#panel [tabindex="0"]')||document.querySelector('#panel button')||document.querySelector('.mcell'));
+    if(target)target.focus();
+    return;
+  }
+  // Not in sidebar → jump to sidebar. If disabled/collapsed, expand to at least rails.
+  if(!appSettings.sidebarEnabled){appSettings.sidebarEnabled=true;saveSettings();}
+  if(sbState==='collapsed')sbSetState('full');
+  const target=(_lastSidebarFocus&&document.contains(_lastSidebarFocus))
+    ?_lastSidebarFocus
+    :(document.querySelector('#sidebar .sb-node.active')||document.querySelector('#sidebar .sb-node'));
+  if(target)setTimeout(()=>target.focus(),0);
+}
 // Click anywhere in rails-mode sidebar returns to full mode
 function sbRailsClick(e){
-  if(sbState==='rails'){e.preventDefault();e.stopPropagation();sbSetState('full');}
+  if(sbState==='rails'){e.preventDefault();e.stopPropagation();sbSetState('full');_sbRailExpanded=true;}
 }
 function sbTabDragEnter(e){
   if(_dragCardId&&sbState==='collapsed'){sbSetState('full');}
@@ -2672,30 +2804,93 @@ function sbPeekContent(dataId){
 }
 
 // Context menu
-function sbContextMenu(e,nodeId){
-  if(!editMode)return; // only in edit mode
-  if(String(nodeId).startsWith('cell-'))return; // pseudo-cells can't be renamed here
+function sbContextMenu(e,dataId){
+  const isCell=String(dataId).startsWith('cell-');
+  const isFeat=String(dataId).startsWith('feat-');
+  if(!isCell&&!isFeat)return;
+  const cp=isCell?_sbParseCellDataId(dataId):null;
+  const fp=isFeat?_sbParseFeatureDataId(dataId):null;
+  if(!cp&&!fp)return;
+
+  const featureAnlageOn=isVis('sbCtxFeature');
+  const contentAnlageOn=isVis('sbCtxContent');
+  const FEAT_COLORS={matrix:'var(--bluetxt)',board:'var(--tealtxt)',info:'var(--ambertxt)',checklists:'var(--purpletxt)'};
+  const buttons=[];
+
+  if(cp){
+    // Cell: "fehlende Features anlegen" — je nach Setting und Edit-Mode-Gate
+    if(featureAnlageOn){
+      const active=new Set(getActiveFeatures(cp.cell).map(f=>f.key));
+      const rowLabel=cp.parent.data.rows.find(r=>r.id===cp.rowId)?.label||'';
+      const colLabel=cp.parent.data.cols.find(c=>c.id===cp.colId)?.label||'';
+      const lbl=`${rowLabel} / ${colLabel}`;
+      FEATURE_DISPLAY_ORDER.forEach(k=>{
+        if(active.has(k))return;
+        const def=getCellFeatureDef(k);if(!def)return;
+        buttons.push({
+          icon:def.icoSm,iconColor:FEAT_COLORS[k],
+          label:`${def.label} anlegen`,
+          onClick:()=>iconClick(cp.parentMatrixId,cp.rowId,cp.colId,k,lbl),
+        });
+      });
+    }
+    if(editMode){
+      if(buttons.length)buttons.push({divider:true});
+      buttons.push({icon:ICO.edit(12),label:'Umbenennen',onClick:()=>sbRename(dataId)});
+      buttons.push({icon:ICO.close(12),label:'Löschen',className:'danger',onClick:()=>sbDelete(dataId)});
+    }
+  }else if(fp){
+    // Feature: "neuen Inhalt anlegen" — je nach Feature-Typ
+    if(contentAnlageOn){
+      const b=fp.cell.boardId?nodes[fp.cell.boardId]:null;
+      if(fp.key==='info'&&b){
+        buttons.push({icon:ICO.link(12),label:'Neuer Link',onClick:()=>addLink(fp.cell.boardId)});
+        buttons.push({icon:ICO.mail(12),label:'Neue Mailvorlage',onClick:()=>addMailTemplate(fp.cell.boardId)});
+      }else if(fp.key==='board'&&b){
+        const def=getCellFeatureDef('board');
+        buttons.push({icon:def?def.icoSm:'',iconColor:FEAT_COLORS.board,label:'Neue Karte',onClick:()=>addKbCard(fp.cell.boardId)});
+      }else if(fp.key==='checklists'&&b){
+        const def=getCellFeatureDef('checklists');
+        buttons.push({icon:def?def.icoSm:'',iconColor:FEAT_COLORS.checklists,label:'Neue Checkliste',onClick:()=>addChecklist(fp.cell.boardId)});
+      }
+      // matrix-feature: bewusst ausgelassen
+    }
+  }
+
+  if(buttons.length===0)return; // nothing to show — don't intercept the event
   e.preventDefault();
-  // Close existing
+
   document.querySelectorAll('.sb-context-menu').forEach(m=>m.remove());
-  const n=nodes[nodeId];if(!n)return;
   const menu=document.createElement('div');
   menu.className='sb-context-menu';
-  menu.style.left=e.clientX+'px';
-  menu.style.top=e.clientY+'px';
-  menu.innerHTML=`
-    <button onclick="document.querySelectorAll('.sb-context-menu').forEach(m=>m.remove());sbRename('${nodeId}')">${ICO.edit(12)} Umbenennen</button>
-    <button class="danger" onclick="document.querySelectorAll('.sb-context-menu').forEach(m=>m.remove());sbDelete('${nodeId}')">${ICO.close(12)} Löschen</button>
-  `;
+  menu.style.left=e.clientX+'px';menu.style.top=e.clientY+'px';
+  menu.innerHTML=buttons.map((b,i)=>{
+    if(b.divider)return '<div style="height:1px;background:var(--border);margin:3px 0;"></div>';
+    const cls=b.className?' class="'+b.className+'"':'';
+    const iconHtml=b.icon?`<span style="display:inline-flex;width:14px;height:14px;align-items:center;justify-content:center;color:${b.iconColor||'var(--text2)'};flex-shrink:0;">${b.icon}</span>`:'';
+    return `<button${cls} data-idx="${i}">${iconHtml}<span>${esc(b.label)}</span></button>`;
+  }).join('');
   document.body.appendChild(menu);
+  menu.querySelectorAll('button[data-idx]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const b=buttons[+btn.dataset.idx];
+      menu.remove();
+      if(b&&b.onClick)b.onClick();
+    });
+  });
   // Clamp to viewport
   const r=menu.getBoundingClientRect();
   if(r.right>window.innerWidth-8)menu.style.left=(window.innerWidth-r.width-8)+'px';
   if(r.bottom>window.innerHeight-8)menu.style.top=(window.innerHeight-r.height-8)+'px';
-  // Dismiss on outside click
+  // Auto-focus first action so Enter works immediately
+  const firstBtn=menu.querySelector('button');
+  if(firstBtn)setTimeout(()=>firstBtn.focus(),0);
+  // Dismiss on outside click OR Escape
   setTimeout(()=>{
-    const close=ev=>{if(!ev.target.closest('.sb-context-menu')){menu.remove();document.removeEventListener('click',close);}};
+    const close=ev=>{if(!ev.target.closest('.sb-context-menu')){menu.remove();document.removeEventListener('click',close);document.removeEventListener('keydown',kdClose);}};
+    const kdClose=ev=>{if(ev.key==='Escape'){menu.remove();document.removeEventListener('click',close);document.removeEventListener('keydown',kdClose);}};
     document.addEventListener('click',close);
+    document.addEventListener('keydown',kdClose);
   },0);
 }
 // Parse cell dataId → {parentMatrixId, rowId, colId, cell}
@@ -2706,6 +2901,15 @@ function _sbParseCellDataId(dataId){
   const parent=nodes[parentMatrixId];if(!parent||parent.type!=='matrix')return null;
   const cell=parent.data.cells[rowId+'-'+colId];if(!cell)return null;
   return {parentMatrixId,rowId,colId,cell,parent};
+}
+// Parse feature dataId → {parentMatrixId, rowId, colId, cell, parent, key}
+function _sbParseFeatureDataId(dataId){
+  const m=/^feat-(.+?)-([^-]+)-([^-]+)-(info|board|checklists|matrix)$/.exec(dataId);
+  if(!m)return null;
+  const parentMatrixId=m[1],rowId=m[2],colId=m[3],key=m[4];
+  const parent=nodes[parentMatrixId];if(!parent||parent.type!=='matrix')return null;
+  const cell=parent.data.cells[rowId+'-'+colId];if(!cell)return null;
+  return {parentMatrixId,rowId,colId,cell,parent,key};
 }
 function sbRename(dataId){
   const p=_sbParseCellDataId(dataId);if(!p)return;
@@ -2781,6 +2985,22 @@ function initSidebar(){
   document.addEventListener('keydown',e=>{if(e.key==='Control')sbCtrlDown=true;});
   document.addEventListener('keyup',e=>{if(e.key==='Control'){sbCtrlDown=false;sbPeekHide();}});
   window.addEventListener('blur',()=>{sbCtrlDown=false;sbPeekHide();});
+  // Click-outside handler: if the sidebar is in "rail-expanded" mode (came from
+  // sbRailsClick or Shift+A), any click outside the sidebar collapses it back to rails.
+  document.addEventListener('click',e=>{
+    if(!_sbRailExpanded||sbState!=='full')return;
+    const t=e.target;
+    if(t.closest&&(t.closest('#sidebar')||t.closest('#sb-cycle-btn')||t.closest('#sb-edge-toggle')||t.closest('#sb-inline-toggle')||t.closest('#sb-rail-cap')))return;
+    sbSetState('rails'); // sbSetState clears _sbRailExpanded
+  });
+  // Track the most recently focused element per region — sidebar vs. canvas (main panel)
+  // so the 'S' focus-swap shortcut can restore the user's last position.
+  document.addEventListener('focusin',e=>{
+    const t=e.target;
+    if(!t||!t.closest)return;
+    if(t.closest('#sidebar')){_lastSidebarFocus=t;}
+    else if(t.closest('#content')||t.closest('#panel')){_lastCanvasFocus=t;}
+  });
   // Redraw connections on resize
   window.addEventListener('resize',()=>{if(appSettings.sidebarEnabled)sbDrawConnections();});
   // Redraw after sidebar width transition (collapsed↔rails↔full) so rails/dots
@@ -2792,6 +3012,9 @@ function initSidebar(){
     if(e.propertyName!=='width')return;
     if(sbState==='collapsed')return;
     sbDrawConnections();
+    // Auto-scroll was skipped during the width transition to avoid the visible
+    // jump; now that the sidebar has settled at final width, scroll normally.
+    sbAutoScrollToActive();
   });
   // Scroll redraws (lines stay aligned)
   const wrap=document.getElementById('sb-tree-wrap');
@@ -3155,11 +3378,12 @@ async function exportNode(nodeId){
   const tree=collectNodeTree(nodeId);
   const payload={exportType:n.type,rootId:nodeId,nodes:tree,exportDate:new Date().toISOString()};
   let content=JSON.stringify(payload,null,2);
-  if(appSettings.encryption){const pw=await getEncPw();if(!pw)return;content=await encryptPayload(content,pw);}
-  const blob=new Blob([content],{type:'application/json'});
+  let encrypted=false;
+  if(appSettings.encryption){const pw=await getEncPw();if(!pw)return;content=await encryptPayload(content,pw);encrypted=true;}
+  const blob=new Blob([content],{type:encrypted?'application/octet-stream':'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download=(n.label||n.type)+'-export.json';
+  a.download=(n.label||n.type)+'-export.'+(encrypted?'imx':'json');
   a.click();
 }
 function importNodeData(e,parentId,rowId,colId,targetType){
@@ -4910,10 +5134,22 @@ function iconClick(nodeId,rowId,colId,type,label){
   const aliasField={label:'Kürzel',id:'a',ph:'z.B. abc',v:cell.alias||'',ro:hasAlias};
   // Unified default name: always "{row} / {col}" (the passed `label`)
   const defaultName=label;
+  // Arrow-Up/Down inside the Name-Field cycles through three values:
+  //   row/col  →  col/row  →  feature's standard label
+  const featDef=getCellFeatureDef(type);
+  const featLabel=featDef?featDef.label:'';
+  // Derive "col / row" by splitting the passed "{row} / {col}" label
+  const swapSep=' / ';
+  const swapIdx=label.indexOf(swapSep);
+  const swapName=swapIdx>0?label.slice(swapIdx+swapSep.length)+swapSep+label.slice(0,swapIdx):null;
+  const nameCycle=[defaultName];
+  if(swapName&&swapName!==defaultName)nameCycle.push(swapName);
+  if(featLabel&&!nameCycle.includes(featLabel))nameCycle.push(featLabel);
+  const nameField={label:'Name',id:'l',ph:defaultName,v:defaultName,cycle:nameCycle};
 
   if(type==='matrix'){
     if(!cell.matrixId){
-      smodal(_featTitle('matrix','Neue Sub-Matrix anlegen'),[{label:'Name',id:'l',ph:defaultName,v:defaultName},aliasField],v=>{
+      smodal(_featTitle('matrix','Neue Sub-Matrix anlegen'),[nameField,aliasField],v=>{
         _applyAlias(cell,hasAlias,v.a);
         const id=mkMatrix(v.l||defaultName);
         cell.matrixId=id;addFeature(cell,'matrix');save();rebuildAliasIndex();
@@ -4924,7 +5160,7 @@ function iconClick(nodeId,rowId,colId,type,label){
     const tab=type;
     if(!cell.boardId){
       // Board existiert noch nicht → anlegen
-      smodal(_featTitle(type,'Neues Board anlegen'),[{label:'Name',id:'l',ph:defaultName,v:defaultName},aliasField],v=>{
+      smodal(_featTitle(type,'Neues Board anlegen'),[nameField,aliasField],v=>{
         _applyAlias(cell,hasAlias,v.a);
         const id=mkBoard(v.l||defaultName);
         cell.boardId=id;addFeature(cell,type);save();rebuildAliasIndex();
@@ -4933,7 +5169,7 @@ function iconClick(nodeId,rowId,colId,type,label){
     } else if(!cell.features||!cell.features.includes(type)){
       // Board existiert, aber Feature noch nicht aktiviert → Dialog
       const titles={board:'Aufgaben hinzufügen',info:'Info hinzufügen',checklists:'Checklisten hinzufügen'};
-      smodal(_featTitle(type,titles[type]||'Feature hinzufügen'),[{label:'Name',id:'l',ph:defaultName,v:defaultName},{label:'Kürzel',id:'a',ph:'',v:cell.alias||'',ro:true}],v=>{
+      smodal(_featTitle(type,titles[type]||'Feature hinzufügen'),[nameField,{label:'Kürzel',id:'a',ph:'',v:cell.alias||'',ro:true}],v=>{
         const newLabel=v.l&&v.l.trim()?v.l.trim():defaultName;
         if(!cell.tabLabels)cell.tabLabels={};
         cell.tabLabels[type]=newLabel;
@@ -5230,6 +5466,7 @@ function smodal(title,fields,cb,onClose){ // smodal = showSimpleModal
     h+=`<label>${f.label}</label>`;
     if(f.sel)h+=`<select id="mf-${f.id}">${f.sel.map((o,i)=>`<option value="${o}"${f.v===o?' selected':''}>${f.sellabels?f.sellabels[i]:o}</option>`).join('')}</select>`;
     else if(f.ro)h+=`<input id="mf-${f.id}" type="text" value="${f.v||''}" disabled style="opacity:0.5;cursor:default;"/>`;
+    else if(f.type==='password')h+=`<input id="mf-${f.id}" type="password" placeholder="${f.ph||''}" value="${f.v||''}" autocomplete="new-password"/>`;
     else h+=`<input id="mf-${f.id}" type="text" placeholder="${f.ph||''}" value="${f.v||''}"/>`;
   });
   h+=`<div class="smodal-actions"><button class="btn-c" onclick="closeS()">Abbrechen</button><button class="btn-p" onclick="subS()">OK</button></div></div></div>`;
@@ -5251,6 +5488,24 @@ function smodal(title,fields,cb,onClose){ // smodal = showSimpleModal
       }
     }
   };
+  // Wire cycle-fields: ↑/↓ inside a field with `cycle:[...]` rotates through the preset values.
+  // User-typed values reset the cycle pointer so the next arrow cycles from the typed state.
+  fields.forEach(f=>{
+    if(!f.cycle||!f.cycle.length)return;
+    const el=document.getElementById('mf-'+f.id);
+    if(!el)return;
+    const vals=f.cycle;
+    let idx=vals.indexOf(el.value);
+    el.addEventListener('keydown',ev=>{
+      if(ev.key!=='ArrowDown'&&ev.key!=='ArrowUp')return;
+      ev.preventDefault();
+      const step=ev.key==='ArrowDown'?1:-1;
+      idx=((idx<0?0:idx)+step+vals.length)%vals.length;
+      el.value=vals[idx];
+      el.select();
+    });
+    el.addEventListener('input',()=>{idx=vals.indexOf(el.value);});
+  });
   setTimeout(()=>{const ff=fields.find(f=>!f.ro)||fields[0];const el=document.getElementById('mf-'+ff.id);if(el){el.focus();el.select();}},MODAL_FOCUS_DELAY_MS);
 }
 function subS(){const v={};mfields.forEach(id=>{const el=document.getElementById('mf-'+id);if(el)v[id]=el.value;});document.getElementById('mc').innerHTML='';const _oc=mOnClose;if(mcb){mcb(v);mcb=null;}mOnClose=null;if(_oc)_oc();}
@@ -5312,7 +5567,8 @@ function showSettings(tab){
     ${settingSection('System')}
     ${settingNumber('autoSaveDelay','Auto-Save (ms)',500,10000,500)}
     ${settingCheck('animationsEnabled','Animationen')}
-    ${settingCheck('encryption','Verschlüsselung (Datei / Export)')}
+    ${settingCheck('encryption','Verschlüsselung (Datei / Export, .imx)')}
+    ${settingRow('Passwort',`<span style="font-size:0.7em;color:${hasEncPw()?'var(--tealtxt)':'var(--text3)'};margin-right:0.5em;">${hasEncPw()?'✓ gesetzt':'nicht gesetzt'}</span><button class="btn-c" style="font-size:0.7em;padding:0.3em 0.7em;" onclick="setEncPasswordDialog()">${hasEncPw()?'Ändern':'Setzen'}…</button>${hasEncPw()?`<button class="btn-c" style="font-size:0.7em;padding:0.3em 0.7em;margin-left:0.3em;" onclick="clearEncPassword()">Löschen</button>`:''}`)}
     ${settingSelect('dateLocale','Datumsformat',[['de-AT','Deutsch (AT)'],['de-DE','Deutsch (DE)'],['en-US','English (US)'],['en-GB','English (GB)'],['fr-FR','Français']])}`;
   } else {
     body=`
@@ -5358,6 +5614,15 @@ function showKeyboardHelp(){
     ['Entf','Karte löschen'],
     ['Tab / Shift+Tab','Nächstes / vorheriges Element'],
     ['^ + Kommando','Schnellnavigation (im Suchfeld)'],
+    ['',''],
+    ['Suchfeld',''],
+    ['Alt + ↑ ↓','Suchverlauf (letzte 25 Eingaben)'],
+    ['Klick in leeres Feld','Verlauf als Dropdown'],
+    ['',''],
+    ['Sidebar',''],
+    ['→ ←','Knoten aus-/einklappen'],
+    ['+','Kontextmenü auf Zeile (Feature/Inhalt anlegen)'],
+    ['Rechtsklick','Kontextmenü (wie +)'],
     ['',''],
     ['Kanban-Karten',''],
     ['Shift + ← →','Karte in Nachbarspalte'],
@@ -5440,9 +5705,47 @@ function resetKeyBindings(){
 function onSearchInput(val){
   if(val.startsWith('^')){
     handleCommandInput(val.slice(1));
-  } else {
+  }else if(!val||val.trim()===''){
+    // Empty (user deleted text but stays focused) — show the history dropdown
+    const inp=document.getElementById('searchinput');
+    if(inp&&document.activeElement===inp&&_searchHistory.length>0)_renderSearchHistoryDropdown();
+    else{const el=document.getElementById('searchresults');if(el)el.style.display='none';}
+  }else{
     doSearch(val);
   }
+}
+
+// Show the history dropdown when the empty search field receives focus or a click.
+function onSearchFocus(){
+  const inp=document.getElementById('searchinput');
+  if(!inp)return;
+  if(inp.value)return; // only show history when the input is empty
+  if(_searchHistory.length===0)return;
+  _renderSearchHistoryDropdown();
+}
+function _renderSearchHistoryDropdown(){
+  const el=document.getElementById('searchresults');
+  if(!el)return;
+  el.style.display='block';el.classList.add('sr-anim');
+  // Newest first
+  const entries=[..._searchHistory].reverse();
+  let h=`<div style="padding:7px 13px;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;border-bottom:0.5px solid var(--border);font-weight:500;">Zuletzt</div>`;
+  entries.forEach(q=>{
+    const isCmd=q.startsWith('^');
+    const prefix=isCmd
+      ?`<span style="color:var(--text3);font-family:monospace;font-size:11px;margin-right:4px;">^</span>`
+      :`<span class="sr-ico" style="color:var(--text3);">${ICO.search(11)}</span>`;
+    const display=isCmd?q.slice(1):q;
+    h+=`<div class="sr-item" data-query="${esc(q)}" onmousedown="event.preventDefault()" onclick="_applySearchHistoryEntry(this.dataset.query)"><div class="sr-name">${prefix}${esc(display)}</div></div>`;
+  });
+  el.innerHTML=h;
+}
+function _applySearchHistoryEntry(q){
+  const inp=document.getElementById('searchinput');
+  if(!inp)return;
+  inp.value=q;
+  inp.focus();
+  onSearchInput(q);
 }
 
 // Resolve the icon, color, label and type-text for one entry in the ^alias result list.
@@ -5926,6 +6229,7 @@ function parseCommand(raw){
 function executeCommand(raw){
   const cmd=parseCommand(raw);
   if(!cmd)return showCmdError();
+  _pushSearchHistory('^'+raw); // record with the leading ^ so recall restores the full command
   if(cmd.type==='find'){
     if(!cmd.query)return showCmdError();
     doScopedSearch(cmd.scope,cmd.query);
@@ -6160,6 +6464,14 @@ function searchInputKey(e){
   const inp=document.getElementById('searchinput');
   const isCmd=inp&&inp.value.startsWith('^');
   const items=document.querySelectorAll('#searchresults .sr-item');
+  // Alt+ArrowUp/Down: recall previous searches and commands (unified history).
+  if(e.altKey&&(e.key==='ArrowUp'||e.key==='ArrowDown')){
+    e.preventDefault();
+    _navSearchHistory(e.key==='ArrowUp'?-1:1);
+    return;
+  }
+  // Any other key resets the history-navigation state so the next Alt+Arrow starts fresh
+  if(_searchHistoryCursor!==-1){_searchHistoryCursor=-1;_searchHistoryDraft='';}
   if(e.key==='ArrowDown'&&items.length>0){
     e.preventDefault();
     _searchActiveIdx=Math.min(_searchActiveIdx+1,items.length-1);
@@ -6277,7 +6589,11 @@ function highlightSearchTerm(){
 function searchOpen(i){
   const r=(window._searchResults||[])[i];
   if(!r)return;
-  _lastSearchQuery=document.getElementById('searchinput')?.value||'';
+  const curVal=document.getElementById('searchinput')?.value||'';
+  _lastSearchQuery=curVal;
+  // Record the search query in history before the search closes (plain text searches
+  // are committed here; ^-commands are recorded via executeCommand separately).
+  if(curVal&&!curVal.startsWith('^'))_pushSearchHistory(curVal);
   closeSearch();
   if(r.type==='card'){openCard(r.boardId,r.id);highlightSearchTerm();}
   else if(r.type==='info'){
@@ -6397,6 +6713,7 @@ document.addEventListener('keydown',e=>{
   if(!_typing&&matchShortcut(e,'freqview')){e.preventDefault();executeCommand('w');return;}
   if(!_typing&&matchShortcut(e,'toggleSidebar')){e.preventDefault();sbToggle();return;}
   if(!_typing&&matchShortcut(e,'sidebarExpandAll')){e.preventDefault();sbToggleExpandAll();return;}
+  if(!_typing&&matchShortcut(e,'focusSwap')){e.preventDefault();focusSwap();return;}
   if(matchShortcut(e,'focusSidebarSearch')){
     e.preventDefault();
     if(!appSettings.sidebarEnabled){appSettings.sidebarEnabled=true;saveSettings();}
