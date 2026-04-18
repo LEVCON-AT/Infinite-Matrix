@@ -711,6 +711,8 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,[contenteditable
 .toast-body{flex:1;min-width:0;}
 .toast-close{flex-shrink:0;background:none;border:none;color:var(--text3);cursor:pointer;padding:0 2px;font-size:16px;line-height:1;opacity:0.6;transition:opacity var(--tr-std);}
 .toast-close:hover{opacity:1;color:var(--text);}
+.toast-action{flex-shrink:0;background:var(--bluebg);border:0.5px solid var(--blue);color:var(--bluetxt);cursor:pointer;padding:3px 9px;font-size:11px;border-radius:var(--r);font-family:inherit;transition:background var(--tr-std);}
+.toast-action:hover{background:var(--blue);color:var(--bg);}
 @keyframes toastIn{from{opacity:0;transform:translateX(16px) scale(0.96);}to{opacity:1;transform:none;}}
 @keyframes toastOut{from{opacity:1;transform:none;}to{opacity:0;transform:translateX(16px) scale(0.96);}}
 
@@ -946,6 +948,48 @@ function showToast(msg,opts){
   stack.appendChild(div);
   if(ms>0)setTimeout(remove,ms);
   return id;
+}
+// ── UNDO-STACK (Sprint 6.1) ──
+const UNDO_MAX=10;
+const UNDO_TOAST_MS=10000;
+let _undoStack=[];
+// pushUndo: vor destruktiver Aktion aufrufen. Snapshot = getPayload()-JSON (komplett, aber ~kB statt MB).
+function pushUndo(label){
+  try{
+    const snap=getPayload(); // already a JSON string
+    _undoStack.push({label,snap,t:Date.now()});
+    if(_undoStack.length>UNDO_MAX)_undoStack.shift();
+  }catch(e){console.warn('undo-snapshot failed',e);}
+}
+function _applyUndo(entry){
+  try{
+    const parsed=JSON.parse(entry.snap);
+    loadData(parsed);
+    save();
+    render();
+    if(appSettings.sidebarEnabled&&typeof renderSidebar==='function')renderSidebar();
+    showToast(`Wiederhergestellt: ${entry.label}`,{type:'success',ms:3000});
+  }catch(e){showToast('Wiederherstellen fehlgeschlagen: '+translateError(e),{type:'error'});}
+}
+function showUndoToast(label){
+  const entry=_undoStack[_undoStack.length-1];
+  if(!entry)return;
+  const stack=document.getElementById('toast-stack');
+  if(!stack)return;
+  const div=document.createElement('div');
+  div.className='toast info';
+  div.setAttribute('role','status');
+  const safe=String(label).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  div.innerHTML=`<span class="toast-icon info">${_toastIcon('info')}</span><div class="toast-body">${safe}</div><button class="toast-action" type="button">Rückgängig</button><button class="toast-close" aria-label="Schließen">&times;</button>`;
+  const remove=()=>{if(!div.isConnected)return;div.classList.add('closing');setTimeout(()=>{if(div.parentNode)div.parentNode.removeChild(div);},160);};
+  div.querySelector('.toast-close').onclick=remove;
+  div.querySelector('.toast-action').onclick=()=>{
+    const idx=_undoStack.indexOf(entry);if(idx>=0)_undoStack.splice(idx,1);
+    _applyUndo(entry);
+    remove();
+  };
+  stack.appendChild(div);
+  setTimeout(remove,UNDO_TOAST_MS);
 }
 // ── ERROR-TRANSLATION (Sprint 3.3) ──
 // translateError(err) → deutscher String. Prüft bekannte Fehler-Klassen/-Namen.
@@ -3410,7 +3454,10 @@ function sbRename(dataId){
 function sbDelete(dataId){
   const p=_sbParseCellDataId(dataId);if(!p)return;
   const {parentMatrixId,rowId,colId,cell}=p;
-  if(!confirm(`Alle Inhalte der Zelle „${p.parent.data.rows.find(r=>r.id===rowId)?.label} / ${p.parent.data.cols.find(c=>c.id===colId)?.label}" löschen?`))return;
+  const rowLbl=p.parent.data.rows.find(r=>r.id===rowId)?.label;
+  const colLbl=p.parent.data.cols.find(c=>c.id===colId)?.label;
+  if(!confirm(`Alle Inhalte der Zelle „${rowLbl} / ${colLbl}" löschen?`))return;
+  pushUndo(`Zelle „${rowLbl} / ${colLbl}" gelöscht`);
   if(cell.boardId){delete nodes[cell.boardId];cell.boardId=null;}
   if(cell.matrixId){removeTree(cell.matrixId);cell.matrixId=null;}
   cell.features=[];
@@ -3421,6 +3468,7 @@ function sbDelete(dataId){
     else break;
   }
   save();render();
+  showUndoToast(`Zelle „${rowLbl} / ${colLbl}" gelöscht`);
 }
 
 // Resize handle — mousemove/mouseup nur während aktivem Drag registriert,
@@ -5794,8 +5842,26 @@ function cleanupCellChildren(cell){
   if(cell.boardId){delete nodes[cell.boardId];}
   if(cell.matrixId){removeTree(cell.matrixId);}
 }
-function delRow(nodeId,rowId){if(!confirm(UI.confirmDeleteRow))return;const d=nodes[nodeId].data;d.rows=d.rows.filter(r=>r.id!==rowId);Object.keys(d.cells).forEach(k=>{if(k.startsWith(rowId+'-')){cleanupCellChildren(d.cells[k]);delete d.cells[k];}});save();render();}
-function delCol(nodeId,colId){if(!confirm(UI.confirmDeleteCol))return;const d=nodes[nodeId].data;d.cols=d.cols.filter(c=>c.id!==colId);Object.keys(d.cells).forEach(k=>{if(k.endsWith('-'+colId)){cleanupCellChildren(d.cells[k]);delete d.cells[k];}});save();render();}
+function delRow(nodeId,rowId){
+  if(!confirm(UI.confirmDeleteRow))return;
+  const d=nodes[nodeId].data;
+  const lbl=d.rows.find(r=>r.id===rowId)?.label||rowId;
+  pushUndo(`Zeile „${lbl}" gelöscht`);
+  d.rows=d.rows.filter(r=>r.id!==rowId);
+  Object.keys(d.cells).forEach(k=>{if(k.startsWith(rowId+'-')){cleanupCellChildren(d.cells[k]);delete d.cells[k];}});
+  save();render();
+  showUndoToast(`Zeile „${lbl}" gelöscht`);
+}
+function delCol(nodeId,colId){
+  if(!confirm(UI.confirmDeleteCol))return;
+  const d=nodes[nodeId].data;
+  const lbl=d.cols.find(c=>c.id===colId)?.label||colId;
+  pushUndo(`Spalte „${lbl}" gelöscht`);
+  d.cols=d.cols.filter(c=>c.id!==colId);
+  Object.keys(d.cells).forEach(k=>{if(k.endsWith('-'+colId)){cleanupCellChildren(d.cells[k]);delete d.cells[k];}});
+  save();render();
+  showUndoToast(`Spalte „${lbl}" gelöscht`);
+}
 
 // ── REORDER & TRANSPOSE ──
 function moveCol(nodeId,colId,dir,src,cellRowId){
