@@ -1235,8 +1235,8 @@ const FILE_DEBOUNCE_MS=2000;
 const FILE_OPTS={types:[{description:'Matrix JSON',accept:{'application/json':['.json']}}]};
 const hasFileAPI=typeof window.showOpenFilePicker==='function';
 
-function getPayload(){return JSON.stringify({version:DATA_VERSION,nodes,nid,rootId,globalTags,globalPeople,dailyCols,keyBindings,searchHistory:_searchHistory});}
-function getPayloadPretty(){return JSON.stringify({version:DATA_VERSION,nodes,nid,rootId,globalTags,globalPeople,dailyCols,keyBindings,searchHistory:_searchHistory},null,2);}
+function getPayload(){return JSON.stringify({version:DATA_VERSION,nodes,nid,rootId,globalTags,globalPeople,dailyCols,keyBindings,searchHistory:_searchHistory,currentTab});}
+function getPayloadPretty(){return JSON.stringify({version:DATA_VERSION,nodes,nid,rootId,globalTags,globalPeople,dailyCols,keyBindings,searchHistory:_searchHistory,currentTab},null,2);}
 
 function showSaveStatus(text,color,duration){
   const d=document.getElementById('savedot');if(!d)return;
@@ -1281,9 +1281,8 @@ async function decryptPayload(encoded,pw){
 }
 async function getEncPw(){
   if(_encPw)return _encPw;
-  const pw=prompt('Passwort für Verschlüsselung:');
-  if(pw)_encPw=pw;
-  return pw;
+  // Wichtig: setzt _encPw NICHT — der Caller muss nach erfolgreichem Encrypt cachen.
+  return prompt('Passwort für Verschlüsselung:');
 }
 function hasEncPw(){return !!_encPw;}
 function setEncPasswordDialog(){
@@ -1336,6 +1335,7 @@ async function flushToFile(){
       const pw=await getEncPw();
       if(!pw){showSaveStatus('✗ Verschlüsselung abgebrochen','var(--red)',SAVE_WARN_MS);return;}
       content=await encryptPayload(content,pw);
+      _encPw=pw;
     }
     const writable=await fileHandle.createWritable();
     await writable.write(content);
@@ -1414,12 +1414,19 @@ function loadData(d){
     _searchHistory=d.searchHistory.slice(-SEARCH_HISTORY_MAX);
     try{localStorage.setItem(SEARCH_HISTORY_KEY,JSON.stringify(_searchHistory));}catch(e){}
   }
+  currentTab=(d.currentTab&&typeof d.currentTab==='object'&&!Array.isArray(d.currentTab))?d.currentTab:{};
   stack=[{nodeId:rootId,label:nodes[rootId].label,cellRef:null}];
   migrateNodeAliasesToCells();
   rebuildAliasIndex();
 }
 function tryLoad(){
-  try{const r=localStorage.getItem(SAVE_KEY);if(!r)return false;loadData(JSON.parse(r));return true;}catch(e){console.warn('tryLoad failed:',e.message);return false;}
+  try{
+    const r=localStorage.getItem(SAVE_KEY);if(!r)return false;
+    const d=JSON.parse(r);
+    if(!validateImport(d)){console.warn('tryLoad: invalid payload shape, falling back to default state');return false;}
+    loadData(d);
+    return true;
+  }catch(e){console.warn('tryLoad failed:',e.message);return false;}
 }
 async function exportJSON(){
   const cur=stack[stack.length-1];
@@ -1432,7 +1439,7 @@ async function exportJSON(){
   }
   let content=getPayloadPretty();
   let encrypted=false;
-  if(appSettings.encryption){const pw=await getEncPw();if(!pw)return;content=await encryptPayload(content,pw);encrypted=true;}
+  if(appSettings.encryption){const pw=await getEncPw();if(!pw)return;content=await encryptPayload(content,pw);_encPw=pw;encrypted=true;}
   const blob=new Blob([content],{type:encrypted?'application/octet-stream':'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download='matrix-backup.'+(encrypted?'imx':'json');
@@ -3099,8 +3106,16 @@ function sbContextMenu(e,dataId){
   // Source-Row-Highlight — wird bei allen 3 Close-Pfaden wieder entfernt (close/kdClose/button-click)
   const srcEl=document.querySelector(`.sb-node[data-id="${CSS.escape(dataId)}"]`);
   if(srcEl)srcEl.classList.add('sb-node-ctx-src');
-  // Vereinheitlichte Cleanup — ein Aufruf reicht (idempotent)
-  const cleanup=()=>{srcEl?.classList.remove('sb-node-ctx-src');};
+  // Close-Handler werden in setTimeout unten erzeugt — hier nur Platzhalter, damit closeMenu sie kennt.
+  let _closeClick=null, _closeKey=null;
+  // Zentraler Close-Pfad: räumt Highlight, entfernt Menü UND document-Listener (idempotent).
+  const closeMenu=()=>{
+    srcEl?.classList.remove('sb-node-ctx-src');
+    menu.remove();
+    if(_closeClick)document.removeEventListener('click',_closeClick);
+    if(_closeKey)document.removeEventListener('keydown',_closeKey,true);
+    _closeClick=_closeKey=null;
+  };
   // Kompakter Breadcrumb: Parent-Cell + Icon + Target (max 2 Segmente)
   const sc=_sbShortCrumb(dataId);
   const parentHtml=sc.parent?`<span class="crumb">${esc(sc.parent)}</span><span class="sep">›</span>`:'';
@@ -3122,8 +3137,7 @@ function sbContextMenu(e,dataId){
   menu.querySelectorAll('button[data-idx]').forEach(btn=>{
     btn.addEventListener('click',()=>{
       const b=buttons[+btn.dataset.idx];
-      cleanup();
-      menu.remove();
+      closeMenu();
       if(b&&b.onClick)b.onClick();
     });
   });
@@ -3137,18 +3151,15 @@ function sbContextMenu(e,dataId){
   // Dismiss on outside click OR Escape. ESC-Handler läuft in Capture-Phase +
   // stopImmediatePropagation — sonst fängt der globale Back-Handler (Stack-Pop) das Event ab.
   setTimeout(()=>{
-    const close=ev=>{if(!ev.target.closest('.sb-context-menu')){cleanup();menu.remove();document.removeEventListener('click',close);document.removeEventListener('keydown',kdClose,true);}};
-    const kdClose=ev=>{
+    _closeClick=ev=>{if(!ev.target.closest('.sb-context-menu'))closeMenu();};
+    _closeKey=ev=>{
       if(ev.key==='Escape'){
         ev.preventDefault();ev.stopImmediatePropagation();
-        cleanup();
-        menu.remove();
-        document.removeEventListener('click',close);
-        document.removeEventListener('keydown',kdClose,true);
+        closeMenu();
       }
     };
-    document.addEventListener('click',close);
-    document.addEventListener('keydown',kdClose,true); // capture-Phase
+    document.addEventListener('click',_closeClick);
+    document.addEventListener('keydown',_closeKey,true); // capture-Phase
   },0);
 }
 // Parse cell dataId → {parentMatrixId, rowId, colId, cell}
@@ -3197,30 +3208,36 @@ function sbDelete(dataId){
   save();render();
 }
 
-// Resize handle
+// Resize handle — mousemove/mouseup nur während aktivem Drag registriert,
+// danach entfernt. Verhindert dauerhafte Listener auf document.
 function sbInitResize(){
   const h=document.getElementById('sb-resize-handle');
   if(!h||h._bound)return;
   h._bound=true;
-  let dragging=false;let startX=0,startW=0;
-  h.addEventListener('mousedown',e=>{
-    dragging=true;startX=e.clientX;startW=appSettings.sidebarWidth||280;
-    h.classList.add('active');
-    document.body.style.userSelect='none';
-    e.preventDefault();
-  });
-  document.addEventListener('mousemove',e=>{
-    if(!dragging)return;
+  let startX=0,startW=0;
+  const onMove=e=>{
     let dx=e.clientX-startX;
     if(appSettings.sidebarPosition==='right')dx=-dx;
-    let w=startW+dx;
-    w=Math.max(200,Math.min(520,w));
+    let w=Math.max(200,Math.min(520,startW+dx));
     appSettings.sidebarWidth=w;
     const sb=document.getElementById('sidebar');
     if(sb)sb.style.setProperty('--sb-w',w+'px');
-  });
-  document.addEventListener('mouseup',()=>{
-    if(dragging){dragging=false;h.classList.remove('active');document.body.style.userSelect='';saveSettings();sbDrawConnections();}
+  };
+  const onUp=()=>{
+    document.removeEventListener('mousemove',onMove);
+    document.removeEventListener('mouseup',onUp);
+    h.classList.remove('active');
+    document.body.style.userSelect='';
+    saveSettings();
+    sbDrawConnections();
+  };
+  h.addEventListener('mousedown',e=>{
+    startX=e.clientX;startW=appSettings.sidebarWidth||280;
+    h.classList.add('active');
+    document.body.style.userSelect='none';
+    e.preventDefault();
+    document.addEventListener('mousemove',onMove);
+    document.addEventListener('mouseup',onUp);
   });
 }
 
@@ -3639,7 +3656,7 @@ async function exportNode(nodeId){
   const payload={exportType:n.type,rootId:nodeId,nodes:tree,exportDate:new Date().toISOString()};
   let content=JSON.stringify(payload,null,2);
   let encrypted=false;
-  if(appSettings.encryption){const pw=await getEncPw();if(!pw)return;content=await encryptPayload(content,pw);encrypted=true;}
+  if(appSettings.encryption){const pw=await getEncPw();if(!pw)return;content=await encryptPayload(content,pw);_encPw=pw;encrypted=true;}
   const blob=new Blob([content],{type:encrypted?'application/octet-stream':'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
