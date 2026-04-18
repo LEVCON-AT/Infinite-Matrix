@@ -194,7 +194,9 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 .kb-add-card{padding:7px;border-top:0.5px solid var(--border);}
 .kb-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:80px;border:1.5px dashed var(--border2);border-radius:var(--r);cursor:pointer;transition:all 0.15s;margin:2px;}
 .kb-empty:hover{border-color:var(--blue);background:var(--bluebg);}
-.kb-empty:hover span{color:var(--blue)!important;}
+.kb-empty-icon{font-size:18px;color:var(--text3);line-height:1;}
+.kb-empty-label{font-size:11px;color:var(--text3);}
+.kb-empty:hover .kb-empty-icon,.kb-empty:hover .kb-empty-label{color:var(--blue);}
 .kb-add-col{min-width:180px;flex-shrink:0;display:flex;flex-direction:column;justify-content:flex-start;padding:7px;}
 
 /* ── CHECKLISTS TAB ── */
@@ -368,8 +370,9 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 /* ── COMMAND ERROR / SUCCESS ── */
 @keyframes cmdError{0%,100%{transform:none}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
 @keyframes cmdSuccess{0%{box-shadow:0 0 0 0 var(--teal)}70%{box-shadow:0 0 0 6px rgba(29,158,117,0)}100%{box-shadow:0 0 0 0 rgba(29,158,117,0)}}
-#searchinput.cmd-error{animation:cmdError 0.3s ease;border-color:var(--red)!important;color:var(--red);}
-#searchinput.cmd-success{animation:cmdSuccess 0.6s ease;border-color:var(--teal)!important;color:var(--tealtxt);}
+#searchinput{font-size:12px;padding:4px 8px 4px 22px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--bg2);color:var(--text);outline:none;width:200px;font-family:inherit;transition:width 0.2s ease;}
+#searchinput.cmd-error{animation:cmdError 0.3s ease;border-color:var(--red);color:var(--red);}
+#searchinput.cmd-success{animation:cmdSuccess 0.6s ease;border-color:var(--teal);color:var(--tealtxt);}
 .cmd-help{font-size:11px;font-family:monospace;padding:10px 12px;line-height:1.8;}
 .cmd-help b{color:var(--bluetxt);}
 
@@ -377,7 +380,7 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 #main-layout{display:flex;flex:1;min-height:0;}
 body.has-sidebar-right #main-layout{flex-direction:row-reverse;}
 body.has-sidebar #content{max-width:none;margin:0;}
-body.has-sidebar #minimap-panel,body.has-sidebar #mapbtn{display:none !important;}
+body.has-sidebar #minimap-panel,body.has-sidebar #mapbtn{display:none;}
 #sidebar{
   position:relative;flex-shrink:0;
   width:var(--sb-w,280px);min-width:0;max-width:520px;
@@ -392,12 +395,12 @@ body.has-sidebar-right #sidebar{border-right:none;border-left:0.5px solid var(--
    verfügbare Höhe, overflow-y:auto scrollt, Mask-Fade wird aktiv. */
 body.sb-scroll-viewport #sidebar{position:sticky;top:0;align-self:flex-start;height:100vh;}
 body.sb-state-full #sidebar{min-width:200px;}
-body.sb-state-rails #sidebar{width:var(--sb-rails-w,24px)!important;min-width:0;max-width:var(--sb-rails-w,24px);cursor:pointer;}
+body.sb-state-rails #sidebar{width:var(--sb-rails-w,24px);min-width:0;max-width:var(--sb-rails-w,24px);cursor:pointer;}
 body.sb-state-rails #sidebar .sb-resize-handle{display:none;}
 body.sb-state-rails #sidebar .sb-node{pointer-events:none;}
 body.sb-state-rails #sidebar .sb-node-chevron,body.sb-state-rails #sidebar .sb-node-alias,body.sb-state-rails #sidebar .sb-node-icon,body.sb-state-rails #sidebar .sb-node-title,body.sb-state-rails #sidebar .sb-row-actions{opacity:0;pointer-events:none;}
 body.sb-state-rails #sidebar .sb-tree-wrap{padding:32px 0 16px 0;}
-body.sb-collapsed #sidebar{width:0!important;min-width:0;border:none;}
+body.sb-collapsed #sidebar{width:0;min-width:0;border:none;}
 .sb-node-chevron,.sb-node-alias,.sb-node-icon,.sb-node-title,.sb-row-actions{transition:opacity 160ms ease;}
 .sb-header{padding:10px 10px 6px;border-bottom:0.5px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;gap:6px;
   max-height:320px;opacity:1;overflow:hidden;
@@ -735,7 +738,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,[contenteditable
       <span id="savedot"><svg viewBox="0 0 16 16" fill="none"><path d="M2 2h8l4 4v8H2V2z" stroke="currentColor" stroke-width="1.4"/><path d="M5 2v4h6V2" stroke="currentColor" stroke-width="1.2"/><path d="M4 9h8v5H4V9z" stroke="currentColor" stroke-width="1.2"/></svg></span>
       <div style="position:relative;flex-shrink:0;">
         <span id="searchicon" style="position:absolute;left:7px;top:50%;transform:translateY(-50%);pointer-events:none;opacity:0.5;color:var(--text3);"></span>
-        <input id="searchinput" type="text" placeholder="Suche, ^Kommando oder Alt+↑↓" style="font-size:12px;padding:4px 8px 4px 22px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--bg2);color:var(--text);outline:none;width:200px;font-family:inherit;transition:width 0.2s ease;" oninput="onSearchInput(this.value)" onkeydown="searchInputKey(event)" onclick="onSearchFocus()" onfocus="this.style.width='260px';onSearchFocus()" onblur="this.style.width='200px';setTimeout(()=>{if(!document.getElementById('searchinput').value)closeSearch();},150)"/>
+        <input id="searchinput" type="text" placeholder="Suche, ^Kommando oder Alt+↑↓" oninput="onSearchInput(this.value)" onkeydown="searchInputKey(event)" onclick="onSearchFocus()" onfocus="this.style.width='260px';onSearchFocus()" onblur="this.style.width='200px';setTimeout(()=>{if(!document.getElementById('searchinput').value)closeSearch();},150)"/>
         <div id="searchresults" style="display:none;position:absolute;top:32px;right:0;width:320px;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--rl);z-index:80;max-height:360px;overflow-y:auto;box-shadow:0 2px 8px rgba(0,0,0,0.1);"></div>
       </div>
     </div>
@@ -3938,8 +3941,8 @@ function renderKanban(node){
       <div class="kb-cards" data-col-id="${col.id}" data-board-id="${node.id}" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dragDrop(event)">`;
     if(cards.length===0){
       h+=`<div class="kb-empty" onclick="addKbCardToCol('${node.id}','${col.id}')">
-        <span style="font-size:18px;color:var(--text3);line-height:1;">+</span>
-        <span style="font-size:11px;color:var(--text3);">Karte</span>
+        <span class="kb-empty-icon">+</span>
+        <span class="kb-empty-label">Karte</span>
       </div>`;
     } else {
       cards.forEach(card=>{h+=kbCardHTML(node.id,card);});
