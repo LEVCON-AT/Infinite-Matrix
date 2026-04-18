@@ -45,6 +45,9 @@
   --fade-mask-color:#000;
   --bg-check:#fff;
   --freq-2-bg:#c8def5;
+  /* Responsive Font-Sizes (Sprint 5.4) */
+  --fs-title:clamp(14px, 0.9vw + 10px, 17px);
+  --fs-subtitle:clamp(13px, 0.6vw + 9px, 15px);
 }
 [data-theme="dark"]{
   --scroll-thumb:rgba(255,255,255,0.16);
@@ -146,7 +149,7 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 
 /* ── PANEL HEADER ── */
 .phd{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
-.ptitle{font-size:17px;font-weight:500;}
+.ptitle{font-size:var(--fs-title);font-weight:500;}
 .psub{font-size:12px;color:var(--text2);margin-top:2px;}
 
 /* ── CARD ── */
@@ -239,7 +242,7 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 .modal-overlay{position:fixed;inset:0;background:var(--overlay-strong);z-index:200;display:flex;align-items:flex-start;justify-content:center;padding-top:40px;overflow-y:auto;}
 .modal{background:var(--bg);border-radius:var(--rl);border:0.5px solid var(--border2);padding:0;width:560px;max-width:96vw;max-height:85vh;overflow-y:auto;}
 .modal-hd{padding:14px 16px;border-bottom:0.5px solid var(--border2);display:flex;align-items:center;gap:8px;position:sticky;top:0;background:var(--bg);z-index:2;}
-.modal-hd h3{font-size:15px;font-weight:500;flex:1;}
+.modal-hd h3{font-size:var(--fs-subtitle);font-weight:500;flex:1;}
 .modal-body{padding:14px 16px;}
 .modal-label{font-size:11px;color:var(--text2);margin-bottom:3px;display:block;}
 .modal-input{width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--bg);color:var(--text);margin-bottom:10px;font-family:inherit;outline:none;}
@@ -3500,7 +3503,7 @@ function renderMatrixPage(node){
   let h=`<div class="phd">
     <div class="flex-fill">
       ${editMode
-        ?`<input class="ptitle" style="border:none;outline:none;background:transparent;font-size:17px;font-weight:500;width:100%;font-family:inherit;color:var(--text);" value="${esc(node.label)}" onchange="renameMatrixNode('${node.id}',this.value)" />`
+        ?`<input class="ptitle" style="border:none;outline:none;background:transparent;font-size:var(--fs-title);font-weight:500;width:100%;font-family:inherit;color:var(--text);" value="${esc(node.label)}" onchange="renameMatrixNode('${node.id}',this.value)" />`
         :`<div class="ptitle">${esc(node.label)}</div>`}
       <div class="psub">Hover auf Zelle → Tasks / Sub-Matrix anlegen</div>
     </div>
@@ -3656,7 +3659,7 @@ function renderCellPage(cur){
   const _exportType=tab==='board'?'board':'matrix';
   let h=`<div class="phd"><div class="flex-fill">
     ${editMode&&_renamableId
-      ?`<input class="ptitle" style="border:none;outline:none;background:transparent;font-size:17px;font-weight:500;width:100%;font-family:inherit;color:var(--text);" value="${esc(cur.label)}" onchange="renameBoardOrMatrix('${_renamableId}',this.value,'${cur.nodeId}')" />`
+      ?`<input class="ptitle" style="border:none;outline:none;background:transparent;font-size:var(--fs-title);font-weight:500;width:100%;font-family:inherit;color:var(--text);" value="${esc(cur.label)}" onchange="renameBoardOrMatrix('${_renamableId}',this.value,'${cur.nodeId}')" />`
       :`<div class="ptitle">${esc(cur.label)}</div>`}
   </div>
   <div style="display:flex;gap:5px;flex-shrink:0;align-items:center;">
@@ -4239,7 +4242,7 @@ let _openCardRef=null; // {boardId,cardId} of currently open card modal
 // Baut das komplette HTML für das Kartenmodal. Keine Seiteneffekte.
 function _renderCardModalHTML(boardId,cardId,b,card,cols){
   let h=`<div class="modal-hd">
-    <h3><input style="font-size:15px;font-weight:500;border:none;outline:none;background:transparent;width:100%;font-family:inherit;color:var(--text);" value="${esc(card.name)}" placeholder="Aufgabenname" onchange="card_set('${boardId}','${cardId}','name',this.value)" id="cn"/></h3>
+    <h3><input style="font-size:var(--fs-subtitle);font-weight:500;border:none;outline:none;background:transparent;width:100%;font-family:inherit;color:var(--text);" value="${esc(card.name)}" placeholder="Aufgabenname" onchange="card_set('${boardId}','${cardId}','name',this.value)" id="cn"/></h3>
     ${(_pendingCard||editMode)
       ?`<input class="alias-input" placeholder="Kürzel" maxlength="${ALIAS_MAX_LEN}" value="${esc(card.alias||'')}" onchange="setCardAlias('${boardId}','${cardId}',this.value)" title="Kürzel für Schnellnavigation"/>`
       :`<span class="alias-input" style="opacity:0.5;cursor:default;">${card.alias?esc(card.alias):'—'}</span>`}
