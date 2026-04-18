@@ -763,6 +763,52 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,[contenteditable
 
 /* A10: Edit mode border */
 #content{transition:border-left 0.2s ease,padding-left 0.2s ease;}
+
+/* ── MODAL UTILITY CLASSES (Backlog 2) ── */
+.row-g4{display:flex;align-items:center;gap:4px;}
+.row-g6{display:flex;align-items:center;gap:6px;}
+.row-g8{display:flex;align-items:center;gap:8px;}
+.row-wrap{flex-wrap:wrap;}
+.col-g6{display:flex;flex-direction:column;gap:6px;}
+.mb-xs{margin-bottom:6px;}
+.mb-sm{margin-bottom:8px;}
+.mb-md{margin-bottom:10px;}
+.mb-0{margin-bottom:0!important;}
+.mg-0{margin:0!important;}
+.mr-auto{margin-right:auto;}
+.nowrap{white-space:nowrap;}
+.inp-num-sm{width:55px;margin:0;}
+.inp-num-md{width:60px;margin:0;}
+.inp-num-lg{width:70px;margin:0;}
+.inp-num-count{width:65px;margin:0;}
+.inp-flex-date{margin:0;flex:1;}
+.modal-title-input{font-size:var(--fs-subtitle);font-weight:500;border:none;outline:none;background:transparent;width:100%;font-family:inherit;color:var(--text);}
+.alias-ro{opacity:0.5;cursor:default;}
+.modal-note-ce{min-height:70px;border:0.5px solid var(--border2);border-radius:var(--r);padding:7px 9px;font-size:12px;outline:none;}
+.modal-pill{font-size:11px;padding:4px 10px;border-radius:20px;cursor:pointer;border:0.5px solid var(--border2);background:var(--bg);color:var(--text2);}
+.modal-pill.sel[data-prio="high"]{background:var(--redbg);color:var(--redtxt);}
+.modal-pill.sel[data-prio="medium"]{background:var(--amberbg);color:var(--ambertxt);}
+.modal-pill.sel[data-prio="low"]{background:var(--tealbg);color:var(--tealtxt);}
+.modal-pill.sel[data-prio=""]{background:var(--bg3);color:var(--text2);}
+.pill-dashed{border-style:dashed;color:var(--text3);}
+.cb-option{display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;}
+.cb-option-8{display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;}
+.wd-chip{display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:4px 8px;border-radius:var(--r);border:0.5px solid var(--border2);background:var(--bg);}
+.wd-chip.sel{border-color:var(--blue);background:var(--bluebg);}
+.cl-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.cl-arrow{font-size:10px;color:var(--text3);cursor:pointer;}
+.cl-arrow[data-disabled="true"]{color:var(--border2);cursor:default;}
+.cl-del{font-size:12px;color:var(--red);cursor:pointer;}
+.cl-reset{font-size:12px;color:var(--text3);cursor:pointer;font-weight:400;}
+.cl-text-input{flex:1;font-size:12px;border:none;outline:none;background:transparent;font-family:inherit;color:var(--text);}
+.cl-text-input[data-done="true"]{text-decoration:line-through;color:var(--text3);}
+.occ-info{font-size:12px;color:var(--teal);}
+.occ-more{font-size:11px;color:var(--text3);}
+.occ-count{font-weight:400;color:var(--text3);}
+.btn-small{font-size:11px;}
+.btn-done-active{background:var(--tealbg);color:var(--tealtxt);border-color:var(--tealbg);}
+/* modal-label als inline-Label innerhalb einer Row (überschreibt display:block/margin-bottom) */
+.modal-label.ml-inline{display:inline;margin:0;}
 </style>
 </head>
 <body>
@@ -4226,38 +4272,38 @@ function openNewCard(boardId,colId){
 function buildRecurrenceUI(boardId,cardId,rv){
   let h='';
   if(rv.type==='daily'){
-    h+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-      <span class="modal-label" style="margin:0;white-space:nowrap;">Alle</span>
-      <input type="number" min="1" max="365" class="modal-input" style="width:70px;margin:0;" value="${rv.every||1}" data-change="recur:field-int" data-field="every"/>
-      <span class="modal-label" style="margin:0;">Tag(e)</span>
+    h+=`<div class="row-g8 mb-md">
+      <span class="modal-label ml-inline nowrap">Alle</span>
+      <input type="number" min="1" max="365" class="modal-input inp-num-lg" value="${rv.every||1}" data-change="recur:field-int" data-field="every"/>
+      <span class="modal-label ml-inline">Tag(e)</span>
     </div>`;
   }
   if(rv.type==='weekly'){
     const selWd=rv.weekdays||[rv.weekday||0];
-    h+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-      <span class="modal-label" style="margin:0;white-space:nowrap;">Alle</span>
-      <input type="number" min="1" max="52" class="modal-input" style="width:60px;margin:0;" value="${rv.every||1}" data-change="recur:field-int" data-field="every"/>
-      <span class="modal-label" style="margin:0;">Woche(n) am</span>
+    h+=`<div class="row-g8 mb-sm">
+      <span class="modal-label ml-inline nowrap">Alle</span>
+      <input type="number" min="1" max="52" class="modal-input inp-num-md" value="${rv.every||1}" data-change="recur:field-int" data-field="every"/>
+      <span class="modal-label ml-inline">Woche(n) am</span>
     </div>`;
-    h+=`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">`;
+    h+=`<div class="row-g6 row-wrap mb-md">`;
     WEEKDAY_NAMES.forEach((name,i)=>{
       const sel=selWd.includes(i);
-      h+=`<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:4px 8px;border-radius:var(--r);border:0.5px solid ${sel?'var(--blue)':'var(--border2)'};background:${sel?'var(--bluebg)':'var(--bg)'};">
-        <input type="checkbox" style="margin:0;" ${sel?'checked':''} data-change="recur:weekday-toggle" data-day="${i}"/>
+      h+=`<label class="wd-chip${sel?' sel':''}">
+        <input type="checkbox" class="mg-0" ${sel?'checked':''} data-change="recur:weekday-toggle" data-day="${i}"/>
         ${name.slice(0,2)}
       </label>`;
     });
     h+=`</div>`;
   }
   if(rv.type==='monthly'){
-    h+=`<div style="margin-bottom:8px;">
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:6px;">
+    h+=`<div class="mb-sm">
+      <label class="cb-option mb-xs">
         <input type="radio" name="mtype_${cardId}" value="day" ${rv.monthType!=='weekday'?'checked':''} data-change="recur:field-fixed" data-field="monthType" data-value="day"/>
         Am
-        <input type="number" min="1" max="31" class="modal-input" style="width:55px;margin:0;" value="${rv.day||1}" data-change="recur:field-int" data-field="day"/>
+        <input type="number" min="1" max="31" class="modal-input inp-num-sm" value="${rv.day||1}" data-change="recur:field-int" data-field="day"/>
         . des Monats
       </label>
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;flex-wrap:wrap;">
+      <label class="cb-option row-wrap">
         <input type="radio" name="mtype_${cardId}" value="weekday" ${rv.monthType==='weekday'?'checked':''} data-change="recur:field-fixed" data-field="monthType" data-value="weekday"/>
         Am
         <select class="modal-select inp-sm" data-change="recur:field-int" data-field="weekdayOrd">
@@ -4269,24 +4315,24 @@ function buildRecurrenceUI(boardId,cardId,rv){
         des Monats
       </label>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-      <span class="modal-label" style="margin:0;white-space:nowrap;">Alle</span>
-      <input type="number" min="1" max="12" class="modal-input" style="width:60px;margin:0;" value="${rv.every||1}" data-change="recur:field-int" data-field="every"/>
-      <span class="modal-label" style="margin:0;">Monat(e)</span>
+    <div class="row-g8 mb-md">
+      <span class="modal-label ml-inline nowrap">Alle</span>
+      <input type="number" min="1" max="12" class="modal-input inp-num-md" value="${rv.every||1}" data-change="recur:field-int" data-field="every"/>
+      <span class="modal-label ml-inline">Monat(e)</span>
     </div>`;
   }
   if(rv.type==='yearly'){
-    h+=`<div style="margin-bottom:8px;">
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:6px;flex-wrap:wrap;">
+    h+=`<div class="mb-sm">
+      <label class="cb-option row-wrap mb-xs">
         <input type="radio" name="ytype_${cardId}" value="day" ${rv.monthType!=='weekday'?'checked':''} data-change="recur:field-fixed" data-field="monthType" data-value="day"/>
         Am
-        <input type="number" min="1" max="31" class="modal-input" style="width:55px;margin:0;" value="${rv.yearDay||rv.anchorDay||1}" data-change="recur:field-int" data-field="yearDay"/>
+        <input type="number" min="1" max="31" class="modal-input inp-num-sm" value="${rv.yearDay||rv.anchorDay||1}" data-change="recur:field-int" data-field="yearDay"/>
         .
         <select class="modal-select inp-sm" data-change="recur:field-int" data-field="yearMonth">
           ${MONTH_NAMES.map((m,i)=>`<option value="${i}"${(rv.yearMonth!==undefined?rv.yearMonth:rv.anchorMonth||0)===i?' selected':''}>${m}</option>`).join('')}
         </select>
       </label>
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;flex-wrap:wrap;">
+      <label class="cb-option row-wrap">
         <input type="radio" name="ytype_${cardId}" value="weekday" ${rv.monthType==='weekday'?'checked':''} data-change="recur:field-fixed" data-field="monthType" data-value="weekday"/>
         Am
         <select class="modal-select inp-sm" data-change="recur:field-int" data-field="weekdayOrd">
@@ -4353,10 +4399,10 @@ const _cardDispatchBlur=_cardDispatch('data-blur');
 // Baut das komplette HTML für das Kartenmodal. Keine Seiteneffekte.
 function _renderCardModalHTML(boardId,cardId,b,card,cols){
   let h=`<div class="modal-hd">
-    <h3><input style="font-size:var(--fs-subtitle);font-weight:500;border:none;outline:none;background:transparent;width:100%;font-family:inherit;color:var(--text);" value="${esc(card.name)}" placeholder="Aufgabenname" data-change="card:set" data-field="name" id="cn"/></h3>
+    <h3><input class="modal-title-input" value="${esc(card.name)}" placeholder="Aufgabenname" data-change="card:set" data-field="name" id="cn"/></h3>
     ${(_pendingCard||editMode)
       ?`<input class="alias-input" placeholder="Kürzel" maxlength="${ALIAS_MAX_LEN}" value="${esc(card.alias||'')}" data-change="card:set-alias" title="Kürzel für Schnellnavigation"/>`
-      :`<span class="alias-input" style="opacity:0.5;cursor:default;">${card.alias?esc(card.alias):'—'}</span>`}
+      :`<span class="alias-input alias-ro">${card.alias?esc(card.alias):'—'}</span>`}
     <button class="btn-c" data-action="card:close">${ICO.close(ICO_SIZE.SM)}</button>
   </div>`;
   h+=`<div class="modal-body">`;
@@ -4369,17 +4415,17 @@ function _renderCardModalHTML(boardId,cardId,b,card,cols){
 
   // Priority
   h+=`<span class="modal-label">Priorität</span>
-  <div style="display:flex;gap:6px;margin-bottom:10px;">
+  <div class="row-g6 mb-md">
     ${['high','medium','low',''].map(p=>`
-      <span data-action="card:set-fixed" data-field="priority" data-value="${p}" style="font-size:11px;padding:4px 10px;border-radius:20px;cursor:pointer;border:0.5px solid var(--border2);background:${card.priority===p?(p==='high'?'var(--redbg)':p==='medium'?'var(--amberbg)':p==='low'?'var(--tealbg)':'var(--bg3)'):'var(--bg)'};color:${card.priority===p?(p==='high'?'var(--redtxt)':p==='medium'?'var(--ambertxt)':p==='low'?'var(--tealtxt)':'var(--text2)'):'var(--text2)'};">
+      <span class="modal-pill${card.priority===p?' sel':''}" data-action="card:set-fixed" data-field="priority" data-value="${p}" data-prio="${p}">
         ${p==='high'?'🔴 Hoch':p==='medium'?'🟡 Mittel':p==='low'?'🟢 Niedrig':'— Keine'}
       </span>`).join('')}
   </div>`;
 
   // Note
   h+=`<span class="modal-label">Notiz (mit Links)</span>`;
-  h+=`<div class="modal-textarea" contenteditable="true" data-blur="card:set-note" style="min-height:70px;border:0.5px solid var(--border2);border-radius:var(--r);padding:7px 9px;font-size:12px;outline:none;">${sanitizeHtml(card.note)||''}</div>`;
-  h+=`<div style="margin-bottom:10px;"></div>`;
+  h+=`<div class="modal-textarea modal-note-ce" contenteditable="true" data-blur="card:set-note">${sanitizeHtml(card.note)||''}</div>`;
+  h+=`<div class="mb-md"></div>`;
 
   // Tags
   h+=`<span class="modal-label">Tags</span>`;
@@ -4388,7 +4434,7 @@ function _renderCardModalHTML(boardId,cardId,b,card,cols){
     const sel=(card.tags||[]).includes(t.label);
     h+=`<span class="tag-pick${sel?' sel':''}" data-action="card:toggle-tag-id" data-id="${t.id}">${esc(t.label)}</span>`;
   });
-  h+=`<span class="tag-pick" data-action="card:add-tag" style="border-style:dashed;color:var(--text3);">+ Neu</span>`;
+  h+=`<span class="tag-pick pill-dashed" data-action="card:add-tag">+ Neu</span>`;
   h+=`</div>`;
 
   // Who
@@ -4398,17 +4444,17 @@ function _renderCardModalHTML(boardId,cardId,b,card,cols){
     const sel=(card.who||[]).includes(p.label);
     h+=`<span class="who-pick${sel?' sel':''}" data-action="card:toggle-who-id" data-id="${p.id}">${esc(p.label)}</span>`;
   });
-  h+=`<span class="who-pick" data-action="card:add-person" style="border-style:dashed;color:var(--text3);">+ Neu</span>`;
+  h+=`<span class="who-pick pill-dashed" data-action="card:add-person">+ Neu</span>`;
   h+=`</div>`;
 
   // Deadline
   h+=`<div class="recur-row">`;
-  h+=`<div><span class="modal-label">Deadline</span><input type="date" class="modal-input" value="${card.deadline||''}" data-change="card:set" data-field="deadline" style="margin-bottom:0;"/></div>`;
+  h+=`<div><span class="modal-label">Deadline</span><input type="date" class="modal-input mb-0" value="${card.deadline||''}" data-change="card:set" data-field="deadline"/></div>`;
 
   // Recurrence
   const rv=card.recur||{type:'none'};
   h+=`<div><span class="modal-label">Wiederholung</span>
-    <select class="modal-select" style="margin-bottom:0;" data-change="recur:type">
+    <select class="modal-select mb-0" data-change="recur:type">
       <option value="none"${rv.type==='none'?' selected':''}>keine</option>
       <option value="daily"${rv.type==='daily'?' selected':''}>täglich</option>
       <option value="weekly"${rv.type==='weekly'?' selected':''}>wöchentlich</option>
@@ -4421,24 +4467,24 @@ function _renderCardModalHTML(boardId,cardId,b,card,cols){
   // ── Seriendauer ──
   const endType=rv.endType||'none';
   h+=`<div class="section-divider">Seriendauer</div>
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-    <span class="modal-label" style="margin:0;white-space:nowrap;">Beginn</span>
-    <input type="date" class="modal-input" style="margin:0;flex:1;" value="${rv.startDate||''}" data-change="recur:field-str" data-field="startDate"/>
+  <div class="row-g8 mb-sm">
+    <span class="modal-label ml-inline nowrap">Beginn</span>
+    <input type="date" class="modal-input inp-flex-date" value="${rv.startDate||''}" data-change="recur:field-str" data-field="startDate"/>
   </div>
-  <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">
-    <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;">
+  <div class="col-g6 mb-md">
+    <label class="cb-option-8">
       <input type="radio" name="end_${cardId}" value="none" ${endType==='none'?'checked':''} data-change="recur:field-fixed" data-field="endType" data-value="none"/>
       Kein Enddatum
     </label>
-    <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;">
+    <label class="cb-option-8">
       <input type="radio" name="end_${cardId}" value="date" ${endType==='date'?'checked':''} data-change="recur:field-fixed" data-field="endType" data-value="date"/>
       Endet am
-      <input type="date" class="modal-input" style="margin:0;flex:1;" value="${rv.endDate||''}" ${endType!=='date'?'disabled':''} data-change="recur:field-str" data-field="endDate"/>
+      <input type="date" class="modal-input inp-flex-date" value="${rv.endDate||''}" ${endType!=='date'?'disabled':''} data-change="recur:field-str" data-field="endDate"/>
     </label>
-    <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;">
+    <label class="cb-option-8">
       <input type="radio" name="end_${cardId}" value="count" ${endType==='count'?'checked':''} data-change="recur:field-fixed" data-field="endType" data-value="count"/>
       Endet nach
-      <input type="number" min="1" max="999" class="modal-input" style="width:65px;margin:0;" value="${rv.endCount||10}" ${endType!=='count'?'disabled':''} data-change="recur:field-int" data-field="endCount"/>
+      <input type="number" min="1" max="999" class="modal-input inp-num-count" value="${rv.endCount||10}" ${endType!=='count'?'disabled':''} data-change="recur:field-int" data-field="endCount"/>
       Terminen
     </label>
   </div>`;
@@ -4448,36 +4494,36 @@ function _renderCardModalHTML(boardId,cardId,b,card,cols){
   if(rv.type!=='none'&&doneOcc.length>0){
     const sorted=[...doneOcc].sort().reverse();
     const lastDone=sorted[0];
-    h+=`<div class="section-divider">Erledigte Termine <span style="font-weight:400;color:var(--text3);">${doneOcc.length}${rv.endType==='count'&&rv.endCount?'/'+rv.endCount:''}</span></div>`;
-    h+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-      <span style="font-size:12px;color:var(--teal);">${ICO.check(11)} Zuletzt: ${fmtDate(lastDone)}</span>
-      ${doneOcc.length>1?`<span style="font-size:11px;color:var(--text3);">(${sorted.slice(1,4).map(d=>fmtDate(d)).join(', ')}${doneOcc.length>4?' …':''})</span>`:''}
+    h+=`<div class="section-divider">Erledigte Termine <span class="occ-count">${doneOcc.length}${rv.endType==='count'&&rv.endCount?'/'+rv.endCount:''}</span></div>`;
+    h+=`<div class="row-g8 mb-xs">
+      <span class="occ-info">${ICO.check(11)} Zuletzt: ${fmtDate(lastDone)}</span>
+      ${doneOcc.length>1?`<span class="occ-more">(${sorted.slice(1,4).map(d=>fmtDate(d)).join(', ')}${doneOcc.length>4?' …':''})</span>`:''}
     </div>`;
-    h+=`<button class="btn" style="font-size:11px;margin-bottom:10px;" data-action="recur:clear-occ">Verlauf zurücksetzen</button>`;
+    h+=`<button class="btn btn-small mb-md" data-action="recur:clear-occ">Verlauf zurücksetzen</button>`;
   }
 
   // Checklist
-  h+=`<div class="section-divider" style="display:flex;align-items:center;gap:8px;">Checkliste <span tabindex="0" role="button" title="Alle abchecken (Shift+R)" style="font-size:12px;color:var(--text3);cursor:pointer;font-weight:400;" data-action="cl:reset-card" onkeydown="if(event.key==='Enter'){event.preventDefault();resetCardCl('${boardId}','${cardId}');}">↺</span></div>`;
+  h+=`<div class="section-divider row-g8">Checkliste <span tabindex="0" role="button" title="Alle abchecken (Shift+R)" class="cl-reset" data-action="cl:reset-card" onkeydown="if(event.key==='Enter'){event.preventDefault();resetCardCl('${boardId}','${cardId}');}">↺</span></div>`;
   h+=`<div id="card-cl-section" onkeydown="if(event.shiftKey&&(event.key==='R'||event.key==='r')){event.preventDefault();resetCardCl('${boardId}','${cardId}');}">`;
   const cl=card.checklist||[];
   cl.forEach((item,idx)=>{
     const canUp=idx>0,canDn=idx<cl.length-1;
-    h+=`<div class="cl-item" data-cl-item="${item.id}" style="display:flex;align-items:center;gap:8px;margin-bottom:6px;" ${editMode?`ondragover="clDragOver(event)" ondrop="clDragDrop(event,'card','${boardId}','${cardId}','${item.id}')"`:''}>
+    h+=`<div class="cl-item cl-row" data-cl-item="${item.id}" ${editMode?`ondragover="clDragOver(event)" ondrop="clDragDrop(event,'card','${boardId}','${cardId}','${item.id}')"`:''}>
       ${editMode?`<span class="cl-drag" draggable="true" title="Verschieben" ondragstart="clDragStart(event,'card','${boardId}','${cardId}','${item.id}')" ondragend="clDragEnd(event)">⋮⋮</span>`:''}
       <div class="cl-check${item.done?' done':''}" tabindex="0" role="checkbox" aria-checked="${item.done}" data-action="cl:toggle" data-id="${item.id}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleClItem('${boardId}','${cardId}','${item.id}');}else if(editMode&&event.shiftKey&&(event.key==='ArrowUp'||event.key==='ArrowDown')){event.preventDefault();moveClItem('card','${boardId}','${cardId}','${item.id}',event.key==='ArrowUp'?-1:1);}"></div>
-      <input class="cl-text" style="flex:1;font-size:12px;border:none;outline:none;background:transparent;font-family:inherit;${item.done?'text-decoration:line-through;color:var(--text3)':'color:var(--text)'};" value="${esc(item.text)}" data-change="cl:update" data-blur="cl:autodel-blur" data-id="${item.id}" onkeydown="if(event.key==='Enter'){event.preventDefault();addClItem('${boardId}','${cardId}');}else if(editMode&&event.shiftKey&&(event.key==='ArrowUp'||event.key==='ArrowDown')){event.preventDefault();moveClItem('card','${boardId}','${cardId}','${item.id}',event.key==='ArrowUp'?-1:1);}"/>
-      ${editMode?`<span ${canUp?'tabindex="0" role="button"':''} style="font-size:10px;color:${canUp?'var(--text3)':'var(--border2)'};cursor:${canUp?'pointer':'default'};" ${canUp?`data-action="cl:move" data-id="${item.id}" data-dir="-1" onkeydown="if(event.key==='Enter'){event.preventDefault();moveClItem('card','${boardId}','${cardId}','${item.id}',-1);}"`:''}>↑</span>
-      <span ${canDn?'tabindex="0" role="button"':''} style="font-size:10px;color:${canDn?'var(--text3)':'var(--border2)'};cursor:${canDn?'pointer':'default'};" ${canDn?`data-action="cl:move" data-id="${item.id}" data-dir="1" onkeydown="if(event.key==='Enter'){event.preventDefault();moveClItem('card','${boardId}','${cardId}','${item.id}',1);}"`:''}>↓</span>`:''}
-      <span tabindex="0" role="button" style="font-size:12px;color:var(--red);cursor:pointer;" data-action="cl:delete" data-id="${item.id}" onkeydown="if(event.key==='Enter'){event.preventDefault();delClItem('${boardId}','${cardId}','${item.id}');}">${ICO.close(ICO_SIZE.XS)}</span>
+      <input class="cl-text cl-text-input" data-done="${item.done?'true':'false'}" value="${esc(item.text)}" data-change="cl:update" data-blur="cl:autodel-blur" data-id="${item.id}" onkeydown="if(event.key==='Enter'){event.preventDefault();addClItem('${boardId}','${cardId}');}else if(editMode&&event.shiftKey&&(event.key==='ArrowUp'||event.key==='ArrowDown')){event.preventDefault();moveClItem('card','${boardId}','${cardId}','${item.id}',event.key==='ArrowUp'?-1:1);}"/>
+      ${editMode?`<span class="cl-arrow" ${canUp?'tabindex="0" role="button"':'data-disabled="true"'} ${canUp?`data-action="cl:move" data-id="${item.id}" data-dir="-1" onkeydown="if(event.key==='Enter'){event.preventDefault();moveClItem('card','${boardId}','${cardId}','${item.id}',-1);}"`:''}>↑</span>
+      <span class="cl-arrow" ${canDn?'tabindex="0" role="button"':'data-disabled="true"'} ${canDn?`data-action="cl:move" data-id="${item.id}" data-dir="1" onkeydown="if(event.key==='Enter'){event.preventDefault();moveClItem('card','${boardId}','${cardId}','${item.id}',1);}"`:''}>↓</span>`:''}
+      <span class="cl-del" tabindex="0" role="button" data-action="cl:delete" data-id="${item.id}" onkeydown="if(event.key==='Enter'){event.preventDefault();delClItem('${boardId}','${cardId}','${item.id}');}">${ICO.close(ICO_SIZE.XS)}</span>
     </div>`;
   });
   h+=`</div>`;
-  h+=`<button class="btn" style="font-size:11px;" data-action="cl:add">+ Punkt</button>`;
+  h+=`<button class="btn btn-small" data-action="cl:add">+ Punkt</button>`;
 
   h+=`</div>`; // modal-body
   h+=`<div class="modal-actions">
-    <button class="btn-c" data-action="card:archive" style="margin-right:auto;">${card.archived?'Aus Archiv':'Archivieren'}</button>
-    <button class="btn-c${card.done?' active':''}" data-action="card:toggle-done" style="${card.done?'background:var(--tealbg);color:var(--tealtxt);border-color:var(--tealbg);':''}">
+    <button class="btn-c mr-auto" data-action="card:archive">${card.archived?'Aus Archiv':'Archivieren'}</button>
+    <button class="btn-c${card.done?' active btn-done-active':''}" data-action="card:toggle-done">
       ${card.done?ICO.check(11)+' Erledigt':'Als erledigt markieren'}
     </button>
     <button class="btn danger btn-c" data-action="card:delete">Löschen</button>
