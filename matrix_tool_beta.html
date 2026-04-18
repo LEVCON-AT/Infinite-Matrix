@@ -583,7 +583,8 @@ body.has-sidebar-right.sb-collapsed #content{padding-right:26px;}
 }
 
 /* ── FOCUS STYLES ── */
-*:focus{outline:none;}
+/* Sprint 5.2: Reset nur für Custom-Elemente & native Focusables, :focus-visible bleibt global */
+button:focus,a:focus,input:focus,select:focus,textarea:focus,[contenteditable]:focus,[tabindex]:focus,.mcell:focus,.sb-node:focus,.kb-card:focus,.mm-node:focus,.tab:focus,.bcs:focus,.btn:focus,.ico-btn:focus,.sb-chip:focus{outline:none;}
 *:focus-visible{outline:var(--focus-width) solid var(--focus-color);outline-offset:var(--focus-offset);border-radius:var(--r);transition:outline-offset 0.1s ease;}
 .mcell:focus-visible{outline-offset:-2px;background:var(--bg2);border-radius:0;}
 .kb-card:focus-visible{outline-offset:-2px;background:var(--bg2);}
