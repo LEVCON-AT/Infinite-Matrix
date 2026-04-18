@@ -248,6 +248,33 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 .addcol-tail{min-width:160px;flex-shrink:0;padding:7px;}
 .addcol-tail-btn{height:48px;}
 .kc-tag-xs{font-size:9px;}
+/* Settings-Modal */
+.setting-row{display:flex;align-items:center;justify-content:space-between;gap:0.75em;padding:0.5em 0;}
+.setting-label{font-size:0.8em;flex:1;color:var(--text);}
+.setting-value{flex-shrink:0;}
+.setting-input{font-size:0.75em;padding:0.25em 0.5em;border:0.5px solid var(--border2);border-radius:var(--rs);background:var(--bg);color:var(--text);}
+.setting-input.num{width:5.5em;padding:0.3em 0.5em;text-align:center;}
+.setting-input.num-dual{width:4.5em;padding:0.3em 0.4em;text-align:center;}
+.setting-section{font-size:0.7em;font-weight:600;color:var(--text2);margin:1.2em 0 0.4em;padding-bottom:0.3em;border-bottom:0.5px solid var(--border);text-transform:uppercase;letter-spacing:0.04em;}
+.setting-pw-status{font-size:0.7em;margin-right:0.5em;}
+.setting-pw-status[data-set="true"]{color:var(--tealtxt);}
+.setting-pw-status[data-set="false"]{color:var(--text3);}
+.setting-pw-btn{font-size:0.7em;padding:0.3em 0.7em;}
+.setting-pw-btn-del{font-size:0.7em;padding:0.3em 0.7em;margin-left:0.3em;}
+.settings-modal{width:440px;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;}
+.settings-hd{padding:16px 18px 0;flex-shrink:0;}
+.settings-hd h3{font-size:14px;font-weight:500;margin-bottom:10px;}
+.settings-tabs{display:flex;gap:0;border-bottom:0.5px solid var(--border);}
+.settings-tab{padding:7px 14px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text2);border-bottom:2px solid transparent;transition:all 0.15s;}
+.settings-tab.active{color:var(--blue);border-bottom-color:var(--blue);}
+.settings-body{padding:4px 18px 18px;overflow-y:auto;flex:1;}
+.settings-actions{display:flex;gap:7px;justify-content:space-between;padding:12px 18px;border-top:0.5px solid var(--border);flex-shrink:0;}
+.settings-intro{font-size:0.7em;color:var(--text2);margin:0.6em 0 1em;line-height:1.5;}
+.settings-grid2{display:grid;grid-template-columns:1fr 1fr;gap:0.6em 0.8em;}
+.settings-cell{display:flex;flex-direction:column;gap:0.2em;}
+.settings-cell-label{font-size:0.7em;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.settings-cell-select{font-size:0.7em;padding:0.3em 0.4em;border:0.5px solid var(--border2);border-radius:var(--rs);background:var(--bg);color:var(--text);width:100%;}
+.ro-input{opacity:0.5;cursor:default;}
 .card-origin{cursor:pointer;margin-right:0.4em;opacity:0.65;transition:opacity 0.15s;display:inline-block;}
 .card-origin:hover{opacity:1;}
 .origin-alias{font-family:monospace;font-size:0.9em;padding:0.05em 0.4em;border-radius:var(--rs);background:var(--bg3);color:var(--text2);}
@@ -6169,7 +6196,7 @@ function smodal(title,fields,cb,onClose,opts){ // smodal = showSimpleModal
   fields.forEach(f=>{
     h+=`<label>${f.label}</label>`;
     if(f.sel)h+=`<select id="mf-${f.id}">${f.sel.map((o,i)=>`<option value="${o}"${f.v===o?' selected':''}>${f.sellabels?f.sellabels[i]:o}</option>`).join('')}</select>`;
-    else if(f.ro)h+=`<input id="mf-${f.id}" type="text" value="${f.v||''}" disabled style="opacity:0.5;cursor:default;"/>`;
+    else if(f.ro)h+=`<input id="mf-${f.id}" type="text" value="${f.v||''}" disabled class="ro-input"/>`;
     else if(f.type==='password')h+=`<input id="mf-${f.id}" type="password" placeholder="${f.ph||''}" value="${f.v||''}" autocomplete="new-password"/>`;
     else h+=`<input id="mf-${f.id}" type="text" placeholder="${f.ph||''}" value="${f.v||''}"/>`;
   });
@@ -6225,13 +6252,13 @@ function closeS(e){
 
 // ═══════════════════════════════════════════════════════
 // SETTINGS MODAL
-function settingRow(label,html){return`<div style="display:flex;align-items:center;justify-content:space-between;gap:0.75em;padding:0.5em 0;"><span style="font-size:0.8em;flex:1;color:var(--text);">${label}</span><span style="flex-shrink:0;">${html}</span></div>`;}
+function settingRow(label,html){return`<div class="setting-row"><span class="setting-label">${label}</span><span class="setting-value">${html}</span></div>`;}
 function settingCheck(key,label){return settingRow(label,`<input type="checkbox" ${appSettings[key]?'checked':''} onchange="appSettings.${key}=this.checked;saveSettings();"/>`);}
-function settingSelect(key,label,opts){return settingRow(label,`<select style="font-size:0.75em;padding:0.25em 0.5em;border:0.5px solid var(--border2);border-radius:var(--rs);background:var(--bg);color:var(--text);" onchange="appSettings.${key}=this.value;saveSettings();">${opts.map(([v,l])=>`<option value="${v}"${String(appSettings[key])===String(v)?' selected':''}>${l}</option>`).join('')}</select>`);}
-function settingNumber(key,label,min,max,step){return settingRow(label,`<input type="number" min="${min}" max="${max}" step="${step||1}" value="${appSettings[key]}" style="width:5.5em;font-size:0.75em;padding:0.3em 0.5em;border:0.5px solid var(--border2);border-radius:var(--rs);background:var(--bg);color:var(--text);text-align:center;" onchange="appSettings.${key}=parseFloat(this.value)||${appSettings[key]};saveSettings();"/>`);}
-function settingSection(title){return`<div style="font-size:0.7em;font-weight:600;color:var(--text2);margin:1.2em 0 0.4em;padding-bottom:0.3em;border-bottom:0.5px solid var(--border);text-transform:uppercase;letter-spacing:0.04em;">${title}</div>`;}
+function settingSelect(key,label,opts){return settingRow(label,`<select class="setting-input" onchange="appSettings.${key}=this.value;saveSettings();">${opts.map(([v,l])=>`<option value="${v}"${String(appSettings[key])===String(v)?' selected':''}>${l}</option>`).join('')}</select>`);}
+function settingNumber(key,label,min,max,step){return settingRow(label,`<input type="number" min="${min}" max="${max}" step="${step||1}" value="${appSettings[key]}" class="setting-input num" onchange="appSettings.${key}=parseFloat(this.value)||${appSettings[key]};saveSettings();"/>`);}
+function settingSection(title){return`<div class="setting-section">${title}</div>`;}
 function settingDual(key1,key2,label,min,max,step){
-  return settingRow(label,`<input type="number" min="${min}" max="${max}" step="${step||0.25}" value="${appSettings[key1]}" style="width:4.5em;font-size:0.75em;padding:0.3em 0.4em;border:0.5px solid var(--border2);border-radius:var(--rs);background:var(--bg);color:var(--text);text-align:center;" onchange="appSettings.${key1}=parseFloat(this.value)||2;saveSettings();"/> × <input type="number" min="${min}" max="${max}" step="${step||0.25}" value="${appSettings[key2]}" style="width:4.5em;font-size:0.75em;padding:0.3em 0.4em;border:0.5px solid var(--border2);border-radius:var(--rs);background:var(--bg);color:var(--text);text-align:center;" onchange="appSettings.${key2}=parseFloat(this.value)||2;saveSettings();"/>`);
+  return settingRow(label,`<input type="number" min="${min}" max="${max}" step="${step||0.25}" value="${appSettings[key1]}" class="setting-input num-dual" onchange="appSettings.${key1}=parseFloat(this.value)||2;saveSettings();"/> × <input type="number" min="${min}" max="${max}" step="${step||0.25}" value="${appSettings[key2]}" class="setting-input num-dual" onchange="appSettings.${key2}=parseFloat(this.value)||2;saveSettings();"/>`);
 }
 
 let _settingsTab='general';
@@ -6240,8 +6267,6 @@ function showSettings(tab){
   if(!document.querySelector('#mc .smodal-overlay')){_pushFocusRestore();_pushModal(closeS);}
   _settingsTab=tab||_settingsTab||'general';
   const t=_settingsTab;
-  const tabStyle=`style="padding:7px 14px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text2);border-bottom:2px solid transparent;transition:all 0.15s;"`;
-  const tabActive=`style="padding:7px 14px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--blue);border-bottom:2px solid var(--blue);transition:all 0.15s;"`;
 
   let body='';
   if(t==='nav'){
@@ -6276,34 +6301,35 @@ function showSettings(tab){
     ${settingNumber('autoSaveDelay','Auto-Save (ms)',500,10000,500)}
     ${settingCheck('animationsEnabled','Animationen')}
     ${settingCheck('encryption','Verschlüsselung (Datei / Export, .imx)')}
-    ${settingRow('Passwort',`<span style="font-size:0.7em;color:${hasEncPw()?'var(--tealtxt)':'var(--text3)'};margin-right:0.5em;">${hasEncPw()?'✓ gesetzt':'nicht gesetzt'}</span><button class="btn-c" style="font-size:0.7em;padding:0.3em 0.7em;" onclick="setEncPasswordDialog()">${hasEncPw()?'Ändern':'Setzen'}…</button>${hasEncPw()?`<button class="btn-c" style="font-size:0.7em;padding:0.3em 0.7em;margin-left:0.3em;" onclick="clearEncPassword()">Löschen</button>`:''}`)}
+    ${settingRow('Passwort',`<span class="setting-pw-status" data-set="${hasEncPw()?'true':'false'}">${hasEncPw()?'✓ gesetzt':'nicht gesetzt'}</span><button class="btn-c setting-pw-btn" onclick="setEncPasswordDialog()">${hasEncPw()?'Ändern':'Setzen'}…</button>${hasEncPw()?`<button class="btn-c setting-pw-btn-del" onclick="clearEncPassword()">Löschen</button>`:''}`)}
     ${settingSelect('dateLocale','Datumsformat',[['de-AT','Deutsch (AT)'],['de-DE','Deutsch (DE)'],['en-US','English (US)'],['en-GB','English (GB)'],['fr-FR','Français']])}`;
   } else {
     body=`
-    <div style="font-size:0.7em;color:var(--text2);margin:0.6em 0 1em;line-height:1.5;">Lege fest, welche Bedienelemente nur im Bearbeiten-Modus, immer oder nie sichtbar sein sollen.</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6em 0.8em;">
-    ${Object.keys(VIS_LABELS).map(k=>`<div style="display:flex;flex-direction:column;gap:0.2em;">
-      <span style="font-size:0.7em;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${VIS_LABELS[k]}</span>
-      <select style="font-size:0.7em;padding:0.3em 0.4em;border:0.5px solid var(--border2);border-radius:var(--rs);background:var(--bg);color:var(--text);width:100%;" onchange="appSettings.vis.${k}=this.value;saveSettings();">
+    <div class="settings-intro">Lege fest, welche Bedienelemente nur im Bearbeiten-Modus, immer oder nie sichtbar sein sollen.</div>
+    <div class="settings-grid2">
+    ${Object.keys(VIS_LABELS).map(k=>`<div class="settings-cell">
+      <span class="settings-cell-label">${VIS_LABELS[k]}</span>
+      <select class="settings-cell-select" onchange="appSettings.vis.${k}=this.value;saveSettings();">
         ${VIS_OPTIONS.map(([v,l])=>`<option value="${v}"${(appSettings.vis[k]||'edit')===v?' selected':''}>${l}</option>`).join('')}
       </select>
     </div>`).join('')}
     </div>`;
   }
 
-  let h=`<div class="smodal-overlay" onclick="closeS(event)"><div class="sdmodal" style="width:440px;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;" onclick="event.stopPropagation()">
-    <div style="padding:16px 18px 0;flex-shrink:0;">
-      <h3 style="font-size:14px;font-weight:500;margin-bottom:10px;">${ICO.gear(ICO_SIZE.MD)} Einstellungen</h3>
-      <div style="display:flex;gap:0;border-bottom:0.5px solid var(--border);">
-        <button ${t==='general'?tabActive:tabStyle} onclick="showSettings('general')">Allgemein</button>
-        <button ${t==='nav'?tabActive:tabStyle} onclick="showSettings('nav')">Navigation</button>
-        <button ${t==='edit'?tabActive:tabStyle} onclick="showSettings('edit')">Bearbeitung</button>
+  const tabCls=k=>`settings-tab${t===k?' active':''}`;
+  let h=`<div class="smodal-overlay" onclick="closeS(event)"><div class="sdmodal settings-modal" onclick="event.stopPropagation()">
+    <div class="settings-hd">
+      <h3>${ICO.gear(ICO_SIZE.MD)} Einstellungen</h3>
+      <div class="settings-tabs">
+        <button class="${tabCls('general')}" onclick="showSettings('general')">Allgemein</button>
+        <button class="${tabCls('nav')}" onclick="showSettings('nav')">Navigation</button>
+        <button class="${tabCls('edit')}" onclick="showSettings('edit')">Bearbeitung</button>
       </div>
     </div>
-    <div style="padding:4px 18px 18px;overflow-y:auto;flex:1;">
+    <div class="settings-body">
       ${body}
     </div>
-    <div style="display:flex;gap:7px;justify-content:space-between;padding:12px 18px;border-top:0.5px solid var(--border);flex-shrink:0;">
+    <div class="settings-actions">
       <button class="btn-c" onclick="appSettings=JSON.parse(JSON.stringify(DEFAULT_SETTINGS));saveSettings();showSettings();">Zurücksetzen</button>
       <button class="btn-p" onclick="closeS();render();">OK</button>
     </div>
