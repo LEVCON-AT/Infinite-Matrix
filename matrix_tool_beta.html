@@ -653,6 +653,10 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,[contenteditable
 
 /* Utility: Klassen-basierte Sichtbarkeit (Sprint 4.2) */
 .is-hidden{display:none;}
+/* Utility: Layout-Muster (Sprint 4.1) */
+.flex-fill{flex:1;min-width:0;}
+.inp-sm{width:auto;margin:0;padding:3px 6px;}
+.empty-hint{padding:12px;font-size:12px;color:var(--text3);text-align:center;}
 
 /* A9: Saved indicator */
 #savedot{display:none;align-items:center;flex-shrink:0;}
@@ -739,7 +743,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,[contenteditable
   <div id="topbar">
     <div id="tl" style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
       <span id="applogo" style="flex-shrink:0;display:flex;align-items:center;cursor:pointer;" onclick="stack=[stack[0]];renderAnimated('out');" title="Infinite Matrix – Home"></span>
-      <div class="bc" id="bc" style="flex:1;min-width:0;"></div>
+      <div class="bc flex-fill" id="bc"></div>
       <span id="savedot"><svg viewBox="0 0 16 16" fill="none"><path d="M2 2h8l4 4v8H2V2z" stroke="currentColor" stroke-width="1.4"/><path d="M5 2v4h6V2" stroke="currentColor" stroke-width="1.2"/><path d="M4 9h8v5H4V9z" stroke="currentColor" stroke-width="1.2"/></svg></span>
       <div style="position:relative;flex-shrink:0;">
         <span id="searchicon" style="position:absolute;left:7px;top:50%;transform:translateY(-50%);pointer-events:none;opacity:0.5;color:var(--text3);"></span>
@@ -757,7 +761,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,[contenteditable
           <button class="gear-item" id="filebtn"></button>
           <button class="gear-item" id="saveasbtn" onclick="saveFileAs();toggleGearMenu();"></button>
           <button class="gear-item" onclick="exportJSON();toggleGearMenu();" id="gear-export"></button>
-          <label class="gear-item" style="cursor:pointer;" id="gear-import"><input type="file" accept=".json,.imx" style="display:none;" onchange="importJSON(event);toggleGearMenu();"></label>
+          <label class="gear-item" style="cursor:pointer;" id="gear-import"><input type="file" class="is-hidden" accept=".json,.imx" onchange="importJSON(event);toggleGearMenu();"></label>
           <div class="gear-sep"></div>
           <button class="gear-item" onclick="openStammdaten();toggleGearMenu();" id="gear-tags"></button>
           <button class="gear-item" onclick="showKeyboardHelp();toggleGearMenu();" id="gear-kb"></button>
@@ -805,7 +809,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,[contenteditable
             <label>Deadline</label><div class="sb-pills-wrap" id="sb-dl-pills"></div>
           </div>
         </details>
-        <button class="sb-clear-filter" id="sb-clear-filter" onclick="sbClearFilter()" style="display:none;">Filter zurücksetzen</button>
+        <button class="sb-clear-filter is-hidden" id="sb-clear-filter" onclick="sbClearFilter()">Filter zurücksetzen</button>
       </div>
       <button id="sb-rail-cap" type="button" onclick="event.stopPropagation();sbToggle();" title="Sidebar ausklappen" aria-label="Sidebar ausklappen"></button>
       <div class="sb-tree-wrap" id="sb-tree-wrap">
@@ -1742,7 +1746,7 @@ function render(){
     const _ge=document.getElementById('gear-export');
     const _gi=document.getElementById('gear-import');
     if(_ge)_ge.innerHTML=ICO.download(12)+(_isSubLevel?' Export Knoten':' Export JSON');
-    if(_gi){const _lbl=_isSubLevel?' Import Knoten':' Import JSON';_gi.innerHTML='';_gi.insertAdjacentHTML('afterbegin',ICO.upload(12)+_lbl);const _inp=_gi.querySelector('input');if(!_inp){_gi.insertAdjacentHTML('beforeend','<input type="file" accept=".json,.imx" style="display:none;" onchange="importJSON(event);toggleGearMenu();">');}}
+    if(_gi){const _lbl=_isSubLevel?' Import Knoten':' Import JSON';_gi.innerHTML='';_gi.insertAdjacentHTML('afterbegin',ICO.upload(12)+_lbl);const _inp=_gi.querySelector('input');if(!_inp){_gi.insertAdjacentHTML('beforeend','<input type="file" class="is-hidden" accept=".json,.imx" onchange="importJSON(event);toggleGearMenu();">');}}
     // Scroll-fade masks on horizontally scrollable containers
     initScrollFade();
     // Auto-focus first cell on matrix pages
@@ -3489,7 +3493,7 @@ function renderMatrixPage(node){
   const{rows,cols}=node.data;
   const isRoot=node.id===rootId;
   let h=`<div class="phd">
-    <div style="flex:1;min-width:0;">
+    <div class="flex-fill">
       ${editMode
         ?`<input class="ptitle" style="border:none;outline:none;background:transparent;font-size:17px;font-weight:500;width:100%;font-family:inherit;color:var(--text);" value="${esc(node.label)}" onchange="renameMatrixNode('${node.id}',this.value)" />`
         :`<div class="ptitle">${esc(node.label)}</div>`}
@@ -3645,7 +3649,7 @@ function renderCellPage(cur){
   const _renamableId=_cell?(tab==='board'?_cell.boardId:_cell.matrixId):null;
   const _exportId=tab==='board'?cell.boardId:cell.matrixId;
   const _exportType=tab==='board'?'board':'matrix';
-  let h=`<div class="phd"><div style="flex:1;min-width:0;">
+  let h=`<div class="phd"><div class="flex-fill">
     ${editMode&&_renamableId
       ?`<input class="ptitle" style="border:none;outline:none;background:transparent;font-size:17px;font-weight:500;width:100%;font-family:inherit;color:var(--text);" value="${esc(cur.label)}" onchange="renameBoardOrMatrix('${_renamableId}',this.value,'${cur.nodeId}')" />`
       :`<div class="ptitle">${esc(cur.label)}</div>`}
@@ -4019,7 +4023,7 @@ function kbCardHTML(boardId,card){
   // Priority dot
   return `<div class="kb-card${card.archived?' archived':''}${card.done?' kb-done':''}" tabindex="0" draggable="${card.archived?'false':'true'}" data-card-id="${card.id}" data-board-id="${boardId}" data-prio="${card.priority||''}" onclick="openCard('${boardId}','${card.id}')" onkeydown="kbCardKeydown(event,'${boardId}','${card.id}')" ondragstart="dragStart(event)" ondragend="dragEnd(event)">
     <div style="display:flex;align-items:flex-start;gap:5px;">
-      <div style="flex:1;min-width:0;">
+      <div class="flex-fill">
         <div class="kc-name" style="--card-lines:${appSettings.cardTitleLines||2};">${esc(card.name)}</div>
         ${card.note?`<div style="font-size:11px;color:var(--text2);margin-top:2px;">${esc(stripHtml(card.note)).slice(0,appSettings.noteTruncate||NOTE_TRUNCATE)}${stripHtml(card.note).length>(appSettings.noteTruncate||NOTE_TRUNCATE)?'…':''}</div>`:''}
       </div>
@@ -4181,10 +4185,10 @@ function buildRecurrenceUI(boardId,cardId,rv){
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;flex-wrap:wrap;">
         <input type="radio" name="mtype_${cardId}" value="weekday" ${rv.monthType==='weekday'?'checked':''} onchange="card_recur_field('${boardId}','${cardId}','monthType','weekday')"/>
         Am
-        <select class="modal-select" style="width:auto;margin:0;padding:3px 6px;" onchange="card_recur_field('${boardId}','${cardId}','weekdayOrd',parseInt(this.value))">
+        <select class="modal-select inp-sm" onchange="card_recur_field('${boardId}','${cardId}','weekdayOrd',parseInt(this.value))">
           ${[1,2,3,4,-1].map(o=>`<option value="${o}"${(rv.weekdayOrd||1)===o?' selected':''}>${o===-1?'letzten':o+'.'}</option>`).join('')}
         </select>
-        <select class="modal-select" style="width:auto;margin:0;padding:3px 6px;" onchange="card_recur_field('${boardId}','${cardId}','weekday',parseInt(this.value))">
+        <select class="modal-select inp-sm" onchange="card_recur_field('${boardId}','${cardId}','weekday',parseInt(this.value))">
           ${WEEKDAY_NAMES.map((d,i)=>`<option value="${i}"${(rv.weekday||0)===i?' selected':''}>${d}</option>`).join('')}
         </select>
         des Monats
@@ -4203,21 +4207,21 @@ function buildRecurrenceUI(boardId,cardId,rv){
         Am
         <input type="number" min="1" max="31" class="modal-input" style="width:55px;margin:0;" value="${rv.yearDay||rv.anchorDay||1}" onchange="card_recur_field('${boardId}','${cardId}','yearDay',parseInt(this.value))"/>
         .
-        <select class="modal-select" style="width:auto;margin:0;padding:3px 6px;" onchange="card_recur_field('${boardId}','${cardId}','yearMonth',parseInt(this.value))">
+        <select class="modal-select inp-sm" onchange="card_recur_field('${boardId}','${cardId}','yearMonth',parseInt(this.value))">
           ${MONTH_NAMES.map((m,i)=>`<option value="${i}"${(rv.yearMonth!==undefined?rv.yearMonth:rv.anchorMonth||0)===i?' selected':''}>${m}</option>`).join('')}
         </select>
       </label>
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;flex-wrap:wrap;">
         <input type="radio" name="ytype_${cardId}" value="weekday" ${rv.monthType==='weekday'?'checked':''} onchange="card_recur_field('${boardId}','${cardId}','monthType','weekday')"/>
         Am
-        <select class="modal-select" style="width:auto;margin:0;padding:3px 6px;" onchange="card_recur_field('${boardId}','${cardId}','weekdayOrd',parseInt(this.value))">
+        <select class="modal-select inp-sm" onchange="card_recur_field('${boardId}','${cardId}','weekdayOrd',parseInt(this.value))">
           ${[1,2,3,4,-1].map(o=>`<option value="${o}"${(rv.weekdayOrd||1)===o?' selected':''}>${o===-1?'letzten':o+'.'}</option>`).join('')}
         </select>
-        <select class="modal-select" style="width:auto;margin:0;padding:3px 6px;" onchange="card_recur_field('${boardId}','${cardId}','weekday',parseInt(this.value))">
+        <select class="modal-select inp-sm" onchange="card_recur_field('${boardId}','${cardId}','weekday',parseInt(this.value))">
           ${WEEKDAY_NAMES.map((d,i)=>`<option value="${i}"${(rv.weekday||0)===i?' selected':''}>${d}</option>`).join('')}
         </select>
         im
-        <select class="modal-select" style="width:auto;margin:0;padding:3px 6px;" onchange="card_recur_field('${boardId}','${cardId}','yearMonth',parseInt(this.value))">
+        <select class="modal-select inp-sm" onchange="card_recur_field('${boardId}','${cardId}','yearMonth',parseInt(this.value))">
           ${MONTH_NAMES.map((m,i)=>`<option value="${i}"${(rv.yearMonth!==undefined?rv.yearMonth:rv.anchorMonth||0)===i?' selected':''}>${m}</option>`).join('')}
         </select>
       </label>
@@ -4896,7 +4900,7 @@ function renderFrequencyMatrix(startNodeId){
   const topCards=aggregates.flatMap(a=>a.cards);
   const activeCols=FREQ_CATEGORIES.filter(cat=>topCards.some(({card})=>cat.test(card)));
   if(rows.length===0||activeCols.length===0){
-    return '<div style="padding:12px;font-size:12px;color:var(--text3);text-align:center;">Keine Aufgaben</div>';
+    return '<div class="empty-hint">Keine Aufgaben</div>';
   }
   const cw=appSettings.colWidthEm||7;
   const gc=`minmax(${cw*2}em,auto) repeat(${activeCols.length},minmax(${cw}em,1fr))`;
@@ -5165,7 +5169,7 @@ function renderTaskOverview(startNodeId){
     const _dceShow=_dce==='always'||(_dce==='edit'&&editMode);
     h+=`<div class="daily-col" data-dcol-id="${col.id}">
       <div class="daily-col-hd" ${_dceShow?`tabindex="0" onkeydown="dailyColKeydown(event,'${col.id}')"`:''}>
-        <div style="flex:1;min-width:0;">
+        <div class="flex-fill">
           ${_dceShow
             ?`<input class="ni" value="${esc(col.label)}" onchange="renameDailyCol('${col.id}',this.value)" style="font-size:0.75em;font-weight:500;width:100%;" onclick="event.stopPropagation()"/>`
             :`<span style="font-size:0.75em;font-weight:500;">${esc(col.label)}</span>`}
@@ -6116,7 +6120,7 @@ function showKeyboardHelp(){
   let h=`<div class="smodal-overlay" onclick="closeS(event)"><div class="smodal" style="width:720px;max-width:96vw;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
     <h3 style="padding:16px 18px 0;">Tastenkürzel</h3>
     <div style="display:flex;gap:20px;padding:12px 18px;overflow-y:auto;flex:1;min-height:0;">
-      <div style="flex:1;min-width:0;"><div class="kb-grid">`;
+      <div class="flex-fill"><div class="kb-grid">`;
   fixedRows.forEach(([key,desc])=>{
     if(!key&&!desc){h+=`<div class="kb-spacer"></div>`;return;}
     if(!desc){h+=`<div class="kb-section">${key}</div>`;return;}
@@ -6124,7 +6128,7 @@ function showKeyboardHelp(){
     h+=`<div class="kb-desc-fixed">${desc}</div>`;
   });
   h+=`</div></div>
-      <div style="flex:1;min-width:0;"><div class="kb-grid">`;
+      <div class="flex-fill"><div class="kb-grid">`;
   h+=`<div class="kb-section">Konfigurierbar <span style="font-weight:400;color:var(--text3);">— klick zum Ändern</span></div>`;
   Object.keys(keyBindings).forEach(action=>{
     const kb=keyBindings[action];
@@ -6464,7 +6468,7 @@ function handleCommandInput(raw){
     el.innerHTML=h;
   } else {
     el.classList.add('is-open');
-    el.innerHTML=`<div style="padding:12px;font-size:12px;color:var(--text3);text-align:center;">Kein Kürzel gefunden</div>`;
+    el.innerHTML=`<div class="empty-hint">Kein Kürzel gefunden</div>`;
   }
 }
 // Custom confirm dialog for label-cleanup, design-matched to app style.
@@ -6941,7 +6945,7 @@ function doScopedSearch(scope,query){
   searchNode(rootId);
   _searchActiveIdx=-1;
   if(results.length===0){
-    el.classList.add('is-open');el.innerHTML=`<div style="padding:12px;font-size:12px;color:var(--text3);text-align:center;">Keine Ergebnisse</div>`;
+    el.classList.add('is-open');el.innerHTML=`<div class="empty-hint">Keine Ergebnisse</div>`;
     return;
   }
   el.classList.add('is-open','sr-anim');
@@ -7027,7 +7031,7 @@ function doSearch(q){
   results.sort((a,b)=>b.score-a.score);
   if(results.length===0){
     el.classList.add('is-open','sr-anim');
-    el.innerHTML=`<div style="padding:12px;font-size:12px;color:var(--text3);text-align:center;">Keine Ergebnisse</div>`;
+    el.innerHTML=`<div class="empty-hint">Keine Ergebnisse</div>`;
     return;
   }
   el.classList.add('is-open','sr-anim');
