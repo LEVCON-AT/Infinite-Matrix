@@ -2706,12 +2706,11 @@ function sbFindMatrixPath(from,tgt,path){
 // Navigate to a dataId: 'matrix-X', 'cell-M-R-C', 'feat-M-R-C-TYPE', or 'link-B-L'
 function sbNav(dataId){
   if(!dataId)return;
+  const p=parseDataId(dataId);
+  if(!p)return;
   // Link/Mail-Row: open URL or mailto, no stack change
-  if(String(dataId).startsWith('link-')){
-    const lm=/^link-(.+?)-(.+)$/.exec(dataId);
-    if(!lm)return;
-    const boardId=lm[1],linkId=lm[2];
-    const link=nodes[boardId]?.data?.links?.find(l=>l.id===linkId);
+  if(p.type==='link'){
+    const link=nodes[p.boardId]?.data?.links?.find(l=>l.id===p.linkId);
     if(!link)return;
     if(link.type==='mail')window.location.href=buildMailto(link);
     else if(link.url)window.open(link.url,'_blank');
@@ -2723,33 +2722,25 @@ function sbNav(dataId){
   _sbLastExpandedId=null;
   // If in rails mode, promote to full for context during navigation
   if(sbState==='rails')sbSetState('full');
-  // Matrix entry (root)
-  let m=/^matrix-(.+)$/.exec(dataId);
-  if(m){
-    const target=nodes[m[1]];if(!target||target.type!=='matrix')return;
-    const path=sbFindMatrixPath(stack[0].nodeId,m[1],[]);
+  if(p.type==='matrix'){
+    const target=nodes[p.matrixId];if(!target||target.type!=='matrix')return;
+    const path=sbFindMatrixPath(stack[0].nodeId,p.matrixId,[]);
     if(!path)return;
     stack=path.map(id=>({nodeId:id,label:nodes[id].label,cellRef:null}));
     renderAnimated('in');
     return;
   }
-  // Feature entry
-  m=/^feat-(.+?)-([^-]+)-([^-]+)-([^-]+)$/.exec(dataId);
-  if(m){
-    const parentMatrixId=m[1],rowId=m[2],colId=m[3],tab=m[4];
-    _sbOpenCellAt(parentMatrixId,rowId,colId,tab);
+  if(p.type==='feat'){
+    _sbOpenCellAt(p.matrixId,p.rowId,p.colId,p.key);
     return;
   }
-  // Cell entry
-  m=/^cell-(.+?)-([^-]+)-([^-]+)$/.exec(dataId);
-  if(m){
-    const parentMatrixId=m[1],rowId=m[2],colId=m[3];
-    const parent=nodes[parentMatrixId];if(!parent||parent.type!=='matrix')return;
-    const cell=parent.data.cells[rowId+'-'+colId];if(!cell||!cell.features||!cell.features.length)return;
+  if(p.type==='cell'){
+    const parent=nodes[p.matrixId];if(!parent||parent.type!=='matrix')return;
+    const cell=parent.data.cells[p.rowId+'-'+p.colId];if(!cell||!cell.features||!cell.features.length)return;
     // Default tab = first feature in CELL_FEATURES order
     const firstFeature=CELL_FEATURES.find(f=>cell.features.includes(f.key));
     const tab=firstFeature?firstFeature.key:cell.features[0];
-    _sbOpenCellAt(parentMatrixId,rowId,colId,tab);
+    _sbOpenCellAt(p.matrixId,p.rowId,p.colId,tab);
     return;
   }
 }
@@ -3014,10 +3005,11 @@ function sbPeekHide(){
   sbPeekCurrentId=null;
 }
 function sbPeekContent(dataId){
+  const pd=parseDataId(dataId);
+  if(!pd)return '';
   // Matrix entry
-  let mm=/^matrix-(.+)$/.exec(dataId);
-  if(mm){
-    const n=nodes[mm[1]];if(!n||n.type!=='matrix')return '';
+  if(pd.type==='matrix'){
+    const n=nodes[pd.matrixId];if(!n||n.type!=='matrix')return '';
     const cols=n.data.cols.length||1,rows=n.data.rows.length||1;
     const maxC=Math.min(cols,5),maxR=Math.min(rows,5);
     let grid='';
@@ -3040,17 +3032,14 @@ function sbPeekContent(dataId){
       <div class="peek-grid" style="grid-template-columns:repeat(${maxC},1fr);">${grid}</div>`;
   }
   // Cell or feature entry
-  const isCell=/^cell-(.+?)-([^-]+)-([^-]+)$/.exec(dataId);
-  const isFeat=/^feat-(.+?)-([^-]+)-([^-]+)-([^-]+)$/.exec(dataId);
-  if(isCell||isFeat){
-    const [parentId,rowId,colId]=isCell?[isCell[1],isCell[2],isCell[3]]:[isFeat[1],isFeat[2],isFeat[3]];
-    const parent=nodes[parentId];if(!parent)return '';
-    const cell=parent.data.cells[rowId+'-'+colId];if(!cell)return '';
-    const rowLbl=(parent.data.rows.find(r=>r.id===rowId)||{}).label||'';
-    const colLbl=(parent.data.cols.find(co=>co.id===colId)||{}).label||'';
-    if(isFeat){
+  if(pd.type==='cell'||pd.type==='feat'){
+    const parent=nodes[pd.matrixId];if(!parent)return '';
+    const cell=parent.data.cells[pd.rowId+'-'+pd.colId];if(!cell)return '';
+    const rowLbl=(parent.data.rows.find(r=>r.id===pd.rowId)||{}).label||'';
+    const colLbl=(parent.data.cols.find(co=>co.id===pd.colId)||{}).label||'';
+    if(pd.type==='feat'){
       // Feature peek: show that tab's content summary
-      const type=isFeat[4];
+      const type=pd.key;
       if(type==='matrix'&&cell.matrixId){
         const sub=nodes[cell.matrixId];
         if(sub){
@@ -3142,30 +3131,21 @@ function sbPeekContent(dataId){
 
 // Label für eine einzelne dataId-Komponente im Breadcrumb-Pfad
 function _sbCrumbLabelFor(dataId){
-  if(dataId.startsWith('matrix-')){
-    return nodes[dataId.slice(7)]?.label||'Matrix';
-  }
-  if(dataId.startsWith('cell-')){
-    const m=/^cell-(.+?)-([^-]+)-([^-]+)$/.exec(dataId);
-    if(!m)return '?';
-    const [,mid,rowId,colId]=m;
-    const parent=nodes[mid];if(!parent)return '?';
-    const row=(parent.data.rows||[]).find(r=>r.id===rowId);
-    const col=(parent.data.cols||[]).find(c=>c.id===colId);
+  const p=parseDataId(dataId);if(!p)return '?';
+  if(p.type==='matrix')return nodes[p.matrixId]?.label||'Matrix';
+  if(p.type==='cell'){
+    const parent=nodes[p.matrixId];if(!parent)return '?';
+    const row=(parent.data.rows||[]).find(r=>r.id===p.rowId);
+    const col=(parent.data.cols||[]).find(c=>c.id===p.colId);
     return (row?.label||'')+' / '+(col?.label||'');
   }
-  if(dataId.startsWith('feat-')){
-    const m=/^feat-(.+?)-([^-]+)-([^-]+)-(info|board|checklists|matrix)$/.exec(dataId);
-    if(!m)return '?';
-    const [,mid,rowId,colId,key]=m;
-    const cell=nodes[mid]?.data?.cells?.[rowId+'-'+colId];
-    if(cell&&typeof getTabLabel==='function')return getTabLabel(cell,key);
-    return getCellFeatureDef(key)?.label||key;
+  if(p.type==='feat'){
+    const cell=nodes[p.matrixId]?.data?.cells?.[p.rowId+'-'+p.colId];
+    if(cell&&typeof getTabLabel==='function')return getTabLabel(cell,p.key);
+    return getCellFeatureDef(p.key)?.label||p.key;
   }
-  if(dataId.startsWith('link-')){
-    const m=/^link-(.+?)-(.+)$/.exec(dataId);
-    if(!m)return '?';
-    const link=nodes[m[1]]?.data?.links?.find(l=>l.id===m[2]);
+  if(p.type==='link'){
+    const link=nodes[p.boardId]?.data?.links?.find(l=>l.id===p.linkId);
     return link?(link.label||link.url||link.to||'(unbenannt)'):'?';
   }
   return '?';
@@ -3175,24 +3155,22 @@ function _sbCrumbLabelFor(dataId){
 // - Feature-Target: Parent-Cell + Feature-Icon + Feature-Label.
 // - Link-Target: Parent-Cell (info-Feature wird übersprungen) + Link/Mail-Icon + Link-Label.
 function _sbShortCrumb(dataId){
-  if(dataId.startsWith('cell-')){
+  const pd=parseDataId(dataId);
+  if(!pd)return {parent:null,target:{label:'?',icon:'',color:''}};
+  if(pd.type==='cell'){
     return {parent:null,target:{label:_sbCrumbLabelFor(dataId),icon:'',color:''}};
   }
-  if(dataId.startsWith('feat-')){
-    const m=/^feat-(.+?)-([^-]+)-([^-]+)-(info|board|checklists|matrix)$/.exec(dataId);
-    if(!m)return {parent:null,target:{label:'?',icon:'',color:''}};
-    const cellId='cell-'+m[1]+'-'+m[2]+'-'+m[3];
-    const def=getCellFeatureDef(m[4]);
+  if(pd.type==='feat'){
+    const cellId='cell-'+pd.matrixId+'-'+pd.rowId+'-'+pd.colId;
+    const def=getCellFeatureDef(pd.key);
     const C={matrix:'var(--bluetxt)',board:'var(--tealtxt)',info:'var(--ambertxt)',checklists:'var(--purpletxt)'};
     return {
       parent:_sbCrumbLabelFor(cellId),
-      target:{label:_sbCrumbLabelFor(dataId),icon:def?.icoSm||'',color:C[m[4]]||''}
+      target:{label:_sbCrumbLabelFor(dataId),icon:def?.icoSm||'',color:C[pd.key]||''}
     };
   }
-  if(dataId.startsWith('link-')){
-    const m=/^link-(.+?)-(.+)$/.exec(dataId);
-    if(!m)return {parent:null,target:{label:'?',icon:'',color:''}};
-    const link=nodes[m[1]]?.data?.links?.find(l=>l.id===m[2]);
+  if(pd.type==='link'){
+    const link=nodes[pd.boardId]?.data?.links?.find(l=>l.id===pd.linkId);
     // Parent = Cell; bei Multi-Feature hängt der Link an feat-info → eine Ebene überspringen
     let p=sbParentMap.get(dataId);
     if(p&&p.startsWith('feat-'))p=sbParentMap.get(p);
@@ -3212,19 +3190,15 @@ function _sbShortCrumb(dataId){
 
 // Context menu
 function sbContextMenu(e,dataId){
-  const isCell=String(dataId).startsWith('cell-');
-  const isFeat=String(dataId).startsWith('feat-');
-  const isLink=String(dataId).startsWith('link-');
-  if(!isCell&&!isFeat&&!isLink)return;
+  const pd=parseDataId(dataId);
+  if(!pd||(pd.type!=='cell'&&pd.type!=='feat'&&pd.type!=='link'))return;
+  const isCell=pd.type==='cell',isFeat=pd.type==='feat',isLink=pd.type==='link';
   const cp=isCell?_sbParseCellDataId(dataId):null;
   const fp=isFeat?_sbParseFeatureDataId(dataId):null;
   let lp=null;
   if(isLink){
-    const lm=/^link-(.+?)-(.+)$/.exec(dataId);
-    if(lm){
-      const link=nodes[lm[1]]?.data?.links?.find(l=>l.id===lm[2]);
-      if(link)lp={boardId:lm[1],linkId:lm[2],link};
-    }
+    const link=nodes[pd.boardId]?.data?.links?.find(l=>l.id===pd.linkId);
+    if(link)lp={boardId:pd.boardId,linkId:pd.linkId,link};
   }
   if(!cp&&!fp&&!lp)return;
 
@@ -3347,23 +3321,38 @@ function sbContextMenu(e,dataId){
     document.addEventListener('keydown',_closeKey,true); // capture-Phase
   },0);
 }
-// Parse cell dataId → {parentMatrixId, rowId, colId, cell}
+// ── DATAID-PARSER (Sprint 4.3) ──
+// Pure string parse, no node lookups. Returns null for unrecognized input.
+//   'matrix-<id>'             → {type:'matrix', matrixId}
+//   'cell-<m>-<r>-<c>'        → {type:'cell',   matrixId, rowId, colId}
+//   'feat-<m>-<r>-<c>-<key>'  → {type:'feat',   matrixId, rowId, colId, key}
+//   'link-<b>-<id>'           → {type:'link',   boardId, linkId}
+function parseDataId(id){
+  if(!id)return null;
+  const s=String(id);
+  let m=/^matrix-(.+)$/.exec(s);
+  if(m)return {type:'matrix',matrixId:m[1]};
+  m=/^feat-(.+?)-([^-]+)-([^-]+)-(info|board|checklists|matrix)$/.exec(s);
+  if(m)return {type:'feat',matrixId:m[1],rowId:m[2],colId:m[3],key:m[4]};
+  m=/^cell-(.+?)-([^-]+)-([^-]+)$/.exec(s);
+  if(m)return {type:'cell',matrixId:m[1],rowId:m[2],colId:m[3]};
+  m=/^link-(.+?)-(.+)$/.exec(s);
+  if(m)return {type:'link',boardId:m[1],linkId:m[2]};
+  return null;
+}
+// Parse cell dataId → {parentMatrixId, rowId, colId, cell, parent}
 function _sbParseCellDataId(dataId){
-  const m=/^cell-(.+?)-([^-]+)-([^-]+)$/.exec(dataId);
-  if(!m)return null;
-  const parentMatrixId=m[1],rowId=m[2],colId=m[3];
-  const parent=nodes[parentMatrixId];if(!parent||parent.type!=='matrix')return null;
-  const cell=parent.data.cells[rowId+'-'+colId];if(!cell)return null;
-  return {parentMatrixId,rowId,colId,cell,parent};
+  const p=parseDataId(dataId);if(!p||p.type!=='cell')return null;
+  const parent=nodes[p.matrixId];if(!parent||parent.type!=='matrix')return null;
+  const cell=parent.data.cells[p.rowId+'-'+p.colId];if(!cell)return null;
+  return {parentMatrixId:p.matrixId,rowId:p.rowId,colId:p.colId,cell,parent};
 }
 // Parse feature dataId → {parentMatrixId, rowId, colId, cell, parent, key}
 function _sbParseFeatureDataId(dataId){
-  const m=/^feat-(.+?)-([^-]+)-([^-]+)-(info|board|checklists|matrix)$/.exec(dataId);
-  if(!m)return null;
-  const parentMatrixId=m[1],rowId=m[2],colId=m[3],key=m[4];
-  const parent=nodes[parentMatrixId];if(!parent||parent.type!=='matrix')return null;
-  const cell=parent.data.cells[rowId+'-'+colId];if(!cell)return null;
-  return {parentMatrixId,rowId,colId,cell,parent,key};
+  const p=parseDataId(dataId);if(!p||p.type!=='feat')return null;
+  const parent=nodes[p.matrixId];if(!parent||parent.type!=='matrix')return null;
+  const cell=parent.data.cells[p.rowId+'-'+p.colId];if(!cell)return null;
+  return {parentMatrixId:p.matrixId,rowId:p.rowId,colId:p.colId,cell,parent,key:p.key};
 }
 function sbRename(dataId){
   const p=_sbParseCellDataId(dataId);if(!p)return;
