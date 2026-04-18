@@ -140,6 +140,69 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 - Nach Abschluss aller Sprints: Zusammenfassung + Merge-Vorschlag an User.
 - Kein Force-Push auf `main`. Kein `--no-verify`.
 
+## Git-Strategie (ab Bridge-Phase)
+
+Mit Start der Bridge-Umsetzung (siehe [docs/plan-bridge.md](docs/plan-bridge.md)) wird die Arbeit professionalisiert: `main` ist geschützt, Feature-Branches kommen per PR zurück, Commits folgen Conventional Commits, Semver-Tags markieren Meilensteine.
+
+### Branch-Modell (trunk-based, PR-gated)
+
+```
+main            prod. Geschützt. Nur via PR mergen. Auto-deploy bei Merge (ab Phase 3).
+ │
+ ├── feat/<name>     neue Features (z.B. feat/bridge-skeleton)
+ ├── fix/<name>      Bugfixes
+ ├── chore/<name>    Refactoring, Tooling, Dependencies, Repo-Housekeeping
+ ├── docs/<name>     nur Doku
+ └── ci/<name>       Workflows / Infra-Config
+```
+
+- Branch-Namen: kebab-case, Scope im Präfix
+- Lebenszyklus: ein Branch = eine Aufgabe, < 5 Tage offen
+- Merge-Strategie: **Squash-Merge auf main** (linear history) — Sub-Commits im Feature-Branch dürfen WIP-artig sein, auf main wird nur ein kuratierter Commit sichtbar
+- Keine Force-Pushes auf `main` (per Branch-Protection blockiert)
+- `main` hat `Require linear history`, `Block force pushes`, `Restrict deletions`, `Require PR before merging`, `Require conversation resolution`, `Require status checks to pass` (sobald CI in Phase 3 steht)
+
+### Conventional-Commits-Format
+
+```
+<type>(<scope>): <kurzer Titel in dt.>
+
+<Body — optional, erklärt Warum. Bullets.>
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+```
+
+**Types:** `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `ci`, `style`, `perf`, `build`
+**Scopes (Beispiele):** `client`, `bridge`, `bridge/tools`, `bridge/ws`, `bridge/mcp`, `infra/nginx`, `infra/systemd`, `ci`, `docs`, `repo`
+
+Beispiele:
+```
+feat(bridge): WebSocket-Protokoll v1 + Tool-Dispatch
+fix(bridge/ws): Reconnect-Loop bei State-Resync-Fehler
+refactor(client): MATRIX_TOOLS-Registry als Top-Level-Dispatch
+ci: rsync-Deploy + systemd-Restart Smoke-Check
+chore(repo): Monorepo-Layout, Client nach client/ extrahiert
+docs(plan): Bridge + MCP + Auto-Deployment Fahrplan
+```
+
+Die bestehende Sub-Sprint-Konvention (`Sprint X.Y: …` bzw. `Backlog N<letter>: …`) bleibt für laufende Review- und Backlog-Wellen gültig. Für alles Neue ab Bridge-Phase: Conventional Commits.
+
+### Tags & Releases
+
+- Semver-Tags nach Meilensteinen: `v0.1.0-code-review` (abgeschlossene Review-Welle), `v0.1.0-bridge-local-mvp` (Bridge lokal), `v0.2.0-mcp-v1` (erste AI-E2E), `v0.3.0-onboarding` usw.
+- Release-Notes in GitHub Releases; automatisch via `release-please`/`git-cliff` bei Bedarf später.
+
+### PR-Hygiene
+
+- Ein PR = eine abgeschlossene Teilleistung, nicht ein WIP-Zustand.
+- PR-Titel = finaler Commit-Titel (wird bei Squash-Merge übernommen).
+- PR-Body: Summary (1–3 Bullet), Test-Plan-Checkliste, Verweis auf Plan-Sektion.
+- Labels: `feat`, `fix`, `chore`, `ci`, `infra`, `docs` — einer pro PR, passend zum Commit-Type.
+
+### Commit-Autorenschaft
+
+Lokaler Committer ist die User-Identität (Git-Config). Inhaltliche Mitarbeit durch den AI-Assistenten wird per `Co-Authored-By`-Trailer anerkannt. Nie `--no-verify`, nie Signaturen manipulieren, nie Force-Push auf `main`.
+
 ## Verifikations-Workflow
 
 Preview-Server `matrix` auf Port 3848 — im `.claude/launch.json` definiert. Bei sichtbaren Änderungen:
