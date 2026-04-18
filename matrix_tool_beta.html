@@ -4231,15 +4231,8 @@ function buildRecurrenceUI(boardId,cardId,rv){
 }
 
 let _openCardRef=null; // {boardId,cardId} of currently open card modal
-function openCard(boardId,cardId){
-  _pushFocusRestore();_pushModal(closeCard);
-  _openCardRef={boardId,cardId};
-  if(!nodes[boardId]){_popModal(closeCard);_popFocusRestore();return;}
-  const b=nodes[boardId].data;
-  const card=b.kbCards.find(c=>c.id===cardId);
-  if(!card){_popModal(closeCard);_popFocusRestore();return;}
-  const cols=b.kbCols;
-
+// Baut das komplette HTML für das Kartenmodal. Keine Seiteneffekte.
+function _renderCardModalHTML(boardId,cardId,b,card,cols){
   let h=`<div class="modal-hd">
     <h3><input style="font-size:15px;font-weight:500;border:none;outline:none;background:transparent;width:100%;font-family:inherit;color:var(--text);" value="${esc(card.name)}" placeholder="Aufgabenname" onchange="card_set('${boardId}','${cardId}','name',this.value)" id="cn"/></h3>
     ${(_pendingCard||editMode)
@@ -4372,7 +4365,11 @@ function openCard(boardId,cardId){
     <button class="btn danger btn-c" onclick="deleteCard('${boardId}','${cardId}')">Löschen</button>
     <button class="btn-p" onclick="closeCard()">Fertig</button>
   </div>`;
+  return h;
+}
 
+// Mountet/re-mountet das Kartenmodal im Container. Kümmert sich um Scroll-Preservation und Initial-Focus.
+function _mountCardModal(h){
   const container=document.getElementById('cardmodal');
   const prevModal=container.querySelector('.modal');
   const savedScroll=prevModal?prevModal.scrollTop:0;
@@ -4382,14 +4379,14 @@ function openCard(boardId,cardId){
     // Only replace modal inner content — keep overlay intact to avoid flash
     prevModal.innerHTML=h;
     if(savedScroll)prevModal.scrollTop=savedScroll;
-    container.onkeydown=cardModalKeyHandler;
+    container.onkeydown=_cardModalKeyHandler;
   } else {
     // First open: wrap in overlay+modal, clone to clear old listeners
     const wrap=`<div class="modal-overlay" onclick="closeCardIfBg(event)"><div class="modal" onclick="event.stopPropagation()">${h}</div></div>`;
     const fresh=container.cloneNode(false);
     container.parentNode.replaceChild(fresh,container);
     fresh.innerHTML=wrap;
-    fresh.onkeydown=cardModalKeyHandler;
+    fresh.onkeydown=_cardModalKeyHandler;
     const cnEl=document.getElementById('cn');
     if(cnEl){
       cnEl.focus();
@@ -4398,21 +4395,36 @@ function openCard(boardId,cardId){
       });
     }
   }
-  function cardModalKeyHandler(e){
-    if(e.key==='Tab'){
-      const modal=document.querySelector('#cardmodal .modal');
-      if(!modal)return;
-      const focusable=Array.from(modal.querySelectorAll('input:not([disabled]),select:not([disabled]),button,[contenteditable]'));
-      const idx=focusable.indexOf(document.activeElement);
-      if(idx>=0){
-        e.preventDefault();
-        const next=focusable[(idx+(e.shiftKey?-1:1)+focusable.length)%focusable.length];
-        if(next)next.focus();
-      }
+}
+
+// Key-Handler für das Kartenmodal (Tab-Trap, ESC, Edit-Shortcut zum Re-Render).
+function _cardModalKeyHandler(e){
+  if(e.key==='Tab'){
+    const modal=document.querySelector('#cardmodal .modal');
+    if(!modal)return;
+    const focusable=Array.from(modal.querySelectorAll('input:not([disabled]),select:not([disabled]),button,[contenteditable]'));
+    const idx=focusable.indexOf(document.activeElement);
+    if(idx>=0){
+      e.preventDefault();
+      const next=focusable[(idx+(e.shiftKey?-1:1)+focusable.length)%focusable.length];
+      if(next)next.focus();
     }
-    if(e.key==='Escape'){e.stopPropagation();closeCard();}
-    if(matchShortcut(e,'edit')){e.preventDefault();e.stopPropagation();toggleEdit();if(_openCardRef)openCard(_openCardRef.boardId,_openCardRef.cardId);}
   }
+  if(e.key==='Escape'){e.stopPropagation();closeCard();}
+  if(matchShortcut(e,'edit')){e.preventDefault();e.stopPropagation();toggleEdit();if(_openCardRef)openCard(_openCardRef.boardId,_openCardRef.cardId);}
+}
+
+// Öffnet (oder re-rendert) das Modal einer Kanban-Karte.
+function openCard(boardId,cardId){
+  _pushFocusRestore();_pushModal(closeCard);
+  _openCardRef={boardId,cardId};
+  if(!nodes[boardId]){_popModal(closeCard);_popFocusRestore();return;}
+  const b=nodes[boardId].data;
+  const card=b.kbCards.find(c=>c.id===cardId);
+  if(!card){_popModal(closeCard);_popFocusRestore();return;}
+  const cols=b.kbCols;
+  const h=_renderCardModalHTML(boardId,cardId,b,card,cols);
+  _mountCardModal(h);
 }
 
 function flushCardInputs(){
