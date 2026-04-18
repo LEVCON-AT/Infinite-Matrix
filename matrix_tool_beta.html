@@ -658,6 +658,37 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,[contenteditable
 #savedot.save-dirty svg{color:var(--blue);animation:savePulse 0.8s ease infinite;}
 #savedot.save-err svg{color:var(--red);animation:saveShake 0.3s ease;}
 
+/* ── TOAST-STACK (Sprint 3.4) ── */
+#toast-stack{position:fixed;right:18px;bottom:18px;z-index:500;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:min(420px,calc(100vw - 36px));}
+.toast{pointer-events:auto;background:var(--bg);color:var(--text);border:0.5px solid var(--border2);border-left:3px solid var(--text3);border-radius:var(--r);padding:10px 14px 10px 12px;font-size:12.5px;line-height:1.4;box-shadow:var(--shadow-md);display:flex;align-items:flex-start;gap:8px;animation:toastIn var(--tr-enter) forwards;max-width:100%;word-wrap:break-word;}
+.toast.closing{animation:toastOut 140ms cubic-bezier(.4,0,.2,1) forwards;}
+.toast.error{border-left-color:var(--red);}
+.toast.success{border-left-color:var(--teal);}
+.toast.warning{border-left-color:var(--amber);}
+.toast.info{border-left-color:var(--blue);}
+.toast-icon{flex-shrink:0;margin-top:1px;}
+.toast-icon.error{color:var(--red);}
+.toast-icon.success{color:var(--teal);}
+.toast-icon.warning{color:var(--amber);}
+.toast-icon.info{color:var(--blue);}
+.toast-body{flex:1;min-width:0;}
+.toast-close{flex-shrink:0;background:none;border:none;color:var(--text3);cursor:pointer;padding:0 2px;font-size:16px;line-height:1;opacity:0.6;transition:opacity var(--tr-std);}
+.toast-close:hover{opacity:1;color:var(--text);}
+@keyframes toastIn{from{opacity:0;transform:translateX(16px) scale(0.96);}to{opacity:1;transform:none;}}
+@keyframes toastOut{from{opacity:1;transform:none;}to{opacity:0;transform:translateX(16px) scale(0.96);}}
+
+/* ── LOADING-OVERLAY (Sprint 3.5) ── */
+#loading-overlay{position:fixed;inset:0;z-index:400;background:var(--overlay-soft);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity var(--tr-std);}
+#loading-overlay.visible{opacity:1;pointer-events:auto;}
+.loading-card{background:var(--bg);color:var(--text);border:0.5px solid var(--border2);border-radius:var(--r);padding:18px 22px;font-size:13px;box-shadow:var(--shadow-md);display:flex;align-items:center;gap:12px;min-width:180px;}
+.loading-spinner{width:18px;height:18px;border:2px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── BREADCRUMB IN SMODAL (Sprint 3.6) ── */
+.smodal-crumb{font-size:10.5px;color:var(--text2);margin:-2px 0 8px;padding:4px 8px;background:var(--bg2);border-radius:var(--rs);display:inline-flex;align-items:center;gap:5px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0.5px solid var(--border);}
+.smodal-crumb .crumb-sep{color:var(--text3);}
+.smodal-crumb .crumb-ico{color:var(--text3);flex-shrink:0;display:inline-flex;align-items:center;}
+
 /* Drag & Drop */
 .kb-card[draggable="true"]{cursor:grab;}
 .kb-card.dragging{opacity:0.4;transform:scale(0.96);}
@@ -781,6 +812,8 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,[contenteditable
 </div>
 <div id="mc"></div><!-- simple modal -->
 <div id="cardmodal"></div><!-- card detail -->
+<div id="toast-stack" aria-live="polite" aria-atomic="false"></div><!-- Sprint 3.4 Toast-System -->
+<div id="loading-overlay" role="status" aria-hidden="true"><div class="loading-card"><div class="loading-spinner"></div><span id="loading-text">Lade …</span></div></div><!-- Sprint 3.5 Loading-Overlay -->
 
 <script>
 // ═══════════════════════════════════════════════════════
@@ -846,6 +879,102 @@ const UI={
   emptySearch:'Keine Ergebnisse',
   emptyCol:'Nichts fällig',
 };
+// ── TOAST-SYSTEM (Sprint 3.4) ──
+// showToast(msg, {type:'error'|'success'|'warning'|'info', ms:number}) – stapelt, auto-dismiss
+const TOAST_DEFAULT_MS=5000;
+const TOAST_ERROR_MS=7000;
+let _toastSeq=0;
+function _toastIcon(type){
+  // Inline SVG statt ICO.* (ICO ist hier noch nicht definiert) – 14px
+  if(type==='error')return '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6.4"/><path d="M8 5v3.5M8 11v.01"/></svg>';
+  if(type==='success')return '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6.4"/><path d="M5.3 8.1l1.9 1.9 3.5-3.9"/></svg>';
+  if(type==='warning')return '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 1.8L14.6 13.6H1.4z"/><path d="M8 6.5v3M8 11.2v.01"/></svg>';
+  return '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6.4"/><path d="M8 7.2v4M8 4.8v.01"/></svg>';
+}
+function showToast(msg,opts){
+  const o=opts||{};
+  const type=o.type||'info';
+  const ms=Number.isFinite(o.ms)?o.ms:(type==='error'?TOAST_ERROR_MS:TOAST_DEFAULT_MS);
+  const stack=document.getElementById('toast-stack');
+  if(!stack){console.warn('toast-stack missing, fallback alert:',msg);alert(msg);return;}
+  const id='toast-'+(++_toastSeq);
+  const div=document.createElement('div');
+  div.className='toast '+type;
+  div.setAttribute('role',type==='error'?'alert':'status');
+  div.id=id;
+  const safe=String(msg).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  div.innerHTML=`<span class="toast-icon ${type}">${_toastIcon(type)}</span><div class="toast-body">${safe}</div><button class="toast-close" aria-label="Schließen">&times;</button>`;
+  const remove=()=>{ if(!div.isConnected)return; div.classList.add('closing'); setTimeout(()=>{if(div.parentNode)div.parentNode.removeChild(div);},160); };
+  div.querySelector('.toast-close').onclick=remove;
+  stack.appendChild(div);
+  if(ms>0)setTimeout(remove,ms);
+  return id;
+}
+// ── ERROR-TRANSLATION (Sprint 3.3) ──
+// translateError(err) → deutscher String. Prüft bekannte Fehler-Klassen/-Namen.
+function translateError(err,fallback){
+  if(!err)return fallback||'Unerwarteter Fehler.';
+  if(typeof err==='string')return err;
+  const name=err.name||'';
+  const msg=err.message||'';
+  if(name==='AbortError')return 'Abgebrochen.';
+  if(name==='SyntaxError'||/JSON/i.test(msg))return 'Datei ist beschädigt oder kein gültiges JSON.';
+  if(name==='OperationError'||/decrypt|cipher|tag|integrity/i.test(msg))return 'Entschlüsselung fehlgeschlagen — falsches Passwort oder beschädigte Datei.';
+  if(name==='QuotaExceededError')return 'Speicher voll — nicht genug Platz für Speicherung.';
+  if(name==='NotAllowedError')return 'Zugriff verweigert. Bitte Berechtigung erteilen.';
+  if(name==='NotFoundError')return 'Datei oder Ziel nicht gefunden.';
+  if(name==='SecurityError')return 'Browser hat den Zugriff aus Sicherheitsgründen blockiert.';
+  if(name==='TypeError'&&/network|fetch/i.test(msg))return 'Netzwerkfehler.';
+  if(name==='InvalidStateError')return 'Ungültiger Zustand — bitte Aktion wiederholen.';
+  if(msg)return msg;
+  return fallback||'Unerwarteter Fehler.';
+}
+// ── LOADING-OVERLAY (Sprint 3.5) ──
+let _loadingDepth=0;
+function showLoading(msg){
+  _loadingDepth++;
+  const ov=document.getElementById('loading-overlay');
+  const tx=document.getElementById('loading-text');
+  if(tx)tx.textContent=msg||'Lade …';
+  if(ov){ov.classList.add('visible');ov.setAttribute('aria-hidden','false');}
+}
+function hideLoading(){
+  _loadingDepth=Math.max(0,_loadingDepth-1);
+  if(_loadingDepth>0)return;
+  const ov=document.getElementById('loading-overlay');
+  if(ov){ov.classList.remove('visible');ov.setAttribute('aria-hidden','true');}
+}
+async function withLoading(msg,fn){
+  showLoading(msg);
+  try{return await fn();}finally{hideLoading();}
+}
+// ── MODAL-STACK (Sprint 3.2) ──
+// Topmost modal owns ESC. Each modal registers a close-fn on open, removes on close.
+const _modalStack=[];
+function _pushModal(close){_modalStack.push(close);}
+function _popModal(close){
+  if(!close){_modalStack.pop();return;}
+  const idx=_modalStack.lastIndexOf(close);
+  if(idx>=0)_modalStack.splice(idx,1);
+}
+function _topModalClose(){return _modalStack.length?_modalStack[_modalStack.length-1]:null;}
+// ── FOCUS-RESTORE-STACK (Sprint 3.1) ──
+// Pro Modal-Instanz wird das zuletzt fokussierte Element gemerkt und beim Schließen zurückgesetzt.
+const _focusRestoreStack=[];
+function _pushFocusRestore(){
+  const ae=document.activeElement;
+  _focusRestoreStack.push(ae&&ae!==document.body?ae:null);
+}
+function _popFocusRestore(){
+  const target=_focusRestoreStack.pop();
+  if(!target)return;
+  // Defer to allow animation/close to complete
+  setTimeout(()=>{
+    if(document.contains(target)&&typeof target.focus==='function'){
+      try{target.focus();}catch(e){}
+    }
+  },0);
+}
 const VIS_LABELS={
   addRowCol:'Zeile/Spalte hinzufügen',
   deleteRowCol:'Zeile/Spalte löschen',
@@ -1074,7 +1203,7 @@ function setNodeAlias(nodeId,val){
   const n=nodes[nodeId];if(!n)return;
   const oldAlias=n.alias||'';
   const v=validateAlias(val,oldAlias);
-  if(!v.valid){alert(v.msg);return;}
+  if(!v.valid){showToast(v.msg,{type:'warning'});return;}
   n.alias=v.alias;
   rebuildAliasIndex();save();
 }
@@ -1082,7 +1211,7 @@ function setCellAlias(parentId,rowId,colId,val){
   const cell=getCell(parentId,`${rowId}-${colId}`);if(!cell)return;
   const oldAlias=cell.alias||'';
   const v=validateAlias(val,oldAlias);
-  if(!v.valid){alert(v.msg);return;}
+  if(!v.valid){showToast(v.msg,{type:'warning'});return;}
   cell.alias=v.alias;
   rebuildAliasIndex();save();
 }
@@ -1090,7 +1219,7 @@ function setCardAlias(boardId,cardId,val){
   const c=getCard(boardId,cardId);if(!c)return;
   const oldAlias=c.alias||'';
   const v=validateAlias(val,oldAlias);
-  if(!v.valid){alert(v.msg);return;}
+  if(!v.valid){showToast(v.msg,{type:'warning'});return;}
   c.alias=v.alias;
   rebuildAliasIndex();save();
 }
@@ -1098,7 +1227,7 @@ function setLinkAlias(boardId,linkId,val){
   const l=nodes[boardId]?.data.links.find(x=>x.id===linkId);if(!l)return;
   const oldAlias=l.alias||'';
   const v=validateAlias(val,oldAlias);
-  if(!v.valid){alert(v.msg);return;}
+  if(!v.valid){showToast(v.msg,{type:'warning'});return;}
   l.alias=v.alias;
   rebuildAliasIndex();save();
 }
@@ -1319,8 +1448,8 @@ function setEncPasswordDialog(){
     {label:'Passwort bestätigen',id:'p2',type:'password'}
   ],v=>{
     const p1=(v.p1||'').trim();
-    if(p1.length<4){alert('Passwort muss mindestens 4 Zeichen haben.');showSettings();return;}
-    if(p1!==(v.p2||'').trim()){alert('Passwörter stimmen nicht überein.');showSettings();return;}
+    if(p1.length<4){showToast('Passwort muss mindestens 4 Zeichen haben.',{type:'warning'});showSettings();return;}
+    if(p1!==(v.p2||'').trim()){showToast('Passwörter stimmen nicht überein.',{type:'warning'});showSettings();return;}
     _encPw=p1;
     showSaveStatus('✓ Passwort gesetzt','var(--teal)',SAVE_INDICATOR_MS);
     showSettings();
@@ -1372,9 +1501,11 @@ function save(){
 
 async function flushToFile(){
   if(!fileHandle||!fileDirty)return;
+  const useEnc=!!appSettings.encryption;
+  if(useEnc)showLoading('Verschlüssele & speichere …');
   try{
     let content=getPayloadPretty();
-    if(appSettings.encryption){
+    if(useEnc){
       const pw=await getEncPw();
       if(!pw){showSaveStatus('✗ Verschlüsselung abgebrochen','var(--red)',SAVE_WARN_MS);return;}
       content=await encryptPayload(content,pw);
@@ -1384,9 +1515,11 @@ async function flushToFile(){
     await writable.write(content);
     await writable.close();
     fileDirty=false;
-    showSaveStatus('✓ gespeichert'+(appSettings.encryption?' 🔒':''),'var(--teal)',SAVE_INDICATOR_MS);
+    showSaveStatus('✓ gespeichert'+(useEnc?' 🔒':''),'var(--teal)',SAVE_INDICATOR_MS);
   }catch(e){
     showSaveStatus(`✗ Schreibfehler: ${fileHandle.name}`,'var(--red)',SAVE_WARN_MS);
+  }finally{
+    if(useEnc)hideLoading();
   }
   updateFileBtn();
 }
@@ -1400,16 +1533,18 @@ async function openFile(){
     if(isEncrypted(text)){
       const pw=prompt('Passwort für Entschlüsselung:');
       if(!pw)return;
+      showLoading('Entschlüssele …');
       try{text=await decryptPayload(text,pw);}
-      catch(e){alert('Falsches Passwort oder beschädigte Datei.');return;}
+      catch(e){hideLoading();showToast(translateError(e,'Entschlüsselung fehlgeschlagen — falsches Passwort oder beschädigte Datei.'),{type:'error'});return;}
+      hideLoading();
       _encPw=pw;
     }
     const d=JSON.parse(text);
-    if(!validateImport(d)){alert(UI.errInvalidFormat);return;}
+    if(!validateImport(d)){showToast(UI.errInvalidFormat,{type:'error'});return;}
     fileHandle=handle;
     loadData(d);save();render();
   }catch(e){
-    if(e.name!=='AbortError')alert('Fehler beim Öffnen: '+e.message);
+    if(e.name!=='AbortError')showToast('Fehler beim Öffnen: '+translateError(e),{type:'error'});
   }
 }
 
@@ -1422,7 +1557,7 @@ async function saveFileAs(){
     await flushToFile();
     render();
   }catch(e){
-    if(e.name!=='AbortError')alert('Fehler beim Speichern: '+e.message);
+    if(e.name!=='AbortError')showToast('Fehler beim Speichern: '+translateError(e),{type:'error'});
   }
 }
 
@@ -1482,7 +1617,12 @@ async function exportJSON(){
   }
   let content=getPayloadPretty();
   let encrypted=false;
-  if(appSettings.encryption){const pw=await getEncPw();if(!pw)return;content=await encryptPayload(content,pw);_encPw=pw;encrypted=true;}
+  if(appSettings.encryption){
+    const pw=await getEncPw();if(!pw)return;
+    showLoading('Verschlüssele Export …');
+    try{content=await encryptPayload(content,pw);_encPw=pw;encrypted=true;}
+    finally{hideLoading();}
+  }
   const blob=new Blob([content],{type:encrypted?'application/octet-stream':'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download='matrix-backup.'+(encrypted?'imx':'json');
@@ -1519,13 +1659,15 @@ function importJSON(e){
     if(isEncrypted(text)){
       const pw=prompt('Passwort für Entschlüsselung:');
       if(!pw)return;
-      try{text=await decryptPayload(text,pw);}catch(x){alert('Falsches Passwort oder beschädigte Datei.');return;}
+      showLoading('Entschlüssele Import …');
+      try{text=await decryptPayload(text,pw);}catch(x){hideLoading();showToast(translateError(x,'Entschlüsselung fehlgeschlagen — falsches Passwort oder beschädigte Datei.'),{type:'error'});return;}
+      hideLoading();
       _encPw=pw;
     }
     const d=JSON.parse(text);
-    if(!validateImport(d)){alert(UI.errImportAbort);return;}
+    if(!validateImport(d)){showToast(UI.errImportAbort,{type:'error'});return;}
     loadData(d);save();render();
-  }catch(x){alert(UI.errInvalidFile);}};
+  }catch(x){showToast(translateError(x,UI.errInvalidFile),{type:'error'});}};
   r.readAsText(f);
 }
 function resetAll(){
@@ -3228,12 +3370,13 @@ function sbRename(dataId){
   // Rename the row + col labels (user can pick which? For now: show current label and on accept update both via simple prompt)
   // Simpler approach: allow renaming the Board/Matrix node.label that lives in this cell
   const tgtNode=p.cell.boardId?nodes[p.cell.boardId]:(p.cell.matrixId?nodes[p.cell.matrixId]:null);
-  if(!tgtNode){alert('Keine Node zum Umbenennen in dieser Zelle.');return;}
+  if(!tgtNode){showToast('Keine Node zum Umbenennen in dieser Zelle.',{type:'warning'});return;}
+  const crumb=_sbShortCrumb(dataId);
   smodal('Node-Label umbenennen',[{label:'Neuer Name',id:'l',v:tgtNode.label}],v=>{
     if(!v.l||!v.l.trim())return;
     renameMatrixNode(tgtNode.id,v.l);
     render();
-  });
+  },null,{context:{label:crumb.target.label,sub:tgtNode.label}});
 }
 function sbDelete(dataId){
   const p=_sbParseCellDataId(dataId);if(!p)return;
@@ -3630,13 +3773,14 @@ function addLink(boardId){
 }
 function editLink(boardId,lid){
   const link=nodes[boardId].data.links.find(l=>l.id===lid);if(!link)return;
+  const host=nodes[boardId];
   smodal('Link bearbeiten',[{label:'Bezeichnung',id:'l',ph:'Bezeichnung',v:link.label},{label:'URL',id:'u',ph:'https://...',v:link.url},{label:'Kürzel',id:'a',ph:'z.B. conf',v:link.alias||''}],v=>{
     if(v.l)link.label=v.l;
     if(v.u){const safeUrl=sanitizeUrl(v.u);if(safeUrl)link.url=safeUrl;}
     const oldAlias=link.alias||'';
     if(v.a!==undefined){const va=validateAlias(v.a,oldAlias);if(va.valid)link.alias=va.alias;}
     save();rebuildAliasIndex();render();
-  });
+  },null,{context:{icon:ICO.link?ICO.link(12):'',label:host?.label||'Board',sub:link.label||link.url||'(unbenannt)'}});
 }
 function delLink(boardId,lid){nodes[boardId].data.links=nodes[boardId].data.links.filter(l=>l.id!==lid);save();render();}
 function buildMailto(l){
@@ -3699,7 +3843,12 @@ async function exportNode(nodeId){
   const payload={exportType:n.type,rootId:nodeId,nodes:tree,exportDate:new Date().toISOString()};
   let content=JSON.stringify(payload,null,2);
   let encrypted=false;
-  if(appSettings.encryption){const pw=await getEncPw();if(!pw)return;content=await encryptPayload(content,pw);_encPw=pw;encrypted=true;}
+  if(appSettings.encryption){
+    const pw=await getEncPw();if(!pw)return;
+    showLoading('Verschlüssele Export …');
+    try{content=await encryptPayload(content,pw);_encPw=pw;encrypted=true;}
+    finally{hideLoading();}
+  }
   const blob=new Blob([content],{type:encrypted?'application/octet-stream':'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -3715,11 +3864,13 @@ function importNodeData(e,parentId,rowId,colId,targetType){
       if(isEncrypted(text)){
         const pw=prompt('Passwort für Entschlüsselung:');
         if(!pw)return;
-        try{text=await decryptPayload(text,pw);}catch(x){alert('Falsches Passwort oder beschädigte Datei.');return;}
+        showLoading('Entschlüssele Import …');
+        try{text=await decryptPayload(text,pw);}catch(x){hideLoading();showToast(translateError(x,'Entschlüsselung fehlgeschlagen — falsches Passwort oder beschädigte Datei.'),{type:'error'});return;}
+        hideLoading();
         _encPw=pw;
       }
       const d=JSON.parse(text);
-      if(!d.nodes||!d.rootId||!d.nodes[d.rootId]){alert(UI.errExportFormat);return;}
+      if(!d.nodes||!d.rootId||!d.nodes[d.rootId]){showToast(UI.errExportFormat,{type:'error'});return;}
       const srcRoot=d.nodes[d.rootId];
       // Remap all IDs to avoid conflicts
       const idMap={};
@@ -3765,7 +3916,7 @@ function importNodeData(e,parentId,rowId,colId,targetType){
         cell.matrixId=newRootId;
       }
       save();render();
-    }catch(x){alert('Fehler beim Import: '+x.message);}
+    }catch(x){showToast('Fehler beim Import: '+translateError(x),{type:'error'});}
   };
   r.readAsText(f);
   e.target.value=''; // reset file input
@@ -4079,11 +4230,12 @@ function buildRecurrenceUI(boardId,cardId,rv){
 
 let _openCardRef=null; // {boardId,cardId} of currently open card modal
 function openCard(boardId,cardId){
+  _pushFocusRestore();_pushModal(closeCard);
   _openCardRef={boardId,cardId};
-  if(!nodes[boardId])return;
+  if(!nodes[boardId]){_popModal(closeCard);_popFocusRestore();return;}
   const b=nodes[boardId].data;
   const card=b.kbCards.find(c=>c.id===cardId);
-  if(!card)return;
+  if(!card){_popModal(closeCard);_popFocusRestore();return;}
   const cols=b.kbCols;
 
   let h=`<div class="modal-hd">
@@ -4292,10 +4444,11 @@ function closeCard(){
     _pendingCard=null;
   }
   const overlay=document.querySelector('#cardmodal .modal-overlay');
+  _popModal(closeCard);
   if(overlay){
     overlay.classList.add('closing');
-    setTimeout(()=>{document.getElementById('cardmodal').innerHTML='';render();},ANIM_EXIT_MS);
-  } else {document.getElementById('cardmodal').innerHTML='';render();}
+    setTimeout(()=>{document.getElementById('cardmodal').innerHTML='';render();_popFocusRestore();},ANIM_EXIT_MS);
+  } else {document.getElementById('cardmodal').innerHTML='';render();_popFocusRestore();}
 }
 function closeCardIfBg(e){if(e.target===e.currentTarget)closeCard();}
 
@@ -5692,6 +5845,7 @@ function transposeMatrix(nodeId){
 let sdTab='tags';
 function openStammdaten(){
   sdTab=sdTab||'tags';
+  _pushFocusRestore();_pushModal(closeStammdaten);
   renderStammdaten();
 }
 function renderStammdaten(){
@@ -5725,8 +5879,9 @@ function renderStammdaten(){
 function closeSdIfBg(e){if(e.target.classList.contains('smodal-overlay'))closeStammdaten();}
 function closeStammdaten(){
   const overlay=document.querySelector('#mc .smodal-overlay');
-  if(overlay){overlay.classList.add('closing');setTimeout(()=>{document.getElementById('mc').innerHTML='';render();},SMODAL_EXIT_MS);}
-  else{document.getElementById('mc').innerHTML='';render();}
+  _popModal(closeStammdaten);
+  if(overlay){overlay.classList.add('closing');setTimeout(()=>{document.getElementById('mc').innerHTML='';render();_popFocusRestore();},SMODAL_EXIT_MS);}
+  else{document.getElementById('mc').innerHTML='';render();_popFocusRestore();}
 }
 function renameGlobal(type,id,val){
   const list=type==='tags'?globalTags:globalPeople;
@@ -5779,9 +5934,13 @@ function addGlobal(type){
 // SIMPLE MODAL
 // ═══════════════════════════════════════════════════════
 let mcb=null,mfields=[],mOnClose=null; // mcb=modalCallback, mfields=modalFieldIds, mOnClose=always-called
-function smodal(title,fields,cb,onClose){ // smodal = showSimpleModal
+// smodal(title, fields[], cb, onClose?, opts?) — opts.context: {icon?:html, label:string, sub?:string} für Breadcrumb (Sprint 3.6)
+function smodal(title,fields,cb,onClose,opts){ // smodal = showSimpleModal
+  _pushFocusRestore();_pushModal(closeS);
   mcb=cb;mfields=fields.map(f=>f.id);mOnClose=onClose||null;
-  let h=`<div class="smodal-overlay" onclick="closeS(event)"><div class="smodal"><h3>${title}</h3>`;
+  const ctx=opts&&opts.context;
+  const crumb=ctx?`<div class="smodal-crumb" title="${String(ctx.label||'').replace(/"/g,'&quot;')}">${ctx.icon?`<span class="crumb-ico">${ctx.icon}</span>`:''}<span>${String(ctx.label||'').replace(/</g,'&lt;')}</span>${ctx.sub?`<span class="crumb-sep">›</span><span>${String(ctx.sub).replace(/</g,'&lt;')}</span>`:''}</div>`:'';
+  let h=`<div class="smodal-overlay" onclick="closeS(event)"><div class="smodal"><h3>${title}</h3>${crumb}`;
   fields.forEach(f=>{
     h+=`<label>${f.label}</label>`;
     if(f.sel)h+=`<select id="mf-${f.id}">${f.sel.map((o,i)=>`<option value="${o}"${f.v===o?' selected':''}>${f.sellabels?f.sellabels[i]:o}</option>`).join('')}</select>`;
@@ -5828,13 +5987,14 @@ function smodal(title,fields,cb,onClose){ // smodal = showSimpleModal
   });
   setTimeout(()=>{const ff=fields.find(f=>!f.ro)||fields[0];const el=document.getElementById('mf-'+ff.id);if(el){el.focus();el.select();}},MODAL_FOCUS_DELAY_MS);
 }
-function subS(){const v={};mfields.forEach(id=>{const el=document.getElementById('mf-'+id);if(el)v[id]=el.value;});document.getElementById('mc').innerHTML='';const _oc=mOnClose;if(mcb){mcb(v);mcb=null;}mOnClose=null;if(_oc)_oc();}
+function subS(){const v={};mfields.forEach(id=>{const el=document.getElementById('mf-'+id);if(el)v[id]=el.value;});document.getElementById('mc').innerHTML='';_popModal(closeS);const _oc=mOnClose;if(mcb){mcb(v);mcb=null;}mOnClose=null;if(_oc)_oc();_popFocusRestore();}
 function closeS(e){
   if(!e||e.target.classList.contains('smodal-overlay')){
     const overlay=document.querySelector('#mc .smodal-overlay');
     const _oc=mOnClose;mcb=null;mOnClose=null;
-    if(overlay){overlay.classList.add('closing');setTimeout(()=>{document.getElementById('mc').innerHTML='';if(_oc)_oc();},SMODAL_EXIT_MS);}
-    else{document.getElementById('mc').innerHTML='';if(_oc)_oc();}
+    _popModal(closeS);
+    if(overlay){overlay.classList.add('closing');setTimeout(()=>{document.getElementById('mc').innerHTML='';if(_oc)_oc();_popFocusRestore();},SMODAL_EXIT_MS);}
+    else{document.getElementById('mc').innerHTML='';if(_oc)_oc();_popFocusRestore();}
   }
 }
 
@@ -5851,6 +6011,8 @@ function settingDual(key1,key2,label,min,max,step){
 
 let _settingsTab='general';
 function showSettings(tab){
+  // Stack-Registrierung nur beim initialen Öffnen, nicht bei Tab-Wechseln (mc bereits gefüllt).
+  if(!document.querySelector('#mc .smodal-overlay')){_pushFocusRestore();_pushModal(closeS);}
   _settingsTab=tab||_settingsTab||'general';
   const t=_settingsTab;
   const tabStyle=`style="padding:7px 14px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text2);border-bottom:2px solid transparent;transition:all 0.15s;"`;
@@ -5927,6 +6089,8 @@ function showSettings(tab){
 
 // KEYBOARD HELP
 function showKeyboardHelp(){
+  // Re-Entry bei Rebind/Reset darf den Stack nicht doppelt füllen.
+  if(!document.querySelector('#mc .smodal-overlay')){_pushFocusRestore();_pushModal(closeS);}
   const fixedRows=[
     ['Fest (nicht änderbar)',''],
     ['↑ ↓ ← →','Matrix-Zellen navigieren'],
@@ -7000,10 +7164,17 @@ function renderBadge(text,bg,txt){return`<span class="kc-recur" style="backgroun
 function emptyState(icon,text){return`<div class="empty-state"><div class="empty-big">${icon}</div><div>${text}</div></div>`;}
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
-    // Priority 1: close card modal
+    // Priority 1: topmost modal via stack (Sprint 3.2)
+    const top=_topModalClose();
+    if(top){top();return;}
+    // Fallback 1: card modal (falls nicht registriert, z.B. Legacy-Pfade)
     if(document.getElementById('cardmodal').innerHTML){closeCard();return;}
-    // Priority 2: close simple modal
-    if(document.getElementById('mc').innerHTML){closeS();return;}
+    // Fallback 2: mc-Overlay — unterscheide Stammdaten (hat .sd-tabs) vs. Generic smodal
+    const mc=document.getElementById('mc');
+    if(mc&&mc.innerHTML){
+      if(mc.querySelector('.sd-tabs')){closeStammdaten();return;}
+      closeS();return;
+    }
     // Priority 3: go one level up in stack
     if(stack.length>1){navTo(stack.length-2);}
   }
@@ -7111,6 +7282,15 @@ document.getElementById('gear-reset').innerHTML=ICO.reset(12)+' Reset';
 
 initSidebar();
 render();
+// ── Sprint 3.7: Focus-Baseline ── plausible Defaults, bevor User interagiert
+(function _initFocusBaseline(){
+  if(!_lastCanvasFocus){
+    _lastCanvasFocus=document.querySelector('#panel [tabindex="0"]')||document.querySelector('#panel .mcell')||document.querySelector('#panel button');
+  }
+  if(!_lastSidebarFocus){
+    _lastSidebarFocus=document.querySelector('#sidebar .sb-node.active')||document.querySelector('#sidebar .sb-node');
+  }
+})();
 // Warn before closing with unsaved file changes
 window.addEventListener('beforeunload',e=>{if(fileDirty){e.preventDefault();e.returnValue='';}});
 // Init file button
