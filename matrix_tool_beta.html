@@ -317,6 +317,66 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 .cl-check.cl-check-sm{width:13px;height:13px;margin-top:0;}
 .kc-recur[data-warn="true"]{background:var(--amberbg);color:var(--ambertxt);}
 .kc-done-badge{background:var(--tealbg);color:var(--tealtxt);}
+/* Sidebar Peek-Preview */
+.peek-grid-cell[data-fill="matrix"]{background:var(--blue);}
+.peek-grid-cell[data-fill="board"]{background:var(--teal);}
+.peek-grid-cell[data-fill="feat"]{background:var(--amber);}
+.peek-feat-badge[data-feat="matrix"]{background:var(--bluebg);color:var(--bluetxt);}
+.peek-feat-badge[data-feat="board"]{background:var(--tealbg);color:var(--tealtxt);}
+.peek-feat-badge[data-feat="info"]{background:var(--amberbg);color:var(--ambertxt);}
+.peek-feat-badge[data-feat="checklists"]{background:var(--purplebg);color:var(--purpletxt);}
+.pc-dot[data-col="set"]{background:var(--pc-color,var(--text3));}
+.peek-empty{color:var(--text3);font-size:10px;}
+.peek-sub-offset{margin-top:6px;}
+/* Command-Help Text */
+.help-title{font-weight:500;margin-bottom:4px;}
+.help-body-2{color:var(--text2);}
+.help-note{color:var(--text3);margin-top:4px;}
+.help-foot{color:var(--text3);font-size:10px;margin-top:6px;}
+.sr-name.faint{color:var(--text3);}
+/* Search-Result Icon/Glyph Farben */
+.sr-ico[data-sr-col="blue"],.sr-feat-glyph[data-sr-col="blue"]{color:var(--blue);}
+.sr-ico[data-sr-col="teal"],.sr-feat-glyph[data-sr-col="teal"]{color:var(--teal);}
+.sr-ico[data-sr-col="amber"],.sr-feat-glyph[data-sr-col="amber"]{color:var(--amber);}
+.sr-ico[data-sr-col="purple"],.sr-feat-glyph[data-sr-col="purple"]{color:var(--purple);}
+.sr-ico[data-sr-col="text2"],.sr-feat-glyph[data-sr-col="text2"]{color:var(--text2);}
+.sr-ico[data-sr-col="text3"],.sr-feat-glyph[data-sr-col="text3"]{color:var(--text3);}
+/* Priority-Dot (renderPrioDot) */
+.prio-dot{border-radius:50%;display:inline-block;flex-shrink:0;margin-top:3px;background:transparent;}
+.prio-dot[data-prio="high"]{background:var(--red);}
+.prio-dot[data-prio="medium"]{background:var(--prio-medium);}
+.prio-dot[data-prio="low"]{background:var(--teal);}
+/* Diverse Helper (Backlog 2f) */
+.err-detail{font-size:11px;color:var(--text3);margin-top:6px;}
+.empty-hint{font-size:10px;color:var(--text3);}
+.ctx-divider{height:1px;background:var(--border);margin:3px 0;}
+.ctx-btn-ico{display:inline-flex;width:14px;height:14px;align-items:center;justify-content:center;flex-shrink:0;}
+.smodal.smodal-420{width:420px;}
+.smodal.smodal-720{width:720px;max-width:96vw;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;}
+.smodal-720-hd{padding:16px 18px 0;}
+.smodal-720-body{display:flex;gap:20px;padding:12px 18px;overflow-y:auto;flex:1;min-height:0;}
+.smodal-720-act{flex-shrink:0;}
+.smodal-720-reset{margin-right:auto;}
+.kb-section-hint{font-weight:400;color:var(--text3);}
+.mail-body-ta{width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border2);border-radius:var(--r);min-height:80px;resize:vertical;font-family:inherit;outline:none;}
+.freq-toolbar{display:flex;gap:6px;margin-bottom:10px;}
+.freq-scroll-wrap{overflow-x:auto;margin-top:8px;}
+.alias-tag.alias-tag-mr4{margin-right:4px;}
+.alias-tag.alias-tag-mr6{margin-right:6px;}
+.origin-alias.origin-alias-mr6{margin-right:6px;}
+.freq-board-link{cursor:pointer;text-decoration:underline;}
+.prio-badge-wrap{display:inline-flex;align-items:center;gap:8px;}
+.prio-badge-ico{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:var(--rs);}
+.prio-badge-ico[data-feat="matrix"]{background:var(--bluebg);color:var(--bluetxt);}
+.prio-badge-ico[data-feat="board"]{background:var(--tealbg);color:var(--tealtxt);}
+.prio-badge-ico[data-feat="info"]{background:var(--amberbg);color:var(--ambertxt);}
+.prio-badge-ico[data-feat="checklists"]{background:var(--purplebg);color:var(--purpletxt);}
+.sd-dot[data-col="set"]{background:var(--sd-color,var(--text3));border:0.5px solid var(--border2);}
+.sd-del{font-size:12px;color:var(--red);cursor:pointer;}
+.sd-tail{margin-top:10px;}
+.sd-section-hd{padding:7px 13px;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;border-bottom:0.5px solid var(--border);font-weight:500;}
+.sr-cmd-mark{color:var(--text3);font-family:monospace;font-size:11px;margin-right:4px;}
+.search-hl{background:var(--bluebg);color:var(--bluetxt);border-radius:2px;padding:0 2px;transition:background 0.5s ease,color 0.5s ease;}
 .card-origin{cursor:pointer;margin-right:0.4em;opacity:0.65;transition:opacity 0.15s;display:inline-block;}
 .card-origin:hover{opacity:1;}
 .origin-alias{font-family:monospace;font-size:0.9em;padding:0.05em 0.4em;border-radius:var(--rs);background:var(--bg3);color:var(--text2);}
@@ -662,7 +722,7 @@ body.has-sidebar-right.sb-collapsed #content{padding-right:26px;}
 #sb-peek .peek-grid-cell{aspect-ratio:1;border-radius:2px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--text3);}
 #sb-peek .peek-cols{display:flex;flex-direction:column;gap:4px;}
 #sb-peek .peek-col{display:flex;align-items:center;gap:6px;font-size:11px;}
-#sb-peek .peek-col .pc-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+#sb-peek .peek-col .pc-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--text3);}
 #sb-peek .peek-col .pc-count{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--text2);font-size:10px;}
 #sb-peek .peek-features{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;}
 #sb-peek .peek-feat-badge{font-size:10px;padding:2px 6px;border-radius:var(--rs);}
@@ -1964,7 +2024,7 @@ function render(){
     if(!cur.cellRef){setTimeout(()=>{const ae=document.activeElement;if(ae&&document.getElementById('panel')?.contains(ae)&&ae!==document.getElementById('panel'))return;const c=document.querySelector('.mcell');if(c)c.focus({preventScroll:true});},FOCUS_RESTORE_MS);}
   }catch(err){
     console.error('Render error:',err);
-    document.getElementById('panel').innerHTML=`<div class="empty-state"><div class="empty-big">${ICO.warn(32)}</div><div>Darstellungsfehler — bitte Seite neu laden.</div><div style="font-size:11px;color:var(--text3);margin-top:6px;">${esc(err.message)}</div></div>`;
+    document.getElementById('panel').innerHTML=`<div class="empty-state"><div class="empty-big">${ICO.warn(32)}</div><div>Darstellungsfehler — bitte Seite neu laden.</div><div class="err-detail">${esc(err.message)}</div></div>`;
   }
 }
 
@@ -2674,7 +2734,7 @@ function sbRenderPillUIs(){
   const whoWrap=document.getElementById('sb-who-pills');
   if(whoWrap){
     const vals=sbCollectWhoValues();
-    if(vals.length===0){whoWrap.innerHTML='<span style="font-size:10px;color:var(--text3);">— keine Personen —</span>';}
+    if(vals.length===0){whoWrap.innerHTML='<span class="empty-hint">— keine Personen —</span>';}
     else whoWrap.innerHTML=vals.map(v=>`<button class="sb-pill${sbFilter.whoSet.has(v)?' active':''}" onclick="sbToggleWho('${esc(v).replace(/'/g,'&#39;')}')">${esc(v)}</button>`).join('');
   }
   // Prio pills
@@ -3242,13 +3302,13 @@ function sbPeekContent(dataId){
         const row=n.data.rows[r],col=n.data.cols[c];
         if(!row||!col){grid+='<div class="peek-grid-cell"></div>';continue;}
         const cell=n.data.cells[row.id+'-'+col.id];
-        let bg='var(--bg3)';
+        let fill='';
         if(cell){
-          if(cell.matrixId)bg='var(--blue)';
-          else if(cell.boardId)bg='var(--teal)';
-          else if(cell.features&&cell.features.length)bg='var(--amber)';
+          if(cell.matrixId)fill='matrix';
+          else if(cell.boardId)fill='board';
+          else if(cell.features&&cell.features.length)fill='feat';
         }
-        grid+=`<div class="peek-grid-cell" style="background:${bg};"></div>`;
+        grid+=`<div class="peek-grid-cell"${fill?` data-fill="${fill}"`:''}></div>`;
       }
     }
     return `<div class="peek-title">${esc(n.label)}</div>
@@ -3280,8 +3340,8 @@ function sbPeekContent(dataId){
             const cols=b.data.kbCols||[];
             const colHtml=cols.map(col=>{
               const count=cards.filter(c=>c.colId===col.id).length;
-              const color=col.color||'var(--text3)';
-              return `<div class="peek-col"><span class="pc-dot" style="background:${color};"></span><span>${esc(col.label)}</span><span class="pc-count">${count}</span></div>`;
+              const dot=col.color?`<span class="pc-dot" data-col="set" style="--pc-color:${col.color};"></span>`:`<span class="pc-dot"></span>`;
+              return `<div class="peek-col">${dot}<span>${esc(col.label)}</span><span class="pc-count">${count}</span></div>`;
             }).join('');
             return `<div class="peek-title">${esc(getTabLabel(cell,'board'))}</div>
               <div class="peek-sub">Aufgaben · ${cards.length}</div>
@@ -3302,14 +3362,10 @@ function sbPeekContent(dataId){
       }
     }
     // Cell peek: show feature badges
-    const feats=(cell.features||[]).map(f=>{
-      const bg={matrix:'var(--bluebg)',board:'var(--tealbg)',info:'var(--amberbg)',checklists:'var(--purplebg)'}[f]||'var(--bg3)';
-      const tx={matrix:'var(--bluetxt)',board:'var(--tealtxt)',info:'var(--ambertxt)',checklists:'var(--purpletxt)'}[f]||'var(--text)';
-      return `<span class="peek-feat-badge" style="background:${bg};color:${tx};">${getTabLabel(cell,f)}</span>`;
-    }).join('');
+    const feats=(cell.features||[]).map(f=>`<span class="peek-feat-badge" data-feat="${f}">${getTabLabel(cell,f)}</span>`).join('');
     return `<div class="peek-title">${esc(rowLbl+' / '+colLbl)}</div>
       <div class="peek-sub">Zelle · ${cell.alias?esc(cell.alias):'kein Kürzel'}</div>
-      <div class="peek-features">${feats||'<span style="color:var(--text3);font-size:10px;">(keine Features)</span>'}</div>`;
+      <div class="peek-features">${feats||'<span class="peek-empty">(keine Features)</span>'}</div>`;
   }
   const n=nodes[dataId];if(!n)return '';
   if(n.type==='matrix'){
@@ -3322,16 +3378,16 @@ function sbPeekContent(dataId){
         const row=n.data.rows[r],col=n.data.cols[c];
         if(!row||!col){grid+='<div class="peek-grid-cell"></div>';continue;}
         const cell=n.data.cells[row.id+'-'+col.id];
-        let bg='var(--bg3)';
+        let fill='';
         if(cell){
-          if(cell.matrixId)bg='var(--blue)';
-          else if(cell.boardId)bg='var(--teal)';
-          else if(cell.features&&cell.features.length)bg='var(--amber)';
+          if(cell.matrixId)fill='matrix';
+          else if(cell.boardId)fill='board';
+          else if(cell.features&&cell.features.length)fill='feat';
         }
-        grid+=`<div class="peek-grid-cell" style="background:${bg};"></div>`;
+        grid+=`<div class="peek-grid-cell"${fill?` data-fill="${fill}"`:''}></div>`;
       }
     }
-    const extra=cols>5||rows>5?`<div class="peek-sub" style="margin-top:6px;">${rows}×${cols} (Ausschnitt ${maxR}×${maxC})</div>`:'';
+    const extra=cols>5||rows>5?`<div class="peek-sub peek-sub-offset">${rows}×${cols} (Ausschnitt ${maxR}×${maxC})</div>`:'';
     return `<div class="peek-title">${esc(n.label)}</div>
       <div class="peek-sub">Matrix · ${rows} Zeilen × ${cols} Spalten</div>
       <div class="peek-grid" style="grid-template-columns:repeat(${maxC},1fr);">${grid}</div>${extra}`;
@@ -3341,14 +3397,14 @@ function sbPeekContent(dataId){
     const cards=(n.data.kbCards||[]).filter(c=>!c.archived);
     const colHtml=cols.map(col=>{
       const count=cards.filter(c=>c.colId===col.id).length;
-      const color=col.color||'var(--text3)';
-      return `<div class="peek-col"><span class="pc-dot" style="background:${color};"></span><span>${esc(col.label)}</span><span class="pc-count">${count}</span></div>`;
+      const dot=col.color?`<span class="pc-dot" data-col="set" style="--pc-color:${col.color};"></span>`:`<span class="pc-dot"></span>`;
+      return `<div class="peek-col">${dot}<span>${esc(col.label)}</span><span class="pc-count">${count}</span></div>`;
     }).join('');
     const cl=(n.data.checklists||[]).length;
     const inf=(n.data.infoFields||[]).length+(n.data.links||[]).length;
     return `<div class="peek-title">${esc(n.label)}</div>
       <div class="peek-sub">Board · ${cards.length} Aufgabe${cards.length===1?'':'n'}${cl?' · '+cl+' Checkliste'+(cl===1?'':'n'):''}${inf?' · '+inf+' Info-Element':''}</div>
-      <div class="peek-cols">${colHtml||'<span style="color:var(--text3);font-size:10px;">(keine Spalten)</span>'}</div>`;
+      <div class="peek-cols">${colHtml||'<span class="peek-empty">(keine Spalten)</span>'}</div>`;
   }
   return '';
 }
@@ -3511,9 +3567,9 @@ function sbContextMenu(e,dataId){
   menu.className='sb-context-menu';
   menu.style.left=e.clientX+'px';menu.style.top=e.clientY+'px';
   menu.innerHTML=headerHtml+buttons.map((b,i)=>{
-    if(b.divider)return '<div style="height:1px;background:var(--border);margin:3px 0;"></div>';
+    if(b.divider)return '<div class="ctx-divider"></div>';
     const cls=b.className?' class="'+b.className+'"':'';
-    const iconHtml=b.icon?`<span style="display:inline-flex;width:14px;height:14px;align-items:center;justify-content:center;color:${b.iconColor||'var(--text2)'};flex-shrink:0;">${b.icon}</span>`:'';
+    const iconHtml=b.icon?`<span class="ctx-btn-ico" style="color:${b.iconColor||'var(--text2)'};">${b.icon}</span>`:'';
     return `<button${cls} data-idx="${i}">${iconHtml}<span>${esc(b.label)}</span></button>`;
   }).join('');
   document.body.appendChild(menu);
@@ -4015,13 +4071,13 @@ function addMailTemplate(boardId){
 }
 function editMailTemplate(boardId,linkId){
   const link=nodes[boardId].data.links.find(l=>l.id===linkId);if(!link)return;
-  let h=`<div class="smodal-overlay" onclick="closeS(event)"><div class="smodal" style="width:420px;"><h3>${ICO.mail(ICO_SIZE.MD)} Mailvorlage</h3>`;
+  let h=`<div class="smodal-overlay" onclick="closeS(event)"><div class="smodal smodal-420"><h3>${ICO.mail(ICO_SIZE.MD)} Mailvorlage</h3>`;
   h+=`<label>Bezeichnung</label><input id="mf-ml" value="${esc(link.label)}"/>`;
   h+=`<label>An (To)</label><input id="mf-to" value="${esc(link.to||'')}" placeholder="empfaenger@firma.de"/>`;
   h+=`<label>CC</label><input id="mf-cc" value="${esc(link.cc||'')}" placeholder="cc@firma.de"/>`;
   h+=`<label>BCC</label><input id="mf-bcc" value="${esc(link.bcc||'')}" placeholder="bcc@firma.de"/>`;
   h+=`<label>Betreff</label><input id="mf-subj" value="${esc(link.subject||'')}" placeholder="Betreff..."/>`;
-  h+=`<label>Nachricht</label><textarea id="mf-body" style="width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border2);border-radius:var(--r);min-height:80px;resize:vertical;font-family:inherit;outline:none;">${esc(link.body||'')}</textarea>`;
+  h+=`<label>Nachricht</label><textarea id="mf-body" class="mail-body-ta">${esc(link.body||'')}</textarea>`;
   h+=`<div class="smodal-actions"><button class="btn-c" onclick="closeS()">Abbrechen</button><button class="btn-p" onclick="saveMailTemplate('${boardId}','${linkId}')">Speichern</button></div></div></div>`;
   document.getElementById('mc').innerHTML=h;
   setTimeout(()=>{const el=document.getElementById('mf-ml');if(el){el.focus();el.select();}},MODAL_FOCUS_DELAY_MS);
@@ -5055,7 +5111,7 @@ function clDragDrop(e,scope,id1,id2,targetItemId){
 // ═══════════════════════════════════════════════════════
 function renderSubMatrix(node){
   const{rows,cols}=node.data;
-  let h=`<div style="display:flex;gap:6px;margin-bottom:10px;">
+  let h=`<div class="freq-toolbar">
     <button class="btn edit-only" onclick="addCol('${node.id}')">+ Spalte</button>
     <button class="btn edit-only" onclick="addRow('${node.id}')">+ Zeile</button></div>`;
   if(rows.length===0&&cols.length===0){
@@ -5179,7 +5235,7 @@ function renderFrequencyMatrix(startNodeId){
   }
   const cw=appSettings.colWidthEm||7;
   const gc=`minmax(${cw*2}em,auto) repeat(${activeCols.length},minmax(${cw}em,1fr))`;
-  let h=`<div style="overflow-x:auto;margin-top:8px;"><div class="freq-grid" style="grid-template-columns:${gc};min-width:fit-content;">`;
+  let h=`<div class="freq-scroll-wrap"><div class="freq-grid" style="grid-template-columns:${gc};min-width:fit-content;">`;
   h+=`<div class="freq-hd corner"></div>`;
   activeCols.forEach(cat=>{h+=`<div class="freq-hd">${cat.label}</div>`;});
   rows.forEach(agg=>{
@@ -5188,7 +5244,7 @@ function renderFrequencyMatrix(startNodeId){
     const chev=agg.expandable
       ?`<span class="freq-chevron${expanded?' expanded':''}" onclick="event.stopPropagation();_freqToggleExpand('${agg.dataId}')">▸</span>`
       :`<span class="freq-chevron-spacer"></span>`;
-    const aliasHtml=agg.alias?`<span class="alias-tag" style="margin-right:4px;">${esc(agg.alias)}</span>`:'';
+    const aliasHtml=agg.alias?`<span class="alias-tag alias-tag-mr4">${esc(agg.alias)}</span>`:'';
     const labelEsc=esc(agg.label).replace(/'/g,"\\'");
     h+=`<div class="freq-row-hd" style="padding-left:${9+indent}px;" onclick="_freqDrillDown('${agg.parentId}','${agg.rowId}','${agg.colId}','${labelEsc}')" title="Drill-Down">${chev}${aliasHtml}${esc(agg.label)}</div>`;
     activeCols.forEach(cat=>{
@@ -5246,7 +5302,7 @@ function _freqShowFlyoutImpl(e,cards,title){
     const detail=card.recur?.type==='weekly'&&card.recur?.weekdays?` (${card.recur.weekdays.map(d=>WEEKDAY_SHORT[d]).join(',')})`
       :card.recur?.type==='monthly'?` (${card.recur?.day||1}.)`
       :card.deadline?` · ${fmtDate(card.deadline)}`:'';
-    const originHtml=origin?`<span class="origin-alias" style="margin-right:6px;">${esc(origin)}</span>`:'';
+    const originHtml=origin?`<span class="origin-alias origin-alias-mr6">${esc(origin)}</span>`:'';
     h+=`<div class="freq-group-item" onclick="event.stopPropagation();closeFreqFlyout();openCard('${boardId}','${card.id}')">${originHtml}${esc(card.name||'(ohne Name)')}${detail}</div>`;
   });
   h+=`</div></div>`;
@@ -5290,7 +5346,7 @@ function showFreqFlyout(e,boardId,catKey){
 
   // Group by path depth (for hierarchical display we show the board's own cards)
   let h=`<div class="freq-flyout" style="left:${Math.min(e.clientX,window.innerWidth-380)}px;top:${Math.min(e.clientY,window.innerHeight-300)}px;">`;
-  h+=`<div class="freq-flyout-hd"><span style="cursor:pointer;text-decoration:underline;" onclick="event.stopPropagation();closeFreqFlyout();navigateToBoardFromFreq('${boardId}')">${esc(board.label)}</span> <span>· ${cat.label} (${cards.length})</span></div>`;
+  h+=`<div class="freq-flyout-hd"><span class="freq-board-link" onclick="event.stopPropagation();closeFreqFlyout();navigateToBoardFromFreq('${boardId}')">${esc(board.label)}</span> <span>· ${cat.label} (${cards.length})</span></div>`;
   h+=`<div class="freq-group">`;
   cards.forEach(card=>{
     const detail=cat.key==='weekly'&&card.recur?.weekdays?` (${card.recur.weekdays.map(d=>WEEKDAY_SHORT[d]).join(',')})`
@@ -5875,7 +5931,7 @@ function _featTitle(key,text){
   const def=getCellFeatureDef(key);
   if(!def)return text;
   const ico=(def.icoLg||def.icoSm||'').replace(/stroke="currentColor"/g,`stroke="${def.txt}"`);
-  return `<span style="display:inline-flex;align-items:center;gap:8px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:var(--rs);background:${def.bg};color:${def.txt};">${ico}</span><span>${text}</span></span>`;
+  return `<span class="prio-badge-wrap"><span class="prio-badge-ico" data-feat="${key}">${ico}</span><span>${text}</span></span>`;
 }
 function iconClick(nodeId,rowId,colId,type,label){
   const key=`${rowId}-${colId}`;const cell=getCell(nodeId,key);
@@ -6160,12 +6216,12 @@ function renderStammdaten(){
       <div class="sd-body">`;
   list.forEach(item=>{
     h+=`<div class="sd-item">
-      <div class="sd-dot" style="background:${color};border:0.5px solid var(--border2);"></div>
+      <div class="sd-dot" data-col="set" style="--sd-color:${color};"></div>
       <input value="${esc(item.label)}" onchange="renameGlobal('${isTags?'tags':'people'}','${item.id}',this.value)" />
-      <span style="font-size:12px;color:var(--red);cursor:pointer;" onclick="delGlobal('${isTags?'tags':'people'}','${item.id}')">${ICO.close(ICO_SIZE.XS)}</span>
+      <span class="sd-del" onclick="delGlobal('${isTags?'tags':'people'}','${item.id}')">${ICO.close(ICO_SIZE.XS)}</span>
     </div>`;
   });
-  h+=`<div style="margin-top:10px;">
+  h+=`<div class="sd-tail">
     <button class="btn" onclick="addGlobal('${isTags?'tags':'people'}')">+ ${isTags?'Neuer Tag':'Neue Person'}</button>
   </div>`;
   h+=`</div></div></div>`;
@@ -6413,9 +6469,9 @@ function showKeyboardHelp(){
     ['↑ ↓','Vorbelegte Werte durchsteppen (z.B. Spaltenname, Priorität)'],
     ['Tippen','Setzt Cycle zurück — nächstes ↑/↓ startet ab Eingabe'],
   ];
-  let h=`<div class="smodal-overlay" onclick="closeS(event)"><div class="smodal" style="width:720px;max-width:96vw;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
-    <h3 style="padding:16px 18px 0;">Tastenkürzel</h3>
-    <div style="display:flex;gap:20px;padding:12px 18px;overflow-y:auto;flex:1;min-height:0;">
+  let h=`<div class="smodal-overlay" onclick="closeS(event)"><div class="smodal smodal-720">
+    <h3 class="smodal-720-hd">Tastenkürzel</h3>
+    <div class="smodal-720-body">
       <div class="flex-fill"><div class="kb-grid">`;
   fixedRows.forEach(([key,desc])=>{
     if(!key&&!desc){h+=`<div class="kb-spacer"></div>`;return;}
@@ -6425,7 +6481,7 @@ function showKeyboardHelp(){
   });
   h+=`</div></div>
       <div class="flex-fill"><div class="kb-grid">`;
-  h+=`<div class="kb-section">Konfigurierbar <span style="font-weight:400;color:var(--text3);">— klick zum Ändern</span></div>`;
+  h+=`<div class="kb-section">Konfigurierbar <span class="kb-section-hint">— klick zum Ändern</span></div>`;
   Object.keys(keyBindings).forEach(action=>{
     const kb=keyBindings[action];
     const label=shortcutLabel(kb);
@@ -6435,8 +6491,8 @@ function showKeyboardHelp(){
   });
   h+=`</div></div>
     </div>
-    <div class="smodal-actions" style="flex-shrink:0;">
-      <button class="btn-c" onclick="resetKeyBindings()" style="margin-right:auto;">Zurücksetzen</button>
+    <div class="smodal-actions smodal-720-act">
+      <button class="btn-c smodal-720-reset" onclick="resetKeyBindings()">Zurücksetzen</button>
       <button class="btn-p" onclick="closeS()">OK</button>
     </div></div></div>`;
   document.getElementById('mc').innerHTML=h;
@@ -6512,12 +6568,12 @@ function _renderSearchHistoryDropdown(){
   el.classList.add('is-open','sr-anim');
   // Newest first
   const entries=[..._searchHistory].reverse();
-  let h=`<div style="padding:7px 13px;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;border-bottom:0.5px solid var(--border);font-weight:500;">Zuletzt</div>`;
+  let h=`<div class="sd-section-hd">Zuletzt</div>`;
   entries.forEach(q=>{
     const isCmd=q.startsWith('^');
     const prefix=isCmd
-      ?`<span style="color:var(--text3);font-family:monospace;font-size:11px;margin-right:4px;">^</span>`
-      :`<span class="sr-ico" style="color:var(--text3);">${ICO.search(11)}</span>`;
+      ?`<span class="sr-cmd-mark">^</span>`
+      :`<span class="sr-ico" data-sr-col="text3">${ICO.search(11)}</span>`;
     const display=isCmd?q.slice(1):q;
     h+=`<div class="sr-item" data-query="${esc(q)}" onmousedown="event.preventDefault()" onclick="_applySearchHistoryEntry(this.dataset.query)"><div class="sr-name">${prefix}${esc(display)}</div></div>`;
   });
@@ -6534,6 +6590,8 @@ function _applySearchHistoryEntry(q){
 // Resolve the icon, color, label and type-text for one entry in the ^alias result list.
 // For cells, icon and color adapt to the active subCmd (i/b/c/m) or — if none —
 // to the cell's default feature (what openCell would actually open).
+// Extrahiert Farb-Key aus 'var(--X)'-String, für [data-sr-col]-Zuweisung. Default 'text2'.
+function _srColKey(cssColor){const m=cssColor&&cssColor.match(/--([a-z0-9-]+)/);return m?m[1]:'text2';}
 function _resolveAliasResultInfo(alias,target,subCmd){
   const FEAT_COLORS={matrix:'var(--blue)',board:'var(--teal)',info:'var(--amber)',checklists:'var(--purple)'};
   const out={icon:'',color:'var(--text2)',label:alias,typeLabel:''};
@@ -6620,7 +6678,7 @@ function _renderAliasResultZoneB(cellAlias,target,subCmd){
       const icon=isMail?ICO.mail(11):ICO.link(11);
       const aliasTag=l.alias?`<span class="alias-tag">${esc(l.alias)}</span>`:'';
       const onClick=l.alias?`executeCommand('${esc(l.alias)}')`:(isMail?`window.location.href=buildMailto(nodes['${cell.boardId}'].data.links.find(x=>x.id==='${l.id}'))`:`window.open('${esc(l.url||'')}','_blank')`);
-      items.push(`<div class="sr-subitem" onclick="${onClick}"><span class="sr-ico" style="color:var(--text2)">${icon}</span>${aliasTag}<span>${esc(l.label||(isMail?'(Mail)':'(Link)'))}</span></div>`);
+      items.push(`<div class="sr-subitem" onclick="${onClick}"><span class="sr-ico" data-sr-col="text2">${icon}</span>${aliasTag}<span>${esc(l.label||(isMail?'(Mail)':'(Link)'))}</span></div>`);
     });
   }else if(subCmd==='b'){
     const board=cell.boardId?nodes[cell.boardId]:null;
@@ -6628,7 +6686,7 @@ function _renderAliasResultZoneB(cellAlias,target,subCmd){
     cards.forEach(c=>{
       const aliasTag=c.alias?`<span class="alias-tag">${esc(c.alias)}</span>`:'';
       const onClick=c.alias?`executeCommand('${esc(cellAlias)} k ${esc(c.alias)}')`:`closeSearch();openCard('${cell.boardId}','${c.id}')`;
-      items.push(`<div class="sr-subitem" onclick="${onClick}"><span class="sr-ico" style="color:var(--amber)">${CARD_ICO}</span>${aliasTag}<span>${esc(c.name||'(ohne Name)')}</span></div>`);
+      items.push(`<div class="sr-subitem" onclick="${onClick}"><span class="sr-ico" data-sr-col="amber">${CARD_ICO}</span>${aliasTag}<span>${esc(c.name||'(ohne Name)')}</span></div>`);
     });
   }else if(subCmd==='m'){
     const submat=cell.matrixId?nodes[cell.matrixId]:null;
@@ -6641,7 +6699,7 @@ function _renderAliasResultZoneB(cellAlias,target,subCmd){
         const label=`${row.label} / ${col.label}`;
         const aliasTag=c.alias?`<span class="alias-tag">${esc(c.alias)}</span>`:'';
         const onClick=c.alias?`executeCommand('${esc(c.alias)}')`:`closeSearch();openCell('${submat.id}','${rid}','${cid}','${esc(label).replace(/'/g,"\\'")}','matrix')`;
-        items.push(`<div class="sr-subitem" onclick="${onClick}"><span class="sr-ico" style="color:var(--text2)">${SB_ICONS.cellBox}</span>${aliasTag}<span>${esc(label)}</span></div>`);
+        items.push(`<div class="sr-subitem" onclick="${onClick}"><span class="sr-ico" data-sr-col="text2">${SB_ICONS.cellBox}</span>${aliasTag}<span>${esc(label)}</span></div>`);
       });
     }
   }else if(subCmd==='c'){
@@ -6655,7 +6713,7 @@ function _renderAliasResultZoneB(cellAlias,target,subCmd){
       const total=items_.length;
       const progress=total>0?`<span class="sr-subitem-progress">${done}/${total}</span>`:'';
       const onClick=`executeCommand('${esc(cellAlias)} c')`;
-      items.push(`<div class="sr-subitem" onclick="${onClick}"><span class="sr-ico" style="color:var(--purple)">${clIcon}</span><span>${esc(cl.label||'(ohne Name)')}</span>${progress}</div>`);
+      items.push(`<div class="sr-subitem" onclick="${onClick}"><span class="sr-ico" data-sr-col="purple">${clIcon}</span><span>${esc(cl.label||'(ohne Name)')}</span>${progress}</div>`);
     });
   }
   if(items.length===0)return'';
@@ -6683,7 +6741,7 @@ function handleCommandInput(raw){
       <div><b>^k</b> — Tastenkürzel</div>
       <div><b>^c</b> [kürzel] [-all] — Labels auf „Zeile / Spalte" zurücksetzen</div>
       <div><b>^c tab</b> [kürzel] [-all] — Tab-Bezeichnungen auf Standard (Info/Aufgaben/…)</div>
-      <div style="margin-top:6px;font-size:10px;color:var(--text3);">Trenner <b>|</b> für mehrere Suchbegriffe</div>
+      <div class="help-foot">Trenner <b>|</b> für mehrere Suchbegriffe</div>
     </div>`;
     return;
   }
@@ -6712,17 +6770,17 @@ function handleCommandInput(raw){
     const aliasStr=alias?` mit Kürzel <b>${esc(alias)}</b>`:'';
     if(mode==='tab'){
       el.innerHTML=`<div class="cmd-help">
-        <div style="font-weight:500;margin-bottom:4px;">${ICO.edit(ICO_SIZE.SM)} Tab-Bezeichnungen auf Standard zurücksetzen</div>
-        <div style="color:var(--text2);">Setzt angepasste Tab-Labels zurück auf „Info / Aufgaben / Checklisten / Sub-Matrix"${aliasStr}.</div>
-        <div style="color:var(--text3);margin-top:4px;">Scope: ${scopeStr}${recursive?'':' (<b>-all</b> für Unterstrukturen)'}</div>
-        <div style="color:var(--text3);font-size:10px;margin-top:6px;">Enter bestätigt — zeigt Preview-Dialog.</div>
+        <div class="help-title">${ICO.edit(ICO_SIZE.SM)} Tab-Bezeichnungen auf Standard zurücksetzen</div>
+        <div class="help-body-2">Setzt angepasste Tab-Labels zurück auf „Info / Aufgaben / Checklisten / Sub-Matrix"${aliasStr}.</div>
+        <div class="help-note">Scope: ${scopeStr}${recursive?'':' (<b>-all</b> für Unterstrukturen)'}</div>
+        <div class="help-foot">Enter bestätigt — zeigt Preview-Dialog.</div>
       </div>`;
     }else{
       el.innerHTML=`<div class="cmd-help">
-        <div style="font-weight:500;margin-bottom:4px;">${ICO.edit(ICO_SIZE.SM)} Labels zurücksetzen</div>
-        <div style="color:var(--text2);">Setzt Board/Matrix-Namen zurück auf „Zeile / Spalte"${aliasStr}.</div>
-        <div style="color:var(--text3);margin-top:4px;">Scope: ${scopeStr}${recursive?'':' (<b>-all</b> für Unterstrukturen)'}</div>
-        <div style="color:var(--text3);font-size:10px;margin-top:6px;"><b>^c tab …</b> für Tab-Bezeichnungen. Enter bestätigt — zeigt Preview-Dialog.</div>
+        <div class="help-title">${ICO.edit(ICO_SIZE.SM)} Labels zurücksetzen</div>
+        <div class="help-body-2">Setzt Board/Matrix-Namen zurück auf „Zeile / Spalte"${aliasStr}.</div>
+        <div class="help-note">Scope: ${scopeStr}${recursive?'':' (<b>-all</b> für Unterstrukturen)'}</div>
+        <div class="help-foot"><b>^c tab …</b> für Tab-Bezeichnungen. Enter bestätigt — zeigt Preview-Dialog.</div>
       </div>`;
     }
     return;
@@ -6738,7 +6796,7 @@ function handleCommandInput(raw){
         const t=aliasIndex[targetAlias];
         h+=`<div class="sr-item" onclick="executeCmdFromSearch()"><div class="sr-name">Neue Karte auf <b>${t?esc(nodes[t.nodeId]?.label||targetAlias):esc(targetAlias)}</b></div><div class="sr-from">${t?'Enter zum Erstellen':'Kürzel nicht gefunden'}</div></div>`;
       } else {
-        h+=`<div class="sr-item"><div class="sr-name" style="color:var(--text3);">^n kürzel — Kürzel eingeben</div></div>`;
+        h+=`<div class="sr-item"><div class="sr-name faint">^n kürzel — Kürzel eingeben</div></div>`;
       }
     }
     const singleMatch=matches.length===1;
@@ -6752,10 +6810,10 @@ function handleCommandInput(raw){
       let glyphsHtml='';
       if(!sub&&target.type==='cell'&&info.cellFeatures&&info.cellFeatures.length){
         glyphsHtml=`<span class="sr-glyphs">${info.cellFeatures.map(f=>
-          `<span class="sr-feat-glyph" style="color:${f.color}" title="${esc(f.label)}" onclick="event.stopPropagation();executeCommand('${esc(alias)} ${f.subCmd}')">${f.icon}</span>`
+          `<span class="sr-feat-glyph" data-sr-col="${_srColKey(f.color)}" title="${esc(f.label)}" onclick="event.stopPropagation();executeCommand('${esc(alias)} ${f.subCmd}')">${f.icon}</span>`
         ).join('')}</span>`;
       }
-      h+=`<div class="sr-item" onclick="executeCommand('${cmd}')"><div class="sr-name"><span class="sr-ico" style="color:${info.color}">${info.icon}</span><span class="alias-tag">${esc(displayAlias)}</span> ${esc(info.label)}${glyphsHtml}</div><div class="sr-from">${info.typeLabel}</div></div>`;
+      h+=`<div class="sr-item" onclick="executeCommand('${cmd}')"><div class="sr-name"><span class="sr-ico" data-sr-col="${_srColKey(info.color)}">${info.icon}</span><span class="alias-tag">${esc(displayAlias)}</span> ${esc(info.label)}${glyphsHtml}</div><div class="sr-from">${info.typeLabel}</div></div>`;
       // Zone B: only when exactly one match, target is a cell, and subCmd is one of i/b/m/c
       if(singleMatch&&target.type==='cell'&&['i','b','m','c'].includes(sub)){
         h+=_renderAliasResultZoneB(alias,target,sub);
@@ -7367,7 +7425,7 @@ function highlightSearchTerm(){
       if(re.test(node.textContent)){
         re.lastIndex=0;
         const span=document.createElement('span');
-        span.innerHTML=node.textContent.replace(re,'<mark class="search-hl" style="background:var(--bluebg);color:var(--bluetxt);border-radius:2px;padding:0 2px;transition:background 0.5s ease,color 0.5s ease;">$1</mark>');
+        span.innerHTML=node.textContent.replace(re,'<mark class="search-hl">$1</mark>');
         node.parentNode.replaceChild(span,node);
         marks.push(span);
       }
@@ -7458,7 +7516,7 @@ function getCard(boardId,cardId){return nodes[boardId]?.data?.kbCards?.find(x=>x
 function getTodayStr(){return today0().toISOString().split('T')[0];}
 function today0(){const d=new Date();d.setHours(0,0,0,0);return d;}
 function day0(v){const d=new Date(v);d.setHours(0,0,0,0);return d;}
-function renderPrioDot(prio,size){if(!prio)return'';return`<span style="width:${size||8}px;height:${size||8}px;border-radius:50%;background:${PRIO_COLORS[prio]||'transparent'};display:inline-block;flex-shrink:0;margin-top:3px;" title="${prio}"></span>`;}
+function renderPrioDot(prio,size){if(!prio)return'';const s=size||8;return`<span class="prio-dot" data-prio="${prio}" style="width:${s}px;height:${s}px;" title="${prio}"></span>`;}
 function renderBadge(text){return`<span class="kc-recur kc-done-badge">${text}</span>`;}
 function emptyState(icon,text){return`<div class="empty-state"><div class="empty-big">${icon}</div><div>${text}</div></div>`;}
 document.addEventListener('keydown',e=>{
