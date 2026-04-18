@@ -584,6 +584,23 @@ body.has-sidebar-right.sb-collapsed #content{padding-right:26px;}
   body.has-sidebar.has-sidebar-right #sidebar{left:auto;right:0;box-shadow:-2px 0 12px rgba(0,0,0,0.12);}
   body.has-sidebar.sb-collapsed #sidebar{display:none;}
 }
+/* Tablet (Sprint 5.3) */
+@media (max-width:1200px){
+  #content{padding:14px 12px;}
+  body.has-sidebar #sidebar{max-width:320px;}
+}
+/* Mobile (Sprint 5.3): Sidebar als Full-Screen-Drawer, größere Tap-Targets */
+@media (max-width:480px){
+  #content{padding:10px 8px;}
+  #topbar{padding:6px 8px;gap:6px;}
+  body.has-sidebar #sidebar{width:100vw!important;max-width:100vw;}
+  .ico-btn{min-width:44px;min-height:44px;padding:10px;}
+  .btn{min-height:40px;padding:8px 12px;}
+  .kb-col{min-width:85vw;max-width:90vw;}
+  .mcell{min-height:44px;}
+  #tl{min-width:0;flex-basis:100%;}
+  .bc{font-size:11px;}
+}
 
 /* ── FOCUS STYLES ── */
 /* Sprint 5.2: Reset nur für Custom-Elemente & native Focusables, :focus-visible bleibt global */
