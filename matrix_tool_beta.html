@@ -124,7 +124,7 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 .edel{display:none;font-size:12px;color:var(--red);cursor:pointer;margin-left:auto;padding:0 2px;flex-shrink:0;}
 .emode .edel{display:inline;}
 .emode .mh{background:var(--bg2);}
-.mcell{border-bottom:0.5px solid var(--border);border-right:0.5px solid var(--border);min-height:66px;display:flex;flex-direction:column;padding:6px 7px;gap:3px;transition:background 0.1s;}
+.mcell{border-bottom:0.5px solid var(--border);border-right:0.5px solid var(--border);min-height:66px;display:flex;flex-direction:column;justify-content:space-between;padding:6px 7px;gap:3px;transition:background 0.1s;}
 .mcell:hover{background:var(--bg2);}
 .mcell:focus{outline:none;}
 .cchips{display:flex;flex-wrap:wrap;gap:2px;}
@@ -275,6 +275,18 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 .settings-cell-label{font-size:0.7em;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .settings-cell-select{font-size:0.7em;padding:0.3em 0.4em;border:0.5px solid var(--border2);border-radius:var(--rs);background:var(--bg);color:var(--text);width:100%;}
 .ro-input{opacity:0.5;cursor:default;}
+/* Matrix-Page & Cell-Page */
+.ptitle-edit-input{border:none;outline:none;background:transparent;font-size:var(--fs-title);font-weight:500;width:100%;font-family:inherit;color:var(--text);}
+.phd-actions{display:flex;gap:6px;flex-shrink:0;}
+.empty-actions{display:flex;gap:8px;justify-content:center;}
+.empty-state-sub{margin-bottom:10px;}
+.mcell-body{flex:1;display:flex;flex-direction:column;}
+.ni.ni-center{text-align:center;}
+.feat-remove{opacity:0.6;font-size:11px;cursor:pointer;}
+.cell-segment[data-feat="matrix"],.cell-quad-item[data-feat="matrix"]{background:var(--bluebg);color:var(--bluetxt);}
+.cell-segment[data-feat="board"],.cell-quad-item[data-feat="board"]{background:var(--tealbg);color:var(--tealtxt);}
+.cell-segment[data-feat="info"],.cell-quad-item[data-feat="info"]{background:var(--amberbg);color:var(--ambertxt);}
+.cell-segment[data-feat="checklists"],.cell-quad-item[data-feat="checklists"]{background:var(--purplebg);color:var(--purpletxt);}
 .card-origin{cursor:pointer;margin-right:0.4em;opacity:0.65;transition:opacity 0.15s;display:inline-block;}
 .card-origin:hover{opacity:1;}
 .origin-alias{font-family:monospace;font-size:0.9em;padding:0.05em 0.4em;border-radius:var(--rs);background:var(--bg3);color:var(--text2);}
@@ -3668,18 +3680,18 @@ function renderMatrixPage(node){
   let h=`<div class="phd">
     <div class="flex-fill">
       ${editMode
-        ?`<input class="ptitle" style="border:none;outline:none;background:transparent;font-size:var(--fs-title);font-weight:500;width:100%;font-family:inherit;color:var(--text);" value="${esc(node.label)}" onchange="renameMatrixNode('${node.id}',this.value)" />`
+        ?`<input class="ptitle ptitle-edit-input" value="${esc(node.label)}" onchange="renameMatrixNode('${node.id}',this.value)" />`
         :`<div class="ptitle">${esc(node.label)}</div>`}
       <div class="psub">Hover auf Zelle → Tasks / Sub-Matrix anlegen</div>
     </div>
-    <div style="display:flex;gap:6px;flex-shrink:0;">
+    <div class="phd-actions">
       <button class="btn edit-only" onclick="addCol('${node.id}')">+ Spalte</button>
       <button class="btn edit-only" onclick="addRow('${node.id}')">+ Zeile</button>
     </div></div>`;
 
   if(rows.length===0&&cols.length===0){
-    h+=`<div class="empty-state"><div class="empty-big">${ICO.map(32)}</div><div style="margin-bottom:10px;">Leere Matrix — leg los.</div>
-      <div style="display:flex;gap:8px;justify-content:center;">
+    h+=`<div class="empty-state"><div class="empty-big">${ICO.map(32)}</div><div class="empty-state-sub">Leere Matrix — leg los.</div>
+      <div class="empty-actions">
         <button class="btn edit-only" onclick="addCol('${node.id}')">+ Spalte</button>
         <button class="btn edit-only" onclick="addRow('${node.id}')">+ Zeile</button>
       </div></div>`;
@@ -3702,7 +3714,7 @@ function renderMatrixGrid(nodeId,rows,cols){
   h+=`<div class="mh corner">${editMode&&rows.length&&cols.length?`<button class="transpose-btn" onclick="transposeMatrix('${nodeId}')" title="Transponieren (Zeilen ↔ Spalten)">${ICO.transpose(ICO_SIZE.MD)}</button>`:''}</div>`;
   cols.forEach(col=>{
     const arrows=editMode?`<div class="hdr-arrows col-arrows"><button class="hdr-arr" tabindex="-1" onclick="moveCol('${nodeId}','${col.id}',-1)" title="Nach links"><svg width="7" height="8" viewBox="0 0 7 8"><path d="M6 1L2 4l4 3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button class="hdr-arr" tabindex="-1" onclick="moveCol('${nodeId}','${col.id}',1)" title="Nach rechts"><svg width="7" height="8" viewBox="0 0 7 8"><path d="M1 1l4 3-4 3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>`:'';
-    h+=`<div class="mh ch" data-col-id="${col.id}"><input class="ni" value="${esc(col.label)}" onchange="renameCol('${nodeId}','${col.id}',this.value)" onkeydown="hdrKeydown(event,'col','${nodeId}','${col.id}')" ${editMode?'tabindex="0"':'readonly tabindex="-1"'} style="text-align:center;"/>
+    h+=`<div class="mh ch" data-col-id="${col.id}"><input class="ni ni-center" value="${esc(col.label)}" onchange="renameCol('${nodeId}','${col.id}',this.value)" onkeydown="hdrKeydown(event,'col','${nodeId}','${col.id}')" ${editMode?'tabindex="0"':'readonly tabindex="-1"'}/>
       <span class="edel" role="button" tabindex="0" onclick="delCol('${nodeId}','${col.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();delCol('${nodeId}','${col.id}');}" title="Spalte löschen">${ICO.close(ICO_SIZE.XS)}</span>${arrows}</div>`;
   });
   if(editMode)h+=`<div class="addcolhdr"><button class="addbtn" id="addcol-${nodeId}" onclick="addCol('${nodeId}')">+</button></div>`;
@@ -3765,12 +3777,12 @@ function cellHTML(nodeId,row,col){
       if(data){
         const qicoPx=Math.round(qico*16);
         const ico=feat.icoLg.replace(/width="\d+"/,`width="${qicoPx}"`).replace(/height="\d+"/,`height="${qicoPx}"`);
-        segments+=`<div class="cell-quad-item" style="background:${feat.bg};color:${feat.txt};padding:${_cp}em;" onclick="iconClick('${nodeId}','${row.id}','${col.id}','${feat.key}','${lbl}')">
+        segments+=`<div class="cell-quad-item" data-feat="${feat.key}" style="padding:${_cp}em;" onclick="iconClick('${nodeId}','${row.id}','${col.id}','${feat.key}','${lbl}')">
           ${ico}<span class="cell-quad-meta">${data.meta}</span>
         </div>`;
       } else {
         // Empty slot — ghost button in edit mode, empty otherwise
-        segments+=`<div class="cell-quad-item" style="padding:${_cp}em;">${editMode?`<span class="cell-ghost edit-only" onclick="iconClick('${nodeId}','${row.id}','${col.id}','${feat.key}','${lbl}')" title="${feat.label} anlegen" style="color:var(--text3);">${feat.icoSm}</span>`:''}</div>`;
+        segments+=`<div class="cell-quad-item" style="padding:${_cp}em;">${editMode?`<span class="cell-ghost edit-only" onclick="iconClick('${nodeId}','${row.id}','${col.id}','${feat.key}','${lbl}')" title="${feat.label} anlegen">${feat.icoSm}</span>`:''}</div>`;
       }
     });
     segments+=`</div>`;
@@ -3781,11 +3793,11 @@ function cellHTML(nodeId,row,col){
     const bsPx=Math.round(bs*16);
     featData.forEach(({feat,meta,label})=>{
       const ico=feat.icoLg.replace(/width="\d+"/,`width="${bsPx}"`).replace(/height="\d+"/,`height="${bsPx}"`);
-      segments+=`<div class="cell-segment" style="background:${feat.bg};color:${feat.txt};padding:${_cp}em ${_cp+0.2}em;" onclick="iconClick('${nodeId}','${row.id}','${col.id}','${feat.key}','${lbl}')">
+      segments+=`<div class="cell-segment" data-feat="${feat.key}" style="padding:${_cp}em ${_cp+0.2}em;" onclick="iconClick('${nodeId}','${row.id}','${col.id}','${feat.key}','${lbl}')">
         ${ico}
         <span class="cell-segment-label">${label}</span>
         <span class="cell-segment-meta">${meta}</span>
-        ${editMode?`<span style="opacity:0.6;font-size:11px;cursor:pointer;" onclick="event.stopPropagation();removeFeature('${nodeId}','${row.id}','${col.id}','${feat.key}')" title="${feat.label} entfernen">${ICO.close(ICO_SIZE.XS)}</span>`:''}
+        ${editMode?`<span class="feat-remove" onclick="event.stopPropagation();removeFeature('${nodeId}','${row.id}','${col.id}','${feat.key}')" title="${feat.label} entfernen">${ICO.close(ICO_SIZE.XS)}</span>`:''}
       </div>`;
     });
   }
@@ -3801,10 +3813,10 @@ function cellHTML(nodeId,row,col){
 
   const firstFeature=activeFeatures.length>0?activeFeatures[0].key:'';
 
-  return `<div class="mcell" style="justify-content:space-between;" tabindex="0" data-row="${row.id}" data-col="${col.id}" data-node="${nodeId}"
+  return `<div class="mcell" tabindex="0" data-row="${row.id}" data-col="${col.id}" data-node="${nodeId}"
     data-enter-node="${nodeId}" data-enter-row="${row.id}" data-enter-col="${col.id}" data-enter-type="${firstFeature}" data-enter-lbl="${lbl}"
     onkeydown="mcellKeydown(event,this)">
-    <div style="flex:1;display:flex;flex-direction:column;gap:${_cg}em;">${segments}</div>
+    <div class="mcell-body" style="gap:${_cg}em;">${segments}</div>
     ${ghostBtns?`<div class="cell-ghosts">${ghostBtns}</div>`:''}
   </div>`;
 }
@@ -3824,7 +3836,7 @@ function renderCellPage(cur){
   const _exportType=tab==='board'?'board':'matrix';
   let h=`<div class="phd"><div class="flex-fill">
     ${editMode&&_renamableId
-      ?`<input class="ptitle" style="border:none;outline:none;background:transparent;font-size:var(--fs-title);font-weight:500;width:100%;font-family:inherit;color:var(--text);" value="${esc(cur.label)}" onchange="renameBoardOrMatrix('${_renamableId}',this.value,'${cur.nodeId}')" />`
+      ?`<input class="ptitle ptitle-edit-input" value="${esc(cur.label)}" onchange="renameBoardOrMatrix('${_renamableId}',this.value,'${cur.nodeId}')" />`
       :`<div class="ptitle">${esc(cur.label)}</div>`}
   </div>
   <div style="display:flex;gap:5px;flex-shrink:0;align-items:center;">
