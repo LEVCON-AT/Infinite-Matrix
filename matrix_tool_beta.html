@@ -647,11 +647,16 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,[contenteditable
 @keyframes popIn{from{opacity:0;transform:scale(0.92)}to{opacity:1;transform:none}}
 
 /* A8: Search dropdown */
-#searchresults{transform-origin:top right;}
+#searchresults{display:none;transform-origin:top right;position:absolute;top:32px;right:0;width:320px;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--rl);z-index:80;max-height:360px;overflow-y:auto;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+#searchresults.is-open{display:block;}
 .sr-anim{animation:popIn 0.18s ease-out;}
+
+/* Utility: Klassen-basierte Sichtbarkeit (Sprint 4.2) */
+.is-hidden{display:none;}
 
 /* A9: Saved indicator */
 #savedot{display:none;align-items:center;flex-shrink:0;}
+#savedot.save-ok,#savedot.save-dirty,#savedot.save-err{display:inline-flex;}
 #savedot svg{width:16px;height:16px;}
 @keyframes savePulse{0%{transform:scale(1)}50%{transform:scale(1.2)}100%{transform:scale(1)}}
 @keyframes saveShake{0%,100%{transform:none}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
@@ -739,7 +744,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,[contenteditable
       <div style="position:relative;flex-shrink:0;">
         <span id="searchicon" style="position:absolute;left:7px;top:50%;transform:translateY(-50%);pointer-events:none;opacity:0.5;color:var(--text3);"></span>
         <input id="searchinput" type="text" placeholder="Suche, ^Kommando oder Alt+↑↓" oninput="onSearchInput(this.value)" onkeydown="searchInputKey(event)" onclick="onSearchFocus()" onfocus="this.style.width='260px';onSearchFocus()" onblur="this.style.width='200px';setTimeout(()=>{if(!document.getElementById('searchinput').value)closeSearch();},150)"/>
-        <div id="searchresults" style="display:none;position:absolute;top:32px;right:0;width:320px;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--rl);z-index:80;max-height:360px;overflow-y:auto;box-shadow:0 2px 8px rgba(0,0,0,0.1);"></div>
+        <div id="searchresults"></div>
       </div>
     </div>
     <div id="tr">
@@ -1400,7 +1405,8 @@ function getPayloadPretty(){return JSON.stringify({version:DATA_VERSION,nodes,ni
 
 function showSaveStatus(text,color,duration){
   const d=document.getElementById('savedot');if(!d)return;
-  d.className='';d.style.display='inline-flex';d.style.opacity='1';
+  // className-Swap steuert display via CSS (#savedot.save-ok/-dirty/-err{display:inline-flex})
+  d.className='';
   if(color==='var(--teal)')d.className='save-ok';
   else if(color==='var(--blue)')d.className='save-dirty';
   else if(color==='var(--red)')d.className='save-err';
@@ -1409,9 +1415,9 @@ function showSaveStatus(text,color,duration){
   clearTimeout(d._t);
   if(d.className==='save-ok'){
     // Fadeout handled by CSS animation; hide element after animation ends
-    d._t=setTimeout(()=>{d.style.display='none';d.className='';},2100);
+    d._t=setTimeout(()=>{d.className='';},2100);
   } else if(duration){
-    d._t=setTimeout(()=>{d.style.display='none';d.className='';},duration);
+    d._t=setTimeout(()=>{d.className='';},duration);
   }
 }
 
@@ -2490,7 +2496,7 @@ function sbUpdateFilterUI(){
   // Clear button
   const cb=document.getElementById('sb-clear-filter');
   const hasAnyFilter=sbFilter.text||sbFilter.chips.matrices||sbFilter.chips.tasks||sbFilter.chips.checklists||sbFilter.chips.infos||sbFilter.whoSet.size||sbFilter.prio.size||sbFilter.deadline;
-  if(cb)cb.style.display=hasAnyFilter?'':'none';
+  if(cb)cb.classList.toggle('is-hidden',!hasAnyFilter);
   sbRenderPillUIs();
 }
 
@@ -3923,7 +3929,7 @@ function renderKanban(node){
   let h=`<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
     <button class="btn" onclick="addKbCard('${node.id}')">+ Karte</button>
     <button class="btn edit-only" onclick="addKbCol('${node.id}')">+ Spalte</button>
-    <span id="kb-no-col-hint" style="display:none;font-size:12px;color:var(--amber);padding:4px 8px;background:var(--amberbg);border-radius:var(--r);">Erst eine Spalte anlegen</span>
+    <span id="kb-no-col-hint" class="is-hidden" style="font-size:12px;color:var(--amber);padding:4px 8px;background:var(--amberbg);border-radius:var(--r);">Erst eine Spalte anlegen</span>
   </div>`;
   h+=`<div class="kb-wrap">`;
   kbCols.forEach(col=>{
@@ -4118,7 +4124,7 @@ function addKbCard(boardId){
   if(!colId){
     // Show inline hint instead of alert
     const hint=document.getElementById('kb-no-col-hint');
-    if(hint){hint.style.display='block';setTimeout(()=>hint.style.display='none',HINT_DISPLAY_MS);}
+    if(hint){hint.classList.remove('is-hidden');setTimeout(()=>hint.classList.add('is-hidden'),HINT_DISPLAY_MS);}
     return;
   }
   openNewCard(boardId,colId);
@@ -6186,7 +6192,7 @@ function onSearchInput(val){
     // Empty (user deleted text but stays focused) — show the history dropdown
     const inp=document.getElementById('searchinput');
     if(inp&&document.activeElement===inp&&_searchHistory.length>0)_renderSearchHistoryDropdown();
-    else{const el=document.getElementById('searchresults');if(el)el.style.display='none';}
+    else{const el=document.getElementById('searchresults');if(el)el.classList.remove('is-open');}
   }else{
     doSearch(val);
   }
@@ -6203,7 +6209,7 @@ function onSearchFocus(){
 function _renderSearchHistoryDropdown(){
   const el=document.getElementById('searchresults');
   if(!el)return;
-  el.style.display='block';el.classList.add('sr-anim');
+  el.classList.add('is-open','sr-anim');
   // Newest first
   const entries=[..._searchHistory].reverse();
   let h=`<div style="padding:7px 13px;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;border-bottom:0.5px solid var(--border);font-weight:500;">Zuletzt</div>`;
@@ -6360,7 +6366,7 @@ function handleCommandInput(raw){
   const el=document.getElementById('searchresults');
   if(!raw||raw.trim()===''){
     // Show inline help
-    el.style.display='block';el.classList.add('sr-anim');
+    el.classList.add('is-open','sr-anim');
     el.innerHTML=`<div class="cmd-help">
       <div><b>^home</b> — Zur Hauptmatrix</div>
       <div><b>^kürzel</b> — Navigieren (Info/erste Zelle)</div>
@@ -6393,7 +6399,7 @@ function handleCommandInput(raw){
   }
   // ^c live-preview (label cleanup)
   if(firstPart==='c'){
-    el.style.display='block';el.classList.add('sr-anim');
+    el.classList.add('is-open','sr-anim');
     // Parse arguments (same logic as parseCommand)
     let alias=null,recursive=false,mode='node';
     let startIdx=1;
@@ -6424,7 +6430,7 @@ function handleCommandInput(raw){
   // Preview matching aliases
   const matches=Object.entries(aliasIndex).filter(([a])=>a.startsWith(firstPart));
   if(matches.length>0||firstPart==='n'){
-    el.style.display='block';el.classList.add('sr-anim');
+    el.classList.add('is-open','sr-anim');
     let h='';
     if(firstPart==='n'){
       if(parts.length>1){
@@ -6457,7 +6463,7 @@ function handleCommandInput(raw){
     });
     el.innerHTML=h;
   } else {
-    el.style.display='block';
+    el.classList.add('is-open');
     el.innerHTML=`<div style="padding:12px;font-size:12px;color:var(--text3);text-align:center;">Kein Kürzel gefunden</div>`;
   }
 }
@@ -6890,7 +6896,7 @@ function showCmdSuccess(){
 function doScopedSearch(scope,query){
   const el=document.getElementById('searchresults');
   const terms=query.split('|').map(t=>t.trim().toLowerCase()).filter(Boolean);
-  if(terms.length===0){el.style.display='none';return;}
+  if(terms.length===0){el.classList.remove('is-open');return;}
   const results=[];
   function searchNode(nodeId){
     const n=nodes[nodeId];if(!n)return;
@@ -6935,10 +6941,10 @@ function doScopedSearch(scope,query){
   searchNode(rootId);
   _searchActiveIdx=-1;
   if(results.length===0){
-    el.style.display='block';el.innerHTML=`<div style="padding:12px;font-size:12px;color:var(--text3);text-align:center;">Keine Ergebnisse</div>`;
+    el.classList.add('is-open');el.innerHTML=`<div style="padding:12px;font-size:12px;color:var(--text3);text-align:center;">Keine Ergebnisse</div>`;
     return;
   }
-  el.style.display='block';el.classList.add('sr-anim');
+  el.classList.add('is-open','sr-anim');
   window._searchResults=results.slice(0,appSettings.searchMax||SEARCH_MAX);
   const hi=s=>{let h=esc(s);terms.forEach(t=>{const re=new RegExp('('+t.replace(/[.*+?^${}()|\[\]]/g,'\\$&')+')','gi');h=h.replace(re,'<mark class="sr-mark">$1</mark>');});return h;};
   el.innerHTML=window._searchResults.map((r,i)=>{
@@ -6990,10 +6996,10 @@ function updateSearchActive(items){
 function doSearch(q){
   _searchActiveIdx=-1;
   const el=document.getElementById('searchresults');
-  if(!q||q.length<SEARCH_MIN_LEN){el.style.display='none';return;}
+  if(!q||q.length<SEARCH_MIN_LEN){el.classList.remove('is-open');return;}
   // Multi-term support: split by |
   const terms=q.split('|').map(t=>t.trim().toLowerCase()).filter(Boolean);
-  if(terms.length===0){el.style.display='none';return;}
+  if(terms.length===0){el.classList.remove('is-open');return;}
   const results=[];
   function searchNode(nodeId){
     const n=nodes[nodeId];if(!n)return;
@@ -7020,11 +7026,11 @@ function doSearch(q){
   searchNode(stack[0].nodeId);
   results.sort((a,b)=>b.score-a.score);
   if(results.length===0){
-    el.style.display='block';el.classList.add('sr-anim');
+    el.classList.add('is-open','sr-anim');
     el.innerHTML=`<div style="padding:12px;font-size:12px;color:var(--text3);text-align:center;">Keine Ergebnisse</div>`;
     return;
   }
-  el.style.display='block';el.classList.add('sr-anim');
+  el.classList.add('is-open','sr-anim');
   window._searchResults=results.slice(0,appSettings.searchMax||SEARCH_MAX);
   const hi=s=>{let h=esc(s);terms.forEach(t=>{const re=new RegExp('('+t.replace(/[.*+?^${}()|\[\]]/g,'\\$&')+')','gi');h=h.replace(re,'<mark class="sr-mark">$1</mark>');});return h;};
   el.innerHTML=window._searchResults.map((r,i)=>{
@@ -7120,14 +7126,14 @@ function searchOpen(i){
 }
 function closeSearch(){
   const sr=document.getElementById('searchresults');
-  sr.classList.remove('sr-anim');sr.style.display='none';
+  sr.classList.remove('sr-anim','is-open');
   const inp=document.getElementById('searchinput');
   if(inp)inp.value='';
 }
 document.addEventListener('click',e=>{
   // Close search dropdown
   if(!e.target.closest('#searchresults')&&!e.target.closest('#searchinput'))
-    document.getElementById('searchresults').style.display='none';
+    document.getElementById('searchresults').classList.remove('is-open');
   // Close minimap if click outside panel and outside toggle button
   if(mmOpen&&!e.target.closest('#minimap-panel')&&!e.target.closest('[onclick="toggleMM()"]')){
     mmOpen=false;
@@ -7287,7 +7293,7 @@ render();
 window.addEventListener('beforeunload',e=>{if(fileDirty){e.preventDefault();e.returnValue='';}});
 // Init file button
 if(hasFileAPI){updateFileBtn();}
-else{const fb=document.getElementById('filebtn');if(fb)fb.style.display='none';const sb=document.getElementById('saveasbtn');if(sb)sb.style.display='none';}
+else{const fb=document.getElementById('filebtn');if(fb)fb.classList.add('is-hidden');const sb=document.getElementById('saveasbtn');if(sb)sb.classList.add('is-hidden');}
 </script>
 </body>
 </html>
