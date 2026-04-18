@@ -1440,7 +1440,9 @@ function showSaveStatus(text,color,duration){
   else if(color==='var(--blue)')d.className='save-dirty';
   else if(color==='var(--red)')d.className='save-err';
   else if(color==='var(--amber)')d.className='save-err';
-  d.title=text;
+  // Sprint 6.2: Tooltip mit Status-Präfix
+  const stateLabel={'save-ok':'Gespeichert','save-dirty':'Nicht gespeichert','save-err':'Speicherfehler'}[d.className]||'';
+  d.title=stateLabel?`${stateLabel} — ${text}`:text;
   clearTimeout(d._t);
   if(d.className==='save-ok'){
     // Fadeout handled by CSS animation; hide element after animation ends
@@ -6785,9 +6787,9 @@ function executeCommand(raw){
     return;
   }
   if(cmd.type==='new'){
-    if(!cmd.alias)return showCmdError();
+    if(!cmd.alias)return showCmdError('Kein Alias angegeben für ^new');
     const target=aliasIndex[cmd.alias];
-    if(!target)return showCmdError();
+    if(!target)return showCmdError(`Alias nicht gefunden: ^${cmd.alias}`);
     // Find boardId for this target
     let boardId=null;
     if(target.type==='board')boardId=target.nodeId;
@@ -6811,7 +6813,7 @@ function executeCommand(raw){
       return;
     }
     const target=aliasIndex[cmd.alias];
-    if(!target)return showCmdError();
+    if(!target)return showCmdError(`Alias nicht gefunden: ^${cmd.alias}`);
     closeSearch();
     if(target.type==='card'){
       openCard(target.boardId,target.cardId);
@@ -6849,7 +6851,7 @@ function executeCommand(raw){
     closeSearch();
     if(cmd.alias){
       const target=aliasIndex[cmd.alias];
-      if(!target)return showCmdError();
+      if(!target)return showCmdError(`Alias nicht gefunden: ^${cmd.alias}`);
       navigateToAlias(target,null,null);
       setTimeout(()=>{toggleFreqView(target.nodeId);},RENDER_DELAY_MS);
     } else {
@@ -6924,10 +6926,11 @@ function executeCmdFromSearch(){
   if(!inp||!inp.value.startsWith('^'))return;
   executeCommand(inp.value.slice(1));
 }
-function showCmdError(){
+function showCmdError(reason){
   const inp=document.getElementById('searchinput');if(!inp)return;
   inp.classList.add('cmd-error');
-  setTimeout(()=>{inp.classList.remove('cmd-error');},CMD_ERROR_MS);
+  if(reason)inp.title=reason; else inp.removeAttribute('title');
+  setTimeout(()=>{inp.classList.remove('cmd-error');inp.removeAttribute('title');},CMD_ERROR_MS);
 }
 function showCmdSuccess(){
   const inp=document.getElementById('searchinput');if(!inp)return;
