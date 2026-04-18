@@ -1611,15 +1611,15 @@ function updateFileBtn(){
   const btn=document.getElementById('filebtn');if(!btn)return;
   const sb=document.getElementById('saveasbtn');
   if(fileHandle){
-    btn.innerHTML=ICO.folder(12)+' '+esc(fileHandle.name);
+    btn.innerHTML=ICO.folder(ICO_SIZE.SM)+' '+esc(fileHandle.name);
     btn.title='Verbundene Datei: '+fileHandle.name+' — Klick zum Trennen';
     btn.onclick=()=>{if(confirm(UI.confirmDisconnect))disconnectFile();};
   } else {
-    btn.innerHTML=ICO.folder(12)+' Datei öffnen';
+    btn.innerHTML=ICO.folder(ICO_SIZE.SM)+' Datei öffnen';
     btn.title='JSON-Datei öffnen oder neu anlegen';
     btn.onclick=()=>openFile();
   }
-  if(sb)sb.innerHTML=ICO.save(12)+' Speichern als';
+  if(sb)sb.innerHTML=ICO.save(ICO_SIZE.SM)+' Speichern als';
 }
 
 function loadData(d){
@@ -1772,8 +1772,8 @@ function render(){
     const _isSubLevel=!!cur.cellRef;
     const _ge=document.getElementById('gear-export');
     const _gi=document.getElementById('gear-import');
-    if(_ge)_ge.innerHTML=ICO.download(12)+(_isSubLevel?' Export Knoten':' Export JSON');
-    if(_gi){const _lbl=_isSubLevel?' Import Knoten':' Import JSON';_gi.innerHTML='';_gi.insertAdjacentHTML('afterbegin',ICO.upload(12)+_lbl);const _inp=_gi.querySelector('input');if(!_inp){_gi.insertAdjacentHTML('beforeend','<input type="file" class="is-hidden" accept=".json,.imx" onchange="importJSON(event);toggleGearMenu();">');}}
+    if(_ge)_ge.innerHTML=ICO.download(ICO_SIZE.SM)+(_isSubLevel?' Export Knoten':' Export JSON');
+    if(_gi){const _lbl=_isSubLevel?' Import Knoten':' Import JSON';_gi.innerHTML='';_gi.insertAdjacentHTML('afterbegin',ICO.upload(ICO_SIZE.SM)+_lbl);const _inp=_gi.querySelector('input');if(!_inp){_gi.insertAdjacentHTML('beforeend','<input type="file" class="is-hidden" accept=".json,.imx" onchange="importJSON(event);toggleGearMenu();">');}}
     // Scroll-fade masks on horizontally scrollable containers
     initScrollFade();
     // Auto-focus first cell on matrix pages
@@ -2436,7 +2436,7 @@ function sbRenderTree(rootMatrixId){
     }else if(e.kind==='link'){
       const isMail=e.linkType==='mail';
       dotTypeCls=isMail?'mail':'link';
-      if(showIcons)iconHtml=`<span class="sb-node-icon ico-${dotTypeCls}">${isMail?ICO.mail(12):ICO.link(12)}</span>`;
+      if(showIcons)iconHtml=`<span class="sb-node-icon ico-${dotTypeCls}">${isMail?ICO.mail(ICO_SIZE.SM):ICO.link(ICO_SIZE.SM)}</span>`;
     }
 
     // Label text
@@ -3220,7 +3220,7 @@ function _sbShortCrumb(dataId){
       parent:parentLabel,
       target:{
         label:link?(link.label||link.url||link.to||'(unbenannt)'):'?',
-        icon:isMail?ICO.mail(12):ICO.link(12),
+        icon:isMail?ICO.mail(ICO_SIZE.SM):ICO.link(ICO_SIZE.SM),
         color:'var(--text3)'
       }
     };
@@ -3250,12 +3250,12 @@ function sbContextMenu(e,dataId){
   if(lp){
     const isMail=lp.link.type==='mail';
     buttons.push({
-      icon:ICO.edit(12),label:isMail?'Mailvorlage bearbeiten':'Link bearbeiten',
+      icon:ICO.edit(ICO_SIZE.SM),label:isMail?'Mailvorlage bearbeiten':'Link bearbeiten',
       onClick:()=>isMail?editMailTemplate(lp.boardId,lp.linkId):editLink(lp.boardId,lp.linkId)
     });
     if(editMode){
       buttons.push({divider:true});
-      buttons.push({icon:ICO.close(12),label:'Löschen',className:'danger',
+      buttons.push({icon:ICO.close(ICO_SIZE.SM),label:'Löschen',className:'danger',
         onClick:()=>delLink(lp.boardId,lp.linkId)});
     }
   }else if(cp){
@@ -3277,16 +3277,16 @@ function sbContextMenu(e,dataId){
     }
     if(editMode){
       if(buttons.length)buttons.push({divider:true});
-      buttons.push({icon:ICO.edit(12),label:'Umbenennen',onClick:()=>sbRename(dataId)});
-      buttons.push({icon:ICO.close(12),label:'Löschen',className:'danger',onClick:()=>sbDelete(dataId)});
+      buttons.push({icon:ICO.edit(ICO_SIZE.SM),label:'Umbenennen',onClick:()=>sbRename(dataId)});
+      buttons.push({icon:ICO.close(ICO_SIZE.SM),label:'Löschen',className:'danger',onClick:()=>sbDelete(dataId)});
     }
   }else if(fp){
     // Feature: "neuen Inhalt anlegen" — je nach Feature-Typ
     if(contentAnlageOn){
       const b=fp.cell.boardId?nodes[fp.cell.boardId]:null;
       if(fp.key==='info'&&b){
-        buttons.push({icon:ICO.link(12),label:'Neuer Link',onClick:()=>addLink(fp.cell.boardId)});
-        buttons.push({icon:ICO.mail(12),label:'Neue Mailvorlage',onClick:()=>addMailTemplate(fp.cell.boardId)});
+        buttons.push({icon:ICO.link(ICO_SIZE.SM),label:'Neuer Link',onClick:()=>addLink(fp.cell.boardId)});
+        buttons.push({icon:ICO.mail(ICO_SIZE.SM),label:'Neue Mailvorlage',onClick:()=>addMailTemplate(fp.cell.boardId)});
       }else if(fp.key==='board'&&b){
         const def=getCellFeatureDef('board');
         buttons.push({icon:def?def.icoSm:'',iconColor:FEAT_COLORS.board,label:'Neue Karte',onClick:()=>addKbCard(fp.cell.boardId)});
@@ -3553,17 +3553,17 @@ function renderMatrixGrid(nodeId,rows,cols){
   const cw=appSettings.colWidthEm||7;
   const gc=`${cw}em repeat(${cols.length},minmax(${cw}em,1fr))${editMode?' 2.25em':''}`;
   h+=`<div class="mwrap"><div class="matrix${editMode?' emode':''}" style="grid-template-columns:${gc};">`;
-  h+=`<div class="mh corner">${editMode&&rows.length&&cols.length?`<button class="transpose-btn" onclick="transposeMatrix('${nodeId}')" title="Transponieren (Zeilen ↔ Spalten)">${ICO.transpose(14)}</button>`:''}</div>`;
+  h+=`<div class="mh corner">${editMode&&rows.length&&cols.length?`<button class="transpose-btn" onclick="transposeMatrix('${nodeId}')" title="Transponieren (Zeilen ↔ Spalten)">${ICO.transpose(ICO_SIZE.MD)}</button>`:''}</div>`;
   cols.forEach(col=>{
     const arrows=editMode?`<div class="hdr-arrows col-arrows"><button class="hdr-arr" tabindex="-1" onclick="moveCol('${nodeId}','${col.id}',-1)" title="Nach links"><svg width="7" height="8" viewBox="0 0 7 8"><path d="M6 1L2 4l4 3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button class="hdr-arr" tabindex="-1" onclick="moveCol('${nodeId}','${col.id}',1)" title="Nach rechts"><svg width="7" height="8" viewBox="0 0 7 8"><path d="M1 1l4 3-4 3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>`:'';
     h+=`<div class="mh ch" data-col-id="${col.id}"><input class="ni" value="${esc(col.label)}" onchange="renameCol('${nodeId}','${col.id}',this.value)" onkeydown="hdrKeydown(event,'col','${nodeId}','${col.id}')" ${editMode?'tabindex="0"':'readonly tabindex="-1"'} style="text-align:center;"/>
-      <span class="edel" role="button" tabindex="0" onclick="delCol('${nodeId}','${col.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();delCol('${nodeId}','${col.id}');}" title="Spalte löschen">${ICO.close(10)}</span>${arrows}</div>`;
+      <span class="edel" role="button" tabindex="0" onclick="delCol('${nodeId}','${col.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();delCol('${nodeId}','${col.id}');}" title="Spalte löschen">${ICO.close(ICO_SIZE.XS)}</span>${arrows}</div>`;
   });
   if(editMode)h+=`<div class="addcolhdr"><button class="addbtn" id="addcol-${nodeId}" onclick="addCol('${nodeId}')">+</button></div>`;
   rows.forEach(row=>{
     const arrows=editMode?`<div class="hdr-arrows row-arrows"><button class="hdr-arr" tabindex="-1" onclick="moveRow('${nodeId}','${row.id}',-1)" title="Nach oben"><svg width="8" height="7" viewBox="0 0 8 7"><path d="M1 6l3-4 3 4" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button class="hdr-arr" tabindex="-1" onclick="moveRow('${nodeId}','${row.id}',1)" title="Nach unten"><svg width="8" height="7" viewBox="0 0 8 7"><path d="M1 1l3 4 3-4" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>`:'';
     h+=`<div class="mh rh" data-row-id="${row.id}"><input class="ni" value="${esc(row.label)}" onchange="renameRow('${nodeId}','${row.id}',this.value)" onkeydown="hdrKeydown(event,'row','${nodeId}','${row.id}')" ${editMode?'tabindex="0"':'readonly tabindex="-1"'}/>
-      <span class="edel" role="button" tabindex="0" onclick="delRow('${nodeId}','${row.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();delRow('${nodeId}','${row.id}');}" title="Zeile löschen">${ICO.close(10)}</span>${arrows}</div>`;
+      <span class="edel" role="button" tabindex="0" onclick="delRow('${nodeId}','${row.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();delRow('${nodeId}','${row.id}');}" title="Zeile löschen">${ICO.close(ICO_SIZE.XS)}</span>${arrows}</div>`;
     cols.forEach(col=>{h+=cellHTML(nodeId,row,col);});
     if(editMode)h+=`<div class="addrowcol"></div>`;
   });
@@ -3639,7 +3639,7 @@ function cellHTML(nodeId,row,col){
         ${ico}
         <span class="cell-segment-label">${label}</span>
         <span class="cell-segment-meta">${meta}</span>
-        ${editMode?`<span style="opacity:0.6;font-size:11px;cursor:pointer;" onclick="event.stopPropagation();removeFeature('${nodeId}','${row.id}','${col.id}','${feat.key}')" title="${feat.label} entfernen">${ICO.close(10)}</span>`:''}
+        ${editMode?`<span style="opacity:0.6;font-size:11px;cursor:pointer;" onclick="event.stopPropagation();removeFeature('${nodeId}','${row.id}','${col.id}','${feat.key}')" title="${feat.label} entfernen">${ICO.close(ICO_SIZE.XS)}</span>`:''}
       </div>`;
     });
   }
@@ -3739,7 +3739,7 @@ function renderInfoTab(node){
           <span tabindex="0" role="button" style="font-size:9px;color:var(--text3);cursor:pointer;line-height:1;" onclick="moveInfoField('${node.id}','${f.id}',1)" onkeydown="if(event.key==='Enter'){event.preventDefault();moveInfoField('${node.id}','${f.id}',1);}" title="Nach unten">▼</span>
         </div>`:''}
         <span class="info-label">${esc(f.label)}</span>
-        ${editMode?`<span tabindex="0" role="button" style="font-size:11px;color:var(--red);cursor:pointer;margin-left:auto;" onclick="delInfoField('${node.id}','${f.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delInfoField('${node.id}','${f.id}');}">${ICO.close(10)}</span>`:''}
+        ${editMode?`<span tabindex="0" role="button" style="font-size:11px;color:var(--red);cursor:pointer;margin-left:auto;" onclick="delInfoField('${node.id}','${f.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delInfoField('${node.id}','${f.id}');}">${ICO.close(ICO_SIZE.XS)}</span>`:''}
       </div>
       <div class="info-val" contenteditable="true" onblur="saveInfoField('${node.id}','${f.id}',this.innerHTML)">${sanitizeHtml(f.value)||''}</div>
     </div>`;
@@ -3756,15 +3756,15 @@ function renderInfoTab(node){
       h+=`<a class="link-btn" href="${mailto}" style="color:var(--tealtxt);">
         <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M1 4l6 4 6-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><rect x="1" y="3" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>
         ${esc(l.label)}${l.alias?` <span style="font-size:9px;color:var(--text3);font-family:monospace;">^${esc(l.alias)}</span>`:''}
-        ${editMode?`<span tabindex="0" role="button" onclick="event.preventDefault();editMailTemplate('${node.id}','${l.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();editMailTemplate('${node.id}','${l.id}');}" style="color:var(--text3);margin-left:4px;" title="Bearbeiten">${ICO.edit(10)}</span>`:''}
-        ${editMode?`<span tabindex="0" role="button" onclick="event.preventDefault();delLink('${node.id}','${l.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delLink('${node.id}','${l.id}');}" style="color:var(--red);margin-left:4px;">${ICO.close(10)}</span>`:''}
+        ${editMode?`<span tabindex="0" role="button" onclick="event.preventDefault();editMailTemplate('${node.id}','${l.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();editMailTemplate('${node.id}','${l.id}');}" style="color:var(--text3);margin-left:4px;" title="Bearbeiten">${ICO.edit(ICO_SIZE.XS)}</span>`:''}
+        ${editMode?`<span tabindex="0" role="button" onclick="event.preventDefault();delLink('${node.id}','${l.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delLink('${node.id}','${l.id}');}" style="color:var(--red);margin-left:4px;">${ICO.close(ICO_SIZE.XS)}</span>`:''}
       </a>`;
     } else {
       h+=`<a class="link-btn" href="${esc(sanitizeUrl(l.url)||'#')}" target="_blank" rel="noopener">
         <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M6 3H3a1 1 0 00-1 1v7a1 1 0 001 1h7a1 1 0 001-1V8" stroke="currentColor" stroke-width="1.3"/><path d="M9 1h4m0 0v4m0-4L7 7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         ${esc(l.label)}${l.alias?` <span style="font-size:9px;color:var(--text3);font-family:monospace;">^${esc(l.alias)}</span>`:''}
-        ${editMode?`<span tabindex="0" role="button" onclick="event.preventDefault();editLink('${node.id}','${l.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();editLink('${node.id}','${l.id}');}" style="color:var(--text3);margin-left:4px;" title="Bearbeiten">${ICO.edit(10)}</span>`:''}
-        ${editMode?`<span tabindex="0" role="button" onclick="event.preventDefault();delLink('${node.id}','${l.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delLink('${node.id}','${l.id}');}" style="color:var(--red);margin-left:4px;">${ICO.close(10)}</span>`:''}
+        ${editMode?`<span tabindex="0" role="button" onclick="event.preventDefault();editLink('${node.id}','${l.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();editLink('${node.id}','${l.id}');}" style="color:var(--text3);margin-left:4px;" title="Bearbeiten">${ICO.edit(ICO_SIZE.XS)}</span>`:''}
+        ${editMode?`<span tabindex="0" role="button" onclick="event.preventDefault();delLink('${node.id}','${l.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delLink('${node.id}','${l.id}');}" style="color:var(--red);margin-left:4px;">${ICO.close(ICO_SIZE.XS)}</span>`:''}
       </a>`;
     }
   });
@@ -3809,7 +3809,7 @@ function editLink(boardId,lid){
     const oldAlias=link.alias||'';
     if(v.a!==undefined){const va=validateAlias(v.a,oldAlias);if(va.valid)link.alias=va.alias;}
     save();rebuildAliasIndex();render();
-  },null,{context:{icon:ICO.link?ICO.link(12):'',label:host?.label||'Board',sub:link.label||link.url||'(unbenannt)'}});
+  },null,{context:{icon:ICO.link?ICO.link(ICO_SIZE.SM):'',label:host?.label||'Board',sub:link.label||link.url||'(unbenannt)'}});
 }
 function delLink(boardId,lid){nodes[boardId].data.links=nodes[boardId].data.links.filter(l=>l.id!==lid);save();render();}
 function buildMailto(l){
@@ -3827,7 +3827,7 @@ function addMailTemplate(boardId){
 }
 function editMailTemplate(boardId,linkId){
   const link=nodes[boardId].data.links.find(l=>l.id===linkId);if(!link)return;
-  let h=`<div class="smodal-overlay" onclick="closeS(event)"><div class="smodal" style="width:420px;"><h3>${ICO.mail(14)} Mailvorlage</h3>`;
+  let h=`<div class="smodal-overlay" onclick="closeS(event)"><div class="smodal" style="width:420px;"><h3>${ICO.mail(ICO_SIZE.MD)} Mailvorlage</h3>`;
   h+=`<label>Bezeichnung</label><input id="mf-ml" value="${esc(link.label)}"/>`;
   h+=`<label>An (To)</label><input id="mf-to" value="${esc(link.to||'')}" placeholder="empfaenger@firma.de"/>`;
   h+=`<label>CC</label><input id="mf-cc" value="${esc(link.cc||'')}" placeholder="cc@firma.de"/>`;
@@ -3973,7 +3973,7 @@ function renderKanban(node){
         <span class="cnt">${cards.length}</span>
         ${editMode?`<button class="hdr-arr" tabindex="-1" onclick="moveKbCol('${node.id}','${col.id}',-1)" title="Nach links"><svg width="7" height="8" viewBox="0 0 7 8"><path d="M6 1L2 4l4 3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button class="hdr-arr" tabindex="-1" onclick="moveKbCol('${node.id}','${col.id}',1)" title="Nach rechts"><svg width="7" height="8" viewBox="0 0 7 8"><path d="M1 1l4 3-4 3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`:''}
         ${editMode?`<span tabindex="0" role="button" style="font-size:11px;color:var(--text3);cursor:pointer;margin-left:2px;" onclick="editKbColColor('${node.id}','${col.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();editKbColColor('${node.id}','${col.id}');}">${ICO.palette(11)}</span>`:''}
-        <span class="delbtn" tabindex="0" role="button" onclick="delKbCol('${node.id}','${col.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delKbCol('${node.id}','${col.id}');}">${ICO.close(10)}</span>
+        <span class="delbtn" tabindex="0" role="button" onclick="delKbCol('${node.id}','${col.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delKbCol('${node.id}','${col.id}');}">${ICO.close(ICO_SIZE.XS)}</span>
       </div>
       <div class="kb-cards" data-col-id="${col.id}" data-board-id="${node.id}" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dragDrop(event)">`;
     if(cards.length===0){
@@ -4016,7 +4016,7 @@ function kbCardHTML(boardId,card){
   if(card.deadline){
     const dl=day0(card.deadline);
     const overdue=dl<now&&!card.done;
-    dlBadge=`<span class="kc-dl${overdue?' overdue':''}">${ICO.calendar(10)} ${fmtDate(card.deadline)}</span>`;
+    dlBadge=`<span class="kc-dl${overdue?' overdue':''}">${ICO.calendar(ICO_SIZE.XS)} ${fmtDate(card.deadline)}</span>`;
   }
   let recurBadge='';
   if(card.recur&&card.recur.type!=='none'){
@@ -4030,7 +4030,7 @@ function kbCardHTML(boardId,card){
       return cnt>=card.recur.endCount;
     })();
     const warn=endingSoon||endedCount;
-    recurBadge=`<span class="kc-recur" style="${warn?'background:var(--amberbg);color:var(--ambertxt);':''}">${ICO.recur(10)} ${recurLabel(card.recur,true)}</span>`;
+    recurBadge=`<span class="kc-recur" style="${warn?'background:var(--amberbg);color:var(--ambertxt);':''}">${ICO.recur(ICO_SIZE.XS)} ${recurLabel(card.recur,true)}</span>`;
   }
   // Last done badge — occurrence-based for recurring, doneDate for one-off
   let lastDoneBadge='';
@@ -4265,7 +4265,7 @@ function _renderCardModalHTML(boardId,cardId,b,card,cols){
     ${(_pendingCard||editMode)
       ?`<input class="alias-input" placeholder="Kürzel" maxlength="${ALIAS_MAX_LEN}" value="${esc(card.alias||'')}" onchange="setCardAlias('${boardId}','${cardId}',this.value)" title="Kürzel für Schnellnavigation"/>`
       :`<span class="alias-input" style="opacity:0.5;cursor:default;">${card.alias?esc(card.alias):'—'}</span>`}
-    <button class="btn-c" onclick="closeCard()">${ICO.close(12)}</button>
+    <button class="btn-c" onclick="closeCard()">${ICO.close(ICO_SIZE.SM)}</button>
   </div>`;
   h+=`<div class="modal-body">`;
 
@@ -4377,7 +4377,7 @@ function _renderCardModalHTML(boardId,cardId,b,card,cols){
       <input class="cl-text" style="flex:1;font-size:12px;border:none;outline:none;background:transparent;font-family:inherit;${item.done?'text-decoration:line-through;color:var(--text3)':'color:var(--text)'};" value="${esc(item.text)}" onchange="updateClItem('${boardId}','${cardId}','${item.id}',this.value)" onblur="if(!this.value.trim())delClItem('${boardId}','${cardId}','${item.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();addClItem('${boardId}','${cardId}');}else if(editMode&&event.shiftKey&&(event.key==='ArrowUp'||event.key==='ArrowDown')){event.preventDefault();moveClItem('card','${boardId}','${cardId}','${item.id}',event.key==='ArrowUp'?-1:1);}"/>
       ${editMode?`<span ${canUp?'tabindex="0" role="button"':''} style="font-size:10px;color:${canUp?'var(--text3)':'var(--border2)'};cursor:${canUp?'pointer':'default'};" ${canUp?`onclick="moveClItem('card','${boardId}','${cardId}','${item.id}',-1)" onkeydown="if(event.key==='Enter'){event.preventDefault();moveClItem('card','${boardId}','${cardId}','${item.id}',-1);}"`:''}>↑</span>
       <span ${canDn?'tabindex="0" role="button"':''} style="font-size:10px;color:${canDn?'var(--text3)':'var(--border2)'};cursor:${canDn?'pointer':'default'};" ${canDn?`onclick="moveClItem('card','${boardId}','${cardId}','${item.id}',1)" onkeydown="if(event.key==='Enter'){event.preventDefault();moveClItem('card','${boardId}','${cardId}','${item.id}',1);}"`:''}>↓</span>`:''}
-      <span tabindex="0" role="button" style="font-size:12px;color:var(--red);cursor:pointer;" onclick="delClItem('${boardId}','${cardId}','${item.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delClItem('${boardId}','${cardId}','${item.id}');}">${ICO.close(10)}</span>
+      <span tabindex="0" role="button" style="font-size:12px;color:var(--red);cursor:pointer;" onclick="delClItem('${boardId}','${cardId}','${item.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delClItem('${boardId}','${cardId}','${item.id}');}">${ICO.close(ICO_SIZE.XS)}</span>
     </div>`;
   });
   h+=`</div>`;
@@ -4682,7 +4682,7 @@ function renderChecklists(node){
         ${editMode?`<input class="ni" value="${esc(cl.label)}" onchange="renameCl('${node.id}','${cl.id}',this.value)" style="font-size:12px;font-weight:500;"/>`:`<span>${esc(cl.label)}</span>`}
         <span style="font-size:10px;color:var(--text3);font-weight:400;">${done}/${cl.items.length}</span>
         <span tabindex="0" role="button" title="Alle abchecken (Shift+R)" style="font-size:12px;color:var(--text3);cursor:pointer;margin-left:4px;" onclick="resetCl('${node.id}','${cl.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();resetCl('${node.id}','${cl.id}');}">↺</span>
-        ${editMode?`<span class="edel" tabindex="0" role="button" style="display:inline;" onclick="delChecklist('${node.id}','${cl.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delChecklist('${node.id}','${cl.id}');}">${ICO.close(10)}</span>`:''}
+        ${editMode?`<span class="edel" tabindex="0" role="button" style="display:inline;" onclick="delChecklist('${node.id}','${cl.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delChecklist('${node.id}','${cl.id}');}">${ICO.close(ICO_SIZE.XS)}</span>`:''}
       </div>
       <div class="cl-list">`;
     cl.items.forEach((item,idx)=>{
@@ -4695,7 +4695,7 @@ function renderChecklists(node){
           :`<span class="cl-text${item.done?' done':''}">${esc(item.text)}</span>`}
         ${editMode?`<span ${canUp?'tabindex="0" role="button"':''} style="font-size:10px;color:${canUp?'var(--text3)':'var(--border2)'};cursor:${canUp?'pointer':'default'};" ${canUp?`onclick="moveClItem('std','${node.id}','${cl.id}','${item.id}',-1)" onkeydown="if(event.key==='Enter'){event.preventDefault();moveClItem('std','${node.id}','${cl.id}','${item.id}',-1);}"`:''}>↑</span>
         <span ${canDn?'tabindex="0" role="button"':''} style="font-size:10px;color:${canDn?'var(--text3)':'var(--border2)'};cursor:${canDn?'pointer':'default'};" ${canDn?`onclick="moveClItem('std','${node.id}','${cl.id}','${item.id}',1)" onkeydown="if(event.key==='Enter'){event.preventDefault();moveClItem('std','${node.id}','${cl.id}','${item.id}',1);}"`:''}>↓</span>
-        <span tabindex="0" role="button" style="font-size:12px;color:var(--red);cursor:pointer;" onclick="delClFromList('${node.id}','${cl.id}','${item.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delClFromList('${node.id}','${cl.id}','${item.id}');}">${ICO.close(10)}</span>`:''}
+        <span tabindex="0" role="button" style="font-size:12px;color:var(--red);cursor:pointer;" onclick="delClFromList('${node.id}','${cl.id}','${item.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delClFromList('${node.id}','${cl.id}','${item.id}');}">${ICO.close(ICO_SIZE.XS)}</span>`:''}
       </div>`;
     });
     h+=`</div>
@@ -5217,7 +5217,7 @@ function renderTaskOverview(startNodeId){
         <span style="font-size:0.625em;color:var(--text3);margin-left:0.3em;">${items.length}</span>
         ${_dceShow?`<button class="hdr-arr" tabindex="0" onclick="moveDailyCol('${col.id}',-1)" title="Nach links"><svg width="7" height="8" viewBox="0 0 7 8"><path d="M6 1L2 4l4 3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button class="hdr-arr" tabindex="0" onclick="moveDailyCol('${col.id}',1)" title="Nach rechts"><svg width="7" height="8" viewBox="0 0 7 8"><path d="M1 1l4 3-4 3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`:''}
         ${_dceShow?`<span tabindex="0" style="font-size:0.75em;color:var(--text2);cursor:pointer;margin-left:0.3em;" onclick="editDailyCol('${col.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();editDailyCol('${col.id}');}" title="Zeitfenster ändern">⚙</span>`:''}
-        ${_dceShow?`<span class="delbtn" style="display:inline;margin-left:0.15em;" onclick="delDailyCol('${col.id}')">${ICO.close(10)}</span>`:''}
+        ${_dceShow?`<span class="delbtn" style="display:inline;margin-left:0.15em;" onclick="delDailyCol('${col.id}')">${ICO.close(ICO_SIZE.XS)}</span>`:''}
       </div>`;
     if(items.length===0){
       h+=`<div style="padding:10px 12px;font-size:12px;color:var(--text3);">Nichts fällig</div>`;
@@ -5229,10 +5229,10 @@ function renderTaskOverview(startNodeId){
         h+=`<div class="daily-item" data-prio="${card.priority||''}" style="${isOverdue?'border-left-color:var(--red);':''}">
           <div class="task-check" onclick="quickDoneFromDaily(event,'${boardId}','${card.id}')" title="Erledigt markieren" style="flex-shrink:0;margin-top:3px;cursor:pointer;"></div>
           <div style="flex:1;min-width:0;cursor:pointer;" tabindex="0" role="link" onclick="openCardFromDaily('${boardId}','${card.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();openCardFromDaily('${boardId}','${card.id}');}">
-            <div class="di-name" style="display:flex;align-items:flex-start;${isOverdue?'color:var(--red);':''}">${isOverdue?ICO.warn(10)+' ':''}${esc(card.name)||'(ohne Name)'}</div>
+            <div class="di-name" style="display:flex;align-items:flex-start;${isOverdue?'color:var(--red);':''}">${isOverdue?ICO.warn(ICO_SIZE.XS)+' ':''}${esc(card.name)||'(ohne Name)'}</div>
             <div class="di-from">
               ${cardOriginHTML(cellInfo,path,boardId)}${esc(boardLabel)}${card.deadline?' · '+fmtDate(card.deadline):''}${isOverdue?' · <span style="color:var(--red);">überfällig</span>':''}
-              ${isRecur?`<span style="color:var(--teal);">· ${ICO.recur(10)} ${recurLabel(card.recur,true)}</span>`:''}
+              ${isRecur?`<span style="color:var(--teal);">· ${ICO.recur(ICO_SIZE.XS)} ${recurLabel(card.recur,true)}</span>`:''}
             </div>
           </div>
           ${(card.tags||[]).slice(0,2).map(t=>`<span class="kc-tag" style="font-size:9px;">${esc(t)}</span>`).join('')}
@@ -5897,7 +5897,7 @@ function renderStammdaten(){
     <div class="sdmodal" onclick="event.stopPropagation()">
       <div class="sdmodal-hd">
         <h3>Tags &amp; Personen</h3>
-        <button class="btn-c" onclick="closeStammdaten()">${ICO.close(12)}</button>
+        <button class="btn-c" onclick="closeStammdaten()">${ICO.close(ICO_SIZE.SM)}</button>
       </div>
       <div class="sd-tabs">
         <div class="sd-tab${sdTab==='tags'?' active':''}" onclick="sdTab='tags';renderStammdaten()">Tags (${globalTags.length})</div>
@@ -5908,7 +5908,7 @@ function renderStammdaten(){
     h+=`<div class="sd-item">
       <div class="sd-dot" style="background:${color};border:0.5px solid var(--border2);"></div>
       <input value="${esc(item.label)}" onchange="renameGlobal('${isTags?'tags':'people'}','${item.id}',this.value)" />
-      <span style="font-size:12px;color:var(--red);cursor:pointer;" onclick="delGlobal('${isTags?'tags':'people'}','${item.id}')">${ICO.close(10)}</span>
+      <span style="font-size:12px;color:var(--red);cursor:pointer;" onclick="delGlobal('${isTags?'tags':'people'}','${item.id}')">${ICO.close(ICO_SIZE.XS)}</span>
     </div>`;
   });
   h+=`<div style="margin-top:10px;">
@@ -6109,7 +6109,7 @@ function showSettings(tab){
 
   let h=`<div class="smodal-overlay" onclick="closeS(event)"><div class="sdmodal" style="width:440px;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;" onclick="event.stopPropagation()">
     <div style="padding:16px 18px 0;flex-shrink:0;">
-      <h3 style="font-size:14px;font-weight:500;margin-bottom:10px;">${ICO.gear(14)} Einstellungen</h3>
+      <h3 style="font-size:14px;font-weight:500;margin-bottom:10px;">${ICO.gear(ICO_SIZE.MD)} Einstellungen</h3>
       <div style="display:flex;gap:0;border-bottom:0.5px solid var(--border);">
         <button ${t==='general'?tabActive:tabStyle} onclick="showSettings('general')">Allgemein</button>
         <button ${t==='nav'?tabActive:tabStyle} onclick="showSettings('nav')">Navigation</button>
@@ -6459,14 +6459,14 @@ function handleCommandInput(raw){
     const aliasStr=alias?` mit Kürzel <b>${esc(alias)}</b>`:'';
     if(mode==='tab'){
       el.innerHTML=`<div class="cmd-help">
-        <div style="font-weight:500;margin-bottom:4px;">${ICO.edit(12)} Tab-Bezeichnungen auf Standard zurücksetzen</div>
+        <div style="font-weight:500;margin-bottom:4px;">${ICO.edit(ICO_SIZE.SM)} Tab-Bezeichnungen auf Standard zurücksetzen</div>
         <div style="color:var(--text2);">Setzt angepasste Tab-Labels zurück auf „Info / Aufgaben / Checklisten / Sub-Matrix"${aliasStr}.</div>
         <div style="color:var(--text3);margin-top:4px;">Scope: ${scopeStr}${recursive?'':' (<b>-all</b> für Unterstrukturen)'}</div>
         <div style="color:var(--text3);font-size:10px;margin-top:6px;">Enter bestätigt — zeigt Preview-Dialog.</div>
       </div>`;
     }else{
       el.innerHTML=`<div class="cmd-help">
-        <div style="font-weight:500;margin-bottom:4px;">${ICO.edit(12)} Labels zurücksetzen</div>
+        <div style="font-weight:500;margin-bottom:4px;">${ICO.edit(ICO_SIZE.SM)} Labels zurücksetzen</div>
         <div style="color:var(--text2);">Setzt Board/Matrix-Namen zurück auf „Zeile / Spalte"${aliasStr}.</div>
         <div style="color:var(--text3);margin-top:4px;">Scope: ${scopeStr}${recursive?'':' (<b>-all</b> für Unterstrukturen)'}</div>
         <div style="color:var(--text3);font-size:10px;margin-top:6px;"><b>^c tab …</b> für Tab-Bezeichnungen. Enter bestätigt — zeigt Preview-Dialog.</div>
@@ -6554,7 +6554,7 @@ function sbConfirmChangesDialog(opts){
   const h=`<div class="smodal-overlay" onclick="sbCloseConfirm(event)">
     <div class="sb-confirm" onclick="event.stopPropagation()">
       <div class="sb-confirm-hd">
-        ${ICO.edit(14)}
+        ${ICO.edit(ICO_SIZE.MD)}
         <h3>Labels zurücksetzen</h3>
       </div>
       <div class="sb-confirm-sub">${summary}${aliasStr} auf <b>${scopeStr}</b> — Individuell angepasste Tab-Bezeichnungen bleiben erhalten.</div>
@@ -7287,7 +7287,7 @@ document.addEventListener('keydown',e=>{
 
 // ── THEME: 3-state toggle (sun/moon/auto) ──
 const THEME_KEY='imatrix-theme';
-const THEME_ICONS={light:ICO.sun(14),dark:ICO.moon(14),auto:ICO.auto(14)};
+const THEME_ICONS={light:ICO.sun(ICO_SIZE.MD),dark:ICO.moon(ICO_SIZE.MD),auto:ICO.auto(ICO_SIZE.MD)};
 const THEME_TITLES={light:'Hell',dark:'Dunkel',auto:'Automatisch'};
 const THEME_CYCLE=['light','dark','auto'];
 let currentTheme=localStorage.getItem(THEME_KEY)||'auto';
@@ -7319,12 +7319,12 @@ document.getElementById('themebtn').innerHTML=ICO.sun();
 document.getElementById('mapbtn').innerHTML=ICO.map();
 document.getElementById('gearbtn').innerHTML=ICO.gear();
 document.getElementById('searchicon').innerHTML=ICO.search(11);
-document.getElementById('gear-export').innerHTML=ICO.download(12)+' Export JSON';
-document.getElementById('gear-import').insertAdjacentHTML('afterbegin',ICO.upload(12)+' Import JSON');
-document.getElementById('gear-tags').innerHTML=ICO.tag(12)+' Tags & Personen';
-document.getElementById('gear-kb').innerHTML=ICO.keyboard(12)+' Tastenkürzel';
-document.getElementById('gear-settings').innerHTML=ICO.gear(12)+' Einstellungen';
-document.getElementById('gear-reset').innerHTML=ICO.reset(12)+' Reset';
+document.getElementById('gear-export').innerHTML=ICO.download(ICO_SIZE.SM)+' Export JSON';
+document.getElementById('gear-import').insertAdjacentHTML('afterbegin',ICO.upload(ICO_SIZE.SM)+' Import JSON');
+document.getElementById('gear-tags').innerHTML=ICO.tag(ICO_SIZE.SM)+' Tags & Personen';
+document.getElementById('gear-kb').innerHTML=ICO.keyboard(ICO_SIZE.SM)+' Tastenkürzel';
+document.getElementById('gear-settings').innerHTML=ICO.gear(ICO_SIZE.SM)+' Einstellungen';
+document.getElementById('gear-reset').innerHTML=ICO.reset(ICO_SIZE.SM)+' Reset';
 
 initSidebar();
 render();
