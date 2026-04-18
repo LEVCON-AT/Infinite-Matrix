@@ -49,6 +49,11 @@ Konsequenz: Jede Änderung bleibt inline, bleibt portabel, bleibt eine Datei.
 9. **Keine Rückgängig-Diskussion.** Wenn User "revertiere" sagt: sofort machen, nicht erklären.
 10. **Messbare Verifikation.** Behauptungen mit Zahlen belegen (`maxDelta < 1px`, `activeInDom === expectedId`), nicht "sieht passend aus".
 11. **Kontext behalten, nicht rekonstruieren.** Wenn eine Aktion ein Menü/Dialog öffnet: zeig Breadcrumb + highlight die Source-Row (oder das Source-Element). User soll nie raten müssen, "worauf" er gerade wirkt.
+12. **Fehler sind UI.** Jeder erwartbare Fehler läuft über `showToast(msg, {type:'error'})` + `translateError(err, fallback)` — niemals `alert()`, niemals nur `console.error`. Bei großem Dataset mit `await`: zusätzlich `showLoading()`/`hideLoading()`. Stille Misserfolge sind verboten.
+13. **Destruktives kriegt Undo.** Alles, was Daten verliert (`delRow`, `delCol`, `sbDelete` …), muss zuerst `pushUndo(label)` rufen und nach der Mutation `showUndoToast(label)` anbieten. User darf nicht durch einen Klick dauerhaft verlieren.
+14. **Tokens vor Literals.** Vor einem neuen Magic-Number / Hex-Color / ms-Duration: existiert ein Token in `:root` (`--space-*`, `--tr-*`, `--focus-*`, `--shadow-*`, `--fs-*`, `ICO_SIZE.*`)? Falls nicht und der Wert taucht ≥2× auf: neuen Token anlegen statt Inline-Literal.
+15. **Focus-Restore bei Modals.** Modal öffnen: `_pushFocusRestore()` + `_pushModal(closeFn)`. Modal schließen: `_popModal(closeFn)` + `_popFocusRestore()` (letzteres restauriert `document.activeElement` vor dem Öffnen). Ohne: Fokus landet im Void, Tastatur-Flow bricht.
+16. **Animations-Hygiene.** Jede State-Änderung, die das Auge sieht, läuft über `transform`/`opacity` + `--tr-std`/`--tr-enter`. Keine `setTimeout`-Animationen; CSS + `animationend` bleiben autoritativ. `@media (prefers-reduced-motion: reduce)` respektieren (smooth-scroll macht das automatisch).
 
 ## Coding-Standards (projektspezifisch)
 
@@ -64,16 +69,76 @@ Konsequenz: Jede Änderung bleibt inline, bleibt portabel, bleibt eine Datei.
 - **Sticky-Refill-Pattern.** Wenn ein Mode über Nav hinweg "sticky" sein soll (Beispiel `_sbExpandAllSticky`): State persistieren, und im Render (hier `sbRenderTree`) den abgeleiteten State **vor dem Rendern neu befüllen**. So überlebt er `sbExpanded.clear()` in `sbNav` ohne Sonderfälle im Nav-Code.
 - **SVG-Dot-Zentrierung.** SVG-Origin muss an Tree-Origin angepasst werden (`svg.style.top = tree.offsetTop`) — sonst verschieben sich Dots gegenüber den Zeilen. Dot-Farben via `circle.dot-{type}{fill:...}` + `path.ln-{type}{stroke:...}`.
 - **Scroll-Preservation.** Vor `innerHTML`-Swap auf einem scrollenden Container `scrollTop` sichern, danach wiederherstellen — sonst springt die Ansicht.
+- **Design-Tokens (Sprint 1, 5.4).** In `:root` definiert, Dark-Overrides in `[data-theme="dark"]`:
+  - Spacing `--space-xs:4 · sm:8 · md:12 · lg:16`
+  - Transitions `--tr-std:220ms cubic-bezier(.4,0,.2,1)` · `--tr-enter:180ms cubic-bezier(.16,1,.3,1)`
+  - Focus `--focus-color` · `--focus-offset:2px` · `--focus-width:2px`
+  - Shadows `--shadow-sm/md/lg`, Overlays `--overlay-strong/soft`, Fade-Maske `--fade-mask-color`
+  - Font-Size-Clamps `--fs-title:clamp(14px,.9vw+10px,17px)` · `--fs-subtitle:clamp(13px,.6vw+9px,15px)` (Body bleibt 14–15 px fix)
+  - Crypto `CRYPTO.PBKDF2_ITERATIONS / IV_BYTES / SALT_BYTES / HASH / KEY_LEN`, Timing `TIMING.SAVE_DEBOUNCE_MS / FILE_FLUSH_MS / …`, Icon-Größen `ICO_SIZE={XS:10,SM:12,MD:14,LG:18}` — Sondergrößen (9, 11, 22, 32) bleiben literal.
+- **Responsive-Breakpoints (Sprint 5.3).** `@media (max-width:1200px)` Content-Padding enger, Sidebar `max-width:320px`. `@media (max-width:900px)` Sidebar als Overlay. `@media (max-width:480px)` Full-Screen-Drawer (`width:100vw`), `.ico-btn` min 44×44 (WCAG-Tap), `.btn` min-height 40, `.kb-col` 85–90 vw single-column.
+- **Toast-System (Sprint 3.4).** `showToast(msg, {type:'error'|'warning'|'success'|'info', ms?})` — stapelt in `#toast-stack`, auto-dismiss (5 s info, 7 s error), Schließen-Button. Niemals `alert()`. Für Action-Toasts (Undo): `showUndoToast(label)` baut einen Toast mit zusätzlichem `.toast-action`-Button (10 s Lebensdauer).
+- **Error-Translation (Sprint 3.3).** `translateError(err, fallback)` mappt bekannte Fehler-Namen (`AbortError`, `SyntaxError`, `OperationError`) auf deutsche Messages. Fallback: „Unerwarteter Fehler." Immer über diesen Helfer leiten, bevor eine Message in den Toast geht.
+- **Modal-Stack (Sprint 3.1/3.2).** `_pushModal(closeFn)` / `_popModal(closeFn)` stapelt schließbare Overlays; globaler ESC-Handler schließt nur das oberste. `_pushFocusRestore()` merkt sich `document.activeElement` beim Öffnen, `_popFocusRestore()` restauriert. Pfade für Button-Click, Outside-Click und ESC alle über denselben `closeFn()` — nicht drei parallele Implementierungen.
+- **Undo-Pattern (Sprint 6.1).** Vor destruktiver Mutation `pushUndo(label)` — Snapshot = `getPayload()` als JSON-String, FIFO-Stack `_undoStack` max 10. Nach Mutation `showUndoToast(label)` zeigt „Rückgängig"-Button, klickt User → `_applyUndo(entry)` ruft `loadData(parsed); save(); render()`. Currently wired: `sbDelete`, `delRow`, `delCol`. Weitere destruktive Aktionen nachziehen, wenn User dort Verluste meldet.
+- **DataId-Parser (Sprint 4.3).** `parseDataId(id)` parst `matrix-<id>` | `cell-<m>-<r>-<c>` | `feat-<m>-<r>-<c>-<key>` | `link-<b>-<id>` → `{type, matrixId?, rowId?, colId?, key?, boardId?, linkId?}`. Spezialisierte Wrapper mit Node-Lookup: `_sbParseCellDataId`, `_sbParseFeatureDataId`. Niemals neue Inline-Regex für diese IDs schreiben — immer über den Parser.
+- **Tabindex-Konvention (Sprint 5.5).** Header-Inputs im Edit-Mode `tabindex="0"` explizit, in Non-Edit `readonly tabindex="-1"`. `.edel`-Delete-Spans: `role="button" tabindex="0" onclick onkeydown` (Enter/Space). Sidebar-Row-Actions (Rename/Delete) `tabindex="-1"` — Zugriff über `+`-Kontextmenü. Keine nativen `<button>` mit `tabindex="-1"`, ohne dass ein Kontextmenü oder Hover-Weg existiert.
+- **Focus-Reset-Konvention (Sprint 5.2).** `:focus`-Reset nur auf `button,a,input,select,textarea,[contenteditable],[tabindex],.mcell,.sb-node,.kb-card,.mm-node,.tab,.bcs,.btn,.ico-btn,.sb-chip`. `*:focus-visible` bleibt global (Tastatur-Navigation). Nie wieder `*:focus{outline:none}` — zu breit.
+- **Event-Delegation (Backlog 1, Card-Modal).** Statt inline `onclick/onchange/onblur` pro Element: ein Attribut-Marker (`data-action` für Click, `data-change` für Change, `data-blur` für Blur) plus `data-field`/`data-value`/`data-id`/`data-dir`-Auxiliaries. Eine zentrale Dispatch-Tabelle (`CARD_ACTIONS = { 'ns:verb': (ref, el, e) => ... }`) — Keys namespaced (`card:`, `recur:`, `cl:`). Drei Listener am Container: **click im Capture-Phase** (wenn ein innerer Node `onclick="event.stopPropagation()"` hat — sonst kommt Bubble nicht durch), change im Bubble, **blur im Capture** (bubbled nicht). Listener werden im „First-Open"-Zweig des Mount angebracht (vorher `cloneNode`+`replaceChild` räumt alte Listener ab); Re-Render ersetzt nur `.innerHTML`, Listener bleiben. Element-spezifische Tastatur- und Drag-Handler (`onkeydown` für Shift+Arrow/Enter, `ondragstart/end`) bleiben inline — die wären als Delegation unleserlich.
+- **Test-Harness-Nodes.** Direkt fabrizierte `nodes['bTEST_...']` mit exotischen `type`-Werten (nicht `matrix`) umgehen Stack-/Parent-Contract und produzieren `renderMatrixPage`-Errors aus `<anonymous>`-Frames beim globalen `render()`. Reine Modal-Tests brauchen `render()` nicht — nur `openCard(bid,cid)` + DOM-Queries. Wenn der Test doch `render()` triggert (über App-API wie `save()`), erst mit `delete nodes['bTEST_...']; save()` aufräumen, sonst bleibt der Bogus-Node in localStorage hängen. Bogus-IDs mit konsistentem Präfix (`bTEST_EVT`, `cTEST_EVT`) erleichtern die Cleanup-Suche. Für Kanban-Tests braucht es den vollen Navigationspfad: `root.data.rows/cols/cells[`r-c`]={boardId, features:['board']}` + `stack.push({nodeId:bid, cellRef:{parentId:rootId,rowId,colId}})` + `currentTab[bid]='board'` + `render()`. Standalone `stack=[{nodeId:bid}]` rendert kein Kanban, weil der Renderer über `cur.cellRef` dispatched.
+- **Feature-Farben als Data-Attribute (Backlog 2).** Statt `style="background:${FEAT_COLORS[key]}"` lieber `data-feat="matrix|board|info|checklists"` am Element und CSS-Regel `.xyz[data-feat="matrix"]{background:var(--bluebg);color:var(--bluetxt);}` etc. Anwendungs­stellen: `.cell-segment`, `.cell-quad-item`, `.peek-feat-badge`, `.prio-badge-ico`. Vorteil: Dark-Mode-Overrides in `[data-theme="dark"]` greifen automatisch; kein Ternary-Morast im Template. Für variable Farben, die nicht ins Feat-Set fallen (User-gewählte Kanban-Spalten-Farbe, Person-Avatar-Farbe): CSS-Custom-Property (`--kb-col-color`, `--pc-color`, `--sd-color`) per `style="--x:${v}"` setzen und Basis-Klasse `.y[data-col=set]{background:var(--x,fallback);}` lesen.
+- **Color-Key-Helper (`_srColKey`).** Für `color:${info.color}`-Muster, wo `info.color` aus einer App-Logik kommt und mehrere Varianten annehmen kann: `_srColKey(cssColor)` extrahiert via Regex den Key aus `'var(--blue)'` → `'blue'`. Dann `data-sr-col="blue"` + CSS-Mapping `.sr-ico[data-sr-col="blue"]{color:var(--blue);}`. Skaliert, wenn die App mehrere Farb-Dimensionen hat (Search-Row-Icons, Context-Menu-Icons) und neue Varianten leicht hinzukommen.
+- **Inline-Style-Diät (Backlog 2).** 219 → 32 inline `style="..."` durch systematische Ersetzung. Regel: *jeder Inline-Style außer dynamischer Werte ist falsch*. Dynamisch = wirklich pro Element variabel (User-Inputs, berechnete Positionen, User-konfigurierte Em-Werte). Statisch = Klassenpattern. Übergangsfall: `style="--x:${v}"` + CSS `{prop:var(--x)}` — auch das ist eine Klasse. Nie eine feste Farbe, feste Größe, festes Padding oder festes `display:flex` inline schreiben.
 
 ## Rollen, aus denen ich assistiere
 
 Ein Solo-Dev hat kein Team — ich bin die Rollen-Palette. Reihenfolge bei komplexen Entscheidungen: UX → Architektur → Implementation → QA.
 
-1. **UI/UX-Spezialist** — Bedienfluss, visuelle Konsistenz, Animations-Timing, Fokus-/Tastatur-Verhalten, Default-Werte (was erwartet Nutzer ohne nachzudenken), Kontext-Rückbindung (Breadcrumb / Source-Highlight, damit der User sieht "worauf" er wirkt).
-2. **Software-Architekt** — Trennung von Verantwortlichkeiten (Stack ≠ Tree, Navigations-State ≠ Struktur-State), Datenfluss, Wiederverwendung, Langlebigkeit des Codes. Sticky-States überleben Navigation via Re-Fill im Render, nicht via Sonderfälle im Nav-Code.
-3. **Frontend-Entwickler** — CSS/JS-Umsetzung, DOM-Struktur, Events, Reflow-/Repaint-Kosten, Transitions. Event-Capture vs. Bubble kennen — Overlays catchen ESC in Capture, globale Handler laufen in Bubble.
-4. **QA/Verifizierer** — messbare Preview-Checks, Console frei, Regressions-Spot, keine "es sollte gehen"-Aussagen ohne Proof.
-5. **Security-Pragmatiker** (bei Verschlüsselung / Passwort / Import) — minimale Angriffsfläche, keine versehentlichen Klartext-Leaks in Fehlerpfaden, User-Aufklärung per UI-Status.
+1. **UI/UX-Spezialist** — Bedienfluss, visuelle Konsistenz, Animations-Timing (`--tr-std` / `--tr-enter`), Fokus-/Tastatur-Verhalten, Default-Werte (was erwartet Nutzer ohne nachzudenken), Kontext-Rückbindung (Breadcrumb / Source-Highlight, damit der User sieht „worauf" er wirkt), Mobile-Tap-Targets ≥ 44 px. *Praktisch-First-Prinzip:* Was ist der kürzeste Weg zum Ziel, ohne den User zu fragen „wie wolltest du es denn?"
+2. **Software-Architekt** — Trennung von Verantwortlichkeiten (Stack ≠ Tree, Navigations-State ≠ Struktur-State), Datenfluss, Wiederverwendung, Langlebigkeit des Codes. Sticky-States überleben Navigation via Re-Fill im Render, nicht via Sonderfälle im Nav-Code. Enabler (Tokens, Parser) vor Consumer — sonst baut man doppelt.
+3. **Frontend-Entwickler** — CSS/JS-Umsetzung, DOM-Struktur, Events, Reflow-/Repaint-Kosten, Transitions. Event-Capture vs. Bubble kennen — Overlays catchen ESC in Capture, globale Handler laufen in Bubble. Klassen-Toggle statt `.style.display`; Tokens statt Literals.
+4. **QA/Verifizierer** — messbare Preview-Checks (DOM-Query + computed-Style), Console frei, Regressions-Spot, keine „es sollte gehen"-Aussagen ohne Proof. Konventionen-Check: `translateError` verwendet? `showToast` statt `alert`? Destruktiv = `pushUndo`? Focus-Restore nach Modal?
+5. **Security-Pragmatiker** (bei Verschlüsselung / Passwort / Import) — minimale Angriffsfläche, keine versehentlichen Klartext-Leaks in Fehlerpfaden, User-Aufklärung per UI-Status. `_encPw` niemals persistieren. Crypto-State nur nach erfolgreichem Round-Trip setzen (`getEncPw`-Bug aus Sprint 0.2).
+6. **Performance-Wächter** — Hot-Paths (Tree-Walks, Render-Loops, Save-Pipeline) profilen, nicht raten. Debounce statt Drosseln-pro-Event. JSON-Deep-Clone nur wo wirklich nötig; lieber Initial-Clone cachen. Tree-Walk-Ergebnisse in einen `*Cache`-State ablegen und bei Mutation invalidieren.
+7. **Deploy-/SaaS-Stratege** (bei Roadmap-Fragen) — Phasen-Plan respektieren (Phase 0 VPS-Deploy → 1 Bridge-Abstraktionen → 2 Integrationen → 3 Lizenz-Gate → …). Keine Frontend-Änderung, die den Single-File-Constraint auflöst, ohne explizite Phase-4-Entscheidung.
+
+## Kontext-Window & Sprint-Aufteilung
+
+Die App ist ~7k LOC in *einer* Datei. Ein Review- oder Refactor-Durchgang kann das Kontext-Fenster sprengen. Deshalb:
+
+### Kontext-Awareness während der Session
+
+- **Große Tool-Results auslagern.** Broad-Searches (>3 Grep/Read-Zyklen) oder „wo wird Feature X gebraucht"-Fragen gehen an den `Explore`-Agent — er scannt, ich kriege die Kurzantwort. Die rohen Treffer bleiben aus dem Haupt-Kontext.
+- **Gezielte Queries.** Grep/Read immer mit Path + Pattern + `head_limit`. Nie `output_mode:"content"` auf einem offenen Suchbegriff ohne Limit — das füllt das Fenster mit Rauschen.
+- **Vor `/compact` warnen.** Wenn ich merke, dass der Kontext eng wird (typ. nach 3–5 Sub-Sprints am Stück): User informieren und den aktuellen Stand als Sub-Sprint-Commit sichern, bevor komprimiert wird. So übersteht die Arbeit die Kompression und der Wiedereinstieg ist sauber.
+- **Nach `/compact` oder Agent-Return.** TodoWrite-Liste synchronisieren (nicht aus dem Gedächtnis weiterarbeiten), Kern-Dateien (CLAUDE.md, Plan) kurz gegenlesen, dann weiter.
+- **Stale Console-Logs akzeptieren.** Preview-Console-Buffer wird bei `reload()` *nicht* geleert. Errors aus `<anonymous>` (mein eigener Test-Harness) sind Rauschen — nur neue Errors aus `matrix_tool_beta.html:<line>` zählen.
+
+### Sprint-Partitionierung (Review- und Refactor-Arbeit)
+
+- **Ein Sprint = ein Meilenstein.** Klares „danach ist X erledigt", messbare Akzeptanzkriterien, ≤ 1–3 Tage Arbeit.
+- **Wenn ein Sprint > 3 unabhängige Sub-Aufgaben hat → aufteilen** in Sub-Sprints (z. B. `4.1`, `4.2`, `4.3`). Pro Sub-Sprint ein Commit + Push auf den Feature-Branch. Atomar rückrollbar.
+- **Enabler zuerst.** Design-Tokens vor Style-Refactor (Sprint 1 vor 4/5). Parser vor Refactor (2.3 Delegation vor 4.4 Split). Dependencies im Plan explizit markieren.
+- **Quick-Wins vor großen Refactors.** Kleine sichtbare Erfolge bauen Vertrauen in die Verifikations-Pipeline auf und decken Regressionen früh auf.
+- **Verify nach jedem Sub-Sprint.** Preview-Reload + gezielte DOM-Messung + `preview_console_logs level:"error"`. Erst *dann* commit.
+- **Pre-Deploy-Blocker nie überspringen.** Sprint 0 (Daten-Sicherheit, Memory-Leaks, Crypto-Korrektheit) läuft immer vor allem anderen. Kein Feature-Polish bei offenen Release-Blockern.
+
+### Commit-Message-Konvention (Review-Sprints)
+
+```
+Sprint X.Y: Kurz-Titel
+
+- Was geändert (1–3 Bullet)
+- Relevante Metriken vorher/nachher wenn vorhanden
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+```
+
+### Branch-Strategie
+
+- Review-/Refactor-Wellen auf einem eigenen Branch (`code-review-sprints` o. ä.) — `main` bleibt deploy-ready.
+- Nach Abschluss aller Sprints: Zusammenfassung + Merge-Vorschlag an User.
+- Kein Force-Push auf `main`. Kein `--no-verify`.
 
 ## Verifikations-Workflow
 
@@ -86,6 +151,10 @@ Preview-Server `matrix` auf Port 3848 — im `.claude/launch.json` definiert. Be
 5. Animation-Hinweis: Preview-Browser throttlet oft Animation-Frames. Aussagekräftig sind **Config** (Keyframe-Regeln, Easing, fill-mode) und **Endzustand nach `animationend`**, nicht Mid-Animation-Snapshots.
 6. `preview_screenshot` timeoutet häufig — gezielte DOM-Messung bevorzugen; Screenshot nur als Beleg zum User, nicht zur Selbst-Verifikation.
 7. Bei Scroll-/Layout-Features: künstlich einen scrollbaren Zustand bauen (`wrap.style.maxHeight='300px'` + Filler-Nodes) um Messungen zu erzwingen — im leeren Standard-Dataset scrollt oft nichts.
+8. **Preview-Cache-Buster bei großen JS-Edits.** Wenn nach Reload `typeof globalVar === 'undefined'` obwohl die Datei die Deklaration enthält: der Preview-Browser serviert eine gecachte Version. Force-Reload über `window.location.href='http://localhost:3848/matrix_tool_beta.html?v='+Date.now()` umgeht den Cache.
+9. **Test-Harness-Hygiene.** Direkte `preview_eval`-Mutationen (z. B. `nodes[rootId].data.rows.push(...)`) + `render()` produzieren `<anonymous>`-Stack-Errors im Console-Log, die persistent liegen bleiben. Diese sind Rauschen — nur Errors mit `at <function> (http://…/matrix_tool_beta.html:<line>)` zählen. Besser: App-APIs nutzen (`addRow`, `toggleEdit`, `pushUndo`), wenn möglich.
+10. **Transition-Timing-Effekte.** Nach einem Klassen-Swap, der eine `transition:width`/`transition:opacity` triggert, landen Computed-Style-Messungen mid-animation. Entweder auf `transitionend` warten oder manuell `setTimeout(measure, 350)` (länger als `--tr-std`).
+11. **Synthetische Szenarien.** Für Destruktiv/Modal-Tests: `window.confirm` monkey-patchen (`window.confirm=()=>true`), danach im `finally` restaurieren. Test-IDs nicht mit Produktions-IDs kollidieren lassen (`rTest`/`cTest` sind safe).
 
 ## Was NICHT tun
 
@@ -97,12 +166,21 @@ Preview-Server `matrix` auf Port 3848 — im `.claude/launch.json` definiert. Be
 - **Kein Feature ohne Setting-Gate** wenn es in Edit/Nicht-Edit unterschiedlich erscheinen soll — `appSettings.vis`-Pattern nutzen.
 - **Keine Passwörter persistent speichern.** `_encPw` lebt nur in-memory pro Session.
 - **Kein globales ESC ohne Capture-Kontrolle.** Overlays, die ESC verarbeiten wollen, müssen in Capture-Phase + `stopImmediatePropagation` — sonst schluckt der Back-Handler das Event.
+- **Kein `alert()`.** Auch nicht „nur für Entwickler-Fehler". `showToast` + `translateError` ist der einzige korrekte Pfad.
+- **Kein `JSON.stringify(getPayload())`.** `getPayload()` *ist* schon ein JSON-String. Doppel-Stringify produziert auf der Rückseite einen String statt eines Objekts — `loadData` bekommt `d.nodes === undefined` und die App implodiert leise.
+- **Keine inline `font-size:17px` in Elementen, die `.ptitle`-ähnlich sind.** Stattdessen `font-size:var(--fs-title)`/`var(--fs-subtitle)` — sonst bricht das Responsive-Clamp.
+- **Keine `*:focus{outline:none}`-Regel.** Zu breit, tötet Accessibility. Scope: siehe Focus-Reset-Konvention in Coding-Standards.
+- **Keine destruktive Aktion ohne `pushUndo` + `showUndoToast`.** Wenn die Aktion Daten löscht und nicht reversibel ist, gehört sie nicht ausgeliefert.
 
 ## Praktischer Ablauf pro Task
 
-1. Userfrage verstehen → bei Unsicherheit `AskUserQuestion`, nicht raten.
-2. Relevante Code-Stellen lesen (Grep/Read, Agent nur bei offener Suche).
-3. Bei non-trivialen Implementierungen: Plan schreiben, Einwände offen benennen, `ExitPlanMode` für Approval.
-4. Kleine, gezielte Edits. Preview-Verify. Console-Check.
-5. Bei UI-Änderungen: animiert wenn sichtbar, Kontext-Rückbindung prüfen (weiß der User worauf er wirkt?).
-6. Am Ende: knappe Zusammenfassung mit Messwerten, keine Marketing-Sprache. Tabelle mit Check/Ergebnis + Stellen-Links ist das Standard-Format.
+1. **Userfrage verstehen.** Bei Unsicherheit `AskUserQuestion`, nicht raten. Bei mehrdeutigem Scope Plan-Mode benutzen.
+2. **Relevante Code-Stellen lesen.** Grep/Read direkt bei bekannten Symbolen/Dateien, `Explore`-Agent nur bei offener Suche über mehrere Stellen.
+3. **Plan bei non-trivialen Implementierungen.** Schreiben, Einwände offen benennen (UX-Risiko, Kontext-Kosten, Regressions-Gefahr), `ExitPlanMode` für Approval.
+4. **Sub-Sprints, wenn > 3 Teilaufgaben.** Plan-Tabelle mit Reihenfolge + Abhängigkeiten. Pro Sub-Sprint Commit + Push.
+5. **Kleine, gezielte Edits.** Pro Sub-Sprint: Token/Pattern/Parser/etc. isoliert ändern, *dann* verifizieren. Nicht fünf Dinge gleichzeitig.
+6. **Preview-Verify nach jedem Edit.** DOM-Query + computed-Style + Console-Error-Check. Bei großen JS-Edits: Cache-Buster-Reload.
+7. **UI-Änderungen:** animiert wenn sichtbar, Kontext-Rückbindung prüfen (weiß der User „worauf" er wirkt?), Tap-Target im Mobile-Viewport messen wenn neu, Dark-Mode-Kontrast mit `preview_resize colorScheme:'dark'` gegenprüfen.
+8. **Destruktive Änderungen:** `pushUndo` + `showUndoToast` **bevor** der Commit erfolgt.
+9. **Zusammenfassung am Ende.** Tabelle mit Sub-Sprint / Commit-Hash / Messwert-Pointer. Keine Marketing-Sprache. Stellen-Links als `[file.html:line](…)`.
+10. **Branch-Merge erst auf explizite User-Freigabe.** Der Merge-Vorschlag kommt als letzter Satz der Zusammenfassung.
