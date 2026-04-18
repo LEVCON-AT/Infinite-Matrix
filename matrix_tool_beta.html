@@ -3534,14 +3534,14 @@ function renderMatrixGrid(nodeId,rows,cols){
   h+=`<div class="mh corner">${editMode&&rows.length&&cols.length?`<button class="transpose-btn" onclick="transposeMatrix('${nodeId}')" title="Transponieren (Zeilen ↔ Spalten)">${ICO.transpose(14)}</button>`:''}</div>`;
   cols.forEach(col=>{
     const arrows=editMode?`<div class="hdr-arrows col-arrows"><button class="hdr-arr" tabindex="-1" onclick="moveCol('${nodeId}','${col.id}',-1)" title="Nach links"><svg width="7" height="8" viewBox="0 0 7 8"><path d="M6 1L2 4l4 3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button class="hdr-arr" tabindex="-1" onclick="moveCol('${nodeId}','${col.id}',1)" title="Nach rechts"><svg width="7" height="8" viewBox="0 0 7 8"><path d="M1 1l4 3-4 3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>`:'';
-    h+=`<div class="mh ch" data-col-id="${col.id}"><input class="ni" value="${esc(col.label)}" onchange="renameCol('${nodeId}','${col.id}',this.value)" onkeydown="hdrKeydown(event,'col','${nodeId}','${col.id}')" ${editMode?'':'readonly tabindex="-1"'} style="text-align:center;"/>
-      <span class="edel" onclick="delCol('${nodeId}','${col.id}')">${ICO.close(10)}</span>${arrows}</div>`;
+    h+=`<div class="mh ch" data-col-id="${col.id}"><input class="ni" value="${esc(col.label)}" onchange="renameCol('${nodeId}','${col.id}',this.value)" onkeydown="hdrKeydown(event,'col','${nodeId}','${col.id}')" ${editMode?'tabindex="0"':'readonly tabindex="-1"'} style="text-align:center;"/>
+      <span class="edel" role="button" tabindex="0" onclick="delCol('${nodeId}','${col.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();delCol('${nodeId}','${col.id}');}" title="Spalte löschen">${ICO.close(10)}</span>${arrows}</div>`;
   });
   if(editMode)h+=`<div class="addcolhdr"><button class="addbtn" id="addcol-${nodeId}" onclick="addCol('${nodeId}')">+</button></div>`;
   rows.forEach(row=>{
     const arrows=editMode?`<div class="hdr-arrows row-arrows"><button class="hdr-arr" tabindex="-1" onclick="moveRow('${nodeId}','${row.id}',-1)" title="Nach oben"><svg width="8" height="7" viewBox="0 0 8 7"><path d="M1 6l3-4 3 4" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button class="hdr-arr" tabindex="-1" onclick="moveRow('${nodeId}','${row.id}',1)" title="Nach unten"><svg width="8" height="7" viewBox="0 0 8 7"><path d="M1 1l3 4 3-4" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>`:'';
-    h+=`<div class="mh rh" data-row-id="${row.id}"><input class="ni" value="${esc(row.label)}" onchange="renameRow('${nodeId}','${row.id}',this.value)" onkeydown="hdrKeydown(event,'row','${nodeId}','${row.id}')" ${editMode?'':'readonly tabindex="-1"'}/>
-      <span class="edel" onclick="delRow('${nodeId}','${row.id}')">${ICO.close(10)}</span>${arrows}</div>`;
+    h+=`<div class="mh rh" data-row-id="${row.id}"><input class="ni" value="${esc(row.label)}" onchange="renameRow('${nodeId}','${row.id}',this.value)" onkeydown="hdrKeydown(event,'row','${nodeId}','${row.id}')" ${editMode?'tabindex="0"':'readonly tabindex="-1"'}/>
+      <span class="edel" role="button" tabindex="0" onclick="delRow('${nodeId}','${row.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();delRow('${nodeId}','${row.id}');}" title="Zeile löschen">${ICO.close(10)}</span>${arrows}</div>`;
     cols.forEach(col=>{h+=cellHTML(nodeId,row,col);});
     if(editMode)h+=`<div class="addrowcol"></div>`;
   });
