@@ -287,6 +287,36 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 .cell-segment[data-feat="board"],.cell-quad-item[data-feat="board"]{background:var(--tealbg);color:var(--tealtxt);}
 .cell-segment[data-feat="info"],.cell-quad-item[data-feat="info"]{background:var(--amberbg);color:var(--ambertxt);}
 .cell-segment[data-feat="checklists"],.cell-quad-item[data-feat="checklists"]{background:var(--purplebg);color:var(--purpletxt);}
+/* Cell-Page, Info-Tab, Links */
+.cellhd-alias{display:flex;gap:5px;flex-shrink:0;align-items:center;}
+.alias-ro-cell{opacity:0.5;cursor:default;border:none;background:transparent;}
+.btn-inline-add{margin-left:auto;padding:3px 8px;}
+.info-empty{padding:12px 13px;font-size:12px;color:var(--text3);}
+.info-field-hd{display:flex;align-items:center;gap:6px;}
+.info-arrow-stack{display:flex;flex-direction:column;gap:1px;margin-right:2px;}
+.info-arrow{font-size:9px;color:var(--text3);cursor:pointer;line-height:1;}
+.info-del{font-size:11px;color:var(--red);cursor:pointer;margin-left:auto;}
+.mt-8{margin-top:8px;}
+.link-btn.link-mail{color:var(--tealtxt);}
+.link-alias{font-size:9px;color:var(--text3);font-family:monospace;}
+.link-action-edit{color:var(--text3);margin-left:4px;}
+.link-action-del{color:var(--red);margin-left:4px;}
+.tab-edit-input{border:none;outline:none;background:transparent;font:inherit;color:inherit;padding:0;}
+/* Kanban-Ansicht */
+.kb-toolbar{margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.kb-nocol-hint{font-size:12px;color:var(--amber);padding:4px 8px;background:var(--amberbg);border-radius:var(--r);}
+.kb-col[data-color="set"]{border-top-width:3px;border-top-style:solid;border-top-color:var(--kb-col-color,var(--border2));}
+.kb-col-dot{width:8px;height:8px;border-radius:50%;background:var(--kb-col-color,var(--border2));flex-shrink:0;display:inline-block;}
+.kb-palette-btn{font-size:11px;color:var(--text3);cursor:pointer;margin-left:2px;}
+.kb-cards[data-scrollable="true"]{overflow-y:auto;}
+.kb-card.archived.kb-card-compact{padding:6px 8px;}
+.kb-archive-name{font-size:12px;color:var(--text3);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.kb-card-row{display:flex;align-items:flex-start;gap:5px;}
+.kc-note{font-size:11px;color:var(--text2);margin-top:2px;}
+.kc-act-spacer{margin-left:auto;}
+.cl-check.cl-check-sm{width:13px;height:13px;margin-top:0;}
+.kc-recur[data-warn="true"]{background:var(--amberbg);color:var(--ambertxt);}
+.kc-done-badge{background:var(--tealbg);color:var(--tealtxt);}
 .card-origin{cursor:pointer;margin-right:0.4em;opacity:0.65;transition:opacity 0.15s;display:inline-block;}
 .card-origin:hover{opacity:1;}
 .origin-alias{font-family:monospace;font-size:0.9em;padding:0.05em 0.4em;border-radius:var(--rs);background:var(--bg3);color:var(--text2);}
@@ -3839,10 +3869,10 @@ function renderCellPage(cur){
       ?`<input class="ptitle ptitle-edit-input" value="${esc(cur.label)}" onchange="renameBoardOrMatrix('${_renamableId}',this.value,'${cur.nodeId}')" />`
       :`<div class="ptitle">${esc(cur.label)}</div>`}
   </div>
-  <div style="display:flex;gap:5px;flex-shrink:0;align-items:center;">
+  <div class="cellhd-alias">
     ${editMode
       ?`<input class="alias-input" placeholder="Kürzel" maxlength="${ALIAS_MAX_LEN}" value="${esc(cell.alias||'')}" onchange="setCellAlias('${parentId}','${rowId}','${colId}',this.value)" title="Kürzel für Schnellnavigation (^kürzel m|i|b|c)"/>`
-      :cell.alias?`<span class="alias-input" style="opacity:0.5;cursor:default;border:none;background:transparent;">${esc(cell.alias)}</span>`:''}
+      :cell.alias?`<span class="alias-input alias-ro-cell">${esc(cell.alias)}</span>`:''}
   </div>
   </div>`;
   const features=cell.features||[];
@@ -3876,7 +3906,7 @@ function tabBtn(name,cur,nodeId,label){
   return `<div class="tab${cur===name?' active':''}" tabindex="0" role="tab" onclick="switchTab('${nodeId}','${name}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchTab('${nodeId}','${name}');}">${label}</div>`;
 }
 function editTabBtn(name,cur,nodeId,label,parentId,rowId,colId,badge){
-  return `<div class="tab${cur===name?' active':''}" onclick="switchTab('${nodeId}','${name}')"><input style="border:none;outline:none;background:transparent;font:inherit;color:inherit;width:${Math.max(3,label.length+1)}ch;padding:0;" value="${esc(label)}" onclick="event.stopPropagation()" onchange="setTabLabel('${parentId}','${rowId}','${colId}','${name}',this.value)"/>${badge||''}</div>`;
+  return `<div class="tab${cur===name?' active':''}" onclick="switchTab('${nodeId}','${name}')"><input class="tab-edit-input" style="width:${Math.max(3,label.length+1)}ch;" value="${esc(label)}" onclick="event.stopPropagation()" onchange="setTabLabel('${parentId}','${rowId}','${colId}','${name}',this.value)"/>${badge||''}</div>`;
 }
 function switchTab(nodeId,tab){setTab(nodeId,tab);renderAnimated('fade');}
 
@@ -3886,18 +3916,18 @@ function switchTab(nodeId,tab){setTab(nodeId,tab);renderAnimated('fade');}
 function renderInfoTab(node){
   const{infoFields,links}=node.data;
   let h=`<div class="card">`;
-  h+=`<div class="cardhd">Info-Felder ${editMode?`<button class="btn" style="margin-left:auto;padding:3px 8px;" onclick="addInfoField('${node.id}')">+ Feld</button>`:''}`;
+  h+=`<div class="cardhd">Info-Felder ${editMode?`<button class="btn btn-inline-add" onclick="addInfoField('${node.id}')">+ Feld</button>`:''}`;
   h+=`</div>`;
-  if(infoFields.length===0&&!editMode) h+=`<div style="padding:12px 13px;font-size:12px;color:var(--text3);">Keine Felder — Bearbeiten-Modus zum Anlegen.</div>`;
+  if(infoFields.length===0&&!editMode) h+=`<div class="info-empty">Keine Felder — Bearbeiten-Modus zum Anlegen.</div>`;
   infoFields.forEach((f,idx)=>{
     h+=`<div class="info-field">
-      <div style="display:flex;align-items:center;gap:6px;">
-        ${editMode?`<div style="display:flex;flex-direction:column;gap:1px;margin-right:2px;">
-          <span tabindex="0" role="button" style="font-size:9px;color:var(--text3);cursor:pointer;line-height:1;" onclick="moveInfoField('${node.id}','${f.id}',-1)" onkeydown="if(event.key==='Enter'){event.preventDefault();moveInfoField('${node.id}','${f.id}',-1);}" title="Nach oben">▲</span>
-          <span tabindex="0" role="button" style="font-size:9px;color:var(--text3);cursor:pointer;line-height:1;" onclick="moveInfoField('${node.id}','${f.id}',1)" onkeydown="if(event.key==='Enter'){event.preventDefault();moveInfoField('${node.id}','${f.id}',1);}" title="Nach unten">▼</span>
+      <div class="info-field-hd">
+        ${editMode?`<div class="info-arrow-stack">
+          <span tabindex="0" role="button" class="info-arrow" onclick="moveInfoField('${node.id}','${f.id}',-1)" onkeydown="if(event.key==='Enter'){event.preventDefault();moveInfoField('${node.id}','${f.id}',-1);}" title="Nach oben">▲</span>
+          <span tabindex="0" role="button" class="info-arrow" onclick="moveInfoField('${node.id}','${f.id}',1)" onkeydown="if(event.key==='Enter'){event.preventDefault();moveInfoField('${node.id}','${f.id}',1);}" title="Nach unten">▼</span>
         </div>`:''}
         <span class="info-label">${esc(f.label)}</span>
-        ${editMode?`<span tabindex="0" role="button" style="font-size:11px;color:var(--red);cursor:pointer;margin-left:auto;" onclick="delInfoField('${node.id}','${f.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delInfoField('${node.id}','${f.id}');}">${ICO.close(ICO_SIZE.XS)}</span>`:''}
+        ${editMode?`<span tabindex="0" role="button" class="info-del" onclick="delInfoField('${node.id}','${f.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delInfoField('${node.id}','${f.id}');}">${ICO.close(ICO_SIZE.XS)}</span>`:''}
       </div>
       <div class="info-val" contenteditable="true" onblur="saveInfoField('${node.id}','${f.id}',this.innerHTML)">${sanitizeHtml(f.value)||''}</div>
     </div>`;
@@ -3905,24 +3935,24 @@ function renderInfoTab(node){
   h+=`</div>`;
 
   // Links block
-  h+=`<div class="card" style="margin-top:8px;">`;
+  h+=`<div class="card mt-8">`;
   h+=`<div class="cardhd">Links & Absprünge</div>`;
   h+=`<div class="links-grid">`;
   links.forEach(l=>{
     if(l.type==='mail'){
       const mailto=buildMailto(l);
-      h+=`<a class="link-btn" href="${mailto}" style="color:var(--tealtxt);">
+      h+=`<a class="link-btn link-mail" href="${mailto}">
         <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M1 4l6 4 6-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><rect x="1" y="3" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>
-        ${esc(l.label)}${l.alias?` <span style="font-size:9px;color:var(--text3);font-family:monospace;">^${esc(l.alias)}</span>`:''}
-        ${editMode?`<span tabindex="0" role="button" onclick="event.preventDefault();editMailTemplate('${node.id}','${l.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();editMailTemplate('${node.id}','${l.id}');}" style="color:var(--text3);margin-left:4px;" title="Bearbeiten">${ICO.edit(ICO_SIZE.XS)}</span>`:''}
-        ${editMode?`<span tabindex="0" role="button" onclick="event.preventDefault();delLink('${node.id}','${l.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delLink('${node.id}','${l.id}');}" style="color:var(--red);margin-left:4px;">${ICO.close(ICO_SIZE.XS)}</span>`:''}
+        ${esc(l.label)}${l.alias?` <span class="link-alias">^${esc(l.alias)}</span>`:''}
+        ${editMode?`<span tabindex="0" role="button" onclick="event.preventDefault();editMailTemplate('${node.id}','${l.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();editMailTemplate('${node.id}','${l.id}');}" class="link-action-edit" title="Bearbeiten">${ICO.edit(ICO_SIZE.XS)}</span>`:''}
+        ${editMode?`<span tabindex="0" role="button" onclick="event.preventDefault();delLink('${node.id}','${l.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delLink('${node.id}','${l.id}');}" class="link-action-del">${ICO.close(ICO_SIZE.XS)}</span>`:''}
       </a>`;
     } else {
       h+=`<a class="link-btn" href="${esc(sanitizeUrl(l.url)||'#')}" target="_blank" rel="noopener">
         <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M6 3H3a1 1 0 00-1 1v7a1 1 0 001 1h7a1 1 0 001-1V8" stroke="currentColor" stroke-width="1.3"/><path d="M9 1h4m0 0v4m0-4L7 7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        ${esc(l.label)}${l.alias?` <span style="font-size:9px;color:var(--text3);font-family:monospace;">^${esc(l.alias)}</span>`:''}
-        ${editMode?`<span tabindex="0" role="button" onclick="event.preventDefault();editLink('${node.id}','${l.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();editLink('${node.id}','${l.id}');}" style="color:var(--text3);margin-left:4px;" title="Bearbeiten">${ICO.edit(ICO_SIZE.XS)}</span>`:''}
-        ${editMode?`<span tabindex="0" role="button" onclick="event.preventDefault();delLink('${node.id}','${l.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delLink('${node.id}','${l.id}');}" style="color:var(--red);margin-left:4px;">${ICO.close(ICO_SIZE.XS)}</span>`:''}
+        ${esc(l.label)}${l.alias?` <span class="link-alias">^${esc(l.alias)}</span>`:''}
+        ${editMode?`<span tabindex="0" role="button" onclick="event.preventDefault();editLink('${node.id}','${l.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();editLink('${node.id}','${l.id}');}" class="link-action-edit" title="Bearbeiten">${ICO.edit(ICO_SIZE.XS)}</span>`:''}
+        ${editMode?`<span tabindex="0" role="button" onclick="event.preventDefault();delLink('${node.id}','${l.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delLink('${node.id}','${l.id}');}" class="link-action-del">${ICO.close(ICO_SIZE.XS)}</span>`:''}
       </a>`;
     }
   });
@@ -4115,22 +4145,22 @@ function importNodeData(e,parentId,rowId,colId,targetType){
 function renderKanban(node){
   const{kbCols,kbCards}=node.data;
   // Filter: show non-archived in columns, archived in Archiv col
-  let h=`<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+  let h=`<div class="kb-toolbar">
     <button class="btn" onclick="addKbCard('${node.id}')">+ Karte</button>
     <button class="btn edit-only" onclick="addKbCol('${node.id}')">+ Spalte</button>
-    <span id="kb-no-col-hint" class="is-hidden" style="font-size:12px;color:var(--amber);padding:4px 8px;background:var(--amberbg);border-radius:var(--r);">Erst eine Spalte anlegen</span>
+    <span id="kb-no-col-hint" class="is-hidden kb-nocol-hint">Erst eine Spalte anlegen</span>
   </div>`;
   h+=`<div class="kb-wrap">`;
   kbCols.forEach(col=>{
     const cards=kbCards.filter(c=>c.colId===col.id&&!c.archived);
     const colColor=col.color||'';
-    h+=`<div class="kb-col" data-col-id="${col.id}" style="border-top:${colColor?`3px solid ${colColor}`:'0.5px solid var(--border2)'};border-radius:var(--rl);">
+    h+=`<div class="kb-col" data-col-id="${col.id}"${colColor?` data-color="set" style="--kb-col-color:${colColor};"`:''}>
       <div class="kb-col-hd" ${editMode?`tabindex="0" onkeydown="if(editMode&&event.shiftKey&&(event.key==='ArrowLeft'||event.key==='ArrowRight')){event.preventDefault();event.stopPropagation();moveKbCol('${node.id}','${col.id}',event.key==='ArrowLeft'?-1:1);}"`:''}>
-        ${colColor?`<span style="width:8px;height:8px;border-radius:50%;background:${colColor};flex-shrink:0;display:inline-block;"></span>`:''}
-        ${editMode?`<input class="ni" value="${esc(col.label)}" onchange="renameKbCol('${node.id}','${col.id}',this.value)" style="font-size:12px;font-weight:500;" onclick="event.stopPropagation()"/>`:`<span>${esc(col.label)}</span>`}
+        ${colColor?`<span class="kb-col-dot"></span>`:''}
+        ${editMode?`<input class="ni ni-md" value="${esc(col.label)}" onchange="renameKbCol('${node.id}','${col.id}',this.value)" onclick="event.stopPropagation()"/>`:`<span>${esc(col.label)}</span>`}
         <span class="cnt">${cards.length}</span>
         ${editMode?`<button class="hdr-arr" tabindex="-1" onclick="moveKbCol('${node.id}','${col.id}',-1)" title="Nach links"><svg width="7" height="8" viewBox="0 0 7 8"><path d="M6 1L2 4l4 3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button class="hdr-arr" tabindex="-1" onclick="moveKbCol('${node.id}','${col.id}',1)" title="Nach rechts"><svg width="7" height="8" viewBox="0 0 7 8"><path d="M1 1l4 3-4 3" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`:''}
-        ${editMode?`<span tabindex="0" role="button" style="font-size:11px;color:var(--text3);cursor:pointer;margin-left:2px;" onclick="editKbColColor('${node.id}','${col.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();editKbColColor('${node.id}','${col.id}');}">${ICO.palette(11)}</span>`:''}
+        ${editMode?`<span tabindex="0" role="button" class="kb-palette-btn" onclick="editKbColColor('${node.id}','${col.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();editKbColColor('${node.id}','${col.id}');}">${ICO.palette(11)}</span>`:''}
         <span class="delbtn" tabindex="0" role="button" onclick="delKbCol('${node.id}','${col.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delKbCol('${node.id}','${col.id}');}">${ICO.close(ICO_SIZE.XS)}</span>
       </div>
       <div class="kb-cards" data-col-id="${col.id}" data-board-id="${node.id}" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dragDrop(event)">`;
@@ -4148,22 +4178,23 @@ function renderKanban(node){
   });
   // Archiv column — compact cards
   const archived=kbCards.filter(c=>c.archived);
+  const archScroll=archived.length>ARCHIVE_SCROLL_THRESHOLD;
   h+=`<div class="kb-col">
     <div class="kb-col-hd"><span>Archiv</span><span class="cnt">${archived.length}</span></div>
-    <div class="kb-cards" style="${archived.length>ARCHIVE_SCROLL_THRESHOLD?'max-height:'+ARCHIVE_SCROLL_HEIGHT+';overflow-y:auto;':''}">`;
+    <div class="kb-cards"${archScroll?` data-scrollable="true" style="max-height:${ARCHIVE_SCROLL_HEIGHT};"`:''}>`;
   archived.forEach(card=>{
     const _lastDone=card.doneDate||((card.doneOccurrences&&card.doneOccurrences.length>0)?[...card.doneOccurrences].sort().reverse()[0]:'');
-    const doneTag=_lastDone?renderBadge(ICO.check(9)+' '+fmtDate(_lastDone),'var(--tealbg)','var(--tealtxt)'):'';
-    h+=`<div class="kb-card archived" tabindex="0" onclick="openCard('${node.id}','${card.id}')" style="padding:6px 8px;">
-      <div style="display:flex;align-items:center;gap:6px;">
-        <span style="font-size:12px;color:var(--text3);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(card.name)||'(ohne Name)'}</span>
+    const doneTag=_lastDone?renderBadge(ICO.check(9)+' '+fmtDate(_lastDone)):'';
+    h+=`<div class="kb-card archived kb-card-compact" tabindex="0" onclick="openCard('${node.id}','${card.id}')">
+      <div class="row-g6">
+        <span class="kb-archive-name">${esc(card.name)||'(ohne Name)'}</span>
         ${doneTag}
       </div>
     </div>`;
   });
   h+=`</div></div>`;
   // Add col button
-  h+=`<div class="kb-add-col edit-only"><button class="addfull" style="height:48px;" onclick="addKbCol('${node.id}')">+ Spalte</button></div>`;
+  h+=`<div class="kb-add-col edit-only"><button class="addfull addcol-tail-btn" onclick="addKbCol('${node.id}')">+ Spalte</button></div>`;
   h+=`</div>`;
   return h;
 }
@@ -4188,16 +4219,16 @@ function kbCardHTML(boardId,card){
       return cnt>=card.recur.endCount;
     })();
     const warn=endingSoon||endedCount;
-    recurBadge=`<span class="kc-recur" style="${warn?'background:var(--amberbg);color:var(--ambertxt);':''}">${ICO.recur(ICO_SIZE.XS)} ${recurLabel(card.recur,true)}</span>`;
+    recurBadge=`<span class="kc-recur"${warn?' data-warn="true"':''}>${ICO.recur(ICO_SIZE.XS)} ${recurLabel(card.recur,true)}</span>`;
   }
   // Last done badge — occurrence-based for recurring, doneDate for one-off
   let lastDoneBadge='';
   const doneOcc=card.doneOccurrences||[];
   if(doneOcc.length>0){
     const last=[...doneOcc].sort().reverse()[0];
-    lastDoneBadge=renderBadge(ICO.check(9)+' '+fmtDate(last),'var(--tealbg)','var(--tealtxt)');
+    lastDoneBadge=renderBadge(ICO.check(9)+' '+fmtDate(last));
   } else if(card.done&&card.doneDate){
-    lastDoneBadge=renderBadge(ICO.check(9)+' '+fmtDate(card.doneDate),'var(--tealbg)','var(--tealtxt)');
+    lastDoneBadge=renderBadge(ICO.check(9)+' '+fmtDate(card.doneDate));
   }
   const cl=card.checklist||[];
   const clDone=cl.filter(x=>x.done).length;
@@ -4207,10 +4238,10 @@ function kbCardHTML(boardId,card){
   const canRight=colIdx<cols.length-1;
   // Priority dot
   return `<div class="kb-card${card.archived?' archived':''}${card.done?' kb-done':''}" tabindex="0" draggable="${card.archived?'false':'true'}" data-card-id="${card.id}" data-board-id="${boardId}" data-prio="${card.priority||''}" onclick="openCard('${boardId}','${card.id}')" onkeydown="kbCardKeydown(event,'${boardId}','${card.id}')" ondragstart="dragStart(event)" ondragend="dragEnd(event)">
-    <div style="display:flex;align-items:flex-start;gap:5px;">
+    <div class="kb-card-row">
       <div class="flex-fill">
         <div class="kc-name" style="--card-lines:${appSettings.cardTitleLines||2};">${esc(card.name)}</div>
-        ${card.note?`<div style="font-size:11px;color:var(--text2);margin-top:2px;">${esc(stripHtml(card.note)).slice(0,appSettings.noteTruncate||NOTE_TRUNCATE)}${stripHtml(card.note).length>(appSettings.noteTruncate||NOTE_TRUNCATE)?'…':''}</div>`:''}
+        ${card.note?`<div class="kc-note">${esc(stripHtml(card.note)).slice(0,appSettings.noteTruncate||NOTE_TRUNCATE)}${stripHtml(card.note).length>(appSettings.noteTruncate||NOTE_TRUNCATE)?'…':''}</div>`:''}
       </div>
     </div>
     <div class="kc-meta">
@@ -4222,8 +4253,8 @@ function kbCardHTML(boardId,card){
     <div class="kc-actions" onclick="event.stopPropagation()">
       <span class="kc-act${canLeft?'':' disabled'}" tabindex="0" role="button" onclick="${canLeft?`moveCard('${boardId}','${card.id}',-1)`:''}" onkeydown="${canLeft?`if(event.key==='Enter'){event.preventDefault();moveCard('${boardId}','${card.id}',-1);}`:''}" title="Spalte zurück">←</span>
       <span class="kc-act${canRight?'':' disabled'}" tabindex="0" role="button" onclick="${canRight?`moveCard('${boardId}','${card.id}',1)`:''}" onkeydown="${canRight?`if(event.key==='Enter'){event.preventDefault();moveCard('${boardId}','${card.id}',1);}`:''}" title="Spalte vor">→</span>
-      <span style="margin-left:auto;"></span>
-      <div class="cl-check${card.done?' done':''}" onclick="quickDoneCard(event,'${boardId}','${card.id}')" title="${card.done?'Wiedereröffnen':'Erledigt'}" style="width:13px;height:13px;margin-top:0;"></div>
+      <span class="kc-act-spacer"></span>
+      <div class="cl-check cl-check-sm${card.done?' done':''}" onclick="quickDoneCard(event,'${boardId}','${card.id}')" title="${card.done?'Wiedereröffnen':'Erledigt'}"></div>
     </div>
   </div>`;
 }
@@ -7428,7 +7459,7 @@ function getTodayStr(){return today0().toISOString().split('T')[0];}
 function today0(){const d=new Date();d.setHours(0,0,0,0);return d;}
 function day0(v){const d=new Date(v);d.setHours(0,0,0,0);return d;}
 function renderPrioDot(prio,size){if(!prio)return'';return`<span style="width:${size||8}px;height:${size||8}px;border-radius:50%;background:${PRIO_COLORS[prio]||'transparent'};display:inline-block;flex-shrink:0;margin-top:3px;" title="${prio}"></span>`;}
-function renderBadge(text,bg,txt){return`<span class="kc-recur" style="background:${bg};color:${txt};">${text}</span>`;}
+function renderBadge(text){return`<span class="kc-recur kc-done-badge">${text}</span>`;}
 function emptyState(icon,text){return`<div class="empty-state"><div class="empty-big">${icon}</div><div>${text}</div></div>`;}
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
