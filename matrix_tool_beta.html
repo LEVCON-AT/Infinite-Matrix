@@ -1334,10 +1334,25 @@ function clearEncPassword(){
   showSettings();
 }
 
+// localStorage-Flush ist debounced. In-Memory-State ist sofort konsistent;
+// der eigentliche setItem-Call passiert nach TIMING.SAVE_DEBOUNCE_MS, sodass
+// Hot-Path-Mutationen (Tippen in einer Zelle) nicht mehrfach pro Sekunde
+// blockieren. beforeunload forced den Flush, damit nichts verloren geht.
+let lsSaveTimer=null;
+let _lsPendingPayload=null;
+function flushLocalStorageNow(){
+  if(_lsPendingPayload==null)return;
+  try{localStorage.setItem(SAVE_KEY,_lsPendingPayload);}catch(e){console.warn('localStorage save failed:',e.message);}
+  _lsPendingPayload=null;
+  if(lsSaveTimer){clearTimeout(lsSaveTimer);lsSaveTimer=null;}
+}
+window.addEventListener('beforeunload',flushLocalStorageNow);
+
 function save(){
   const payload=getPayload();
-  // Always save to localStorage immediately
-  try{localStorage.setItem(SAVE_KEY,payload);}catch(e){console.warn('localStorage save failed:',e.message);}
+  _lsPendingPayload=payload;
+  clearTimeout(lsSaveTimer);
+  lsSaveTimer=setTimeout(flushLocalStorageNow,TIMING.SAVE_DEBOUNCE_MS);
 
   if(fileHandle){
     fileDirty=true;
