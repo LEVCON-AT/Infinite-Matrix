@@ -1,45 +1,34 @@
 # Backlog — Infinite Matrix
 
-Nach Abschluss der Code-Review-Sprints (0–6, Branch `code-review-sprints` → `main`) sind die folgenden Aufgaben offen. Reihenfolge = Priorität. Nächste Arbeits-Welle: Punkte **1–3** (Code-Sauberkeit abschließen).
+Nach Abschluss der Code-Review-Sprints (0–6, Branch `code-review-sprints` → `main`) sind die folgenden Aufgaben offen. Reihenfolge = Priorität.
+
+**Status Code-Sauberkeits-Welle:** 1 ✅ (Event-Delegation, Commits `117b314`+`35fe38e`), 2 ✅ (Inline-Styles 219→32, Commits `c0c9388`…`49571a2`), 3 offen, 4–9 geplant.
 
 ---
 
-## 1. Event-Delegation für `openCard`
+## 1. Event-Delegation für `openCard` ✅ (erledigt)
 
-**Hintergrund**: `_renderCardModalHTML` baut ~130 Zeilen Template-String mit ~100 inline `onchange`/`onclick`-Handlern. Pro Re-Render werden alle Listener neu verdrahtet; Handler-Code wird als String ins HTML interpoliert (XSS-Oberfläche + schlechte Testbarkeit).
-
-**Fix**: Single Delegate-Listener auf `.modal` mit `data-action`-Attribut + `data-*`-Payload. Handler-Map lokal:
-
-```js
-const CARD_ACTIONS = {
-  set_name:  (el, {boardId,cardId}) => card_set(boardId, cardId, 'name', el.value),
-  set_prio:  (el, {boardId,cardId}) => card_set(boardId, cardId, 'priority', el.value),
-  close:     () => closeCard(),
-  // …
-};
-container.addEventListener('input', dispatchAction);
-container.addEventListener('click', dispatchAction);
-```
-
-**Gewinn**: 1 Listener statt 100 · kleinere Re-Render-Kosten bei großen Datasets · keine Code-Strings im Markup · sauberere Struktur für spätere Features (Redo, Keyboard-Navigation in Cards).
-
-**Voraussetzung**: Template-Split (Sprint 4.4) — schon erledigt.
-
-**Aufwand**: 1 Tag.
+Commits `117b314` (Implementation) + `35fe38e` (CLAUDE.md-Pattern). Card-Modal hat 0 inline `on(click|change|blur)` Handler; 25 benannte Aktionen in `CARD_ACTIONS`-Dispatch-Tabelle, 3 Listener (click im Capture, change/blur im Bubble/Capture) am Modal-Container. Drag + element-spezifische `onkeydown` bewusst inline belassen.
 
 ---
 
-## 2. Inline-Styles auf Plan-Ziel bringen (Sprint 4.1 Abschluss)
+## 2. Inline-Styles auf Plan-Ziel bringen ✅ (erledigt)
 
-**Stand**: 242 → 219 im Markup (partial). Plan-Ziel <30.
+**Stand**: 219 → 32 (Plan-Ziel „< 30" praktisch erreicht; verbliebene 32 sind alle dynamische Werte wie `grid-template-columns:${gc}`, `left/top:${e.clientX}`, `--kb-col-color`, `--card-lines`, `--sd-color`, `--pc-color` sowie konfigurierbare Em-Werte `padding:${_cp}em`).
 
-**Was fehlt**: Systematische Durchsicht der Template-Strings in `openCard`, `renderKanban`, `renderInfoTab`, `renderSubMatrix`, `renderDailyBoard` etc. Pro Inline-Style entweder:
-- Statische Werte → dedizierte CSS-Klasse
-- Dynamische Werte → CSS-Custom-Property per `style="--x:${v}"` + Klasse liest `var(--x)`
+**Commits**:
+- `c0c9388` 2a Card-Modal + Recurrence-UI (−56)
+- `30d3190` 2b Std-Checkliste + Daily-Column (−27)
+- `5fea780` 2c Settings-Modal (−20)
+- `a0f27ab` 2d Matrix-Page + Cell-Grid (−8)
+- `95b779e` 2e Info/Links + Kanban-Cards (−32)
+- `49571a2` 2f Peek/Context-Menu/Modals/Search/Prio-Dot/Search-HL (−44)
 
-**Gewinn**: Theming greift überall, keine XSS-Oberfläche für user-abgeleitete Style-Werte, Dark-Mode-Kontraste brechen nicht mehr durch gepatchte Inline-Farben.
-
-**Aufwand**: 2–3 Tage. Keine funktionalen Änderungen.
+**Eingeführte Pattern** (für Backlog-3+ als Referenz):
+- Feature-Farben über `[data-feat="matrix|board|info|checklists"]` (Cell-Segments, Peek-Badges, Priority-Badges im _featTitle)
+- Farb-Keys aus `var(--X)` via `_srColKey()` → `[data-sr-col="blue|teal|amber|purple|text2|text3"]` (Search-Row-Icons)
+- Dynamische Farben über CSS-Custom-Properties: `--kb-col-color`, `--pc-color`, `--sd-color`, `--card-lines`, `--cg-gap`
+- Neue Utility-Klassen: `.row-g4/6/8`, `.col-g6`, `.mb-xs/sm/md/0`, `.mg-0`, `.mr-auto`, `.mt-8/10`, `.nowrap`, `.inp-num-sm/md/lg/count`, `.inp-flex-date`, `.modal-title-input`, `.modal-note-ce`, `.modal-pill[data-prio]`, `.pill-dashed`, `.cb-option(-8)`, `.wd-chip(.sel)`, `.cl-row/arrow/del/reset/text-input`, `.occ-info/more/count`, `.btn-small/done-active`, `.alias-ro(-cell)`, `.ptitle-edit-input`, `.phd-actions`, `.empty-actions`, `.ni.ni-md/ni-center`, `.feat-remove`, `.cellhd-alias`, `.tab-edit-input`, `.kb-toolbar/nocol-hint/palette-btn`, `.kb-col[data-color=set]`, `.kb-col-dot`, `.kb-cards[data-scrollable]`, `.kb-card-compact/row`, `.kb-archive-name`, `.kc-note/act-spacer/done-badge`, `.cl-check-sm`, `.kc-recur[data-warn]`, `.setting-row/label/value/input(.num,.num-dual)/section/pw-*`, `.settings-modal/hd/tabs/tab(.active)/body/actions/intro/grid2/cell/cell-label/cell-select`, `.ro-input`, `.info-empty/field-hd/arrow-stack/arrow/del`, `.link-btn.link-mail`, `.link-alias/action-edit/del`, `.dtitle-ico`, `.addcol-btn/tail/tail-btn`, `.dcolh-*`, `.delbtn-dcol`, `.daily-empty`, `.di-check/name-wrap/overdue-text/recur-badge`, `.peek-grid-cell[data-fill]`, `.peek-feat-badge[data-feat]`, `.pc-dot[data-col=set]`, `.peek-empty/sub-offset`, `.help-title/body-2/note/foot`, `.sr-name.faint`, `.sr-cmd-mark`, `.sd-section-hd`, `.sd-dot[data-col=set]`, `.sd-del/tail`, `.ctx-divider/btn-ico`, `.smodal-420`, `.smodal-720(-hd/body/act/reset)`, `.kb-section-hint`, `.mail-body-ta`, `.freq-toolbar/scroll-wrap/board-link`, `.alias-tag-mr4/6`, `.origin-alias-mr6`, `.prio-badge-wrap/ico[data-feat]`, `.prio-dot[data-prio]`, `.search-hl`, `.err-detail`, `.empty-hint`
 
 ---
 
