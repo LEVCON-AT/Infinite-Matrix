@@ -8425,6 +8425,67 @@ Object.assign(MATRIX_TOOLS,{
   }
 });
 
+// ─── Sprint 4.6: template-Registry (synchron mit bridge/src/tools/template.ts) ──
+
+const MATRIX_TEMPLATES={
+  'projektplan':{label:'Projektplan',description:'Wochenraster mit Phasen × Wochentagen',
+    rows:['Planung','Umsetzung','Review'],cols:['Mo','Di','Mi','Do','Fr']},
+  'gtd':{label:'GTD (Getting Things Done)',description:'Inbox-Ablauf mit Status × Notizen',
+    rows:['Inbox','Heute','Woche','Projekte','Warten'],cols:['Status','Notizen']},
+  'life-layout':{label:'Life-Layout',description:'Lebensbereiche × Zeithorizonte',
+    rows:['Arbeit','Gesundheit','Familie','Finanzen','Lernen'],cols:['Kurzfristig','Mittelfristig','Langfristig']},
+  'decision':{label:'Decision-Matrix',description:'Optionen × Bewertungsdimensionen',
+    rows:['Option A','Option B','Option C'],cols:['Pros','Cons','Kosten','Risiken']},
+  'reading-list':{label:'Reading-List',description:'Inhaltstyp × Status',
+    rows:['Bücher','Artikel','Podcasts'],cols:['Offen','In Arbeit','Erledigt']}
+};
+
+Object.assign(MATRIX_TOOLS,{
+  'template.list':async()=>{
+    return{
+      templates:Object.entries(MATRIX_TEMPLATES).map(([id,t])=>({
+        id,label:t.label,description:t.description,
+        rows:t.rows.length,cols:t.cols.length
+      }))
+    };
+  },
+
+  'template.instantiate':async(args)=>{
+    const tpl=MATRIX_TEMPLATES[args.templateId];
+    if(!tpl)return{error:'Unbekanntes Template: '+args.templateId};
+    const label=(args.label&&String(args.label).trim())||tpl.label;
+    // Neue Matrix anlegen mit Template-Inhalt
+    const mid=mkMatrix(label);
+    const nm=nodes[mid];
+    nm.data.rows=tpl.rows.map(l=>({id:uid(),label:l}));
+    nm.data.cols=tpl.cols.map(l=>({id:uid(),label:l}));
+    nm.data.cells={};
+    // Optional: an Cell anhängen
+    let attached=null;
+    if(args.parentCellAlias){
+      const raw=String(args.parentCellAlias);
+      const key=(raw.startsWith('^')?raw.slice(1):raw).toLowerCase();
+      const entry=aliasIndex[key];
+      if(!entry||entry.type!=='cell'){
+        // Rollback: Matrix wieder löschen
+        delete nodes[mid];
+        return{error:'parentCellAlias verweist nicht auf eine Zelle: '+args.parentCellAlias};
+      }
+      const cell=getCell(entry.parentId,entry.rowId+'-'+entry.colId);
+      if(cell.matrixId){
+        delete nodes[mid];
+        return{error:'Zielzelle hat bereits eine Sub-Matrix'};
+      }
+      cell.matrixId=mid;
+      addFeature(cell,'matrix');
+      attached={parentId:entry.parentId,rowId:entry.rowId,colId:entry.colId};
+    }
+    rebuildAliasIndex();save();render();
+    return{instantiated:true,templateId:args.templateId,matrixId:mid,label,
+      rows:nm.data.rows.length,cols:nm.data.cols.length,attached};
+  }
+});
+
 // Bridge verbinden wenn konfiguriert
 if(localStorage.getItem('bridgeUrl'))BridgeClient.connect();
 

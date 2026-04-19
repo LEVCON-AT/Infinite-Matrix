@@ -9,6 +9,7 @@ import { matrixCrudTools } from './matrix-crud.js';
 import { metaTools } from './meta.js';
 import { queryTools } from './query.js';
 import { settingsTools } from './settings.js';
+import { templateTools } from './template.js';
 
 export function registerAllTools(): void {
   for (const tool of [
@@ -22,6 +23,7 @@ export function registerAllTools(): void {
     ...aliasTools,
     ...settingsTools,
     ...metaTools,
+    ...templateTools,
   ]) {
     registerTool(tool);
   }
