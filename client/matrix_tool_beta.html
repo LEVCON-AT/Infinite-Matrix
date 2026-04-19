@@ -1766,6 +1766,8 @@ function save(){
   _lsPendingPayload=payload;
   clearTimeout(lsSaveTimer);
   lsSaveTimer=setTimeout(flushLocalStorageNow,TIMING.SAVE_DEBOUNCE_MS);
+  // Bridge-Snapshot nach Mutation (debounced wie File-Save)
+  if(typeof BridgeClient!=='undefined'&&BridgeClient.isConnected)try{BridgeClient.sendSnapshot();}catch(e){}
 
   if(fileHandle){
     fileDirty=true;
@@ -7653,6 +7655,215 @@ window.addEventListener('beforeunload',e=>{if(fileDirty){e.preventDefault();e.re
 // Init file button
 if(hasFileAPI){updateFileBtn();}
 else{const fb=document.getElementById('filebtn');if(fb)fb.classList.add('is-hidden');const sb=document.getElementById('saveasbtn');if(sb)sb.classList.add('is-hidden');}
+
+// ─── Bridge-Connection (MCP/Tool-Call-Infrastruktur) ───────────────────
+const BridgeClient=(()=>{
+  let ws=null,reconnTimer=null,_snapshotVersion=0;
+  const RECONN_MS=3000;
+  const bridgeUrl=localStorage.getItem('bridgeUrl')||'';
+  const bridgeToken=localStorage.getItem('bridgeToken')||'';
+
+  function connect(){
+    if(!bridgeUrl||!bridgeToken)return;
+    const sep=bridgeUrl.includes('?')?'&':'?';
+    ws=new WebSocket(bridgeUrl+sep+'token='+encodeURIComponent(bridgeToken));
+
+    ws.onopen=()=>{
+      console.log('[Bridge] Verbunden');
+      ws.send(JSON.stringify({
+        type:'hello',
+        clientId:localStorage.getItem('bridgeClientId')||crypto.randomUUID(),
+        protocolVersion:1
+      }));
+      if(!localStorage.getItem('bridgeClientId'))
+        localStorage.setItem('bridgeClientId',crypto.randomUUID());
+    };
+
+    ws.onmessage=(ev)=>{
+      let msg;
+      try{msg=JSON.parse(ev.data);}catch{return;}
+      switch(msg.type){
+        case 'hello.ack':
+          console.log('[Bridge] Session:',msg.sessionId);
+          break;
+        case 'state.request':
+          sendSnapshot();
+          break;
+        case 'tool.call':
+          handleToolCall(msg);
+          break;
+        case 'ping':
+          ws.send(JSON.stringify({type:'pong',seq:msg.seq}));
+          break;
+        case 'notice':
+          console.log('[Bridge]',msg.level,msg.message);
+          if(msg.level==='error')showToast(msg.message,{type:'error'});
+          break;
+      }
+    };
+
+    ws.onclose=()=>{
+      console.log('[Bridge] Getrennt, reconnect in',RECONN_MS,'ms');
+      ws=null;
+      reconnTimer=setTimeout(connect,RECONN_MS);
+    };
+
+    ws.onerror=(err)=>{
+      console.error('[Bridge] WS-Fehler',err);
+    };
+  }
+
+  function sendSnapshot(){
+    if(!ws||ws.readyState!==WebSocket.OPEN)return;
+    _snapshotVersion++;
+    ws.send(JSON.stringify({
+      type:'snapshot',
+      version:_snapshotVersion,
+      payload:getPayload()
+    }));
+  }
+
+  async function handleToolCall(msg){
+    const handler=MATRIX_TOOLS[msg.tool];
+    if(!handler){
+      ws.send(JSON.stringify({
+        type:'tool.error',callId:msg.callId,ok:false,
+        error:{code:'unknown_tool',message:'Unbekanntes Tool: '+msg.tool}
+      }));
+      return;
+    }
+    try{
+      const result=await handler(msg.args);
+      ws.send(JSON.stringify({type:'tool.result',callId:msg.callId,ok:true,result}));
+      // Nach Mutation Snapshot senden
+      sendSnapshot();
+    }catch(err){
+      ws.send(JSON.stringify({
+        type:'tool.error',callId:msg.callId,ok:false,
+        error:{code:'tool_error',message:err.message||String(err)}
+      }));
+    }
+  }
+
+  function disconnect(){
+    clearTimeout(reconnTimer);
+    if(ws){ws.close();ws=null;}
+  }
+
+  function isConnected(){return ws&&ws.readyState===WebSocket.OPEN;}
+
+  return{connect,sendSnapshot,disconnect,isConnected};
+})();
+
+// ─── MATRIX_TOOLS Registry ────────────────────────────────────────────
+const MATRIX_TOOLS={
+  'matrix.state.get':async(args)=>{
+    const payload=JSON.parse(getPayload());
+    if(args&&args.subtreeRef){
+      // Teilbaum via Alias oder ID
+      const ref=args.subtreeRef;
+      const resolved=aliasIndex[ref.toLowerCase()]||ref;
+      const node=nodes[resolved];
+      if(!node)return{error:'Referenz nicht gefunden: '+ref};
+      return{node,id:resolved};
+    }
+    return{snapshot:payload};
+  },
+
+  'matrix.navigate':async(args)=>{
+    const target=args.target;
+    // Alias-Auflösung (wie ^alias)
+    if(target.startsWith('^')){
+      const alias=target.slice(1);
+      const resolved=aliasIndex[alias.toLowerCase()];
+      if(!resolved)return{error:'Alias nicht gefunden: '+alias};
+      jumpToAlias(alias);
+      return{navigated:true,resolved};
+    }
+    // Direkte Node-ID
+    if(nodes[target]){
+      stack.length=0;
+      stack.push({nodeId:target});
+      render();
+      return{navigated:true,target};
+    }
+    return{error:'Ziel nicht gefunden: '+target};
+  },
+
+  'matrix.create':async(args)=>{
+    const id='m'+Date.now();
+    const rowLabels=args.rows||['Zeile 1'];
+    const colLabels=args.cols||['Spalte 1'];
+    const rows=rowLabels.map((_,i)=>'r'+(i+1));
+    const cols=colLabels.map((_,i)=>'c'+(i+1));
+    const cells={};
+    rows.forEach(r=>cols.forEach(c=>{cells[r+'-'+c]={};}));
+    nodes[id]={type:'matrix',label:args.label||'Neue Matrix',
+      data:{rows:rows.map((r,i)=>({id:r,label:rowLabels[i]})),
+            cols:cols.map((c,i)=>({id:c,label:colLabels[i]})),cells}};
+    if(args.alias){
+      nodes[id].alias=args.alias;
+      aliasIndex[args.alias.toLowerCase()]={type:'matrix',nodeId:id};
+    }
+    save();render();
+    return{created:true,id,label:args.label};
+  },
+
+  'query.cards':async(args)=>{
+    const filter=args&&args.filter||{};
+    const limit=args&&args.limit||20;
+    const results=[];
+    const now=new Date();
+    for(const[nid,node]of Object.entries(nodes)){
+      if(node.type!=='board')continue;
+      const cards=node.data&&node.data.cards||[];
+      for(const card of cards){
+        let match=true;
+        if(filter.tag&&!(card.tags||[]).includes(filter.tag))match=false;
+        if(filter.who&&!(card.who||[]).includes(filter.who))match=false;
+        if(filter.priority!==undefined&&card.priority!==filter.priority)match=false;
+        if(filter.due&&card.deadline){
+          const dl=new Date(card.deadline);
+          if(filter.due==='overdue')match=match&&dl<now&&!card.done;
+          else if(filter.due==='today')match=match&&dl.toDateString()===now.toDateString();
+          else if(filter.due==='week'){const w=new Date(now);w.setDate(w.getDate()+7);match=match&&dl<=w;}
+          else if(filter.due==='month'){const m=new Date(now);m.setMonth(m.getMonth()+1);match=match&&dl<=m;}
+        }else if(filter.due){match=false;}
+        if(match)results.push({boardId:nid,card});
+        if(results.length>=limit)break;
+      }
+      if(results.length>=limit)break;
+    }
+    return{cards:results,total:results.length};
+  },
+
+  'alias.resolve':async(args)=>{
+    const key=args.alias.toLowerCase();
+    const entry=aliasIndex[key];
+    if(!entry)return{error:'Alias nicht gefunden: '+args.alias};
+    return{alias:args.alias,resolved:entry};
+  }
+};
+
+// Bridge verbinden wenn konfiguriert
+if(localStorage.getItem('bridgeUrl'))BridgeClient.connect();
+
+// URL-Parameter für Bridge-Setup
+(function _bridgeUrlSetup(){
+  const p=new URLSearchParams(location.search);
+  const bUrl=p.get('bridge');
+  const bToken=p.get('token');
+  if(bUrl){
+    localStorage.setItem('bridgeUrl',bUrl);
+    if(bToken)localStorage.setItem('bridgeToken',bToken);
+    // URL bereinigen
+    const clean=new URL(location.href);
+    clean.searchParams.delete('bridge');
+    clean.searchParams.delete('token');
+    history.replaceState(null,'',clean.toString());
+    if(!BridgeClient.isConnected())BridgeClient.connect();
+  }
+})();
 </script>
 </body>
 </html>
