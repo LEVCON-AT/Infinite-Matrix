@@ -20,6 +20,15 @@ const queryCardsSchema = z.object({
   limit: z.number().int().min(1).max(100).optional().default(20),
 });
 
+const queryAliasesSchema = z.object({
+  prefix: z.string().optional().describe('Nur Aliasse mit diesem Prefix (case-insensitiv)'),
+  type: z
+    .enum(['matrix', 'board', 'cell', 'card', 'link', 'mail'])
+    .optional()
+    .describe('Nur Aliasse dieses Typs'),
+  limit: z.number().int().min(1).max(500).optional().default(100),
+});
+
 export const queryTools: ToolDef[] = [
   {
     name: 'query.cards',
@@ -27,5 +36,12 @@ export const queryTools: ToolDef[] = [
       'Sucht Kanban-Karten mit Filtern (Fälligkeit, Tag, Person, Priorität). Gibt passende Karten zurück.',
     schema: queryCardsSchema,
     jsonSchema: zodToJsonSchema(queryCardsSchema),
+  },
+  {
+    name: 'query.aliases',
+    description:
+      'Listet Aliasse optional gefiltert nach Prefix und Typ. Nützlich für Fuzzy-Lookups in Prompts.',
+    schema: queryAliasesSchema,
+    jsonSchema: zodToJsonSchema(queryAliasesSchema),
   },
 ];

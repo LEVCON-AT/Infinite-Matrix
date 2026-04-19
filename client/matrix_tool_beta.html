@@ -8286,6 +8286,142 @@ Object.assign(MATRIX_TOOLS,{
     item.done=!item.done;
     save();render();
     return{toggled:true,boardId:bid,checklistId:cl.id,itemId:item.id,done:item.done};
+  },
+
+  // ─── Sprint 4.5: alias + query + settings + meta ─────────────────
+  'alias.set':async(args)=>{
+    const newAlias=String(args.alias||'');
+    // Rename/Delete-Pfad via currentAlias
+    if(args.currentAlias){
+      const raw=String(args.currentAlias);
+      const key=(raw.startsWith('^')?raw.slice(1):raw).toLowerCase();
+      const entry=aliasIndex[key];
+      if(!entry)return{error:'currentAlias nicht gefunden: '+args.currentAlias};
+      // Typ-spezifisch dispatchen
+      if(entry.type==='matrix'||entry.type==='board'){
+        const node=nodes[entry.nodeId];if(!node)return{error:'Node fehlt: '+entry.nodeId};
+        const v=validateAlias(newAlias,node.alias||'');
+        if(!v.valid)return{error:v.msg};
+        if(v.alias)node.alias=v.alias;else delete node.alias;
+      } else if(entry.type==='cell'){
+        const cell=getCell(entry.parentId,entry.rowId+'-'+entry.colId);
+        const v=validateAlias(newAlias,cell.alias||'');
+        if(!v.valid)return{error:v.msg};
+        if(v.alias)cell.alias=v.alias;else delete cell.alias;
+      } else if(entry.type==='card'){
+        const card=getCard(entry.boardId,entry.cardId);
+        if(!card)return{error:'Karte fehlt'};
+        const v=validateAlias(newAlias,card.alias||'');
+        if(!v.valid)return{error:v.msg};
+        if(v.alias)card.alias=v.alias;else delete card.alias;
+      } else if(entry.type==='link'||entry.type==='mail'){
+        const link=nodes[entry.boardId]?.data?.links?.find(l=>l.id===entry.linkId);
+        if(!link)return{error:'Link fehlt'};
+        const v=validateAlias(newAlias,link.alias||'');
+        if(!v.valid)return{error:v.msg};
+        if(v.alias)link.alias=v.alias;else delete link.alias;
+      } else {
+        return{error:'Unbekannter Alias-Typ: '+entry.type};
+      }
+      rebuildAliasIndex();save();render();
+      return{set:true,oldAlias:raw,newAlias:newAlias||null,type:entry.type};
+    }
+    // Neu-Zuweisung via nodeRef (nur Matrix/Board)
+    if(args.nodeRef){
+      const nid=_resolveNodeRef(args.nodeRef);
+      if(!nid)return{error:'Node nicht gefunden: '+args.nodeRef};
+      const node=nodes[nid];
+      if(!['matrix','board'].includes(node.type))return{error:'nodeRef muss Matrix oder Board sein (type='+node.type+')'};
+      const v=validateAlias(newAlias,node.alias||'');
+      if(!v.valid)return{error:v.msg};
+      if(v.alias)node.alias=v.alias;else delete node.alias;
+      rebuildAliasIndex();save();render();
+      return{set:true,nodeId:nid,type:node.type,newAlias:newAlias||null};
+    }
+    return{error:'Weder currentAlias noch nodeRef angegeben'};
+  },
+
+  'query.aliases':async(args)=>{
+    const prefix=(args&&args.prefix?String(args.prefix):'').toLowerCase().replace(/^\^/,'');
+    const typeFilter=args&&args.type;
+    const limit=Math.min(Math.max(args&&args.limit||100,1),500);
+    const results=[];
+    for(const[key,entry]of Object.entries(aliasIndex)){
+      if(prefix&&!key.startsWith(prefix))continue;
+      if(typeFilter&&entry.type!==typeFilter)continue;
+      results.push({alias:entry.alias,type:entry.type,
+        nodeId:entry.nodeId||null,parentId:entry.parentId||null,
+        rowId:entry.rowId||null,colId:entry.colId||null,
+        boardId:entry.boardId||null,cardId:entry.cardId||null,linkId:entry.linkId||null});
+      if(results.length>=limit)break;
+    }
+    return{total:results.length,prefix:prefix||null,type:typeFilter||null,aliases:results};
+  },
+
+  'settings.get':async(args)=>{
+    if(!args||!args.key)return{settings:JSON.parse(JSON.stringify(appSettings))};
+    const path=String(args.key).split('.');
+    let v=appSettings;
+    for(const p of path){
+      if(v&&typeof v==='object'&&p in v)v=v[p];
+      else return{error:'Key nicht gefunden: '+args.key};
+    }
+    return{key:args.key,value:v};
+  },
+
+  'settings.set':async(args)=>{
+    const path=String(args.key||'').split('.');
+    if(!path[0])return{error:'key fehlt'};
+    // Nur Keys, die bereits in DEFAULT_SETTINGS existieren, sind akzeptiert
+    let ref=DEFAULT_SETTINGS;
+    for(let i=0;i<path.length-1;i++){
+      if(!ref||typeof ref!=='object'||!(path[i] in ref))return{error:'Unbekannter Settings-Key: '+args.key};
+      ref=ref[path[i]];
+    }
+    const lastKey=path[path.length-1];
+    if(!(lastKey in ref))return{error:'Unbekannter Settings-Key: '+args.key};
+    // Vis-Keys zusätzlich validieren
+    if(path[0]==='vis'){
+      if(!['edit','always','never'].includes(args.value))return{error:'vis-Wert muss edit/always/never sein'};
+    }
+    // Anwenden
+    let tgt=appSettings;
+    for(let i=0;i<path.length-1;i++){
+      if(!tgt[path[i]]||typeof tgt[path[i]]!=='object')tgt[path[i]]={};
+      tgt=tgt[path[i]];
+    }
+    const old=tgt[lastKey];
+    tgt[lastKey]=args.value;
+    saveSettings();
+    // Für vis-Klassen: sofort auf body anwenden
+    if(path[0]==='vis'){
+      document.body.classList.toggle('vis-'+lastKey,args.value==='always');
+    }
+    render();
+    return{set:true,key:args.key,old,value:args.value};
+  },
+
+  'undo.last':async()=>{
+    if(!_undoStack.length)return{undone:false,reason:'Undo-Stack leer'};
+    const entry=_undoStack.pop();
+    _applyUndo(entry);
+    return{undone:true,label:entry.label,remaining:_undoStack.length};
+  },
+
+  'status':async()=>{
+    const topNodeId=stack.length?stack[stack.length-1].nodeId:null;
+    const topNode=topNodeId?nodes[topNodeId]:null;
+    return{
+      rootId,
+      stackDepth:stack.length,
+      top:topNode?{id:topNodeId,type:topNode.type,label:topNode.label,alias:topNode.alias||null}:null,
+      nodeCount:Object.keys(nodes).length,
+      aliasCount:Object.keys(aliasIndex).length,
+      undoStackSize:_undoStack.length,
+      editMode,
+      clientId:localStorage.getItem('bridgeClientId')||null,
+      appVersion:(typeof DATA_VERSION!=='undefined'?DATA_VERSION:null)
+    };
   }
 });
 

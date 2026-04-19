@@ -6,7 +6,9 @@ import { checklistTools } from './checklist.js';
 import { infoLinkTools } from './info-link.js';
 import { matrixTools } from './matrix.js';
 import { matrixCrudTools } from './matrix-crud.js';
+import { metaTools } from './meta.js';
 import { queryTools } from './query.js';
+import { settingsTools } from './settings.js';
 
 export function registerAllTools(): void {
   for (const tool of [
@@ -18,6 +20,8 @@ export function registerAllTools(): void {
     ...checklistTools,
     ...queryTools,
     ...aliasTools,
+    ...settingsTools,
+    ...metaTools,
   ]) {
     registerTool(tool);
   }
