@@ -7756,6 +7756,14 @@ const BridgeClient=(()=>{
 })();
 
 // ─── MATRIX_TOOLS Registry ────────────────────────────────────────────
+// Ref-Resolver: akzeptiert Alias (^foo oder foo) oder direkte Node-ID → nodeId|null
+function _resolveNodeRef(ref){
+  if(!ref||typeof ref!=='string')return null;
+  const r=ref.startsWith('^')?ref.slice(1):ref;
+  const entry=aliasIndex[r.toLowerCase()];
+  if(entry&&entry.nodeId)return entry.nodeId;
+  return nodes[ref]?ref:null;
+}
 const MATRIX_TOOLS={
   'matrix.state.get':async(args)=>{
     const payload=JSON.parse(getPayload());
@@ -7842,6 +7850,118 @@ const MATRIX_TOOLS={
     const entry=aliasIndex[key];
     if(!entry)return{error:'Alias nicht gefunden: '+args.alias};
     return{alias:args.alias,resolved:entry};
+  },
+
+  // ─── Sprint 4.1: matrix-crud + edit-mode ──────────────────────────
+  'matrix.rename':async(args)=>{
+    const id=_resolveNodeRef(args.ref);
+    if(!id)return{error:'Matrix nicht gefunden: '+args.ref};
+    const node=nodes[id];
+    if(node.type!=='matrix')return{error:'Ref ist keine Matrix: '+args.ref};
+    const label=String(args.label||'').trim();
+    if(!label)return{error:'Label darf nicht leer sein'};
+    node.label=label;
+    const s=stack.find(x=>x.nodeId===id);if(s)s.label=label;
+    save();render();
+    return{renamed:true,id,label};
+  },
+
+  'matrix.delete':async(args)=>{
+    const id=_resolveNodeRef(args.ref);
+    if(!id)return{error:'Matrix nicht gefunden: '+args.ref};
+    if(id===rootId)return{error:'Root-Matrix kann nicht gelöscht werden'};
+    const node=nodes[id];
+    if(!node||node.type!=='matrix')return{error:'Ref ist keine Matrix: '+args.ref};
+    const label=node.label||id;
+    pushUndo(`Matrix „${label}" gelöscht`);
+    // Zellen-Refs im ganzen Baum entkoppeln, bevor removeTree die Node killt
+    for(const n of Object.values(nodes)){
+      if(n.type==='matrix'&&n.data&&n.data.cells){
+        for(const cell of Object.values(n.data.cells)){
+          if(cell.matrixId===id){
+            cell.matrixId=null;
+            cell.features=(cell.features||[]).filter(f=>f!=='matrix');
+          }
+        }
+      }
+    }
+    removeTree(id);
+    // Stack säubern: Einträge, deren Nodes nicht mehr existieren, poppen
+    while(stack.length>1&&!nodes[stack[stack.length-1].nodeId])stack.pop();
+    rebuildAliasIndex();save();render();
+    showUndoToast(`Matrix „${label}" gelöscht`);
+    return{deleted:true,id,label};
+  },
+
+  'row.add':async(args)=>{
+    const id=_resolveNodeRef(args.matrixRef);
+    if(!id)return{error:'Matrix nicht gefunden: '+args.matrixRef};
+    if(nodes[id].type!=='matrix')return{error:'Ref ist keine Matrix'};
+    const label=String(args.label||'').trim()||'Zeile';
+    const rowId=uid();
+    nodes[id].data.rows.push({id:rowId,label});
+    save();render();
+    return{added:true,matrixId:id,rowId,label};
+  },
+
+  'row.delete':async(args)=>{
+    const id=_resolveNodeRef(args.matrixRef);
+    if(!id||nodes[id].type!=='matrix')return{error:'Matrix nicht gefunden: '+args.matrixRef};
+    const d=nodes[id].data;
+    const row=d.rows.find(r=>r.id===args.rowId);
+    if(!row)return{error:'Zeile nicht gefunden: '+args.rowId};
+    pushUndo(`Zeile „${row.label}" gelöscht`);
+    d.rows=d.rows.filter(r=>r.id!==args.rowId);
+    Object.keys(d.cells).forEach(k=>{
+      if(k.startsWith(args.rowId+'-')){cleanupCellChildren(d.cells[k]);delete d.cells[k];}
+    });
+    // Stack-Einträge in gelöschter Zeile poppen
+    while(stack.length>1){
+      const top=stack[stack.length-1];
+      if(top.cellRef&&top.cellRef.parentId===id&&top.cellRef.rowId===args.rowId)stack.pop();
+      else break;
+    }
+    rebuildAliasIndex();save();render();
+    showUndoToast(`Zeile „${row.label}" gelöscht`);
+    return{deleted:true,matrixId:id,rowId:args.rowId,label:row.label};
+  },
+
+  'col.add':async(args)=>{
+    const id=_resolveNodeRef(args.matrixRef);
+    if(!id)return{error:'Matrix nicht gefunden: '+args.matrixRef};
+    if(nodes[id].type!=='matrix')return{error:'Ref ist keine Matrix'};
+    const label=String(args.label||'').trim()||'Spalte';
+    const colId=uid();
+    nodes[id].data.cols.push({id:colId,label});
+    save();render();
+    return{added:true,matrixId:id,colId,label};
+  },
+
+  'col.delete':async(args)=>{
+    const id=_resolveNodeRef(args.matrixRef);
+    if(!id||nodes[id].type!=='matrix')return{error:'Matrix nicht gefunden: '+args.matrixRef};
+    const d=nodes[id].data;
+    const col=d.cols.find(c=>c.id===args.colId);
+    if(!col)return{error:'Spalte nicht gefunden: '+args.colId};
+    pushUndo(`Spalte „${col.label}" gelöscht`);
+    d.cols=d.cols.filter(c=>c.id!==args.colId);
+    Object.keys(d.cells).forEach(k=>{
+      if(k.endsWith('-'+args.colId)){cleanupCellChildren(d.cells[k]);delete d.cells[k];}
+    });
+    while(stack.length>1){
+      const top=stack[stack.length-1];
+      if(top.cellRef&&top.cellRef.parentId===id&&top.cellRef.colId===args.colId)stack.pop();
+      else break;
+    }
+    rebuildAliasIndex();save();render();
+    showUndoToast(`Spalte „${col.label}" gelöscht`);
+    return{deleted:true,matrixId:id,colId:args.colId,label:col.label};
+  },
+
+  'matrix.edit_mode.set':async(args)=>{
+    const want=!!args.on;
+    if(want!==editMode)toggleEdit();
+    return{editMode};
   }
 };
 
