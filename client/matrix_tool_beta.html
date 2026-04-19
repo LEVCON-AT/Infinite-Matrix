@@ -8021,8 +8021,151 @@ const MATRIX_TOOLS={
     else delete cell.alias;
     rebuildAliasIndex();save();
     return{set:true,alias:cell.alias||null,matrixId:mid,rowId:args.rowId,colId:args.colId};
-  }
+  },
+
 };
+// ─── Sprint 4.3: board-card Resolver + Handler via Object.assign ──
+function _resolveBoardRef(ref){
+  const id=_resolveNodeRef(ref);
+  if(!id||!nodes[id]||nodes[id].type!=='board')return null;
+  return id;
+}
+function _resolveCardRef(args){
+  if(args.cardRef){
+    const raw=String(args.cardRef);
+    const key=(raw.startsWith('^')?raw.slice(1):raw).toLowerCase();
+    const entry=aliasIndex[key];
+    if(entry&&entry.type==='card'){
+      const card=getCard(entry.boardId,entry.cardId);
+      if(card)return{boardId:entry.boardId,cardId:entry.cardId,card};
+    }
+    return null;
+  }
+  if(args.boardRef&&args.cardId){
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return null;
+    const card=getCard(bid,args.cardId);
+    if(card)return{boardId:bid,cardId:args.cardId,card};
+  }
+  return null;
+}
+Object.assign(MATRIX_TOOLS,{
+  'card.create':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const b=nodes[bid].data;
+    if(!b.kbCols||!b.kbCols.length)return{error:'Board hat keine Spalten'};
+    const colId=args.colId||b.kbCols[0].id;
+    if(!b.kbCols.find(c=>c.id===colId))return{error:'Spalte nicht gefunden: '+colId};
+    const card={
+      id:uid(),colId,
+      name:String(args.name).trim(),
+      note:args.note?String(args.note):'',
+      tags:Array.isArray(args.tags)?args.tags.slice():[],
+      who:Array.isArray(args.who)?args.who.slice():[],
+      deadline:args.deadline||'',
+      recur:{type:'none'},
+      checklist:[],archived:false,done:false,
+      priority:args.priority!==undefined?args.priority:''
+    };
+    if(args.alias){
+      const v=validateAlias(args.alias,'');
+      if(!v.valid)return{error:'Alias ungültig: '+v.msg};
+      card.alias=v.alias;
+    }
+    nodes[bid].data.kbCards.push(card);
+    if(card.alias)rebuildAliasIndex();
+    save();render();
+    return{created:true,boardId:bid,cardId:card.id,colId,alias:card.alias||null};
+  },
+
+  'card.update':async(args)=>{
+    const ref=_resolveCardRef(args);
+    if(!ref)return{error:'Karte nicht gefunden'};
+    const patch=args.patch||{};
+    const allowed=['name','note','colId','priority','deadline','tags','who'];
+    const changed=[];
+    for(const k of allowed){
+      if(!(k in patch))continue;
+      if(k==='colId'){
+        const cols=nodes[ref.boardId].data.kbCols||[];
+        if(!cols.find(c=>c.id===patch.colId))return{error:'Spalte nicht gefunden: '+patch.colId};
+      }
+      if(k==='tags'||k==='who'){
+        if(!Array.isArray(patch[k]))return{error:k+' muss Array sein'};
+        ref.card[k]=patch[k].slice();
+      } else {
+        ref.card[k]=patch[k];
+      }
+      changed.push(k);
+    }
+    if(changed.length===0)return{updated:false,reason:'Kein gültiges Feld im Patch'};
+    save();render();
+    return{updated:true,boardId:ref.boardId,cardId:ref.cardId,changed};
+  },
+
+  'card.move':async(args)=>{
+    const ref=_resolveCardRef(args);
+    if(!ref)return{error:'Karte nicht gefunden'};
+    if(args.targetBoardRef){
+      const tgt=_resolveBoardRef(args.targetBoardRef);
+      if(!tgt)return{error:'Ziel-Board nicht gefunden: '+args.targetBoardRef};
+      if(tgt===ref.boardId&&!args.targetColId)return{moved:false,reason:'Gleiches Board, keine Spalte gesetzt'};
+      const tgtData=nodes[tgt].data;
+      const colId=args.targetColId||(tgtData.kbCols[0]&&tgtData.kbCols[0].id);
+      if(!colId||!tgtData.kbCols.find(c=>c.id===colId))return{error:'Ziel-Spalte ungültig: '+colId};
+      nodes[ref.boardId].data.kbCards=nodes[ref.boardId].data.kbCards.filter(c=>c.id!==ref.cardId);
+      ref.card.colId=colId;
+      tgtData.kbCards.push(ref.card);
+      if(ref.card.alias)rebuildAliasIndex();
+      save();render();
+      return{moved:true,cardId:ref.cardId,fromBoard:ref.boardId,toBoard:tgt,toCol:colId};
+    }
+    if(args.targetColId){
+      const cols=nodes[ref.boardId].data.kbCols||[];
+      if(!cols.find(c=>c.id===args.targetColId))return{error:'Spalte nicht gefunden: '+args.targetColId};
+      ref.card.colId=args.targetColId;
+      save();render();
+      return{moved:true,cardId:ref.cardId,boardId:ref.boardId,toCol:args.targetColId};
+    }
+    return{error:'Weder targetColId noch targetBoardRef angegeben'};
+  },
+
+  'card.delete':async(args)=>{
+    const ref=_resolveCardRef(args);
+    if(!ref)return{error:'Karte nicht gefunden'};
+    const label=ref.card.name||ref.cardId;
+    pushUndo(`Karte „${label}" gelöscht`);
+    nodes[ref.boardId].data.kbCards=nodes[ref.boardId].data.kbCards.filter(c=>c.id!==ref.cardId);
+    if(ref.card.alias)rebuildAliasIndex();
+    save();render();
+    showUndoToast(`Karte „${label}" gelöscht`);
+    return{deleted:true,boardId:ref.boardId,cardId:ref.cardId,label};
+  },
+
+  'card.done.toggle':async(args)=>{
+    const ref=_resolveCardRef(args);
+    if(!ref)return{error:'Karte nicht gefunden'};
+    const updated=setCardDone(ref.boardId,ref.cardId,true);
+    if(!updated)return{error:'Toggle fehlgeschlagen'};
+    render();
+    return{toggled:true,cardId:ref.cardId,done:updated.done,colId:updated.colId};
+  },
+
+  'card.recurrence.set':async(args)=>{
+    const ref=_resolveCardRef(args);
+    if(!ref)return{error:'Karte nicht gefunden'};
+    const r=args.recur||{type:'none'};
+    if(!['none','daily','weekly','monthly','yearly'].includes(r.type))return{error:'Unbekannter recur.type: '+r.type};
+    const out={type:r.type};
+    if(r.every!==undefined)out.every=r.every;
+    if(r.day!==undefined)out.day=r.day;
+    if(r.weekday!==undefined)out.weekday=r.weekday;
+    ref.card.recur=out;
+    save();render();
+    return{set:true,cardId:ref.cardId,recur:out};
+  }
+});
 
 // Bridge verbinden wenn konfiguriert
 if(localStorage.getItem('bridgeUrl'))BridgeClient.connect();
