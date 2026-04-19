@@ -8,7 +8,7 @@ Ein persönliches Organisations-System, aufgebaut auf einer **rekursiven Matrix-
 
 ## Wofür
 
-Ein Einzelwerkzeug statt Flickwerk aus separaten Apps (Notion + Trello + Todoist + Docs …). Alles in *einer* HTML-Datei: Daten, UI, Logik. Offline, lokal, ohne Account, ohne Server, portabel. AES-GCM-Verschlüsselung für sensible Inhalte; verschlüsselte Exports als `.imx`, plain als `.json`.
+Ein Einzelwerkzeug statt Flickwerk aus separaten Apps (Notion + Trello + Todoist + Docs …). Alles in *einer* HTML-Datei: Daten, UI, Logik. **Offline-first, self-hosted, ohne Drittanbieter-Account** — lokal im Browser (localStorage + File System Access API); optional AI-steuerbar über eine **selbstgehostete Bridge** (WebSocket + MCP) auf eigenem VPS. AES-GCM-Verschlüsselung für sensible Inhalte; verschlüsselte Exports als `.imx`, plain als `.json`.
 
 Nutzerprofil: jemand, der strukturiert denkt und ein Werkzeug will, das seinen Denkstrukturen folgt — statt ihn in vorgefertigte Schemata zu zwingen.
 
@@ -16,7 +16,7 @@ Nutzerprofil: jemand, der strukturiert denkt und ein Werkzeug will, das seinen D
 
 - **Ein Gitter als Atom.** Nicht Liste, nicht Baum, nicht Tag — Matrix. Zwei Achsen sind der natürliche Rahmen für Strukturiertes.
 - **Rekursion ohne Ende.** Jede Zelle kann zur neuen Matrix werden. Keine künstliche Decke.
-- **Datei statt Cloud.** Single-File-HTML öffnet im Browser wie ein Dokument. localStorage + optional verschlüsselte Dateien (`.imx`).
+- **Datei statt Cloud, Bridge statt SaaS.** Single-File-HTML öffnet im Browser wie ein Dokument (localStorage + verschlüsselte `.imx`-Dateien). Für AI-Integration: selbstgehostete Bridge auf eigenem Server (Node + SQLite + nginx/TLS), kein Drittanbieter zwischen User und Daten.
 - **Tastatur-first.** `^alias` springt direkt zu jeder benannten Stelle. `S` swappt Fokus Sidebar ↔ Canvas. `+` öffnet Kontextmenü auf Sidebar-Zeilen. Alt+↑↓ durch Suchverlauf. `Shift+A` togglet im Full-Modus "alles expandiert" (sticky).
 - **Direkte Manipulation.** Matrizen editierbar wie Spreadsheets; Kanban innerhalb der Zelle; Checklisten inline.
 
@@ -44,7 +44,7 @@ Konsequenz: Jede Änderung bleibt inline, bleibt portabel, bleibt eine Datei.
 4. **Animated, wenn sichtbar.** Sichtbare State-Änderungen animieren, nie harte `display:none`/`visibility:hidden`-Swaps. Projekt-Standard: `220 ms cubic-bezier(.4, 0, .2, 1)` für Transitions, `180 ms cubic-bezier(.16, 1, .3, 1)` für Enter-Animationen. Bei scaleY-Animationen immer `transform-origin: left center` (damit SVG-Dots nicht verrutschen). Smooth-Scroll über `scrollIntoView({behavior:'smooth'})` — respektiert `prefers-reduced-motion`.
 5. **Single-File-Constraint.** Nichts extrahieren. CSS und JS bleiben in der HTML-Datei.
 6. **Deutsch.** UI-Strings deutsch. Kommentare konsistent zur umgebenden Datei.
-7. **Daten bleiben beim User.** Nichts geht an Server. Nichts wird getrackt. Verschlüsselung (AES-GCM, PBKDF2, 100k iterations) ist die einzige Form "Netzwerk", die das Projekt kennt.
+7. **Datenhoheit beim User.** Im Offline-Modus: nichts geht je an einen Server. Im Bridge-Modus: Datenfluss ausschließlich zum **eigenen** Server (self-hosted VPS), authentifiziert mit einem Token, den der User selbst generiert. Kein Drittanbieter, kein Tracking. Verschlüsselung (AES-GCM, PBKDF2, 100k iterations) für sensible Exports. Bridge-Snapshot wird als JSON in der User-eigenen SQLite persistiert — gleiche Eigentumslogik wie localStorage.
 8. **Risiko-Aktionen bestätigen lassen.** Destruktives (git reset, rm, Branch-Delete) und Außenwirkung (push, PR, Comment) vorab abnicken lassen.
 9. **Keine Rückgängig-Diskussion.** Wenn User "revertiere" sagt: sofort machen, nicht erklären.
 10. **Messbare Verifikation.** Behauptungen mit Zahlen belegen (`maxDelta < 1px`, `activeInDom === expectedId`), nicht "sieht passend aus".
@@ -306,7 +306,7 @@ Niemals „mach ich später, merk ich mir eh" — wird garantiert vergessen.
 
 ## Kontext-Window & Sprint-Aufteilung
 
-Die App ist ~7k LOC in *einer* Datei. Ein Review- oder Refactor-Durchgang kann das Kontext-Fenster sprengen. Deshalb:
+Die Codebasis: **Client ~8.5k LOC** in `client/matrix_tool_beta.html` (Single-File), plus **Bridge ~900 LOC TypeScript** in `bridge/src/`. Ein Review- oder Refactor-Durchgang am Client kann das Kontext-Fenster sprengen. Deshalb:
 
 ### Kontext-Awareness während der Session
 
@@ -449,3 +449,19 @@ Preview-Server `matrix` auf Port 3848 — im `.claude/launch.json` definiert. Be
 8. **Destruktive Änderungen:** `pushUndo` + `showUndoToast` **bevor** der Commit erfolgt.
 9. **Zusammenfassung am Ende.** Tabelle mit Sub-Sprint / Commit-Hash / Messwert-Pointer. Keine Marketing-Sprache. Stellen-Links als `[file.html:line](…)`.
 10. **Branch-Merge erst auf explizite User-Freigabe.** Der Merge-Vorschlag kommt als letzter Satz der Zusammenfassung.
+
+## Dokumenten-Landkarte
+
+Diese Datei (CLAUDE.md) bleibt der **Single Entry Point** für Konventionen, Prinzipien und Prüfroutinen. Bei spezifischen Fragen → gezielt in diese Datei/Ordner schauen:
+
+| Was | Wo | Wann lesen |
+|---|---|---|
+| Bridge-Architektur + Deployment-Plan | `docs/plan-bridge.md` | Bei Bridge-/MCP-/VPS-Arbeit, besonders Phase 2+ |
+| MCP-Tool-Beispiele (Schemas) | `bridge/src/tools/*.ts` | Beim Hinzufügen neuer Tools — Pattern kopieren |
+| Client-Handler-Patterns | `client/matrix_tool_beta.html` Suchmuster `MATRIX_TOOLS={` | Beim Hinzufügen neuer Tool-Handler |
+| nginx/systemd-Config | `infra/nginx/matrix.conf`, `infra/systemd/matrix-bridge.service` | Bei Deploy/Infra-Arbeit |
+| CI/CD-Workflow | `.github/workflows/deploy.yml`, `pr.yml` | Bei CI-Anpassungen |
+| Design-Tokens + CSS-Patterns | `client/matrix_tool_beta.html` Sucher `:root {` | Bei UI-Arbeit |
+| Memory-Files (Session-Wissen) | `~/.claude/projects/…/memory/` — lokal pro Claude-Installation | Automatisch beim Session-Start gelesen |
+
+**Wenn CLAUDE.md > 1000 Zeilen wird:** Domain-Splits erwägen (`bridge/CLAUDE.md`, `infra/CLAUDE.md`) — Claude Code liest sub-CLAUDE.md-Files automatisch, wenn man im jeweiligen Ordner arbeitet. Root-CLAUDE.md behält dann nur Core-Prinzipien + Verweis auf Domain-Docs. Aktuell (~600 Zeilen) noch nicht nötig.
