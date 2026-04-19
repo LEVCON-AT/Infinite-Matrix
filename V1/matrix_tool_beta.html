@@ -4655,7 +4655,7 @@ function _renderCardModalHTML(boardId,cardId,b,card,cols){
 
   // Checklist
   h+=`<div class="section-divider row-g8">Checkliste <span tabindex="0" role="button" title="Alle abchecken (Shift+R)" class="cl-reset" data-action="cl:reset-card" onkeydown="if(event.key==='Enter'){event.preventDefault();resetCardCl('${boardId}','${cardId}');}">↺</span></div>`;
-  h+=`<div id="card-cl-section" onkeydown="if(event.shiftKey&&(event.key==='R'||event.key==='r')){event.preventDefault();resetCardCl('${boardId}','${cardId}');}">`;
+  h+=`<div id="card-cl-section" onkeydown="if(event.shiftKey&&(event.key==='R'||event.key==='r')&&!event.target.matches('input,textarea,[contenteditable]')){event.preventDefault();resetCardCl('${boardId}','${cardId}');}">`;
   const cl=card.checklist||[];
   cl.forEach((item,idx)=>{
     const canUp=idx>0,canDn=idx<cl.length-1;
@@ -4969,7 +4969,7 @@ function renderChecklists(node){
   if(checklists.length===0) h+=emptyState(ICO.check(32),UI.emptyChecklists);
   checklists.forEach(cl=>{
     const done=cl.items.filter(i=>i.done).length;
-    h+=`<div class="card" data-cl-id="${cl.id}" onkeydown="if(event.shiftKey&&(event.key==='R'||event.key==='r')){event.preventDefault();resetCl('${node.id}','${cl.id}');}">
+    h+=`<div class="card" data-cl-id="${cl.id}" onkeydown="if(event.shiftKey&&(event.key==='R'||event.key==='r')&&!event.target.matches('input,textarea,[contenteditable]')){event.preventDefault();resetCl('${node.id}','${cl.id}');}">
       <div class="cardhd">
         ${editMode?`<input class="ni ni-md" value="${esc(cl.label)}" onchange="renameCl('${node.id}','${cl.id}',this.value)"/>`:`<span>${esc(cl.label)}</span>`}
         <span class="cl-count">${done}/${cl.items.length}</span>
