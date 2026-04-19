@@ -8164,6 +8164,128 @@ Object.assign(MATRIX_TOOLS,{
     ref.card.recur=out;
     save();render();
     return{set:true,cardId:ref.cardId,recur:out};
+  },
+
+  // ─── Sprint 4.4: info-link + checklist ───────────────────────────
+  'info.field.add':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const label=String(args.label||'').trim();
+    if(!label)return{error:'Label darf nicht leer sein'};
+    const field={id:uid(),label,value:args.value!==undefined?String(args.value):''};
+    nodes[bid].data.infoFields.push(field);
+    save();render();
+    return{added:true,boardId:bid,fieldId:field.id,label:field.label};
+  },
+
+  'info.field.update':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const field=nodes[bid].data.infoFields.find(f=>f.id===args.fieldId);
+    if(!field)return{error:'Info-Feld nicht gefunden: '+args.fieldId};
+    const changed=[];
+    if(args.value!==undefined){field.value=String(args.value);changed.push('value');}
+    if(args.label!==undefined){
+      const lbl=String(args.label).trim();
+      if(!lbl)return{error:'Label darf nicht leer sein'};
+      field.label=lbl;changed.push('label');
+    }
+    if(changed.length===0)return{updated:false,reason:'Kein Feld zu aktualisieren'};
+    save();render();
+    return{updated:true,boardId:bid,fieldId:field.id,changed};
+  },
+
+  'info.field.delete':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const d=nodes[bid].data;
+    const field=d.infoFields.find(f=>f.id===args.fieldId);
+    if(!field)return{error:'Info-Feld nicht gefunden: '+args.fieldId};
+    pushUndo(`Info-Feld „${field.label}" gelöscht`);
+    d.infoFields=d.infoFields.filter(f=>f.id!==args.fieldId);
+    save();render();
+    showUndoToast(`Info-Feld „${field.label}" gelöscht`);
+    return{deleted:true,boardId:bid,fieldId:args.fieldId,label:field.label};
+  },
+
+  'link.add':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const safeUrl=typeof sanitizeUrl==='function'?sanitizeUrl(args.url):args.url;
+    if(!safeUrl)return{error:'URL ungültig: '+args.url};
+    const link={id:uid(),label:(args.label&&String(args.label).trim())||safeUrl,url:safeUrl};
+    if(args.alias){
+      const va=validateAlias(args.alias,'');
+      if(!va.valid)return{error:'Alias ungültig: '+va.msg};
+      link.alias=va.alias;
+    }
+    nodes[bid].data.links.push(link);
+    if(link.alias)rebuildAliasIndex();
+    save();render();
+    return{added:true,boardId:bid,linkId:link.id,label:link.label,url:link.url,alias:link.alias||null};
+  },
+
+  'link.delete':async(args)=>{
+    // Resolver: linkRef (Alias) ODER boardRef+linkId
+    let boardId=null, linkId=null;
+    if(args.linkRef){
+      const raw=String(args.linkRef);
+      const key=(raw.startsWith('^')?raw.slice(1):raw).toLowerCase();
+      const entry=aliasIndex[key];
+      if(entry&&(entry.type==='link'||entry.type==='mail')){
+        boardId=entry.boardId;linkId=entry.linkId;
+      }
+    }
+    if(!boardId&&args.boardRef&&args.linkId){
+      const bid=_resolveBoardRef(args.boardRef);
+      if(bid){boardId=bid;linkId=args.linkId;}
+    }
+    if(!boardId||!linkId)return{error:'Link nicht gefunden'};
+    const link=nodes[boardId].data.links.find(l=>l.id===linkId);
+    if(!link)return{error:'Link nicht gefunden: '+linkId};
+    const label=link.label||link.url||linkId;
+    pushUndo(`Link „${label}" gelöscht`);
+    nodes[boardId].data.links=nodes[boardId].data.links.filter(l=>l.id!==linkId);
+    if(link.alias)rebuildAliasIndex();
+    save();render();
+    showUndoToast(`Link „${label}" gelöscht`);
+    return{deleted:true,boardId,linkId,label};
+  },
+
+  'checklist.add':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const label=String(args.label||'').trim();
+    if(!label)return{error:'Label darf nicht leer sein'};
+    const cl={id:uid(),label,items:[]};
+    nodes[bid].data.checklists.push(cl);
+    save();render();
+    return{added:true,boardId:bid,checklistId:cl.id,label:cl.label};
+  },
+
+  'checklist.item.add':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const cl=nodes[bid].data.checklists.find(c=>c.id===args.checklistId);
+    if(!cl)return{error:'Checkliste nicht gefunden: '+args.checklistId};
+    const text=String(args.text||'').trim();
+    if(!text)return{error:'Item-Text darf nicht leer sein'};
+    const item={id:uid(),text,done:false};
+    cl.items.push(item);
+    save();render();
+    return{added:true,boardId:bid,checklistId:cl.id,itemId:item.id,text};
+  },
+
+  'checklist.item.toggle':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const cl=nodes[bid].data.checklists.find(c=>c.id===args.checklistId);
+    if(!cl)return{error:'Checkliste nicht gefunden: '+args.checklistId};
+    const item=cl.items.find(i=>i.id===args.itemId);
+    if(!item)return{error:'Item nicht gefunden: '+args.itemId};
+    item.done=!item.done;
+    save();render();
+    return{toggled:true,boardId:bid,checklistId:cl.id,itemId:item.id,done:item.done};
   }
 });
 
