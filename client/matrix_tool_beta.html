@@ -7962,6 +7962,65 @@ const MATRIX_TOOLS={
     const want=!!args.on;
     if(want!==editMode)toggleEdit();
     return{editMode};
+  },
+
+  // ─── Sprint 4.2: cell-Gruppe ──────────────────────────────────────
+  'cell.get':async(args)=>{
+    const mid=_resolveNodeRef(args.matrixRef);
+    if(!mid||nodes[mid].type!=='matrix')return{error:'Matrix nicht gefunden: '+args.matrixRef};
+    const d=nodes[mid].data;
+    if(!d.rows.find(r=>r.id===args.rowId))return{error:'Zeile nicht gefunden: '+args.rowId};
+    if(!d.cols.find(c=>c.id===args.colId))return{error:'Spalte nicht gefunden: '+args.colId};
+    const key=args.rowId+'-'+args.colId;
+    const raw=d.cells[key]||{};
+    const features=raw.features||[];
+    const hasContent=!!(raw.alias||raw.boardId||raw.matrixId||features.length>0);
+    return{hasContent,matrixId:mid,rowId:args.rowId,colId:args.colId,cell:{
+      alias:raw.alias||null,
+      features:features.slice(),
+      boardId:raw.boardId||null,
+      matrixId:raw.matrixId||null,
+      tabLabels:raw.tabLabels?JSON.parse(JSON.stringify(raw.tabLabels)):{}
+    }};
+  },
+
+  'cell.feature.add':async(args)=>{
+    const mid=_resolveNodeRef(args.matrixRef);
+    if(!mid||nodes[mid].type!=='matrix')return{error:'Matrix nicht gefunden: '+args.matrixRef};
+    const d=nodes[mid].data;
+    if(!d.rows.find(r=>r.id===args.rowId))return{error:'Zeile nicht gefunden: '+args.rowId};
+    if(!d.cols.find(c=>c.id===args.colId))return{error:'Spalte nicht gefunden: '+args.colId};
+    const feat=args.feature;
+    if(!['matrix','board','info','checklists'].includes(feat))return{error:'Unbekanntes Feature: '+feat};
+    const cell=getCell(mid,args.rowId+'-'+args.colId);
+    const defaultLabel=(args.label&&String(args.label).trim())||
+      ((d.rows.find(r=>r.id===args.rowId)?.label||'')+' / '+(d.cols.find(c=>c.id===args.colId)?.label||''));
+    if(feat==='matrix'){
+      if(!cell.matrixId)cell.matrixId=mkMatrix(defaultLabel.trim()||'Sub-Matrix');
+      addFeature(cell,'matrix');
+    }else{
+      if(!cell.boardId)cell.boardId=mkBoard(defaultLabel.trim()||'Board');
+      addFeature(cell,feat);
+    }
+    rebuildAliasIndex();save();render();
+    return{added:true,matrixId:mid,rowId:args.rowId,colId:args.colId,feature:feat,
+      boardId:cell.boardId||null,subMatrixId:cell.matrixId||null,features:[...cell.features]};
+  },
+
+  'cell.alias.set':async(args)=>{
+    const mid=_resolveNodeRef(args.matrixRef);
+    if(!mid||nodes[mid].type!=='matrix')return{error:'Matrix nicht gefunden: '+args.matrixRef};
+    const d=nodes[mid].data;
+    if(!d.rows.find(r=>r.id===args.rowId))return{error:'Zeile nicht gefunden: '+args.rowId};
+    if(!d.cols.find(c=>c.id===args.colId))return{error:'Spalte nicht gefunden: '+args.colId};
+    const cell=getCell(mid,args.rowId+'-'+args.colId);
+    const oldAlias=cell.alias||'';
+    const v=validateAlias(args.alias||'',oldAlias);
+    if(!v.valid)return{error:v.msg};
+    if(v.alias)cell.alias=v.alias;
+    else delete cell.alias;
+    rebuildAliasIndex();save();
+    return{set:true,alias:cell.alias||null,matrixId:mid,rowId:args.rowId,colId:args.colId};
   }
 };
 
