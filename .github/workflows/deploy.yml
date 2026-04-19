@@ -1,0 +1,124 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'bridge/**'
+      - 'client/**'
+      - 'infra/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      bridge-sha: ${{ steps.hash.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: bridge/pnpm-lock.yaml
+
+      - name: Install & Build
+        working-directory: bridge
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm lint
+          pnpm typecheck
+          pnpm test -- --run
+          pnpm build
+
+      - name: Hash build
+        id: hash
+        working-directory: bridge
+        run: echo "sha=$(sha256sum dist/index.js | cut -d' ' -f1 | head -c 12)" >> "$GITHUB_OUTPUT"
+
+      - name: Package artifact
+        run: |
+          mkdir -p artifact/bridge
+          cp -r bridge/dist artifact/bridge/dist
+          cp bridge/package.json bridge/pnpm-lock.yaml artifact/bridge/
+          mkdir -p artifact/client
+          cp client/matrix_tool_beta.html artifact/client/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deploy-artifact
+          path: artifact/
+          retention-days: 7
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: deploy-artifact, path: artifact }
+
+      - name: Setup SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Deploy bridge
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/id_ed25519" \
+            artifact/bridge/ \
+            "$USER@$HOST:/tmp/matrix-bridge-stage/"
+
+          ssh -i ~/.ssh/id_ed25519 "$USER@$HOST" bash -s <<'REMOTE'
+            set -euo pipefail
+            cd /tmp/matrix-bridge-stage
+            pnpm install --prod --frozen-lockfile --ignore-scripts
+
+            sudo rsync -az --delete \
+              --chown=matrix-bridge:matrix-bridge \
+              /tmp/matrix-bridge-stage/ \
+              /opt/matrix-bridge/
+
+            sudo systemctl restart matrix-bridge
+            sleep 2
+            curl -fsS http://127.0.0.1:3849/healthz || (sudo journalctl -u matrix-bridge -n 50 && exit 1)
+          REMOTE
+
+      - name: Deploy client
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/id_ed25519" \
+            artifact/client/ \
+            "$USER@$HOST:/var/www/matrix/"
+
+      - name: Smoke test
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          set -euo pipefail
+          curl -fsS "https://$HOST/healthz" | grep -q '"ok":true'
+          curl -fsS -o /dev/null -w "%{http_code}\n" "https://$HOST/" | grep -q 200
