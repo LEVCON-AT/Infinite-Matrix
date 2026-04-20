@@ -9,10 +9,15 @@ function getTool(name: string) {
 }
 
 describe('checklist tool registrierung', () => {
-  it('enthält alle 3 Sprint-4.4b-Tools', () => {
-    expect(checklistTools).toHaveLength(3);
+  it('enthält 4 Tools (Sprint 4.4b + V2.1 set_level)', () => {
+    expect(checklistTools).toHaveLength(4);
     const names = checklistTools.map((t) => t.name).sort();
-    expect(names).toEqual(['checklist.add', 'checklist.item.add', 'checklist.item.toggle']);
+    expect(names).toEqual([
+      'checklist.add',
+      'checklist.item.add',
+      'checklist.item.set_level',
+      'checklist.item.toggle',
+    ]);
   });
 });
 
@@ -57,6 +62,47 @@ describe('checklist.item.add schema', () => {
   it('lehnt afterItemId als number ab', () => {
     expect(
       t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', text: 'x', afterItemId: 5 }).success,
+    ).toBe(false);
+  });
+  it('akzeptiert optionales level 0-2', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', text: 'x', level: 2 }).success,
+    ).toBe(true);
+  });
+  it('lehnt level 3 ab', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', text: 'x', level: 3 }).success,
+    ).toBe(false);
+  });
+  it('lehnt negatives level ab', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', text: 'x', level: -1 }).success,
+    ).toBe(false);
+  });
+});
+
+describe('checklist.item.set_level schema', () => {
+  const t = getTool('checklist.item.set_level');
+  it('akzeptiert gültige Args (level 0..2)', () => {
+    for (const lvl of [0, 1, 2]) {
+      expect(
+        t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', itemId: 'n8', level: lvl }).success,
+      ).toBe(true);
+    }
+  });
+  it('lehnt level 3 ab', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', itemId: 'n8', level: 3 }).success,
+    ).toBe(false);
+  });
+  it('lehnt level als float ab', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', itemId: 'n8', level: 1.5 }).success,
+    ).toBe(false);
+  });
+  it('lehnt fehlendes level ab', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', itemId: 'n8' }).success,
     ).toBe(false);
   });
 });

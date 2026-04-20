@@ -27,6 +27,7 @@ describe('registerAllTools() Integration', () => {
       'cell.get',
       'checklist.add',
       'checklist.item.add',
+      'checklist.item.set_level',
       'checklist.item.toggle',
       'col.add',
       'col.delete',
@@ -54,7 +55,7 @@ describe('registerAllTools() Integration', () => {
     ];
 
     expect(names).toEqual(expected);
-    expect(tools.size).toBe(37); // Plan nennt ~35, tatsächliche Summe mit meta+status+edit_mode: 37
+    expect(tools.size).toBe(38); // +1 aus V2.1: checklist.item.set_level
   });
 
   it('jedes registrierte Tool hat schema + jsonSchema', () => {

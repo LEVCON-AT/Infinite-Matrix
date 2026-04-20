@@ -209,7 +209,7 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 
 /* ── CHECKLISTS TAB ── */
 .cl-list{padding:10px 13px;}
-.cl-item{display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border);}
+.cl-item{display:flex;align-items:flex-start;gap:8px;padding:5px 0;padding-left:calc(var(--space-md) * var(--cl-level, 0));border-bottom:0.5px solid var(--border);}
 .cl-item:last-child{border-bottom:none;}
 .cl-check{width:15px;height:15px;border-radius:3px;border:1.5px solid var(--border2);flex-shrink:0;margin-top:2px;cursor:pointer;position:relative;}
 .cl-check.done{background:var(--teal);border-color:var(--teal);}
@@ -1084,6 +1084,7 @@ const ANIM_ENTER_MS=220;
 const ANIM_CHECK_MS=350;
 const RENDER_DELAY_MS=200;
 const FOCUS_RESTORE_MS=50;
+const CL_MAX_LEVEL=2;
 const MODAL_FOCUS_DELAY_MS=30;
 const SMODAL_EXIT_MS=150;
 // ── Crypto-Parameter (Sprint 1) ──
@@ -1885,6 +1886,13 @@ function loadData(d){
   currentTab=(d.currentTab&&typeof d.currentTab==='object'&&!Array.isArray(d.currentTab))?d.currentTab:{};
   stack=[{nodeId:rootId,label:nodes[rootId].label,cellRef:null}];
   migrateNodeAliasesToCells();
+  // V2.1: level-Feld auf Checklisten-Items (Board + Karte) backfillen
+  Object.values(nodes).forEach(n=>{
+    if(n.type==='board'){
+      (n.data.checklists||[]).forEach(cl=>(cl.items||[]).forEach(it=>{if(typeof it.level!=='number')it.level=0;}));
+      (n.data.kbCards||[]).forEach(c=>(c.checklist||[]).forEach(it=>{if(typeof it.level!=='number')it.level=0;}));
+    }
+  });
   rebuildAliasIndex();
 }
 function tryLoad(){
@@ -4675,10 +4683,11 @@ function _renderCardModalHTML(boardId,cardId,b,card,cols){
   const cl=card.checklist||[];
   cl.forEach((item,idx)=>{
     const canUp=idx>0,canDn=idx<cl.length-1;
-    h+=`<div class="cl-item cl-row" data-cl-item="${item.id}" ${editMode?`ondragover="clDragOver(event)" ondrop="clDragDrop(event,'card','${boardId}','${cardId}','${item.id}')"`:''}>
+    const lvl=item.level|0;
+    h+=`<div class="cl-item cl-row" data-cl-item="${item.id}" style="--cl-level:${lvl}" ${editMode?`ondragover="clDragOver(event)" ondrop="clDragDrop(event,'card','${boardId}','${cardId}','${item.id}')"`:''}>
       ${editMode?`<span class="cl-drag" draggable="true" title="Verschieben" ondragstart="clDragStart(event,'card','${boardId}','${cardId}','${item.id}')" ondragend="clDragEnd(event)">⋮⋮</span>`:''}
       <div class="cl-check${item.done?' done':''}" tabindex="0" role="checkbox" aria-checked="${item.done}" data-action="cl:toggle" data-id="${item.id}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleClItem('${boardId}','${cardId}','${item.id}');}else if(editMode&&event.shiftKey&&(event.key==='ArrowUp'||event.key==='ArrowDown')){event.preventDefault();moveClItem('card','${boardId}','${cardId}','${item.id}',event.key==='ArrowUp'?-1:1);}"></div>
-      <input class="cl-text cl-text-input" data-done="${item.done?'true':'false'}" value="${esc(item.text)}" data-change="cl:update" data-blur="cl:autodel-blur" data-id="${item.id}" onkeydown="if(event.key==='Enter'){event.preventDefault();if(!this.value.trim())return;updateClItem('${boardId}','${cardId}','${item.id}',this.value);addClItem('${boardId}','${cardId}','${item.id}');}else if(editMode&&event.shiftKey&&(event.key==='ArrowUp'||event.key==='ArrowDown')){event.preventDefault();moveClItem('card','${boardId}','${cardId}','${item.id}',event.key==='ArrowUp'?-1:1);}"/>
+      <input class="cl-text cl-text-input" data-done="${item.done?'true':'false'}" value="${esc(item.text)}" data-change="cl:update" data-blur="cl:autodel-blur" data-id="${item.id}" onkeydown="if(event.key==='Enter'){event.preventDefault();if(!this.value.trim())return;updateClItem('${boardId}','${cardId}','${item.id}',this.value);addClItem('${boardId}','${cardId}','${item.id}',${item.level|0});}else if(event.altKey&&(event.key==='ArrowRight'||event.key==='ArrowLeft')){event.preventDefault();setClItemLevel('card','${boardId}','${cardId}','${item.id}',event.key==='ArrowRight'?1:-1);}else if(editMode&&event.shiftKey&&(event.key==='ArrowUp'||event.key==='ArrowDown')){event.preventDefault();moveClItem('card','${boardId}','${cardId}','${item.id}',event.key==='ArrowUp'?-1:1);}"/>
       ${editMode?`<span class="cl-arrow" ${canUp?'tabindex="0" role="button"':'data-disabled="true"'} ${canUp?`data-action="cl:move" data-id="${item.id}" data-dir="-1" onkeydown="if(event.key==='Enter'){event.preventDefault();moveClItem('card','${boardId}','${cardId}','${item.id}',-1);}"`:''}>↑</span>
       <span class="cl-arrow" ${canDn?'tabindex="0" role="button"':'data-disabled="true"'} ${canDn?`data-action="cl:move" data-id="${item.id}" data-dir="1" onkeydown="if(event.key==='Enter'){event.preventDefault();moveClItem('card','${boardId}','${cardId}','${item.id}',1);}"`:''}>↓</span>`:''}
       <span class="cl-del" tabindex="0" role="button" data-action="cl:delete" data-id="${item.id}" onkeydown="if(event.key==='Enter'){event.preventDefault();delClItem('${boardId}','${cardId}','${item.id}');}">${ICO.close(ICO_SIZE.XS)}</span>
@@ -4886,17 +4895,18 @@ function addGlobalPerson(boardId,cardId){
     toggleCardWho(boardId,cardId,v.l);
   });
 }
-function addClItem(boardId,cardId,afterItemId){
+function addClItem(boardId,cardId,afterItemId,level){
   const c=getCard(boardId,cardId);
   if(!c)return;if(!c.checklist)c.checklist=[];
-  const newItem={id:uid(),text:'',done:false};
+  const lvl=typeof level==='number'?Math.max(0,Math.min(CL_MAX_LEVEL,level|0)):0;
+  const newItem={id:uid(),text:'',done:false,level:lvl};
   const idx=afterItemId?c.checklist.findIndex(i=>i.id===afterItemId):-1;
   if(idx>=0)c.checklist.splice(idx+1,0,newItem);
   else c.checklist.push(newItem);
   save();openCard(boardId,cardId);
   setTimeout(()=>{
     const el=document.querySelector(`#card-cl-section .cl-item[data-cl-item="${newItem.id}"] input`);
-    if(el)el.focus();
+    if(el)el.focus({preventScroll:true});
   },FOCUS_RESTORE_MS);
 }
 function toggleClItem(boardId,cardId,itemId){
@@ -5000,11 +5010,12 @@ function renderChecklists(node){
       <div class="cl-list">`;
     cl.items.forEach((item,idx)=>{
       const canUp=idx>0,canDn=idx<cl.items.length-1;
-      h+=`<div class="cl-item" data-cl-item="${item.id}" ${editMode?`ondragover="clDragOver(event)" ondrop="clDragDrop(event,'std','${node.id}','${cl.id}','${item.id}')"`:''}>
+      const lvl=item.level|0;
+      h+=`<div class="cl-item" data-cl-item="${item.id}" style="--cl-level:${lvl}" ${editMode?`ondragover="clDragOver(event)" ondrop="clDragDrop(event,'std','${node.id}','${cl.id}','${item.id}')"`:''}>
         ${editMode?`<span class="cl-drag" draggable="true" title="Verschieben" ondragstart="clDragStart(event,'std','${node.id}','${cl.id}','${item.id}')" ondragend="clDragEnd(event)">⋮⋮</span>`:''}
         <div class="cl-check${item.done?' done':''}" tabindex="${editMode?-1:(idx===0?0:-1)}" role="checkbox" aria-checked="${item.done}" onclick="toggleCl('${node.id}','${cl.id}','${item.id}')" onkeydown="if(event.key===' '){event.preventDefault();toggleCl('${node.id}','${cl.id}','${item.id}',true);}else if(editMode&&event.shiftKey&&(event.key==='ArrowUp'||event.key==='ArrowDown')){event.preventDefault();moveClItem('std','${node.id}','${cl.id}','${item.id}',event.key==='ArrowUp'?-1:1);}else if(event.key==='ArrowUp'||event.key==='ArrowDown'){event.preventDefault();_clNav(this,event.key==='ArrowUp'?-1:1);}"></div>
         ${editMode
-          ?`<input class="cl-text cl-text-edit${item.done?' done':''}" tabindex="-1" data-done="${item.done?'true':'false'}" value="${esc(item.text)}" onchange="updateClText('std','${node.id}','${cl.id}','${item.id}',this.value)" onblur="if(!this.value.trim())delClFromList('${node.id}','${cl.id}','${item.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();if(!this.value.trim())return;updateClText('std','${node.id}','${cl.id}','${item.id}',this.value);addClItemDirect('${node.id}','${cl.id}','${item.id}');}else if(event.shiftKey&&(event.key==='ArrowUp'||event.key==='ArrowDown')){event.preventDefault();moveClItem('std','${node.id}','${cl.id}','${item.id}',event.key==='ArrowUp'?-1:1);}"/>`
+          ?`<input class="cl-text cl-text-edit${item.done?' done':''}" tabindex="-1" data-done="${item.done?'true':'false'}" value="${esc(item.text)}" onchange="updateClText('std','${node.id}','${cl.id}','${item.id}',this.value)" onblur="if(!this.value.trim())delClFromList('${node.id}','${cl.id}','${item.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();if(!this.value.trim())return;updateClText('std','${node.id}','${cl.id}','${item.id}',this.value);addClItemDirect('${node.id}','${cl.id}','${item.id}',${item.level|0});}else if(event.altKey&&(event.key==='ArrowRight'||event.key==='ArrowLeft')){event.preventDefault();setClItemLevel('std','${node.id}','${cl.id}','${item.id}',event.key==='ArrowRight'?1:-1);}else if(event.shiftKey&&(event.key==='ArrowUp'||event.key==='ArrowDown')){event.preventDefault();moveClItem('std','${node.id}','${cl.id}','${item.id}',event.key==='ArrowUp'?-1:1);}"/>`
           :`<span class="cl-text${item.done?' done':''}">${esc(item.text)}</span>`}
         ${editMode?`<span class="cl-arrow" ${canUp?'tabindex="0" role="button"':'data-disabled="true"'} ${canUp?`onclick="moveClItem('std','${node.id}','${cl.id}','${item.id}',-1)" onkeydown="if(event.key==='Enter'){event.preventDefault();moveClItem('std','${node.id}','${cl.id}','${item.id}',-1);}"`:''}>↑</span>
         <span class="cl-arrow" ${canDn?'tabindex="0" role="button"':'data-disabled="true"'} ${canDn?`onclick="moveClItem('std','${node.id}','${cl.id}','${item.id}',1)" onkeydown="if(event.key==='Enter'){event.preventDefault();moveClItem('std','${node.id}','${cl.id}','${item.id}',1);}"`:''}>↓</span>
@@ -5033,6 +5044,23 @@ function delChecklist(boardId,clId){nodes[boardId].data.checklists=nodes[boardId
 function toggleCl(boardId,clId,itemId,keepFocus){const cl=nodes[boardId].data.checklists.find(x=>x.id===clId);if(!cl)return;const i=cl.items.find(x=>x.id===itemId);if(i)i.done=!i.done;save();render();if(keepFocus)setTimeout(()=>{const cb=document.querySelector(`.cl-item[data-cl-item="${itemId}"] .cl-check`);if(!cb)return;if(!editMode)_clRovingSet(cb);cb.focus({preventScroll:true});},FOCUS_RESTORE_MS);}
 function delClFromList(boardId,clId,itemId){const cl=nodes[boardId].data.checklists.find(x=>x.id===clId);if(cl)cl.items=cl.items.filter(i=>i.id!==itemId);save();render();}
 function addClItem2(boardId,clId){addClItemDirect(boardId,clId);}
+// V2.1 Nesting: Nachkommen eines Items (Positionen mit level > basisLevel, bis gleich-/kleiner-level).
+function _clDescendants(items,idx){
+  if(!items||idx<0||idx>=items.length)return[];
+  const base=items[idx].level|0;
+  const out=[];
+  for(let i=idx+1;i<items.length;i++){
+    if((items[i].level|0)>base)out.push(i);
+    else break;
+  }
+  return out;
+}
+// Max erlaubter Level fuer Item an Position idx: Level des Vorgaengers + 1, gecappt auf CL_MAX_LEVEL.
+function _clMaxAllowedLevel(items,idx){
+  if(!items||idx<=0)return 0;
+  const prev=items[idx-1].level|0;
+  return Math.min(prev+1,CL_MAX_LEVEL);
+}
 // Arrow-Navigation:
 //  - Von einer Checkbox: panel-weite Kette der Checkboxes (cross-list). Im Non-Edit wird Roving-Tabindex aktualisiert.
 //  - Vom "+ Punkt"-Button: Pivot in die eigene Liste (ArrowDown → erste cb, ArrowUp → letzte cb).
@@ -5084,17 +5112,45 @@ function _clAutoFocus(targetClId){
   const cb=card.querySelector('.cl-item .cl-check');
   if(cb)cb.focus({preventScroll:true});
 }
-function addClItemDirect(boardId,clId,afterItemId){
+function addClItemDirect(boardId,clId,afterItemId,level){
   const cl=nodes[boardId].data.checklists.find(x=>x.id===clId);
   if(!cl)return;
-  const newItem={id:uid(),text:'',done:false};
+  const lvl=typeof level==='number'?Math.max(0,Math.min(CL_MAX_LEVEL,level|0)):0;
+  const newItem={id:uid(),text:'',done:false,level:lvl};
   const idx=afterItemId?cl.items.findIndex(i=>i.id===afterItemId):-1;
   if(idx>=0)cl.items.splice(idx+1,0,newItem);
   else cl.items.push(newItem);
   save();render();
   setTimeout(()=>{
     const el=document.querySelector(`.cl-item[data-cl-item="${newItem.id}"] input.cl-text`);
-    if(el)el.focus();
+    if(el)el.focus({preventScroll:true});
+  },FOCUS_RESTORE_MS);
+}
+// V2.1: Einruecken/Ausruecken eines Items (delta = +1 oder -1). Nachkommen wandern mit.
+// Lehnt ab, wenn Level-Sprung entstehen wuerde oder Grenzen (0..CL_MAX_LEVEL) verletzt werden.
+function setClItemLevel(scope,id1,id2,itemId,delta){
+  let arr;
+  if(scope==='std'){const cl=nodes[id1].data.checklists.find(x=>x.id===id2);if(!cl)return;arr=cl.items;}
+  else{const c=getCard(id1,id2);if(!c||!c.checklist)return;arr=c.checklist;}
+  const idx=arr.findIndex(i=>i.id===itemId);
+  if(idx<0)return;
+  const cur=arr[idx].level|0;
+  const next=cur+delta;
+  if(next<0||next>CL_MAX_LEVEL)return;
+  if(delta>0&&next>_clMaxAllowedLevel(arr,idx))return;
+  const desc=_clDescendants(arr,idx);
+  for(const i of desc){
+    const d=(arr[i].level|0)+delta;
+    if(d<0||d>CL_MAX_LEVEL)return;
+  }
+  arr[idx].level=next;
+  desc.forEach(i=>{arr[i].level=(arr[i].level|0)+delta;});
+  save();
+  if(scope==='std')render();else openCard(id1,id2);
+  setTimeout(()=>{
+    const sel=scope==='card'?`#card-cl-section .cl-item[data-cl-item="${itemId}"] input`:`.cl-item[data-cl-item="${itemId}"] input.cl-text`;
+    const el=document.querySelector(sel);
+    if(el)el.focus({preventScroll:true});
   },FOCUS_RESTORE_MS);
 }
 function updateClText(scope,id1,id2,itemId,val){
@@ -8344,12 +8400,13 @@ Object.assign(MATRIX_TOOLS,{
     if(!cl)return{error:'Checkliste nicht gefunden: '+args.checklistId};
     const text=String(args.text||'').trim();
     if(!text)return{error:'Item-Text darf nicht leer sein'};
-    const item={id:uid(),text,done:false};
+    const lvl=typeof args.level==='number'?Math.max(0,Math.min(CL_MAX_LEVEL,args.level|0)):0;
+    const item={id:uid(),text,done:false,level:lvl};
     const idx=args.afterItemId?cl.items.findIndex(i=>i.id===args.afterItemId):-1;
     if(idx>=0)cl.items.splice(idx+1,0,item);
     else cl.items.push(item);
     save();render();
-    return{added:true,boardId:bid,checklistId:cl.id,itemId:item.id,text,index:idx>=0?idx+1:cl.items.length-1};
+    return{added:true,boardId:bid,checklistId:cl.id,itemId:item.id,text,level:lvl,index:idx>=0?idx+1:cl.items.length-1};
   },
 
   'checklist.item.toggle':async(args)=>{
@@ -8362,6 +8419,29 @@ Object.assign(MATRIX_TOOLS,{
     item.done=!item.done;
     save();render();
     return{toggled:true,boardId:bid,checklistId:cl.id,itemId:item.id,done:item.done};
+  },
+
+  'checklist.item.set_level':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const cl=nodes[bid].data.checklists.find(c=>c.id===args.checklistId);
+    if(!cl)return{error:'Checkliste nicht gefunden: '+args.checklistId};
+    const idx=cl.items.findIndex(i=>i.id===args.itemId);
+    if(idx<0)return{error:'Item nicht gefunden: '+args.itemId};
+    const target=Math.max(0,Math.min(CL_MAX_LEVEL,args.level|0));
+    const cur=cl.items[idx].level|0;
+    if(target===cur)return{set:true,boardId:bid,checklistId:cl.id,itemId:args.itemId,level:cur,unchanged:true};
+    const delta=target-cur;
+    if(delta>0&&target>_clMaxAllowedLevel(cl.items,idx))return{error:'Level-Sprung nicht erlaubt (Vorgaenger-Level zu niedrig)'};
+    const desc=_clDescendants(cl.items,idx);
+    for(const i of desc){
+      const d=(cl.items[i].level|0)+delta;
+      if(d<0||d>CL_MAX_LEVEL)return{error:'Nachkommen wuerden Grenzen ueberschreiten'};
+    }
+    cl.items[idx].level=target;
+    desc.forEach(i=>{cl.items[i].level=(cl.items[i].level|0)+delta;});
+    save();render();
+    return{set:true,boardId:bid,checklistId:cl.id,itemId:args.itemId,level:target};
   },
 
   // ─── Sprint 4.5: alias + query + settings + meta ─────────────────
