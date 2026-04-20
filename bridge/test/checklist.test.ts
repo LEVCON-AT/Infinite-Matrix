@@ -39,6 +39,26 @@ describe('checklist.item.add schema', () => {
   it('lehnt ohne checklistId ab', () => {
     expect(t.schema.safeParse({ boardRef: '^b', text: 'x' }).success).toBe(false);
   });
+  it('akzeptiert optionales afterItemId', () => {
+    const parsed = t.schema.safeParse({
+      boardRef: '^b',
+      checklistId: 'n7',
+      text: 'Schritt 2',
+      afterItemId: 'n8',
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.afterItemId).toBe('n8');
+  });
+  it('akzeptiert Args ohne afterItemId (default ans Ende)', () => {
+    const parsed = t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', text: 'x' });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.afterItemId).toBeUndefined();
+  });
+  it('lehnt afterItemId als number ab', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', text: 'x', afterItemId: 5 }).success,
+    ).toBe(false);
+  });
 });
 
 describe('checklist.item.toggle schema', () => {

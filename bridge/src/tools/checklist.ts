@@ -13,6 +13,7 @@ const checklistItemAddSchema = z.object({
   boardRef: z.string().describe('Alias/ID des Boards'),
   checklistId: z.string().describe('Checklisten-ID'),
   text: z.string().min(1).describe('Item-Text'),
+  afterItemId: z.string().optional().describe('ID des Items, nach dem eingefügt wird (Default: ans Ende)'),
 });
 
 // ─── checklist.item.toggle ─────────────────────────────────────────
