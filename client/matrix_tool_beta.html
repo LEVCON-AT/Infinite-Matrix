@@ -7482,11 +7482,52 @@ function parseCommand(raw){
     }
     return{type:'cleanup',alias,recursive,mode};
   }
+  // V2.2 generische Verben: ^copy quelle [ziel|--], ^move (V2+), ^delete (V2+)
+  if(parts[0]==='copy'){
+    return{type:'copy',source:parts[1]||null,target:parts[2]||null};
+  }
+  if(parts[0]==='move'||parts[0]==='delete'){
+    return{type:parts[0],source:parts[1]||null,target:parts[2]||null};
+  }
   // Navigation: kürzel [subCmd] [cardAlias]
   const alias=parts[0];
   const subCmd=parts[1]||null; // m, i, b, c
   const cardAlias=parts[2]||null;
   return{type:'nav',alias,subCmd,cardAlias};
+}
+// V2.2: Generischer Clone-Helper. Aktuell nur aktiv fuer Boards mit Checklisten.
+// srcRef/tgtRef: Alias (ohne ^) oder rohe Node-ID. tgtRef fehlt → aktuelles Board im Stack.
+function _cloneByRef(srcRef,tgtRef){
+  const srcId=_resolveNodeRef(srcRef);
+  if(!srcId)return{error:'Quelle nicht gefunden: ^'+srcRef};
+  const src=nodes[srcId];
+  if(src.type!=='board'){
+    return{error:'Typ noch nicht unterstuetzt: nur Boards mit Checklisten in V2.2.'};
+  }
+  let tgtId;
+  if(tgtRef){
+    tgtId=_resolveNodeRef(tgtRef);
+    if(!tgtId)return{error:'Ziel nicht gefunden: ^'+tgtRef};
+    if(nodes[tgtId].type!=='board')return{error:'Ziel ist kein Board.'};
+  }else{
+    const cur=stack&&stack[stack.length-1];
+    if(!cur||nodes[cur.nodeId]?.type!=='board')return{error:'Aktueller Kontext ist kein Board. Ziel angeben: ^copy quelle ziel.'};
+    tgtId=cur.nodeId;
+  }
+  const srcCls=Array.isArray(src.data.checklists)?src.data.checklists:[];
+  if(!srcCls.length)return{error:'Quelle hat keine Checklisten.'};
+  pushUndo('Checklisten geklont');
+  const cloned=srcCls.map(cl=>({
+    id:uid(),
+    label:(cl.label||'Checkliste')+' (Kopie)',
+    items:(Array.isArray(cl.items)?cl.items:[]).map(it=>({id:uid(),text:String(it.text||''),done:false,level:Math.max(0,Math.min(CL_MAX_LEVEL,it.level|0))}))
+  }));
+  if(!Array.isArray(nodes[tgtId].data.checklists))nodes[tgtId].data.checklists=[];
+  nodes[tgtId].data.checklists.push(...cloned);
+  save();render();
+  showToast(`${cloned.length} Checkliste(n) geklont nach „${nodes[tgtId].label}".`,{type:'success'});
+  showUndoToast('Checklisten geklont');
+  return{ok:true,count:cloned.length,targetBoardId:tgtId};
 }
 function executeCommand(raw){
   const cmd=parseCommand(raw);
@@ -7511,6 +7552,26 @@ function executeCommand(raw){
     if(!targetBoardId)return showCmdError();
     closeSearch();
     if(!moveCardToBoard(cardTarget.boardId,cardTarget.cardId,targetBoardId,cmd.colName))showCmdError();
+    return;
+  }
+  if(cmd.type==='copy'){
+    closeSearch();
+    if(!cmd.source)return showCmdError('Keine Quelle angegeben fuer ^copy.');
+    if(cmd.target==='--'){
+      smodal('Kopieren nach',[{label:'Ziel-Alias oder ID',id:'t',ph:'z.B. board2'}],v=>{
+        if(!v.t)return;
+        const res=_cloneByRef(cmd.source,v.t);
+        if(res&&res.error)showToast(res.error,{type:'error'});
+      });
+      return;
+    }
+    const res=_cloneByRef(cmd.source,cmd.target);
+    if(res&&res.error)showToast(res.error,{type:'error'});
+    return;
+  }
+  if(cmd.type==='move'||cmd.type==='delete'){
+    closeSearch();
+    showToast(`^${cmd.type} kommt in V2+.`,{type:'info'});
     return;
   }
   if(cmd.type==='cleanup'){
