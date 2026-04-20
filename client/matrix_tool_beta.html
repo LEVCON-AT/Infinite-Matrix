@@ -227,6 +227,9 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 .cl-check:focus-visible::before{content:'';position:absolute;inset:-4px;border:var(--focus-width) solid var(--focus-color);border-radius:4px;pointer-events:none;}
 .cl-text{font-size:13px;color:var(--text);flex:1;}
 .cl-text.done{text-decoration:line-through;color:var(--text3);}
+.cl-paste-prev{max-height:180px;overflow-y:auto;border:0.5px solid var(--border2);border-radius:var(--r);padding:6px 9px;background:var(--bg);margin-bottom:10px;}
+.cl-paste-item{font-size:12px;padding:2px 0;padding-left:calc(var(--space-md) * var(--cl-level, 0));color:var(--text);}
+.cl-paste-empty{font-size:12px;color:var(--text3);padding:4px 0;}
 
 /* ── DAILY OVERVIEW ── */
 .daily-wrap{margin-top:22px;}
@@ -5405,6 +5408,120 @@ function clDragDrop(e,scope,id1,id2,targetItemId){
     if(el){el.classList.add('anim-add');el.addEventListener('animationend',()=>el.classList.remove('anim-add'),{once:true});el.scrollIntoView({behavior:'smooth',block:'nearest'});}
   },20);
 }
+
+// ═══════════════════════════════════════════════════════
+// V2.2 Paste-Preview (Checkliste)
+// Mehrzeiliger Paste in .cl-text-edit/.cl-text-input → Popup mit Preview + Parser.
+// Einzeiliger Paste bleibt native (Browser-Default).
+// ═══════════════════════════════════════════════════════
+const CL_PASTE_BULLET_RE=/^(?:[-*•]\s+|\d+\.\s+)/;
+function _clPasteParse(text){
+  if(!text)return [];
+  const lines=String(text).split(/\r?\n/);
+  const parsed=lines.map(line=>{
+    const m=line.match(/^([\t ]*)(.*)$/);
+    const indent=m[1]||'';
+    const tabs=(indent.match(/\t/g)||[]).length;
+    const spaces=indent.replace(/\t/g,'').length;
+    const lvl=tabs+Math.floor(spaces/2);
+    const rest=m[2].trim().replace(CL_PASTE_BULLET_RE,'').trim();
+    return{lvl,rest};
+  }).filter(x=>x.rest);
+  if(!parsed.length)return [];
+  const minLvl=parsed.reduce((a,x)=>Math.min(a,x.lvl),Infinity);
+  return parsed.map(x=>({text:x.rest,level:Math.max(0,Math.min(CL_MAX_LEVEL,x.lvl-minLvl)),done:false}));
+}
+let _clPasteCtx=null;
+function _clPasteOpen(ctx){
+  _pushFocusRestore();_pushModal(_clPasteClose);
+  _clPasteCtx=ctx;
+  const crumb=ctx.clLabel?`<div class="smodal-crumb"><span>${esc(ctx.clLabel)}</span></div>`:'';
+  const h=`<div class="smodal-overlay" onclick="_clPasteClose(event)"><div class="smodal" onclick="event.stopPropagation()"><h3>Aus Zwischenablage einfügen</h3>${crumb}`+
+    `<label>Clipboard-Text (bearbeitbar)</label>`+
+    `<textarea id="cl-paste-ta" class="modal-textarea" style="min-height:110px;" placeholder="Eine Zeile pro Item. Einrückung via 2 Spaces oder Tab."></textarea>`+
+    `<label>Vorschau</label>`+
+    `<div id="cl-paste-prev" class="cl-paste-prev" aria-live="polite"></div>`+
+    `<div class="smodal-actions"><button class="btn-c" onclick="_clPasteClose()">Abbrechen</button><button class="btn-p" id="cl-paste-ok" onclick="_clPasteCommit()">Einfügen</button></div>`+
+    `</div></div>`;
+  document.getElementById('mc').innerHTML=h;
+  const ta=document.getElementById('cl-paste-ta');
+  ta.value=ctx.text||'';
+  _clPasteUpdatePreview();
+  ta.addEventListener('input',_clPasteUpdatePreview);
+  setTimeout(()=>{ta.focus();try{ta.setSelectionRange(ta.value.length,ta.value.length);}catch(_){}},MODAL_FOCUS_DELAY_MS);
+}
+function _clPasteUpdatePreview(){
+  const ta=document.getElementById('cl-paste-ta');
+  const prev=document.getElementById('cl-paste-prev');
+  if(!ta||!prev)return;
+  const items=_clPasteParse(ta.value);
+  const ok=document.getElementById('cl-paste-ok');
+  if(!items.length){prev.innerHTML='<div class="cl-paste-empty">Keine Items erkannt.</div>';if(ok)ok.disabled=true;return;}
+  if(ok)ok.disabled=false;
+  prev.innerHTML=items.map(it=>`<div class="cl-paste-item" style="--cl-level:${it.level}">• ${esc(it.text)}</div>`).join('');
+}
+function _clPasteClose(e){
+  if(e&&e.target&&e.target.classList&&!e.target.classList.contains('smodal-overlay')&&e.type==='click')return;
+  _clPasteCtx=null;
+  _popModal(_clPasteClose);
+  const overlay=document.querySelector('#mc .smodal-overlay');
+  if(overlay){overlay.classList.add('closing');setTimeout(()=>{document.getElementById('mc').innerHTML='';_popFocusRestore();},SMODAL_EXIT_MS);}
+  else{document.getElementById('mc').innerHTML='';_popFocusRestore();}
+}
+function _clPasteCommit(){
+  if(!_clPasteCtx)return _clPasteClose();
+  const ctx=_clPasteCtx;
+  const ta=document.getElementById('cl-paste-ta');
+  if(!ta)return _clPasteClose();
+  const items=_clPasteParse(ta.value);
+  if(!items.length)return _clPasteClose();
+  let arr,rerender;
+  if(ctx.scope==='std'){const cl=nodes[ctx.id1]&&nodes[ctx.id1].data.checklists.find(x=>x.id===ctx.id2);if(!cl)return _clPasteClose();arr=cl.items;rerender=()=>render();}
+  else{const c=getCard(ctx.id1,ctx.id2);if(!c)return _clPasteClose();if(!Array.isArray(c.checklist))c.checklist=[];arr=c.checklist;rerender=()=>openCard(ctx.id1,ctx.id2);}
+  pushUndo('Aus Zwischenablage eingefügt');
+  const base=ctx.baseLevel|0;
+  const mapped=items.map(it=>({id:uid(),text:it.text,done:false,level:Math.max(0,Math.min(CL_MAX_LEVEL,base+(it.level|0)))}));
+  let insertAt=arr.length;
+  if(ctx.afterItemId){const idx=arr.findIndex(x=>x.id===ctx.afterItemId);if(idx>=0)insertAt=idx+1;}
+  arr.splice(insertAt,0,...mapped);
+  save();
+  const firstId=mapped[0].id;
+  _clPasteClose();
+  setTimeout(()=>{rerender();showUndoToast('Aus Zwischenablage eingefügt');setTimeout(()=>{const el=document.querySelector(`.cl-item[data-cl-item="${firstId}"]`);if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'});},30);},SMODAL_EXIT_MS);
+}
+document.addEventListener('paste',e=>{
+  const active=document.activeElement;
+  if(!active||!active.matches)return;
+  if(!active.matches('.cl-text-edit, .cl-text-input'))return;
+  const host=active.closest('[data-cl-id]');
+  if(!host)return;
+  const clip=e.clipboardData||window.clipboardData;
+  if(!clip)return;
+  const text=clip.getData('text/plain')||'';
+  if(!/\r?\n/.test(text))return; // nur multi-line abfangen
+  const clId=host.dataset.clId;
+  let ctx=null;
+  const inCardModal=!!active.closest('#cardmodal .modal');
+  if(inCardModal){
+    if(!_openCardRef||!_openCardRef.boardId||!_openCardRef.cardId)return;
+    const card=getCard(_openCardRef.boardId,_openCardRef.cardId);
+    if(!card)return;
+    ctx={scope:'card',id1:_openCardRef.boardId,id2:_openCardRef.cardId,clLabel:card.name||'Karten-Checkliste'};
+  }else{
+    const cur=stack&&stack[stack.length-1];
+    if(!cur)return;
+    const nid=cur.nodeId;
+    const cl=nodes[nid]&&nodes[nid].data&&nodes[nid].data.checklists&&nodes[nid].data.checklists.find(x=>x.id===clId);
+    if(!cl)return;
+    ctx={scope:'std',id1:nid,id2:clId,clLabel:cl.label};
+  }
+  const item=active.closest('.cl-item');
+  if(item){ctx.afterItemId=item.dataset.clItem;ctx.baseLevel=Number(getComputedStyle(item).getPropertyValue('--cl-level'))|0;}
+  else{ctx.afterItemId=null;ctx.baseLevel=0;}
+  ctx.text=text;
+  e.preventDefault();
+  _clPasteOpen(ctx);
+},true);
 
 // ═══════════════════════════════════════════════════════
 // SUB-MATRIX (inline)
