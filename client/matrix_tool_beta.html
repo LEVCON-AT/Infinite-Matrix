@@ -8833,6 +8833,72 @@ Object.assign(MATRIX_TOOLS,{
     return{set:true,boardId:bid,checklistId:cl.id,itemId:args.itemId,level:target};
   },
 
+  // ─── V2.2: paste / clone / item.move ─────────────────────────────
+  'checklist.paste':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const cl=nodes[bid].data.checklists.find(c=>c.id===args.checklistId);
+    if(!cl)return{error:'Checkliste nicht gefunden: '+args.checklistId};
+    const parsed=_clPasteParse(String(args.text||''));
+    if(!parsed.length)return{error:'Keine Items im Text erkannt'};
+    let insertAt=cl.items.length;
+    if(args.afterItemId){
+      const idx=cl.items.findIndex(i=>i.id===args.afterItemId);
+      if(idx<0)return{error:'afterItemId nicht gefunden'};
+      insertAt=idx+1;
+    }
+    const base=typeof args.baseLevel==='number'?Math.max(0,Math.min(CL_MAX_LEVEL,args.baseLevel|0)):0;
+    pushUndo('Aus Text eingefuegt');
+    const mapped=parsed.map(it=>({id:uid(),text:it.text,done:false,level:Math.max(0,Math.min(CL_MAX_LEVEL,base+(it.level|0)))}));
+    cl.items.splice(insertAt,0,...mapped);
+    save();render();
+    showUndoToast('Aus Text eingefuegt');
+    return{pasted:true,boardId:bid,checklistId:cl.id,count:mapped.length,itemIds:mapped.map(m=>m.id)};
+  },
+
+  'checklist.clone':async(args)=>{
+    const res=_cloneByRef(args.sourceRef,args.targetRef||null);
+    if(res&&res.error)return{error:res.error};
+    return{cloned:true,count:res.count,targetBoardId:res.targetBoardId};
+  },
+
+  'checklist.item.move':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const srcCl=nodes[bid].data.checklists.find(c=>c.id===args.fromChecklistId);
+    if(!srcCl)return{error:'Quell-Checkliste nicht gefunden: '+args.fromChecklistId};
+    const tgtCl=nodes[bid].data.checklists.find(c=>c.id===args.toChecklistId);
+    if(!tgtCl)return{error:'Ziel-Checkliste nicht gefunden: '+args.toChecklistId};
+    const srcIdx=srcCl.items.findIndex(i=>i.id===args.itemId);
+    if(srcIdx<0)return{error:'Item nicht gefunden: '+args.itemId};
+    const descIdxs=_clDescendants(srcCl.items,srcIdx);
+    const count=1+descIdxs.length;
+    const crossList=srcCl!==tgtCl;
+    if(!crossList&&args.afterItemId){
+      const chunkIds=new Set([args.itemId,...descIdxs.map(i=>srcCl.items[i].id)]);
+      if(chunkIds.has(args.afterItemId))return{error:'afterItemId liegt im bewegten Chunk'};
+    }
+    const chunk=srcCl.items.splice(srcIdx,count);
+    let dst;
+    if(args.afterItemId){
+      dst=tgtCl.items.findIndex(i=>i.id===args.afterItemId);
+      if(dst<0){
+        srcCl.items.splice(srcIdx,0,...chunk);
+        return{error:'afterItemId im Ziel nicht gefunden'};
+      }
+      dst+=1;
+    }else{
+      dst=tgtCl.items.length;
+    }
+    if(crossList){
+      const base=chunk[0].level|0;
+      chunk.forEach(it=>{it.level=Math.max(0,Math.min(CL_MAX_LEVEL,(it.level|0)-base));});
+    }
+    tgtCl.items.splice(dst,0,...chunk);
+    save();render();
+    return{moved:true,boardId:bid,fromChecklistId:srcCl.id,toChecklistId:tgtCl.id,itemId:args.itemId,count};
+  },
+
   // ─── Sprint 4.5: alias + query + settings + meta ─────────────────
   'alias.set':async(args)=>{
     const newAlias=String(args.alias||'');

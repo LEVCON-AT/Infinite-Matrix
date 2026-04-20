@@ -12,7 +12,7 @@ describe('registerAllTools() Integration', () => {
     const tools = getTools();
     const names = [...tools.keys()].sort();
 
-    // Vollständige Liste aller 35 Tools aus Phase 4
+    // Vollständige Liste aller Tools (Phase 4 + V2.1 + V2.2)
     const expected = [
       'alias.resolve',
       'alias.set',
@@ -26,9 +26,12 @@ describe('registerAllTools() Integration', () => {
       'cell.feature.add',
       'cell.get',
       'checklist.add',
+      'checklist.clone',
       'checklist.item.add',
+      'checklist.item.move',
       'checklist.item.set_level',
       'checklist.item.toggle',
+      'checklist.paste',
       'col.add',
       'col.delete',
       'info.field.add',
@@ -55,7 +58,7 @@ describe('registerAllTools() Integration', () => {
     ];
 
     expect(names).toEqual(expected);
-    expect(tools.size).toBe(38); // +1 aus V2.1: checklist.item.set_level
+    expect(tools.size).toBe(41); // +3 aus V2.2: checklist.paste, .clone, .item.move
   });
 
   it('jedes registrierte Tool hat schema + jsonSchema', () => {

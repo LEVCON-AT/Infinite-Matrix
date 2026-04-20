@@ -32,6 +32,30 @@ const checklistItemSetLevelSchema = z.object({
   level: z.number().int().min(0).max(2).describe('Neuer Einrückungs-Level 0-2'),
 });
 
+// ─── checklist.paste (V2.2) ────────────────────────────────────────
+const checklistPasteSchema = z.object({
+  boardRef: z.string().describe('Alias/ID des Boards'),
+  checklistId: z.string().describe('Checklisten-ID'),
+  text: z.string().min(1).describe('Zu parsender Text. Erkennt Bullets (-, *, •, "1.") und Einrückung (2 Spaces oder Tab)'),
+  afterItemId: z.string().optional().describe('ID des Items, nach dem eingefügt wird (Default: ans Ende)'),
+  baseLevel: z.number().int().min(0).max(2).optional().describe('Basis-Level für alle eingefügten Items 0-2 (Default: 0)'),
+});
+
+// ─── checklist.clone (V2.2) ────────────────────────────────────────
+const checklistCloneSchema = z.object({
+  sourceRef: z.string().describe('Alias/ID des Quell-Boards'),
+  targetRef: z.string().optional().describe('Alias/ID des Ziel-Boards (Default: aktuelles Board im Stack)'),
+});
+
+// ─── checklist.item.move (V2.2) ────────────────────────────────────
+const checklistItemMoveSchema = z.object({
+  boardRef: z.string().describe('Alias/ID des Boards'),
+  fromChecklistId: z.string().describe('Quell-Checklisten-ID'),
+  toChecklistId: z.string().describe('Ziel-Checklisten-ID'),
+  itemId: z.string().describe('Item-ID (Nachkommen werden mitverschoben)'),
+  afterItemId: z.string().optional().describe('ID des Ziel-Items, nach dem eingefügt wird (Default: ans Ende)'),
+});
+
 export const checklistTools: ToolDef[] = [
   {
     name: 'checklist.add',
@@ -56,5 +80,23 @@ export const checklistTools: ToolDef[] = [
     description: 'Setzt den Einrückungs-Level eines Items (0-2). Nachkommen werden mit-verschoben; lehnt ab, wenn Level-Sprung oder Grenzen verletzt werden.',
     schema: checklistItemSetLevelSchema,
     jsonSchema: zodToJsonSchema(checklistItemSetLevelSchema),
+  },
+  {
+    name: 'checklist.paste',
+    description: 'Fügt Items aus einem Text-Block in eine Checkliste ein. Parser erkennt Bullets und Einrückung (2 Spaces/Tab pro Level, max. 2). baseLevel offset ist optional.',
+    schema: checklistPasteSchema,
+    jsonSchema: zodToJsonSchema(checklistPasteSchema),
+  },
+  {
+    name: 'checklist.clone',
+    description: 'Klont alle Checklisten eines Quell-Boards in ein Ziel-Board (oder aktuelles Board). Labels bekommen "(Kopie)"-Suffix, Items behalten Levels, done wird zurückgesetzt.',
+    schema: checklistCloneSchema,
+    jsonSchema: zodToJsonSchema(checklistCloneSchema),
+  },
+  {
+    name: 'checklist.item.move',
+    description: 'Verschiebt ein Item (mit allen Nachkommen) zwischen zwei Checklisten im selben Board. Level wird bei Cross-List-Move auf 0 normalisiert.',
+    schema: checklistItemMoveSchema,
+    jsonSchema: zodToJsonSchema(checklistItemMoveSchema),
   },
 ];
