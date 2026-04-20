@@ -5020,7 +5020,7 @@ function renderChecklists(node){
         <span tabindex="0" role="button" title="Alle abchecken (Shift+R)" class="cl-reset ml4" onclick="resetCl('${node.id}','${cl.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();resetCl('${node.id}','${cl.id}');}">↺</span>
         ${editMode?`<span class="edel" tabindex="0" role="button" onclick="delChecklist('${node.id}','${cl.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delChecklist('${node.id}','${cl.id}');}">${ICO.close(ICO_SIZE.XS)}</span>`:''}
       </div>
-      <div class="cl-list">`;
+      <div class="cl-list" ${editMode?`ondragover="clDragOver(event)" ondrop="clDragDropList(event,'std','${node.id}','${cl.id}')"`:''}>`;
     cl.items.forEach((item,idx)=>{
       const canUp=idx>0,canDn=idx<cl.items.length-1;
       const lvl=item.level|0;
@@ -5390,18 +5390,61 @@ function clDragOver(e){
 }
 function clDragDrop(e,scope,id1,id2,targetItemId){
   e.preventDefault();
-  if(!_clDrag||_clDrag.scope!==scope||_clDrag.id1!==id1||_clDrag.id2!==id2){clDragEnd(e);return;}
-  if(_clDrag.itemId===targetItemId){clDragEnd(e);return;}
-  let arr,rerender;
-  if(scope==='std'){const cl=nodes[id1].data.checklists.find(x=>x.id===id2);if(!cl){clDragEnd(e);return;}arr=cl.items;rerender=()=>render();}
-  else{const c=getCard(id1,id2);if(!c||!c.checklist){clDragEnd(e);return;}arr=c.checklist;rerender=()=>openCard(id1,id2);}
-  const src=arr.findIndex(x=>x.id===_clDrag.itemId);
-  const dst=arr.findIndex(x=>x.id===targetItemId);
-  if(src<0||dst<0){clDragEnd(e);return;}
-  const[item]=arr.splice(src,1);
-  arr.splice(dst,0,item);
+  if(!_clDrag||_clDrag.scope!==scope||_clDrag.id1!==id1){clDragEnd(e);return;}
+  // Cross-Liste nur im std-Scope erlaubt (Karten haben nur 1 Checkliste).
+  if(_clDrag.id2!==id2&&scope!=='std'){clDragEnd(e);return;}
+  _clDragDropInto(scope,id1,id2,targetItemId);
+}
+// V2.2c: Drop auf leerem Listen-Bereich (Cross-Liste oder „ans Ende"-Drop).
+function clDragDropList(e,scope,id1,id2){
+  if(scope!=='std')return;
+  if(!_clDrag||_clDrag.scope!==scope||_clDrag.id1!==id1){clDragEnd(e);return;}
+  // Wenn der Drop eigentlich auf einem .cl-item gelandet waere → dessen Handler hat Vorrang.
+  if(e.target.closest('.cl-item'))return;
+  e.preventDefault();
+  _clDragDropInto(scope,id1,id2,null);
+}
+function _clDragDropInto(scope,id1,id2,targetItemId){
+  let srcArr,tgtArr,rerender;
+  if(scope==='std'){
+    const srcCl=nodes[id1]&&nodes[id1].data.checklists.find(x=>x.id===_clDrag.id2);
+    const tgtCl=nodes[id1]&&nodes[id1].data.checklists.find(x=>x.id===id2);
+    if(!srcCl||!tgtCl){clDragEnd();return;}
+    srcArr=srcCl.items;tgtArr=tgtCl.items;rerender=()=>render();
+  }else{
+    const c=getCard(id1,id2);
+    if(!c||!c.checklist){clDragEnd();return;}
+    srcArr=c.checklist;tgtArr=c.checklist;rerender=()=>openCard(id1,id2);
+  }
+  const crossList=srcArr!==tgtArr;
+  const srcIdx=srcArr.findIndex(x=>x.id===_clDrag.itemId);
+  if(srcIdx<0){clDragEnd();return;}
+  // Item + Nachkommen als zusammenhaengender Chunk
+  const descIdxs=_clDescendants(srcArr,srcIdx);
+  const count=1+descIdxs.length;
+  // Self-/Descendant-Drop innerhalb derselben Liste verwerfen
+  if(!crossList&&targetItemId){
+    const chunkIds=new Set([_clDrag.itemId,...descIdxs.map(i=>srcArr[i].id)]);
+    if(chunkIds.has(targetItemId)){clDragEnd();return;}
+  }
+  const chunk=srcArr.splice(srcIdx,count);
+  // dst wird NACH der Source-Splice berechnet; "drop auf Ziel" → Chunk landet direkt nach Ziel (konsistent mit alter Single-Item-Semantik).
+  let dst;
+  if(targetItemId){
+    dst=tgtArr.findIndex(x=>x.id===targetItemId);
+    if(dst<0){clDragEnd();return;}
+    dst+=1;
+  }else{
+    dst=tgtArr.length;
+  }
+  if(crossList){
+    // Normalisierung: Drag-Item landet auf Level 0, Nachkommen relativ dazu.
+    const base=chunk[0].level|0;
+    chunk.forEach(it=>{it.level=Math.max(0,Math.min(CL_MAX_LEVEL,(it.level|0)-base));});
+  }
+  tgtArr.splice(dst,0,...chunk);
   const movedId=_clDrag.itemId;
-  clDragEnd(e);
+  clDragEnd();
   save();rerender();
   setTimeout(()=>{
     const el=document.querySelector(`[data-cl-item="${movedId}"]`);
