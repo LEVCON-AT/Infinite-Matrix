@@ -2033,6 +2033,9 @@ function render(){
     const _vk=stack.map(s=>s.nodeId+(s.cellRef?`#${s.cellRef.rowId}-${s.cellRef.colId}`:'')).join('/')+'||'+JSON.stringify(currentTab)+'||'+(editMode?1:0);
     if(_vk!==_lastClViewKey){
       _lastClViewKey=_vk;
+      // Scroll-Reset bei View-Wechsel, damit Titel/Breadcrumb sichtbar sind (statt durch Auto-Fokus weggescrollt)
+      window.scrollTo(0,0);
+      if(el&&el.scrollTo)el.scrollTo(0,0);
       setTimeout(()=>_clAutoFocus(),FOCUS_RESTORE_MS);
     }
   }catch(err){
@@ -4983,7 +4986,7 @@ function deleteCard(boardId,cardId){
 // ═══════════════════════════════════════════════════════
 function renderChecklists(node){
   const{checklists}=node.data;
-  let h=`<div class="mb-md"><button class="btn edit-only" onclick="addChecklist('${node.id}')">+ Checkliste</button></div>`;
+  let h=`<div class="mb-md"><button class="btn edit-only" data-cl-add onclick="addChecklist('${node.id}')">+ Checkliste</button></div>`;
   if(checklists.length===0) h+=emptyState(ICO.check(32),UI.emptyChecklists);
   checklists.forEach(cl=>{
     const done=cl.items.filter(i=>i.done).length;
@@ -5027,7 +5030,7 @@ function addChecklist(boardId){
 }
 function renameCl(boardId,clId,val){const c=nodes[boardId].data.checklists.find(x=>x.id===clId);if(c)c.label=val;save();}
 function delChecklist(boardId,clId){nodes[boardId].data.checklists=nodes[boardId].data.checklists.filter(c=>c.id!==clId);save();render();}
-function toggleCl(boardId,clId,itemId,keepFocus){const cl=nodes[boardId].data.checklists.find(x=>x.id===clId);if(!cl)return;const i=cl.items.find(x=>x.id===itemId);if(i)i.done=!i.done;save();render();if(keepFocus)setTimeout(()=>{const cb=document.querySelector(`.cl-item[data-cl-item="${itemId}"] .cl-check`);if(!cb)return;if(!editMode)_clRovingSet(cb);cb.focus();},FOCUS_RESTORE_MS);}
+function toggleCl(boardId,clId,itemId,keepFocus){const cl=nodes[boardId].data.checklists.find(x=>x.id===clId);if(!cl)return;const i=cl.items.find(x=>x.id===itemId);if(i)i.done=!i.done;save();render();if(keepFocus)setTimeout(()=>{const cb=document.querySelector(`.cl-item[data-cl-item="${itemId}"] .cl-check`);if(!cb)return;if(!editMode)_clRovingSet(cb);cb.focus({preventScroll:true});},FOCUS_RESTORE_MS);}
 function delClFromList(boardId,clId,itemId){const cl=nodes[boardId].data.checklists.find(x=>x.id===clId);if(cl)cl.items=cl.items.filter(i=>i.id!==itemId);save();render();}
 function addClItem2(boardId,clId){addClItemDirect(boardId,clId);}
 // Arrow-Navigation:
@@ -5041,7 +5044,7 @@ function _clNav(fromEl,dir){
     if(!cbs.length)return;
     const next=dir>0?cbs[0]:cbs[cbs.length-1];
     if(!editMode)_clRovingSet(next);
-    next.focus();
+    next.focus({preventScroll:true});
     return;
   }
   const all=[...document.querySelectorAll('#panel .cl-item .cl-check')];
@@ -5050,7 +5053,7 @@ function _clNav(fromEl,dir){
   const next=all[i+dir];
   if(!next)return;
   if(!editMode)_clRovingSet(next);
-  next.focus();
+  next.focus({preventScroll:true});
 }
 // Non-Edit Roving: pro Liste genau eine .cl-check mit tabindex=0.
 function _clRovingSet(el){
@@ -5064,17 +5067,22 @@ function _clRovingSet(el){
 function _clAutoFocus(targetClId){
   const panel=document.getElementById('panel');
   if(!panel)return;
-  if(!panel.querySelector('[data-cl-id]'))return;
   const ae=document.activeElement;
   // Passiv = body/html oder geschlossenes Suchfeld (nach ^alias-Sprung bleibt dort technisch der Fokus)
   if(ae&&ae!==document.body&&ae!==document.documentElement&&ae.id!=='searchinput')return;
+  // Leeres Checklisten-Board: auf den "+ Checkliste"-Button fokussieren, wenn sichtbar (Edit-Mode).
+  if(!panel.querySelector('[data-cl-id]')){
+    const addCl=panel.querySelector('[data-cl-add]');
+    if(addCl&&addCl.offsetParent!==null)addCl.focus({preventScroll:true});
+    return;
+  }
   let card=targetClId?panel.querySelector(`[data-cl-id="${targetClId}"]`):null;
   if(!card)card=panel.querySelector('[data-cl-id]');
   if(!card)return;
   const btn=card.querySelector('.cl-footer .addfull');
-  if(btn&&btn.offsetParent!==null){btn.focus();return;}
+  if(btn&&btn.offsetParent!==null){btn.focus({preventScroll:true});return;}
   const cb=card.querySelector('.cl-item .cl-check');
-  if(cb)cb.focus();
+  if(cb)cb.focus({preventScroll:true});
 }
 function addClItemDirect(boardId,clId,afterItemId){
   const cl=nodes[boardId].data.checklists.find(x=>x.id===clId);
