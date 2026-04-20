@@ -8,7 +8,7 @@ Ein persönliches Organisations-System, aufgebaut auf einer **rekursiven Matrix-
 
 ## Wofür
 
-Ein Einzelwerkzeug statt Flickwerk aus separaten Apps (Notion + Trello + Todoist + Docs …). Alles in *einer* HTML-Datei: Daten, UI, Logik. Offline, lokal, ohne Account, ohne Server, portabel. AES-GCM-Verschlüsselung für sensible Inhalte; verschlüsselte Exports als `.imx`, plain als `.json`.
+Ein Einzelwerkzeug statt Flickwerk aus separaten Apps (Notion + Trello + Todoist + Docs …). Alles in *einer* HTML-Datei: Daten, UI, Logik. **Offline-first, self-hosted, ohne Drittanbieter-Account** — lokal im Browser (localStorage + File System Access API); optional AI-steuerbar über eine **selbstgehostete Bridge** (WebSocket + MCP) auf eigenem VPS. AES-GCM-Verschlüsselung für sensible Inhalte; verschlüsselte Exports als `.imx`, plain als `.json`.
 
 Nutzerprofil: jemand, der strukturiert denkt und ein Werkzeug will, das seinen Denkstrukturen folgt — statt ihn in vorgefertigte Schemata zu zwingen.
 
@@ -16,7 +16,7 @@ Nutzerprofil: jemand, der strukturiert denkt und ein Werkzeug will, das seinen D
 
 - **Ein Gitter als Atom.** Nicht Liste, nicht Baum, nicht Tag — Matrix. Zwei Achsen sind der natürliche Rahmen für Strukturiertes.
 - **Rekursion ohne Ende.** Jede Zelle kann zur neuen Matrix werden. Keine künstliche Decke.
-- **Datei statt Cloud.** Single-File-HTML öffnet im Browser wie ein Dokument. localStorage + optional verschlüsselte Dateien (`.imx`).
+- **Datei statt Cloud, Bridge statt SaaS.** Single-File-HTML öffnet im Browser wie ein Dokument (localStorage + verschlüsselte `.imx`-Dateien). Für AI-Integration: selbstgehostete Bridge auf eigenem Server (Node + SQLite + nginx/TLS), kein Drittanbieter zwischen User und Daten.
 - **Tastatur-first.** `^alias` springt direkt zu jeder benannten Stelle. `S` swappt Fokus Sidebar ↔ Canvas. `+` öffnet Kontextmenü auf Sidebar-Zeilen. Alt+↑↓ durch Suchverlauf. `Shift+A` togglet im Full-Modus "alles expandiert" (sticky).
 - **Direkte Manipulation.** Matrizen editierbar wie Spreadsheets; Kanban innerhalb der Zelle; Checklisten inline.
 
@@ -44,7 +44,7 @@ Konsequenz: Jede Änderung bleibt inline, bleibt portabel, bleibt eine Datei.
 4. **Animated, wenn sichtbar.** Sichtbare State-Änderungen animieren, nie harte `display:none`/`visibility:hidden`-Swaps. Projekt-Standard: `220 ms cubic-bezier(.4, 0, .2, 1)` für Transitions, `180 ms cubic-bezier(.16, 1, .3, 1)` für Enter-Animationen. Bei scaleY-Animationen immer `transform-origin: left center` (damit SVG-Dots nicht verrutschen). Smooth-Scroll über `scrollIntoView({behavior:'smooth'})` — respektiert `prefers-reduced-motion`.
 5. **Single-File-Constraint.** Nichts extrahieren. CSS und JS bleiben in der HTML-Datei.
 6. **Deutsch.** UI-Strings deutsch. Kommentare konsistent zur umgebenden Datei.
-7. **Daten bleiben beim User.** Nichts geht an Server. Nichts wird getrackt. Verschlüsselung (AES-GCM, PBKDF2, 100k iterations) ist die einzige Form "Netzwerk", die das Projekt kennt.
+7. **Datenhoheit beim User.** Im Offline-Modus: nichts geht je an einen Server. Im Bridge-Modus: Datenfluss ausschließlich zum **eigenen** Server (self-hosted VPS), authentifiziert mit einem Token, den der User selbst generiert. Kein Drittanbieter, kein Tracking. Verschlüsselung (AES-GCM, PBKDF2, 100k iterations) für sensible Exports. Bridge-Snapshot wird als JSON in der User-eigenen SQLite persistiert — gleiche Eigentumslogik wie localStorage.
 8. **Risiko-Aktionen bestätigen lassen.** Destruktives (git reset, rm, Branch-Delete) und Außenwirkung (push, PR, Comment) vorab abnicken lassen.
 9. **Keine Rückgängig-Diskussion.** Wenn User "revertiere" sagt: sofort machen, nicht erklären.
 10. **Messbare Verifikation.** Behauptungen mit Zahlen belegen (`maxDelta < 1px`, `activeInDom === expectedId`), nicht "sieht passend aus".
@@ -90,6 +90,124 @@ Konsequenz: Jede Änderung bleibt inline, bleibt portabel, bleibt eine Datei.
 - **Color-Key-Helper (`_srColKey`).** Für `color:${info.color}`-Muster, wo `info.color` aus einer App-Logik kommt und mehrere Varianten annehmen kann: `_srColKey(cssColor)` extrahiert via Regex den Key aus `'var(--blue)'` → `'blue'`. Dann `data-sr-col="blue"` + CSS-Mapping `.sr-ico[data-sr-col="blue"]{color:var(--blue);}`. Skaliert, wenn die App mehrere Farb-Dimensionen hat (Search-Row-Icons, Context-Menu-Icons) und neue Varianten leicht hinzukommen.
 - **Inline-Style-Diät (Backlog 2).** 219 → 32 inline `style="..."` durch systematische Ersetzung. Regel: *jeder Inline-Style außer dynamischer Werte ist falsch*. Dynamisch = wirklich pro Element variabel (User-Inputs, berechnete Positionen, User-konfigurierte Em-Werte). Statisch = Klassenpattern. Übergangsfall: `style="--x:${v}"` + CSS `{prop:var(--x)}` — auch das ist eine Klasse. Nie eine feste Farbe, feste Größe, festes Padding oder festes `display:flex` inline schreiben.
 
+## Bridge + MCP-Tools — Konventionen (Phase 4+)
+
+Ab Phase 4 ist der **Bridge-Pfad** produktiv: externe AI-Clients (Claude Desktop via `mcp-remote`) rufen `MATRIX_TOOLS` über WebSocket auf, Handler laufen im Browser-Client, mutieren den State wie ein User-Klick. Damit das robust bleibt, gelten folgende Regeln.
+
+### Tool-Trio-Regel
+
+Jedes MATRIX_TOOL hat **drei Artefakte** — fehlt eins, ist das Tool nicht merge-ready:
+
+1. **Bridge-Schema** in `bridge/src/tools/<gruppe>.ts`: Zod-Objekt + `zodToJsonSchema()` für MCP, registriert in `bridge/src/tools/index.ts`
+2. **Client-Handler** in `client/matrix_tool_beta.html` (`MATRIX_TOOLS`-Registry): liest `args`, mutiert `nodes`/`aliasIndex`/etc., ruft `save()` + `render()`, gibt strukturiertes Ergebnis zurück
+3. **Vitest** in `bridge/test/<gruppe>.test.ts`: `safeParse` mit valid + invalid Args, Enum-Grenzen, required-Felder-Check — plus Integration via `bridge/test/tool-registry.test.ts` (Gesamtzahl)
+
+### Feature → MCP-Mapping-Pflicht
+
+**Jede neue Mutations-UI-Aktion (Add/Update/Delete/Move/Toggle) bekommt einen MATRIX_TOOL-Eintrag.** Keine Ausnahmen ohne dokumentierte Begründung im Commit. Ausnahme-Kategorien:
+
+- Rein darstellerisch (Scroll, Hover, Highlight) — keine Datenmutation → kein Tool
+- Komposition bestehender Tools (AI kann `X.do()` + `Y.do()` selbst verketten) → im Plan oder Feature-Commit notieren „nutzt X+Y"
+- Einmalige Import-/Export-Flows → ggf. als `import.*`/`export.*`-Tool spezifisch, wenn AI-steuerbar sinnvoll
+
+**Selbst-Check am Feature-Ende:** „Kann die AI dieses Feature aufrufen, ohne im Browser zu klicken?" — Wenn nein: Tool ergänzen oder schreiben warum nicht. Das `registerAllTools`-Gate in `bridge/test/tool-registry.test.ts` ist die Regressions-Absicherung: neue Produktions-Tools dort in die `expected`-Liste + Count eintragen.
+
+### Ref-Resolver-Konventionen
+
+Alle Refs akzeptieren Alias-Form (`^foo` oder `foo`) und Raw-ID — der Resolver strippt `^` und schlägt in `aliasIndex` nach, fällt auf Node-ID zurück:
+
+- `_resolveNodeRef(ref)` → `nodeId | null` (Matrix oder Board)
+- `_resolveBoardRef(ref)` → dasselbe plus `type==='board'`-Check
+- `_resolveCardRef(args)` → `{boardId, cardId, card} | null`; akzeptiert `args.cardRef` (Alias) ODER `args.boardRef + args.cardId`
+- Cells haben **keinen** eigenen Resolver — stets explizit `matrixRef + rowId + colId` (stabil, eindeutig, nicht von Alias-Setzung abhängig)
+
+Neue Resolver? Gleiches Muster (`^`-Prefix strippen, Alias-Index zuerst, Raw-ID-Fallback, Typ-Check am Ende).
+
+### Alias-Index-Hygiene
+
+`aliasIndex` wird bei jedem Mutations-Pfad, der Aliase **anlegt, löscht oder verschiebt**, neu aufgebaut via `rebuildAliasIndex()`. Gedankenmerker: *Wenn ich an `node.alias`, `cell.alias`, `card.alias` oder `link.alias` drehe → rebuild.*
+
+Besonderer Fallstrick (Sprint 4.3 gefixt): **cross-board `card.move`** verschiebt die Karte, aber der alte `aliasIndex[alias].boardId` zeigt noch aufs Quellboard — folgende Lookups per Alias finden die Karte nicht mehr. Fix: nach cross-board move explizit `rebuildAliasIndex()`. Gilt analog für jede Operation, die den Parent-Zugehörigkeits-Teil einer Alias-Entry ändert.
+
+### Destruktiv-Pattern in Tools
+
+Tools, die Daten löschen/überschreiben ohne triviale Wiederherstellung:
+
+1. `pushUndo('<Deutsches Label>')` **vor** der Mutation
+2. Mutation durchführen (Filter, delete, etc.)
+3. `showUndoToast('<Label>')` **nach** der Mutation
+
+**Kein `confirm()` in Tool-Handlern.** MCP-Calls laufen headless; ein native-Dialog würde den Handler einfrieren. Der Schutz ist die Undo-Pipeline — User sieht die Aktion im Browser und hat 10 s „Rückgängig".
+
+### Tool-Return-Shape
+
+- **Erfolg:** `{<verb>:true, ...details}` mit Verb-Präfix je nach Aktion (`created`, `deleted`, `updated`, `moved`, `toggled`, `added`, `renamed`, `set`, `undone`, `instantiated`)
+- **Fehler:** `{error:'<konkrete deutsche Meldung>'}` — nie werfen, nie `undefined` zurückgeben
+- **Weiter-Ketten:** IDs/Refs mitzurückgeben (`boardId`, `cardId`, `matrixId`) — die AI kann den nächsten Call darauf aufbauen
+- **Defensive Kopien:** Bei Array- oder Object-Rückgaben `features.slice()`, `JSON.parse(JSON.stringify(tabLabels))` — kein Leak von Live-Referenzen an den Aufrufer
+
+### Sanitization-Pflicht
+
+- **URLs** immer durch `sanitizeUrl()` (`link.add`) — `javascript:`, `data:` und unbekannte Schemes werden abgelehnt
+- **Aliase** immer durch `validateAlias(new, old)` — nutze den zurückgegebenen `v.alias` (canonical, lowercase)
+- **Arrays** explizit `Array.isArray()`-Check, bevor `.slice()` oder `.filter()`
+
+### Object.assign-Chunking für MATRIX_TOOLS
+
+Die Registry wird sprint-weise erweitert. Statt den gesamten Literal neu zu schreiben, folgt jedes Sprint-Paket dem Muster:
+
+```js
+// Basis-Registry schließt:
+'status':async()=>{ ... }
+});
+
+// ─── Sprint X.Y: <gruppe> ──────────────────────────────
+// (Hilfsfunktionen/Konstanten hier, wenn sie Handler-lokal sind)
+function _resolveXyzRef(args){ ... }
+const XYZ_TEMPLATES = { ... };
+
+Object.assign(MATRIX_TOOLS, {
+  'xyz.foo': async (args) => { ... },
+  'xyz.bar': async (args) => { ... }
+});
+```
+
+Vorteil: minimalinvasive Diffs, sauber rückrollbar, leicht review-bar. Ein Helper-/Konstanten-Block zwischen zwei `Object.assign`-Aufrufen ist explizit erlaubt.
+
+### Tool-Naming
+
+- **Dot-separated**, Lesefluss als Satz: `card.done.toggle`, `cell.feature.add`, `matrix.edit_mode.set`
+- **Singular** für Aktionen auf Einzel-Items: `row.add`, nicht `rows.add`
+- **Query-Präfix** für Read-only Suchen: `query.cards`, `query.aliases`
+- **Gruppen-Präfix** stimmt mit Domain überein: `matrix.*`, `cell.*`, `card.*`, `link.*`, `info.field.*`, `checklist.*`, `checklist.item.*`
+- **Meta-Präfix-frei** für Session-Level: `status`, `undo.last`
+
+### Testing-Level
+
+- **Schema-Tests (Vitest, Bridge)** — pro Gruppe eine Datei `bridge/test/<gruppe>.test.ts`. Decken: valid Args, fehlende required, Enum-Abweichungen, Range-Grenzen. Kein Dispatch, kein WS — reine Zod-Validation.
+- **Integration-Test** (`bridge/test/tool-registry.test.ts`) — `registerAllTools()` + `getTools()`-Count abgeglichen gegen explizite Expected-Liste. Regression-Gate: vergisst man den Import in `tools/index.ts`, bricht der Test.
+- **Client-Smoke (Preview)** — echte `MATRIX_TOOLS[name](args)`-Aufrufe via `preview_eval`, Roundtrip über Setup → Call → State-Check → Cleanup. `preview_console_logs level:"error"` nach jedem Szenario.
+- **Kein** lokaler WS/MCP-Full-Roundtrip — das ist Phase-5-E2E, läuft dann gegen VPS.
+
+### Bridge-Typ-Deckung (`util/zod-json.ts`)
+
+Der Mini-Konverter deckt aktuell: `string`, `number`, `boolean`, `enum`, `optional`, `default`, `array`, `object`, `record`, `union`, `discriminatedUnion`, `literal`. Neue Zod-Typen? Entweder erweitern oder auf eine vorhandene Darstellung mappen. Unbekannte Typen liefern `{}` — MCP zeigt dann keine Constraint; der Handler **muss** zur Laufzeit validieren.
+
+### Client-Globals, auf die Handler zugreifen dürfen
+
+Stabil und in Tool-Handlern verwendbar (stammen alle aus dem Haupt-Script):
+
+- **Daten:** `nodes`, `rootId`, `stack`, `aliasIndex`, `appSettings`, `editMode`, `_undoStack`
+- **Getter/Builder:** `uid()`, `mkMatrix(label)`, `mkBoard(label)`, `getCell(nid,key)`, `getCard(boardId,cardId)`
+- **Feature-Manipulation:** `addFeature(cell,feat)`, `removeTree(nid)`, `cleanupCellChildren(cell)`
+- **Undo:** `pushUndo(label)`, `showUndoToast(label)`, `_applyUndo(entry)`
+- **Alias:** `validateAlias(val,exclude)`, `rebuildAliasIndex()`
+- **Persistenz:** `save()`, `saveSettings()`, `getPayload()`, `loadData(d)`, `render()`
+- **Sanitization:** `sanitizeUrl(str)`
+- **Toggle:** `setCardDone(boardId,cardId,toggle)`, `toggleEdit()`
+
+Nicht zugreifen: interne Render-Helpers, private `_sb*`/`sb*`-Sidebar-State, DOM-Elemente direkt (außer es ist Teil der dokumentierten UI-Aktion wie `matrix.edit_mode.set`, das `document.body.classList` togglet).
+
 ## Rollen, aus denen ich assistiere
 
 Ein Solo-Dev hat kein Team — ich bin die Rollen-Palette. Reihenfolge bei komplexen Entscheidungen: UX → Architektur → Implementation → QA.
@@ -102,9 +220,93 @@ Ein Solo-Dev hat kein Team — ich bin die Rollen-Palette. Reihenfolge bei kompl
 6. **Performance-Wächter** — Hot-Paths (Tree-Walks, Render-Loops, Save-Pipeline) profilen, nicht raten. Debounce statt Drosseln-pro-Event. JSON-Deep-Clone nur wo wirklich nötig; lieber Initial-Clone cachen. Tree-Walk-Ergebnisse in einen `*Cache`-State ablegen und bei Mutation invalidieren.
 7. **Deploy-/SaaS-Stratege** (bei Roadmap-Fragen) — Phasen-Plan respektieren (Phase 0 VPS-Deploy → 1 Bridge-Abstraktionen → 2 Integrationen → 3 Lizenz-Gate → …). Keine Frontend-Änderung, die den Single-File-Constraint auflöst, ohne explizite Phase-4-Entscheidung.
 
+## Standards, auf die wir uns berufen
+
+Die impliziten Qualitätsregeln im Projekt sind an formale Standards angelehnt. Feature-Reviews und Code-Changes prüfen gegen diese Liste als Checkliste — nicht dogmatisch (keine Zeile muss jeden Standard erfüllen), sondern als Messlatte für „State-of-the-Art".
+
+| Standard | Geltungsbereich | Konkret bei uns |
+|---|---|---|
+| **WCAG 2.2 Level AA** — Web Content Accessibility Guidelines | Client-UI (`client/matrix_tool_beta.html`) | Tastatur-first (`^alias`, `Shift+A`, `+`-Menü), `:focus-visible` scoped (nicht `*:focus{outline:none}`), Kontrast ≥ 4.5:1 in Light+Dark (`--fs-*`-Tokens, Dark-Overrides), `role=`/`aria-*` auf interaktiven Elementen (Checkboxes, Dialogs), 44×44 Tap-Targets bei `@media (max-width:480px)` |
+| **OWASP ASVS v4 Level 2** — Application Security Verification Standard | Bridge (`bridge/`), Client-Crypto | V2 Auth: Bearer-Token (`/mcp`) + Query-Param-Token (`/ws`, Browser-Limitation dokumentiert). V5 Input: `sanitizeUrl()` bei `link.add`, `validateAlias()` bei allen Alias-Settern, Zod-Schema-Parse vor jedem Tool-Dispatch. V7 Errors: `translateError()` → deutsche Messages ohne Stack-Leak, `showToast`-Pipeline, niemals `alert()`. V7.1 Audit: `audit_log`-Table in SQLite, jeder Tool-Call mit `args`/`result`/`ok` geloggt |
+| **12-Factor App** — stateless, config-driven Service | `bridge/` (Phase 2+) | III Config: `/opt/matrix-bridge/.env` (`PORT`, `HOST`, `BRIDGE_TOKEN`, `DB_PATH`), niemals hardcoded. VI Processes: systemd-Service, stateless Bridge-Prozess, State in SQLite-File. X Dev/Prod-Parity: gleicher Branch, gleiches `pnpm install --frozen-lockfile`. XI Logs: pino → journald, strukturiertes JSON |
+| **RFC 6455 (WebSocket) + RFC 6750 (Bearer)** | Bridge Auth-Flow | WebSocket-Upgrade via nginx (`proxy_http_version 1.1`, `Upgrade`/`Connection` headers). Bearer-Token bei HTTP-Routes (`/mcp`), Query-Param-Token bei WS (`/ws?token=...`) — Browser-WebSocket-API kann keine Custom-Headers setzen, das ist explizit im Auth-Code kommentiert |
+| **Conventional Commits 1.0 + SemVer 2.0** | Git-Workflow | `<type>(<scope>): <titel>`-Format, Types siehe oben (`feat`/`fix`/`refactor`/…). Tags wie `v0.2.0-mcp-v1` bei Meilensteinen. Ein PR = eine Teilleistung. Squash-Merge auf `main` |
+| **systemd sandboxing** — freedesktop.org Service-Hardening | `infra/systemd/matrix-bridge.service` | `ProtectSystem=strict` + `ReadWritePaths=/opt/matrix-bridge/data`, `ProtectHome=true`, `ProtectKernel*`, `RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX`, `SystemCallFilter=@system-service` + `~@privileged @resources`, `CapabilityBoundingSet=` (leer), `UMask=0027`. **Ausgeschlossen mit Begründung:** `MemoryDenyWriteExecute=true` — blockiert V8-JIT (Baseline + TurboFan), Node-Service crasht mit SIGTRAP. Dokumentiert inline |
+
+### Wenn ein Standard nicht passt
+
+Dann **explizit begründen im Commit/Code-Comment**, nicht stillschweigend abweichen. Beispiel: die `MemoryDenyWriteExecute`-Ausnahme ist im Unit-File inline kommentiert, damit ein zukünftiger Reviewer nicht denkt, die Abweichung sei ein Versehen.
+
+### Wenn ein neuer Standard relevant wird
+
+- Neuer Zeileneintrag in obiger Tabelle mit Geltungsbereich + „Konkret bei uns"
+- Kurzer Hinweis in CLAUDE.md-Abschnitt „Coding-Standards" oder „Arbeitsprinzipien", wenn es tägliche Arbeit berührt
+- Memory-File anlegen, wenn es ein größerer Schwenk ist (z.B. „Datenschutz-DSGVO-Compliance-Pass vor SaaS-Launch")
+
+## Prüfroutinen (Trigger-basierte Checklisten)
+
+Konventionen beschreiben *was* gilt, Prüfroutinen *wann* was zu prüfen ist. Vor jedem Commit gehe ich (die AI) die zum Scope passende Checkliste mechanisch durch — nicht aus Bauchgefühl. Mindestens **ein** Trigger passt bei jeder Code-Änderung.
+
+### Trigger: Feature geändert / neues Feature
+
+- [ ] **MCP-Coverage**: existiert ein `MATRIX_TOOL` für die (neue/geänderte) Mutations-Aktion? Wenn nein: Schema in `bridge/src/tools/<gruppe>.ts` + Client-Handler in `MATRIX_TOOLS` + Vitest + `tool-registry.test.ts`-Count erhöhen. *Selbst-Check: „Kann die AI das Feature headless aufrufen?"*
+- [ ] **Destruktiv?** → `pushUndo(label)` vor Mutation, `showUndoToast(label)` danach. Kein `confirm()` in Tool-Handlern.
+- [ ] **Error-Pfade**: jeder erwartbare Fehler via `showToast(msg, {type:'error'}) + translateError(err, fallback)`. Niemals `alert()`, niemals nur `console.error`.
+- [ ] **Animation**: sichtbare State-Änderung via `transform`/`opacity` + `--tr-std` (220ms) oder `--tr-enter` (180ms). Keine `display:none`-Swaps, keine `setTimeout`-Animationen.
+- [ ] **Alias-Index**: mutiert die Änderung `node.alias`/`cell.alias`/`card.alias`/`link.alias` (inkl. Parent-Zugehörigkeit, z.B. cross-board move)? → `rebuildAliasIndex()` nach Mutation.
+- [ ] **Settings-Gate**: Feature soll in Edit vs. Non-Edit unterschiedlich erscheinen? → Eintrag in `appSettings.vis.{key}` + `VIS_LABELS` + `isVis('key')`-Check.
+- [ ] **Focus-Restore**: öffnet die Änderung ein Modal? → `_pushFocusRestore()` beim Open, `_popFocusRestore()` beim Close. Plus `_pushModal(closeFn)`/`_popModal`.
+- [ ] **Tokens vor Literals**: neue Magic-Number / Hex-Color / ms-Duration → existiert Token in `:root`? Falls ≥2× verwendet, neuen Token anlegen.
+
+### Trigger: Neues UI-Element (Button, Row, Modal, Chip, …)
+
+- [ ] **Tastatur**: `tabindex="0"` wenn interaktiv erreichbar, `-1` wenn über Kontextmenü zugänglich. `onclick` + `onkeydown` für Enter/Space (rolle­spezifisch).
+- [ ] **Semantik**: `role=`/`aria-*` wenn nicht natives Element (z.B. `<span role="button" aria-label="…">`). Bei Checkboxes `aria-checked=…`.
+- [ ] **Focus-Styling**: Element matched den `:focus-visible`-Scope in Coding-Standards (Reset nicht global). Neue Klassen ggf. zur Scope-Liste ergänzen.
+- [ ] **Mobile-Tap**: `@media (max-width:480px)` min 44×44 px für Ico-Buttons, min 40 px Höhe für `.btn`.
+- [ ] **Dark-Mode**: Farben via Token oder `data-theme="dark"`-Override geprüft. Kein `style="color:#333"` inline.
+- [ ] **Inline-Styles**: keine statischen `style="…"` — nur dynamische Werte (User-Input, berechnete Position) als `style="--x:${v}"` mit CSS-Klasse die `var(--x)` liest.
+- [ ] **Kontext-Rückbindung**: öffnet das Element ein Menü/Dialog? → Breadcrumb oder Source-Highlight zeigen, damit User sieht „worauf" gewirkt wird.
+
+### Trigger: Neues MATRIX_TOOL / Bridge-Endpoint
+
+- [ ] **Tool-Trio vollständig**: Schema + Client-Handler + Vitest (siehe Abschnitt „Bridge + MCP-Tools").
+- [ ] **Zod-Schema**: jedes Feld mit `.describe('…')` für JSON-Schema-Readability in MCP-Inspector.
+- [ ] **zod-json-Deckung**: benutzter Zod-Typ ist in `util/zod-json.ts` abgedeckt? Wenn neu (z.B. `z.tuple`), erweitern.
+- [ ] **Registry-Test**: neuer Tool-Name in `bridge/test/tool-registry.test.ts` expected-Liste + `tools.size`-Count erhöht.
+- [ ] **Return-Shape**: Erfolg `{verb:true, …details}`, Fehler `{error:'<deutsch, konkret>'}`. Nie werfen, nie `undefined`.
+- [ ] **Defensive Kopien**: bei Array-/Object-Returns `.slice()` / `JSON.parse(JSON.stringify(…))` — kein Leak auf internen State.
+- [ ] **Ref-Resolver**: neue Ref-Form? Muster `^`-Prefix strippen + Alias-Index zuerst + Raw-ID-Fallback + Typ-Check, analog zu `_resolveNodeRef`/`_resolveBoardRef`/`_resolveCardRef`.
+- [ ] **URL-Input**: landet ein URL-String im State? → `sanitizeUrl()` davor. **Alias**: `validateAlias(val, oldAlias)` mit canonical `v.alias` speichern.
+
+### Trigger: Neue Tastatur-Shortcut / Keyboard-Interaktion
+
+- [ ] **Konfigurierbar?** → Eintrag in `DEFAULT_KEYBINDINGS` + `KB_ACTIONS`, Check via `matchShortcut(e, 'actionName')`.
+- [ ] **Fix?** → in `fixedRows`-Liste von `showKeyboardHelp()` dokumentieren.
+- [ ] **In Text-Input geschützt?** → Guard `!event.target.matches('input,textarea,[contenteditable]')` bei Alphazeichen-Shortcuts (wie Shift+R).
+- [ ] **Overlay mit ESC**: `document.addEventListener('keydown', h, true)` (Capture) + `ev.stopImmediatePropagation()` im Handler, sonst schluckt globaler Back-Handler das Event.
+
+### Trigger: Vor dem Commit (jede Änderung, immer)
+
+- [ ] **Diff gelesen**: `git diff --cached` manuell durchgegangen — keine `console.log`, keine Dead-Code-Reste, keine TODOs ohne Ticket-Referenz, keine Secrets.
+- [ ] **Preview-Smoke**: `preview_eval window.location.reload()` + gezielte DOM-Messung + `preview_console_logs level:"error"` leer. Bei großen JS-Edits: Cache-Buster-URL.
+- [ ] **Messbar verifiziert**: Zahlen statt Adjektive — `maxDelta < 1px`, `toolsCount === 37`, nicht „sieht passend aus".
+- [ ] **Commit-Message**: Conventional-Commits-Format, Co-Authored-By-Trailer, Scope passt (`feat(bridge/tools)` / `fix(client)` / `docs(claude)` / …).
+- [ ] **Standards-Abgleich**: Änderung berührt Security / Accessibility / Infra? → Kurz gegen den passenden Standard (OWASP ASVS / WCAG / 12-Factor / systemd) prüfen.
+- [ ] **Destruktive Git-Aktion nur mit Auftrag**: kein `reset --hard`, `push --force`, `--no-verify` ohne explizite User-Freigabe.
+
+### Wenn eine Checkbox scheitert
+
+Nicht weichklopfen. Entweder:
+- **Fix sofort** wenn ≤ 5 Minuten (Animation hinzufügen, Token einführen, Vitest-Assert ergänzen)
+- **Im gleichen Commit nachziehen** wenn logisch Teil der Änderung (MCP-Tool zum neuen Feature)
+- **Explizit als Follow-up-Todo** in TodoWrite eintragen wenn separater Aufwand (SSH-Hardening-Style)
+
+Niemals „mach ich später, merk ich mir eh" — wird garantiert vergessen.
+
 ## Kontext-Window & Sprint-Aufteilung
 
-Die App ist ~7k LOC in *einer* Datei. Ein Review- oder Refactor-Durchgang kann das Kontext-Fenster sprengen. Deshalb:
+Die Codebasis: **Client ~8.5k LOC** in `client/matrix_tool_beta.html` (Single-File), plus **Bridge ~900 LOC TypeScript** in `bridge/src/`. Ein Review- oder Refactor-Durchgang am Client kann das Kontext-Fenster sprengen. Deshalb:
 
 ### Kontext-Awareness während der Session
 
@@ -247,3 +449,19 @@ Preview-Server `matrix` auf Port 3848 — im `.claude/launch.json` definiert. Be
 8. **Destruktive Änderungen:** `pushUndo` + `showUndoToast` **bevor** der Commit erfolgt.
 9. **Zusammenfassung am Ende.** Tabelle mit Sub-Sprint / Commit-Hash / Messwert-Pointer. Keine Marketing-Sprache. Stellen-Links als `[file.html:line](…)`.
 10. **Branch-Merge erst auf explizite User-Freigabe.** Der Merge-Vorschlag kommt als letzter Satz der Zusammenfassung.
+
+## Dokumenten-Landkarte
+
+Diese Datei (CLAUDE.md) bleibt der **Single Entry Point** für Konventionen, Prinzipien und Prüfroutinen. Bei spezifischen Fragen → gezielt in diese Datei/Ordner schauen:
+
+| Was | Wo | Wann lesen |
+|---|---|---|
+| Bridge-Architektur + Deployment-Plan | `docs/plan-bridge.md` | Bei Bridge-/MCP-/VPS-Arbeit, besonders Phase 2+ |
+| MCP-Tool-Beispiele (Schemas) | `bridge/src/tools/*.ts` | Beim Hinzufügen neuer Tools — Pattern kopieren |
+| Client-Handler-Patterns | `client/matrix_tool_beta.html` Suchmuster `MATRIX_TOOLS={` | Beim Hinzufügen neuer Tool-Handler |
+| nginx/systemd-Config | `infra/nginx/matrix.conf`, `infra/systemd/matrix-bridge.service` | Bei Deploy/Infra-Arbeit |
+| CI/CD-Workflow | `.github/workflows/deploy.yml`, `pr.yml` | Bei CI-Anpassungen |
+| Design-Tokens + CSS-Patterns | `client/matrix_tool_beta.html` Sucher `:root {` | Bei UI-Arbeit |
+| Memory-Files (Session-Wissen) | `~/.claude/projects/…/memory/` — lokal pro Claude-Installation | Automatisch beim Session-Start gelesen |
+
+**Wenn CLAUDE.md > 1000 Zeilen wird:** Domain-Splits erwägen (`bridge/CLAUDE.md`, `infra/CLAUDE.md`) — Claude Code liest sub-CLAUDE.md-Files automatisch, wenn man im jeweiligen Ordner arbeitet. Root-CLAUDE.md behält dann nur Core-Prinzipien + Verweis auf Domain-Docs. Aktuell (~600 Zeilen) noch nicht nötig.

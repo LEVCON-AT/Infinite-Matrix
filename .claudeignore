@@ -20,3 +20,6 @@ _check.js
 Thumbs.db
 *.swp
 *~
+
+# misc
+Secrets_aus_claude_chat.txt

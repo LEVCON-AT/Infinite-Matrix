@@ -146,6 +146,7 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 .addbtn:hover{border-color:var(--blue);color:var(--blue);background:var(--bluebg);}
 .addfull{width:100%;padding:6px;font-size:12px;color:var(--text3);border:0.5px dashed var(--border2);border-radius:var(--r);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;font-family:inherit;}
 .addfull:hover{border-color:var(--blue);color:var(--blue);}
+.addfull:focus-visible{border-style:solid;border-color:var(--focus-color);color:var(--blue);}
 
 /* ── PANEL HEADER ── */
 .phd{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
@@ -213,6 +214,8 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 .cl-check{width:15px;height:15px;border-radius:3px;border:1.5px solid var(--border2);flex-shrink:0;margin-top:2px;cursor:pointer;position:relative;}
 .cl-check.done{background:var(--teal);border-color:var(--teal);}
 .cl-check.done::after{content:'';position:absolute;top:2px;left:2px;width:7px;height:4px;border-left:1.5px solid var(--bg-check);border-bottom:1.5px solid var(--bg-check);transform:rotate(-45deg);}
+.cl-check:focus-visible{outline:none;}
+.cl-check:focus-visible::before{content:'';position:absolute;inset:-4px;border:var(--focus-width) solid var(--focus-color);border-radius:4px;pointer-events:none;}
 .cl-text{font-size:13px;color:var(--text);flex:1;}
 .cl-text.done{text-decoration:line-through;color:var(--text3);}
 
@@ -1603,6 +1606,7 @@ const SAVE_KEY='imatrix-v2';
 const DATA_VERSION=1;
 let stack=[], editMode=false, mmOpen=false;
 let currentTab={}; // nodeId -> tab name
+let _lastClViewKey=null; // tracks stack/tab/editMode signature for checklist auto-focus
 let rootId;
 // ── Sidebar state ──
 // sbState cycles: 'full' → 'rails' → 'collapsed' → 'full' via Shift+N
@@ -1766,6 +1770,8 @@ function save(){
   _lsPendingPayload=payload;
   clearTimeout(lsSaveTimer);
   lsSaveTimer=setTimeout(flushLocalStorageNow,TIMING.SAVE_DEBOUNCE_MS);
+  // Bridge-Snapshot nach Mutation (debounced wie File-Save)
+  if(typeof BridgeClient!=='undefined'&&BridgeClient.isConnected)try{BridgeClient.sendSnapshot();}catch(e){}
 
   if(fileHandle){
     fileDirty=true;
@@ -2022,6 +2028,13 @@ function render(){
     initScrollFade();
     // Auto-focus first cell on matrix pages
     if(!cur.cellRef){setTimeout(()=>{const ae=document.activeElement;if(ae&&document.getElementById('panel')?.contains(ae)&&ae!==document.getElementById('panel'))return;const c=document.querySelector('.mcell');if(c)c.focus({preventScroll:true});},FOCUS_RESTORE_MS);}
+    // Auto-focus auf Checklisten-Seite: nur bei View-Wechsel (Stack / Tabs / editMode),
+    // nicht bei internem Re-Render (Toggle, Text-Edit) — sonst wird der User weggeschossen.
+    const _vk=stack.map(s=>s.nodeId+(s.cellRef?`#${s.cellRef.rowId}-${s.cellRef.colId}`:'')).join('/')+'||'+JSON.stringify(currentTab)+'||'+(editMode?1:0);
+    if(_vk!==_lastClViewKey){
+      _lastClViewKey=_vk;
+      setTimeout(()=>_clAutoFocus(),FOCUS_RESTORE_MS);
+    }
   }catch(err){
     console.error('Render error:',err);
     document.getElementById('panel').innerHTML=`<div class="empty-state"><div class="empty-big">${ICO.warn(32)}</div><div>Darstellungsfehler — bitte Seite neu laden.</div><div class="err-detail">${esc(err.message)}</div></div>`;
@@ -4655,14 +4668,14 @@ function _renderCardModalHTML(boardId,cardId,b,card,cols){
 
   // Checklist
   h+=`<div class="section-divider row-g8">Checkliste <span tabindex="0" role="button" title="Alle abchecken (Shift+R)" class="cl-reset" data-action="cl:reset-card" onkeydown="if(event.key==='Enter'){event.preventDefault();resetCardCl('${boardId}','${cardId}');}">↺</span></div>`;
-  h+=`<div id="card-cl-section" onkeydown="if(event.shiftKey&&(event.key==='R'||event.key==='r')){event.preventDefault();resetCardCl('${boardId}','${cardId}');}">`;
+  h+=`<div id="card-cl-section" onkeydown="if(event.shiftKey&&(event.key==='R'||event.key==='r')&&!event.target.matches('input,textarea,[contenteditable]')){event.preventDefault();resetCardCl('${boardId}','${cardId}');}">`;
   const cl=card.checklist||[];
   cl.forEach((item,idx)=>{
     const canUp=idx>0,canDn=idx<cl.length-1;
     h+=`<div class="cl-item cl-row" data-cl-item="${item.id}" ${editMode?`ondragover="clDragOver(event)" ondrop="clDragDrop(event,'card','${boardId}','${cardId}','${item.id}')"`:''}>
       ${editMode?`<span class="cl-drag" draggable="true" title="Verschieben" ondragstart="clDragStart(event,'card','${boardId}','${cardId}','${item.id}')" ondragend="clDragEnd(event)">⋮⋮</span>`:''}
       <div class="cl-check${item.done?' done':''}" tabindex="0" role="checkbox" aria-checked="${item.done}" data-action="cl:toggle" data-id="${item.id}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleClItem('${boardId}','${cardId}','${item.id}');}else if(editMode&&event.shiftKey&&(event.key==='ArrowUp'||event.key==='ArrowDown')){event.preventDefault();moveClItem('card','${boardId}','${cardId}','${item.id}',event.key==='ArrowUp'?-1:1);}"></div>
-      <input class="cl-text cl-text-input" data-done="${item.done?'true':'false'}" value="${esc(item.text)}" data-change="cl:update" data-blur="cl:autodel-blur" data-id="${item.id}" onkeydown="if(event.key==='Enter'){event.preventDefault();addClItem('${boardId}','${cardId}');}else if(editMode&&event.shiftKey&&(event.key==='ArrowUp'||event.key==='ArrowDown')){event.preventDefault();moveClItem('card','${boardId}','${cardId}','${item.id}',event.key==='ArrowUp'?-1:1);}"/>
+      <input class="cl-text cl-text-input" data-done="${item.done?'true':'false'}" value="${esc(item.text)}" data-change="cl:update" data-blur="cl:autodel-blur" data-id="${item.id}" onkeydown="if(event.key==='Enter'){event.preventDefault();if(!this.value.trim())return;updateClItem('${boardId}','${cardId}','${item.id}',this.value);addClItem('${boardId}','${cardId}','${item.id}');}else if(editMode&&event.shiftKey&&(event.key==='ArrowUp'||event.key==='ArrowDown')){event.preventDefault();moveClItem('card','${boardId}','${cardId}','${item.id}',event.key==='ArrowUp'?-1:1);}"/>
       ${editMode?`<span class="cl-arrow" ${canUp?'tabindex="0" role="button"':'data-disabled="true"'} ${canUp?`data-action="cl:move" data-id="${item.id}" data-dir="-1" onkeydown="if(event.key==='Enter'){event.preventDefault();moveClItem('card','${boardId}','${cardId}','${item.id}',-1);}"`:''}>↑</span>
       <span class="cl-arrow" ${canDn?'tabindex="0" role="button"':'data-disabled="true"'} ${canDn?`data-action="cl:move" data-id="${item.id}" data-dir="1" onkeydown="if(event.key==='Enter'){event.preventDefault();moveClItem('card','${boardId}','${cardId}','${item.id}',1);}"`:''}>↓</span>`:''}
       <span class="cl-del" tabindex="0" role="button" data-action="cl:delete" data-id="${item.id}" onkeydown="if(event.key==='Enter'){event.preventDefault();delClItem('${boardId}','${cardId}','${item.id}');}">${ICO.close(ICO_SIZE.XS)}</span>
@@ -4870,13 +4883,18 @@ function addGlobalPerson(boardId,cardId){
     toggleCardWho(boardId,cardId,v.l);
   });
 }
-function addClItem(boardId,cardId){
+function addClItem(boardId,cardId,afterItemId){
   const c=getCard(boardId,cardId);
   if(!c)return;if(!c.checklist)c.checklist=[];
-  c.checklist.push({id:uid(),text:'',done:false});
+  const newItem={id:uid(),text:'',done:false};
+  const idx=afterItemId?c.checklist.findIndex(i=>i.id===afterItemId):-1;
+  if(idx>=0)c.checklist.splice(idx+1,0,newItem);
+  else c.checklist.push(newItem);
   save();openCard(boardId,cardId);
-  // Auto-focus the new empty input so onblur cleanup works
-  setTimeout(()=>{const inputs=document.querySelectorAll('#card-cl-section input');if(inputs.length)inputs[inputs.length-1].focus();},FOCUS_RESTORE_MS);
+  setTimeout(()=>{
+    const el=document.querySelector(`#card-cl-section .cl-item[data-cl-item="${newItem.id}"] input`);
+    if(el)el.focus();
+  },FOCUS_RESTORE_MS);
 }
 function toggleClItem(boardId,cardId,itemId){
   const c=getCard(boardId,cardId);
@@ -4969,7 +4987,7 @@ function renderChecklists(node){
   if(checklists.length===0) h+=emptyState(ICO.check(32),UI.emptyChecklists);
   checklists.forEach(cl=>{
     const done=cl.items.filter(i=>i.done).length;
-    h+=`<div class="card" data-cl-id="${cl.id}" onkeydown="if(event.shiftKey&&(event.key==='R'||event.key==='r')){event.preventDefault();resetCl('${node.id}','${cl.id}');}">
+    h+=`<div class="card" data-cl-id="${cl.id}" onkeydown="if(event.shiftKey&&(event.key==='R'||event.key==='r')&&!event.target.matches('input,textarea,[contenteditable]')){event.preventDefault();resetCl('${node.id}','${cl.id}');}">
       <div class="cardhd">
         ${editMode?`<input class="ni ni-md" value="${esc(cl.label)}" onchange="renameCl('${node.id}','${cl.id}',this.value)"/>`:`<span>${esc(cl.label)}</span>`}
         <span class="cl-count">${done}/${cl.items.length}</span>
@@ -4981,9 +4999,9 @@ function renderChecklists(node){
       const canUp=idx>0,canDn=idx<cl.items.length-1;
       h+=`<div class="cl-item" data-cl-item="${item.id}" ${editMode?`ondragover="clDragOver(event)" ondrop="clDragDrop(event,'std','${node.id}','${cl.id}','${item.id}')"`:''}>
         ${editMode?`<span class="cl-drag" draggable="true" title="Verschieben" ondragstart="clDragStart(event,'std','${node.id}','${cl.id}','${item.id}')" ondragend="clDragEnd(event)">⋮⋮</span>`:''}
-        <div class="cl-check${item.done?' done':''}" tabindex="0" role="checkbox" aria-checked="${item.done}" onclick="toggleCl('${node.id}','${cl.id}','${item.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleCl('${node.id}','${cl.id}','${item.id}');}else if(editMode&&event.shiftKey&&(event.key==='ArrowUp'||event.key==='ArrowDown')){event.preventDefault();moveClItem('std','${node.id}','${cl.id}','${item.id}',event.key==='ArrowUp'?-1:1);}"></div>
+        <div class="cl-check${item.done?' done':''}" tabindex="${editMode?-1:(idx===0?0:-1)}" role="checkbox" aria-checked="${item.done}" onclick="toggleCl('${node.id}','${cl.id}','${item.id}')" onkeydown="if(event.key===' '){event.preventDefault();toggleCl('${node.id}','${cl.id}','${item.id}',true);}else if(editMode&&event.shiftKey&&(event.key==='ArrowUp'||event.key==='ArrowDown')){event.preventDefault();moveClItem('std','${node.id}','${cl.id}','${item.id}',event.key==='ArrowUp'?-1:1);}else if(event.key==='ArrowUp'||event.key==='ArrowDown'){event.preventDefault();_clNav(this,event.key==='ArrowUp'?-1:1);}"></div>
         ${editMode
-          ?`<input class="cl-text cl-text-edit${item.done?' done':''}" data-done="${item.done?'true':'false'}" value="${esc(item.text)}" onchange="updateClText('std','${node.id}','${cl.id}','${item.id}',this.value)" onblur="if(!this.value.trim())delClFromList('${node.id}','${cl.id}','${item.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();addClItemDirect('${node.id}','${cl.id}');}else if(event.shiftKey&&(event.key==='ArrowUp'||event.key==='ArrowDown')){event.preventDefault();moveClItem('std','${node.id}','${cl.id}','${item.id}',event.key==='ArrowUp'?-1:1);}"/>`
+          ?`<input class="cl-text cl-text-edit${item.done?' done':''}" tabindex="-1" data-done="${item.done?'true':'false'}" value="${esc(item.text)}" onchange="updateClText('std','${node.id}','${cl.id}','${item.id}',this.value)" onblur="if(!this.value.trim())delClFromList('${node.id}','${cl.id}','${item.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();if(!this.value.trim())return;updateClText('std','${node.id}','${cl.id}','${item.id}',this.value);addClItemDirect('${node.id}','${cl.id}','${item.id}');}else if(event.shiftKey&&(event.key==='ArrowUp'||event.key==='ArrowDown')){event.preventDefault();moveClItem('std','${node.id}','${cl.id}','${item.id}',event.key==='ArrowUp'?-1:1);}"/>`
           :`<span class="cl-text${item.done?' done':''}">${esc(item.text)}</span>`}
         ${editMode?`<span class="cl-arrow" ${canUp?'tabindex="0" role="button"':'data-disabled="true"'} ${canUp?`onclick="moveClItem('std','${node.id}','${cl.id}','${item.id}',-1)" onkeydown="if(event.key==='Enter'){event.preventDefault();moveClItem('std','${node.id}','${cl.id}','${item.id}',-1);}"`:''}>↑</span>
         <span class="cl-arrow" ${canDn?'tabindex="0" role="button"':'data-disabled="true"'} ${canDn?`onclick="moveClItem('std','${node.id}','${cl.id}','${item.id}',1)" onkeydown="if(event.key==='Enter'){event.preventDefault();moveClItem('std','${node.id}','${cl.id}','${item.id}',1);}"`:''}>↓</span>
@@ -4992,7 +5010,7 @@ function renderChecklists(node){
     });
     h+=`</div>
       <div class="cl-footer">
-        <button class="addfull edit-only" onclick="addClItemDirect('${node.id}','${cl.id}')">+ Punkt</button>
+        <button class="addfull edit-only" onclick="addClItemDirect('${node.id}','${cl.id}')" onkeydown="if(event.key==='ArrowUp'||event.key==='ArrowDown'){event.preventDefault();_clNav(this,event.key==='ArrowUp'?-1:1);}">+ Punkt</button>
       </div>
     </div>`;
   });
@@ -5001,20 +5019,70 @@ function renderChecklists(node){
 function addChecklist(boardId){
   smodal('Neue Checkliste',[{label:'Name',id:'l',ph:'z.B. Onboarding Schritte'}],v=>{
     if(!v.l)return;
-    nodes[boardId].data.checklists.push({id:uid(),label:v.l,items:[]});
+    const newCl={id:uid(),label:v.l,items:[]};
+    nodes[boardId].data.checklists.push(newCl);
     save();render();
+    setTimeout(()=>_clAutoFocus(newCl.id),FOCUS_RESTORE_MS);
   });
 }
 function renameCl(boardId,clId,val){const c=nodes[boardId].data.checklists.find(x=>x.id===clId);if(c)c.label=val;save();}
 function delChecklist(boardId,clId){nodes[boardId].data.checklists=nodes[boardId].data.checklists.filter(c=>c.id!==clId);save();render();}
-function toggleCl(boardId,clId,itemId){const cl=nodes[boardId].data.checklists.find(x=>x.id===clId);if(!cl)return;const i=cl.items.find(x=>x.id===itemId);if(i)i.done=!i.done;save();render();}
+function toggleCl(boardId,clId,itemId,keepFocus){const cl=nodes[boardId].data.checklists.find(x=>x.id===clId);if(!cl)return;const i=cl.items.find(x=>x.id===itemId);if(i)i.done=!i.done;save();render();if(keepFocus)setTimeout(()=>{const cb=document.querySelector(`.cl-item[data-cl-item="${itemId}"] .cl-check`);if(!cb)return;if(!editMode)_clRovingSet(cb);cb.focus();},FOCUS_RESTORE_MS);}
 function delClFromList(boardId,clId,itemId){const cl=nodes[boardId].data.checklists.find(x=>x.id===clId);if(cl)cl.items=cl.items.filter(i=>i.id!==itemId);save();render();}
 function addClItem2(boardId,clId){addClItemDirect(boardId,clId);}
-function addClItemDirect(boardId,clId){
+// Arrow-Navigation:
+//  - Von einer Checkbox: panel-weite Kette der Checkboxes (cross-list). Im Non-Edit wird Roving-Tabindex aktualisiert.
+//  - Vom "+ Punkt"-Button: Pivot in die eigene Liste (ArrowDown → erste cb, ArrowUp → letzte cb).
+function _clNav(fromEl,dir){
+  if(fromEl.classList&&fromEl.classList.contains('addfull')){
+    const card=fromEl.closest('[data-cl-id]');
+    if(!card)return;
+    const cbs=[...card.querySelectorAll('.cl-item .cl-check')];
+    if(!cbs.length)return;
+    const next=dir>0?cbs[0]:cbs[cbs.length-1];
+    if(!editMode)_clRovingSet(next);
+    next.focus();
+    return;
+  }
+  const all=[...document.querySelectorAll('#panel .cl-item .cl-check')];
+  const i=all.indexOf(fromEl);
+  if(i<0)return;
+  const next=all[i+dir];
+  if(!next)return;
+  if(!editMode)_clRovingSet(next);
+  next.focus();
+}
+// Non-Edit Roving: pro Liste genau eine .cl-check mit tabindex=0.
+function _clRovingSet(el){
+  const card=el.closest('[data-cl-id]');
+  if(!card)return;
+  card.querySelectorAll('.cl-item .cl-check').forEach(e=>e.setAttribute('tabindex','-1'));
+  el.setAttribute('tabindex','0');
+}
+// Setzt Fokus auf eine Checklisten-Seite: wenn "+ Punkt"-Button sichtbar → dorthin,
+// sonst erste Checkbox der ersten Zeile. Fokus-Stealing nur bei passivem activeElement.
+function _clAutoFocus(targetClId){
+  const panel=document.getElementById('panel');
+  if(!panel)return;
+  if(!panel.querySelector('[data-cl-id]'))return;
+  const ae=document.activeElement;
+  // Passiv = body/html oder geschlossenes Suchfeld (nach ^alias-Sprung bleibt dort technisch der Fokus)
+  if(ae&&ae!==document.body&&ae!==document.documentElement&&ae.id!=='searchinput')return;
+  let card=targetClId?panel.querySelector(`[data-cl-id="${targetClId}"]`):null;
+  if(!card)card=panel.querySelector('[data-cl-id]');
+  if(!card)return;
+  const btn=card.querySelector('.cl-footer .addfull');
+  if(btn&&btn.offsetParent!==null){btn.focus();return;}
+  const cb=card.querySelector('.cl-item .cl-check');
+  if(cb)cb.focus();
+}
+function addClItemDirect(boardId,clId,afterItemId){
   const cl=nodes[boardId].data.checklists.find(x=>x.id===clId);
   if(!cl)return;
   const newItem={id:uid(),text:'',done:false};
-  cl.items.push(newItem);
+  const idx=afterItemId?cl.items.findIndex(i=>i.id===afterItemId):-1;
+  if(idx>=0)cl.items.splice(idx+1,0,newItem);
+  else cl.items.push(newItem);
   save();render();
   setTimeout(()=>{
     const el=document.querySelector(`.cl-item[data-cl-item="${newItem.id}"] input.cl-text`);
@@ -7653,6 +7721,858 @@ window.addEventListener('beforeunload',e=>{if(fileDirty){e.preventDefault();e.re
 // Init file button
 if(hasFileAPI){updateFileBtn();}
 else{const fb=document.getElementById('filebtn');if(fb)fb.classList.add('is-hidden');const sb=document.getElementById('saveasbtn');if(sb)sb.classList.add('is-hidden');}
+
+// ─── Bridge-Connection (MCP/Tool-Call-Infrastruktur) ───────────────────
+const BridgeClient=(()=>{
+  let ws=null,reconnTimer=null,_snapshotVersion=0;
+  const RECONN_MS=3000;
+  const bridgeUrl=localStorage.getItem('bridgeUrl')||'';
+  const bridgeToken=localStorage.getItem('bridgeToken')||'';
+
+  function connect(){
+    if(!bridgeUrl||!bridgeToken)return;
+    const sep=bridgeUrl.includes('?')?'&':'?';
+    ws=new WebSocket(bridgeUrl+sep+'token='+encodeURIComponent(bridgeToken));
+
+    ws.onopen=()=>{
+      console.log('[Bridge] Verbunden');
+      ws.send(JSON.stringify({
+        type:'hello',
+        clientId:localStorage.getItem('bridgeClientId')||crypto.randomUUID(),
+        protocolVersion:1
+      }));
+      if(!localStorage.getItem('bridgeClientId'))
+        localStorage.setItem('bridgeClientId',crypto.randomUUID());
+    };
+
+    ws.onmessage=(ev)=>{
+      let msg;
+      try{msg=JSON.parse(ev.data);}catch{return;}
+      switch(msg.type){
+        case 'hello.ack':
+          console.log('[Bridge] Session:',msg.sessionId);
+          break;
+        case 'state.request':
+          sendSnapshot();
+          break;
+        case 'tool.call':
+          handleToolCall(msg);
+          break;
+        case 'ping':
+          ws.send(JSON.stringify({type:'pong',seq:msg.seq}));
+          break;
+        case 'notice':
+          console.log('[Bridge]',msg.level,msg.message);
+          if(msg.level==='error')showToast(msg.message,{type:'error'});
+          break;
+      }
+    };
+
+    ws.onclose=()=>{
+      console.log('[Bridge] Getrennt, reconnect in',RECONN_MS,'ms');
+      ws=null;
+      reconnTimer=setTimeout(connect,RECONN_MS);
+    };
+
+    ws.onerror=(err)=>{
+      console.error('[Bridge] WS-Fehler',err);
+    };
+  }
+
+  function sendSnapshot(){
+    if(!ws||ws.readyState!==WebSocket.OPEN)return;
+    _snapshotVersion++;
+    ws.send(JSON.stringify({
+      type:'snapshot',
+      version:_snapshotVersion,
+      payload:getPayload()
+    }));
+  }
+
+  async function handleToolCall(msg){
+    const handler=MATRIX_TOOLS[msg.tool];
+    if(!handler){
+      ws.send(JSON.stringify({
+        type:'tool.error',callId:msg.callId,ok:false,
+        error:{code:'unknown_tool',message:'Unbekanntes Tool: '+msg.tool}
+      }));
+      return;
+    }
+    try{
+      const result=await handler(msg.args);
+      ws.send(JSON.stringify({type:'tool.result',callId:msg.callId,ok:true,result}));
+      // Nach Mutation Snapshot senden
+      sendSnapshot();
+    }catch(err){
+      ws.send(JSON.stringify({
+        type:'tool.error',callId:msg.callId,ok:false,
+        error:{code:'tool_error',message:err.message||String(err)}
+      }));
+    }
+  }
+
+  function disconnect(){
+    clearTimeout(reconnTimer);
+    if(ws){ws.close();ws=null;}
+  }
+
+  function isConnected(){return ws&&ws.readyState===WebSocket.OPEN;}
+
+  return{connect,sendSnapshot,disconnect,isConnected};
+})();
+
+// ─── MATRIX_TOOLS Registry ────────────────────────────────────────────
+// Ref-Resolver: akzeptiert Alias (^foo oder foo) oder direkte Node-ID → nodeId|null
+function _resolveNodeRef(ref){
+  if(!ref||typeof ref!=='string')return null;
+  const r=ref.startsWith('^')?ref.slice(1):ref;
+  const entry=aliasIndex[r.toLowerCase()];
+  if(entry&&entry.nodeId)return entry.nodeId;
+  return nodes[ref]?ref:null;
+}
+const MATRIX_TOOLS={
+  'matrix.state.get':async(args)=>{
+    const payload=JSON.parse(getPayload());
+    if(args&&args.subtreeRef){
+      // Teilbaum via Alias oder ID
+      const ref=args.subtreeRef;
+      const resolved=aliasIndex[ref.toLowerCase()]||ref;
+      const node=nodes[resolved];
+      if(!node)return{error:'Referenz nicht gefunden: '+ref};
+      return{node,id:resolved};
+    }
+    return{snapshot:payload};
+  },
+
+  'matrix.navigate':async(args)=>{
+    const target=args.target;
+    // Alias-Auflösung (wie ^alias)
+    if(target.startsWith('^')){
+      const alias=target.slice(1);
+      const resolved=aliasIndex[alias.toLowerCase()];
+      if(!resolved)return{error:'Alias nicht gefunden: '+alias};
+      jumpToAlias(alias);
+      return{navigated:true,resolved};
+    }
+    // Direkte Node-ID
+    if(nodes[target]){
+      stack.length=0;
+      stack.push({nodeId:target});
+      render();
+      return{navigated:true,target};
+    }
+    return{error:'Ziel nicht gefunden: '+target};
+  },
+
+  'matrix.create':async(args)=>{
+    const id='m'+Date.now();
+    const rowLabels=args.rows||['Zeile 1'];
+    const colLabels=args.cols||['Spalte 1'];
+    const rows=rowLabels.map((_,i)=>'r'+(i+1));
+    const cols=colLabels.map((_,i)=>'c'+(i+1));
+    const cells={};
+    rows.forEach(r=>cols.forEach(c=>{cells[r+'-'+c]={};}));
+    nodes[id]={type:'matrix',label:args.label||'Neue Matrix',
+      data:{rows:rows.map((r,i)=>({id:r,label:rowLabels[i]})),
+            cols:cols.map((c,i)=>({id:c,label:colLabels[i]})),cells}};
+    if(args.alias){
+      nodes[id].alias=args.alias;
+      aliasIndex[args.alias.toLowerCase()]={type:'matrix',nodeId:id};
+    }
+    save();render();
+    return{created:true,id,label:args.label};
+  },
+
+  'query.cards':async(args)=>{
+    const filter=args&&args.filter||{};
+    const limit=args&&args.limit||20;
+    const results=[];
+    const now=new Date();
+    for(const[nid,node]of Object.entries(nodes)){
+      if(node.type!=='board')continue;
+      const cards=node.data&&node.data.cards||[];
+      for(const card of cards){
+        let match=true;
+        if(filter.tag&&!(card.tags||[]).includes(filter.tag))match=false;
+        if(filter.who&&!(card.who||[]).includes(filter.who))match=false;
+        if(filter.priority!==undefined&&card.priority!==filter.priority)match=false;
+        if(filter.due&&card.deadline){
+          const dl=new Date(card.deadline);
+          if(filter.due==='overdue')match=match&&dl<now&&!card.done;
+          else if(filter.due==='today')match=match&&dl.toDateString()===now.toDateString();
+          else if(filter.due==='week'){const w=new Date(now);w.setDate(w.getDate()+7);match=match&&dl<=w;}
+          else if(filter.due==='month'){const m=new Date(now);m.setMonth(m.getMonth()+1);match=match&&dl<=m;}
+        }else if(filter.due){match=false;}
+        if(match)results.push({boardId:nid,card});
+        if(results.length>=limit)break;
+      }
+      if(results.length>=limit)break;
+    }
+    return{cards:results,total:results.length};
+  },
+
+  'alias.resolve':async(args)=>{
+    const key=args.alias.toLowerCase();
+    const entry=aliasIndex[key];
+    if(!entry)return{error:'Alias nicht gefunden: '+args.alias};
+    return{alias:args.alias,resolved:entry};
+  },
+
+  // ─── Sprint 4.1: matrix-crud + edit-mode ──────────────────────────
+  'matrix.rename':async(args)=>{
+    const id=_resolveNodeRef(args.ref);
+    if(!id)return{error:'Matrix nicht gefunden: '+args.ref};
+    const node=nodes[id];
+    if(node.type!=='matrix')return{error:'Ref ist keine Matrix: '+args.ref};
+    const label=String(args.label||'').trim();
+    if(!label)return{error:'Label darf nicht leer sein'};
+    node.label=label;
+    const s=stack.find(x=>x.nodeId===id);if(s)s.label=label;
+    save();render();
+    return{renamed:true,id,label};
+  },
+
+  'matrix.delete':async(args)=>{
+    const id=_resolveNodeRef(args.ref);
+    if(!id)return{error:'Matrix nicht gefunden: '+args.ref};
+    if(id===rootId)return{error:'Root-Matrix kann nicht gelöscht werden'};
+    const node=nodes[id];
+    if(!node||node.type!=='matrix')return{error:'Ref ist keine Matrix: '+args.ref};
+    const label=node.label||id;
+    pushUndo(`Matrix „${label}" gelöscht`);
+    // Zellen-Refs im ganzen Baum entkoppeln, bevor removeTree die Node killt
+    for(const n of Object.values(nodes)){
+      if(n.type==='matrix'&&n.data&&n.data.cells){
+        for(const cell of Object.values(n.data.cells)){
+          if(cell.matrixId===id){
+            cell.matrixId=null;
+            cell.features=(cell.features||[]).filter(f=>f!=='matrix');
+          }
+        }
+      }
+    }
+    removeTree(id);
+    // Stack säubern: Einträge, deren Nodes nicht mehr existieren, poppen
+    while(stack.length>1&&!nodes[stack[stack.length-1].nodeId])stack.pop();
+    rebuildAliasIndex();save();render();
+    showUndoToast(`Matrix „${label}" gelöscht`);
+    return{deleted:true,id,label};
+  },
+
+  'row.add':async(args)=>{
+    const id=_resolveNodeRef(args.matrixRef);
+    if(!id)return{error:'Matrix nicht gefunden: '+args.matrixRef};
+    if(nodes[id].type!=='matrix')return{error:'Ref ist keine Matrix'};
+    const label=String(args.label||'').trim()||'Zeile';
+    const rowId=uid();
+    nodes[id].data.rows.push({id:rowId,label});
+    save();render();
+    return{added:true,matrixId:id,rowId,label};
+  },
+
+  'row.delete':async(args)=>{
+    const id=_resolveNodeRef(args.matrixRef);
+    if(!id||nodes[id].type!=='matrix')return{error:'Matrix nicht gefunden: '+args.matrixRef};
+    const d=nodes[id].data;
+    const row=d.rows.find(r=>r.id===args.rowId);
+    if(!row)return{error:'Zeile nicht gefunden: '+args.rowId};
+    pushUndo(`Zeile „${row.label}" gelöscht`);
+    d.rows=d.rows.filter(r=>r.id!==args.rowId);
+    Object.keys(d.cells).forEach(k=>{
+      if(k.startsWith(args.rowId+'-')){cleanupCellChildren(d.cells[k]);delete d.cells[k];}
+    });
+    // Stack-Einträge in gelöschter Zeile poppen
+    while(stack.length>1){
+      const top=stack[stack.length-1];
+      if(top.cellRef&&top.cellRef.parentId===id&&top.cellRef.rowId===args.rowId)stack.pop();
+      else break;
+    }
+    rebuildAliasIndex();save();render();
+    showUndoToast(`Zeile „${row.label}" gelöscht`);
+    return{deleted:true,matrixId:id,rowId:args.rowId,label:row.label};
+  },
+
+  'col.add':async(args)=>{
+    const id=_resolveNodeRef(args.matrixRef);
+    if(!id)return{error:'Matrix nicht gefunden: '+args.matrixRef};
+    if(nodes[id].type!=='matrix')return{error:'Ref ist keine Matrix'};
+    const label=String(args.label||'').trim()||'Spalte';
+    const colId=uid();
+    nodes[id].data.cols.push({id:colId,label});
+    save();render();
+    return{added:true,matrixId:id,colId,label};
+  },
+
+  'col.delete':async(args)=>{
+    const id=_resolveNodeRef(args.matrixRef);
+    if(!id||nodes[id].type!=='matrix')return{error:'Matrix nicht gefunden: '+args.matrixRef};
+    const d=nodes[id].data;
+    const col=d.cols.find(c=>c.id===args.colId);
+    if(!col)return{error:'Spalte nicht gefunden: '+args.colId};
+    pushUndo(`Spalte „${col.label}" gelöscht`);
+    d.cols=d.cols.filter(c=>c.id!==args.colId);
+    Object.keys(d.cells).forEach(k=>{
+      if(k.endsWith('-'+args.colId)){cleanupCellChildren(d.cells[k]);delete d.cells[k];}
+    });
+    while(stack.length>1){
+      const top=stack[stack.length-1];
+      if(top.cellRef&&top.cellRef.parentId===id&&top.cellRef.colId===args.colId)stack.pop();
+      else break;
+    }
+    rebuildAliasIndex();save();render();
+    showUndoToast(`Spalte „${col.label}" gelöscht`);
+    return{deleted:true,matrixId:id,colId:args.colId,label:col.label};
+  },
+
+  'matrix.edit_mode.set':async(args)=>{
+    const want=!!args.on;
+    if(want!==editMode)toggleEdit();
+    return{editMode};
+  },
+
+  // ─── Sprint 4.2: cell-Gruppe ──────────────────────────────────────
+  'cell.get':async(args)=>{
+    const mid=_resolveNodeRef(args.matrixRef);
+    if(!mid||nodes[mid].type!=='matrix')return{error:'Matrix nicht gefunden: '+args.matrixRef};
+    const d=nodes[mid].data;
+    if(!d.rows.find(r=>r.id===args.rowId))return{error:'Zeile nicht gefunden: '+args.rowId};
+    if(!d.cols.find(c=>c.id===args.colId))return{error:'Spalte nicht gefunden: '+args.colId};
+    const key=args.rowId+'-'+args.colId;
+    const raw=d.cells[key]||{};
+    const features=raw.features||[];
+    const hasContent=!!(raw.alias||raw.boardId||raw.matrixId||features.length>0);
+    return{hasContent,matrixId:mid,rowId:args.rowId,colId:args.colId,cell:{
+      alias:raw.alias||null,
+      features:features.slice(),
+      boardId:raw.boardId||null,
+      matrixId:raw.matrixId||null,
+      tabLabels:raw.tabLabels?JSON.parse(JSON.stringify(raw.tabLabels)):{}
+    }};
+  },
+
+  'cell.feature.add':async(args)=>{
+    const mid=_resolveNodeRef(args.matrixRef);
+    if(!mid||nodes[mid].type!=='matrix')return{error:'Matrix nicht gefunden: '+args.matrixRef};
+    const d=nodes[mid].data;
+    if(!d.rows.find(r=>r.id===args.rowId))return{error:'Zeile nicht gefunden: '+args.rowId};
+    if(!d.cols.find(c=>c.id===args.colId))return{error:'Spalte nicht gefunden: '+args.colId};
+    const feat=args.feature;
+    if(!['matrix','board','info','checklists'].includes(feat))return{error:'Unbekanntes Feature: '+feat};
+    const cell=getCell(mid,args.rowId+'-'+args.colId);
+    const defaultLabel=(args.label&&String(args.label).trim())||
+      ((d.rows.find(r=>r.id===args.rowId)?.label||'')+' / '+(d.cols.find(c=>c.id===args.colId)?.label||''));
+    if(feat==='matrix'){
+      if(!cell.matrixId)cell.matrixId=mkMatrix(defaultLabel.trim()||'Sub-Matrix');
+      addFeature(cell,'matrix');
+    }else{
+      if(!cell.boardId)cell.boardId=mkBoard(defaultLabel.trim()||'Board');
+      addFeature(cell,feat);
+    }
+    rebuildAliasIndex();save();render();
+    return{added:true,matrixId:mid,rowId:args.rowId,colId:args.colId,feature:feat,
+      boardId:cell.boardId||null,subMatrixId:cell.matrixId||null,features:[...cell.features]};
+  },
+
+  'cell.alias.set':async(args)=>{
+    const mid=_resolveNodeRef(args.matrixRef);
+    if(!mid||nodes[mid].type!=='matrix')return{error:'Matrix nicht gefunden: '+args.matrixRef};
+    const d=nodes[mid].data;
+    if(!d.rows.find(r=>r.id===args.rowId))return{error:'Zeile nicht gefunden: '+args.rowId};
+    if(!d.cols.find(c=>c.id===args.colId))return{error:'Spalte nicht gefunden: '+args.colId};
+    const cell=getCell(mid,args.rowId+'-'+args.colId);
+    const oldAlias=cell.alias||'';
+    const v=validateAlias(args.alias||'',oldAlias);
+    if(!v.valid)return{error:v.msg};
+    if(v.alias)cell.alias=v.alias;
+    else delete cell.alias;
+    rebuildAliasIndex();save();
+    return{set:true,alias:cell.alias||null,matrixId:mid,rowId:args.rowId,colId:args.colId};
+  },
+
+};
+// ─── Sprint 4.3: board-card Resolver + Handler via Object.assign ──
+function _resolveBoardRef(ref){
+  const id=_resolveNodeRef(ref);
+  if(!id||!nodes[id]||nodes[id].type!=='board')return null;
+  return id;
+}
+function _resolveCardRef(args){
+  if(args.cardRef){
+    const raw=String(args.cardRef);
+    const key=(raw.startsWith('^')?raw.slice(1):raw).toLowerCase();
+    const entry=aliasIndex[key];
+    if(entry&&entry.type==='card'){
+      const card=getCard(entry.boardId,entry.cardId);
+      if(card)return{boardId:entry.boardId,cardId:entry.cardId,card};
+    }
+    return null;
+  }
+  if(args.boardRef&&args.cardId){
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return null;
+    const card=getCard(bid,args.cardId);
+    if(card)return{boardId:bid,cardId:args.cardId,card};
+  }
+  return null;
+}
+Object.assign(MATRIX_TOOLS,{
+  'card.create':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const b=nodes[bid].data;
+    if(!b.kbCols||!b.kbCols.length)return{error:'Board hat keine Spalten'};
+    const colId=args.colId||b.kbCols[0].id;
+    if(!b.kbCols.find(c=>c.id===colId))return{error:'Spalte nicht gefunden: '+colId};
+    const card={
+      id:uid(),colId,
+      name:String(args.name).trim(),
+      note:args.note?String(args.note):'',
+      tags:Array.isArray(args.tags)?args.tags.slice():[],
+      who:Array.isArray(args.who)?args.who.slice():[],
+      deadline:args.deadline||'',
+      recur:{type:'none'},
+      checklist:[],archived:false,done:false,
+      priority:args.priority!==undefined?args.priority:''
+    };
+    if(args.alias){
+      const v=validateAlias(args.alias,'');
+      if(!v.valid)return{error:'Alias ungültig: '+v.msg};
+      card.alias=v.alias;
+    }
+    nodes[bid].data.kbCards.push(card);
+    if(card.alias)rebuildAliasIndex();
+    save();render();
+    return{created:true,boardId:bid,cardId:card.id,colId,alias:card.alias||null};
+  },
+
+  'card.update':async(args)=>{
+    const ref=_resolveCardRef(args);
+    if(!ref)return{error:'Karte nicht gefunden'};
+    const patch=args.patch||{};
+    const allowed=['name','note','colId','priority','deadline','tags','who'];
+    const changed=[];
+    for(const k of allowed){
+      if(!(k in patch))continue;
+      if(k==='colId'){
+        const cols=nodes[ref.boardId].data.kbCols||[];
+        if(!cols.find(c=>c.id===patch.colId))return{error:'Spalte nicht gefunden: '+patch.colId};
+      }
+      if(k==='tags'||k==='who'){
+        if(!Array.isArray(patch[k]))return{error:k+' muss Array sein'};
+        ref.card[k]=patch[k].slice();
+      } else {
+        ref.card[k]=patch[k];
+      }
+      changed.push(k);
+    }
+    if(changed.length===0)return{updated:false,reason:'Kein gültiges Feld im Patch'};
+    save();render();
+    return{updated:true,boardId:ref.boardId,cardId:ref.cardId,changed};
+  },
+
+  'card.move':async(args)=>{
+    const ref=_resolveCardRef(args);
+    if(!ref)return{error:'Karte nicht gefunden'};
+    if(args.targetBoardRef){
+      const tgt=_resolveBoardRef(args.targetBoardRef);
+      if(!tgt)return{error:'Ziel-Board nicht gefunden: '+args.targetBoardRef};
+      if(tgt===ref.boardId&&!args.targetColId)return{moved:false,reason:'Gleiches Board, keine Spalte gesetzt'};
+      const tgtData=nodes[tgt].data;
+      const colId=args.targetColId||(tgtData.kbCols[0]&&tgtData.kbCols[0].id);
+      if(!colId||!tgtData.kbCols.find(c=>c.id===colId))return{error:'Ziel-Spalte ungültig: '+colId};
+      nodes[ref.boardId].data.kbCards=nodes[ref.boardId].data.kbCards.filter(c=>c.id!==ref.cardId);
+      ref.card.colId=colId;
+      tgtData.kbCards.push(ref.card);
+      if(ref.card.alias)rebuildAliasIndex();
+      save();render();
+      return{moved:true,cardId:ref.cardId,fromBoard:ref.boardId,toBoard:tgt,toCol:colId};
+    }
+    if(args.targetColId){
+      const cols=nodes[ref.boardId].data.kbCols||[];
+      if(!cols.find(c=>c.id===args.targetColId))return{error:'Spalte nicht gefunden: '+args.targetColId};
+      ref.card.colId=args.targetColId;
+      save();render();
+      return{moved:true,cardId:ref.cardId,boardId:ref.boardId,toCol:args.targetColId};
+    }
+    return{error:'Weder targetColId noch targetBoardRef angegeben'};
+  },
+
+  'card.delete':async(args)=>{
+    const ref=_resolveCardRef(args);
+    if(!ref)return{error:'Karte nicht gefunden'};
+    const label=ref.card.name||ref.cardId;
+    pushUndo(`Karte „${label}" gelöscht`);
+    nodes[ref.boardId].data.kbCards=nodes[ref.boardId].data.kbCards.filter(c=>c.id!==ref.cardId);
+    if(ref.card.alias)rebuildAliasIndex();
+    save();render();
+    showUndoToast(`Karte „${label}" gelöscht`);
+    return{deleted:true,boardId:ref.boardId,cardId:ref.cardId,label};
+  },
+
+  'card.done.toggle':async(args)=>{
+    const ref=_resolveCardRef(args);
+    if(!ref)return{error:'Karte nicht gefunden'};
+    const updated=setCardDone(ref.boardId,ref.cardId,true);
+    if(!updated)return{error:'Toggle fehlgeschlagen'};
+    render();
+    return{toggled:true,cardId:ref.cardId,done:updated.done,colId:updated.colId};
+  },
+
+  'card.recurrence.set':async(args)=>{
+    const ref=_resolveCardRef(args);
+    if(!ref)return{error:'Karte nicht gefunden'};
+    const r=args.recur||{type:'none'};
+    if(!['none','daily','weekly','monthly','yearly'].includes(r.type))return{error:'Unbekannter recur.type: '+r.type};
+    const out={type:r.type};
+    if(r.every!==undefined)out.every=r.every;
+    if(r.day!==undefined)out.day=r.day;
+    if(r.weekday!==undefined)out.weekday=r.weekday;
+    ref.card.recur=out;
+    save();render();
+    return{set:true,cardId:ref.cardId,recur:out};
+  },
+
+  // ─── Sprint 4.4: info-link + checklist ───────────────────────────
+  'info.field.add':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const label=String(args.label||'').trim();
+    if(!label)return{error:'Label darf nicht leer sein'};
+    const field={id:uid(),label,value:args.value!==undefined?String(args.value):''};
+    nodes[bid].data.infoFields.push(field);
+    save();render();
+    return{added:true,boardId:bid,fieldId:field.id,label:field.label};
+  },
+
+  'info.field.update':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const field=nodes[bid].data.infoFields.find(f=>f.id===args.fieldId);
+    if(!field)return{error:'Info-Feld nicht gefunden: '+args.fieldId};
+    const changed=[];
+    if(args.value!==undefined){field.value=String(args.value);changed.push('value');}
+    if(args.label!==undefined){
+      const lbl=String(args.label).trim();
+      if(!lbl)return{error:'Label darf nicht leer sein'};
+      field.label=lbl;changed.push('label');
+    }
+    if(changed.length===0)return{updated:false,reason:'Kein Feld zu aktualisieren'};
+    save();render();
+    return{updated:true,boardId:bid,fieldId:field.id,changed};
+  },
+
+  'info.field.delete':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const d=nodes[bid].data;
+    const field=d.infoFields.find(f=>f.id===args.fieldId);
+    if(!field)return{error:'Info-Feld nicht gefunden: '+args.fieldId};
+    pushUndo(`Info-Feld „${field.label}" gelöscht`);
+    d.infoFields=d.infoFields.filter(f=>f.id!==args.fieldId);
+    save();render();
+    showUndoToast(`Info-Feld „${field.label}" gelöscht`);
+    return{deleted:true,boardId:bid,fieldId:args.fieldId,label:field.label};
+  },
+
+  'link.add':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const safeUrl=typeof sanitizeUrl==='function'?sanitizeUrl(args.url):args.url;
+    if(!safeUrl)return{error:'URL ungültig: '+args.url};
+    const link={id:uid(),label:(args.label&&String(args.label).trim())||safeUrl,url:safeUrl};
+    if(args.alias){
+      const va=validateAlias(args.alias,'');
+      if(!va.valid)return{error:'Alias ungültig: '+va.msg};
+      link.alias=va.alias;
+    }
+    nodes[bid].data.links.push(link);
+    if(link.alias)rebuildAliasIndex();
+    save();render();
+    return{added:true,boardId:bid,linkId:link.id,label:link.label,url:link.url,alias:link.alias||null};
+  },
+
+  'link.delete':async(args)=>{
+    // Resolver: linkRef (Alias) ODER boardRef+linkId
+    let boardId=null, linkId=null;
+    if(args.linkRef){
+      const raw=String(args.linkRef);
+      const key=(raw.startsWith('^')?raw.slice(1):raw).toLowerCase();
+      const entry=aliasIndex[key];
+      if(entry&&(entry.type==='link'||entry.type==='mail')){
+        boardId=entry.boardId;linkId=entry.linkId;
+      }
+    }
+    if(!boardId&&args.boardRef&&args.linkId){
+      const bid=_resolveBoardRef(args.boardRef);
+      if(bid){boardId=bid;linkId=args.linkId;}
+    }
+    if(!boardId||!linkId)return{error:'Link nicht gefunden'};
+    const link=nodes[boardId].data.links.find(l=>l.id===linkId);
+    if(!link)return{error:'Link nicht gefunden: '+linkId};
+    const label=link.label||link.url||linkId;
+    pushUndo(`Link „${label}" gelöscht`);
+    nodes[boardId].data.links=nodes[boardId].data.links.filter(l=>l.id!==linkId);
+    if(link.alias)rebuildAliasIndex();
+    save();render();
+    showUndoToast(`Link „${label}" gelöscht`);
+    return{deleted:true,boardId,linkId,label};
+  },
+
+  'checklist.add':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const label=String(args.label||'').trim();
+    if(!label)return{error:'Label darf nicht leer sein'};
+    const cl={id:uid(),label,items:[]};
+    nodes[bid].data.checklists.push(cl);
+    save();render();
+    return{added:true,boardId:bid,checklistId:cl.id,label:cl.label};
+  },
+
+  'checklist.item.add':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const cl=nodes[bid].data.checklists.find(c=>c.id===args.checklistId);
+    if(!cl)return{error:'Checkliste nicht gefunden: '+args.checklistId};
+    const text=String(args.text||'').trim();
+    if(!text)return{error:'Item-Text darf nicht leer sein'};
+    const item={id:uid(),text,done:false};
+    const idx=args.afterItemId?cl.items.findIndex(i=>i.id===args.afterItemId):-1;
+    if(idx>=0)cl.items.splice(idx+1,0,item);
+    else cl.items.push(item);
+    save();render();
+    return{added:true,boardId:bid,checklistId:cl.id,itemId:item.id,text,index:idx>=0?idx+1:cl.items.length-1};
+  },
+
+  'checklist.item.toggle':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const cl=nodes[bid].data.checklists.find(c=>c.id===args.checklistId);
+    if(!cl)return{error:'Checkliste nicht gefunden: '+args.checklistId};
+    const item=cl.items.find(i=>i.id===args.itemId);
+    if(!item)return{error:'Item nicht gefunden: '+args.itemId};
+    item.done=!item.done;
+    save();render();
+    return{toggled:true,boardId:bid,checklistId:cl.id,itemId:item.id,done:item.done};
+  },
+
+  // ─── Sprint 4.5: alias + query + settings + meta ─────────────────
+  'alias.set':async(args)=>{
+    const newAlias=String(args.alias||'');
+    // Rename/Delete-Pfad via currentAlias
+    if(args.currentAlias){
+      const raw=String(args.currentAlias);
+      const key=(raw.startsWith('^')?raw.slice(1):raw).toLowerCase();
+      const entry=aliasIndex[key];
+      if(!entry)return{error:'currentAlias nicht gefunden: '+args.currentAlias};
+      // Typ-spezifisch dispatchen
+      if(entry.type==='matrix'||entry.type==='board'){
+        const node=nodes[entry.nodeId];if(!node)return{error:'Node fehlt: '+entry.nodeId};
+        const v=validateAlias(newAlias,node.alias||'');
+        if(!v.valid)return{error:v.msg};
+        if(v.alias)node.alias=v.alias;else delete node.alias;
+      } else if(entry.type==='cell'){
+        const cell=getCell(entry.parentId,entry.rowId+'-'+entry.colId);
+        const v=validateAlias(newAlias,cell.alias||'');
+        if(!v.valid)return{error:v.msg};
+        if(v.alias)cell.alias=v.alias;else delete cell.alias;
+      } else if(entry.type==='card'){
+        const card=getCard(entry.boardId,entry.cardId);
+        if(!card)return{error:'Karte fehlt'};
+        const v=validateAlias(newAlias,card.alias||'');
+        if(!v.valid)return{error:v.msg};
+        if(v.alias)card.alias=v.alias;else delete card.alias;
+      } else if(entry.type==='link'||entry.type==='mail'){
+        const link=nodes[entry.boardId]?.data?.links?.find(l=>l.id===entry.linkId);
+        if(!link)return{error:'Link fehlt'};
+        const v=validateAlias(newAlias,link.alias||'');
+        if(!v.valid)return{error:v.msg};
+        if(v.alias)link.alias=v.alias;else delete link.alias;
+      } else {
+        return{error:'Unbekannter Alias-Typ: '+entry.type};
+      }
+      rebuildAliasIndex();save();render();
+      return{set:true,oldAlias:raw,newAlias:newAlias||null,type:entry.type};
+    }
+    // Neu-Zuweisung via nodeRef (nur Matrix/Board)
+    if(args.nodeRef){
+      const nid=_resolveNodeRef(args.nodeRef);
+      if(!nid)return{error:'Node nicht gefunden: '+args.nodeRef};
+      const node=nodes[nid];
+      if(!['matrix','board'].includes(node.type))return{error:'nodeRef muss Matrix oder Board sein (type='+node.type+')'};
+      const v=validateAlias(newAlias,node.alias||'');
+      if(!v.valid)return{error:v.msg};
+      if(v.alias)node.alias=v.alias;else delete node.alias;
+      rebuildAliasIndex();save();render();
+      return{set:true,nodeId:nid,type:node.type,newAlias:newAlias||null};
+    }
+    return{error:'Weder currentAlias noch nodeRef angegeben'};
+  },
+
+  'query.aliases':async(args)=>{
+    const prefix=(args&&args.prefix?String(args.prefix):'').toLowerCase().replace(/^\^/,'');
+    const typeFilter=args&&args.type;
+    const limit=Math.min(Math.max(args&&args.limit||100,1),500);
+    const results=[];
+    for(const[key,entry]of Object.entries(aliasIndex)){
+      if(prefix&&!key.startsWith(prefix))continue;
+      if(typeFilter&&entry.type!==typeFilter)continue;
+      results.push({alias:entry.alias,type:entry.type,
+        nodeId:entry.nodeId||null,parentId:entry.parentId||null,
+        rowId:entry.rowId||null,colId:entry.colId||null,
+        boardId:entry.boardId||null,cardId:entry.cardId||null,linkId:entry.linkId||null});
+      if(results.length>=limit)break;
+    }
+    return{total:results.length,prefix:prefix||null,type:typeFilter||null,aliases:results};
+  },
+
+  'settings.get':async(args)=>{
+    if(!args||!args.key)return{settings:JSON.parse(JSON.stringify(appSettings))};
+    const path=String(args.key).split('.');
+    let v=appSettings;
+    for(const p of path){
+      if(v&&typeof v==='object'&&p in v)v=v[p];
+      else return{error:'Key nicht gefunden: '+args.key};
+    }
+    return{key:args.key,value:v};
+  },
+
+  'settings.set':async(args)=>{
+    const path=String(args.key||'').split('.');
+    if(!path[0])return{error:'key fehlt'};
+    // Nur Keys, die bereits in DEFAULT_SETTINGS existieren, sind akzeptiert
+    let ref=DEFAULT_SETTINGS;
+    for(let i=0;i<path.length-1;i++){
+      if(!ref||typeof ref!=='object'||!(path[i] in ref))return{error:'Unbekannter Settings-Key: '+args.key};
+      ref=ref[path[i]];
+    }
+    const lastKey=path[path.length-1];
+    if(!(lastKey in ref))return{error:'Unbekannter Settings-Key: '+args.key};
+    // Vis-Keys zusätzlich validieren
+    if(path[0]==='vis'){
+      if(!['edit','always','never'].includes(args.value))return{error:'vis-Wert muss edit/always/never sein'};
+    }
+    // Anwenden
+    let tgt=appSettings;
+    for(let i=0;i<path.length-1;i++){
+      if(!tgt[path[i]]||typeof tgt[path[i]]!=='object')tgt[path[i]]={};
+      tgt=tgt[path[i]];
+    }
+    const old=tgt[lastKey];
+    tgt[lastKey]=args.value;
+    saveSettings();
+    // Für vis-Klassen: sofort auf body anwenden
+    if(path[0]==='vis'){
+      document.body.classList.toggle('vis-'+lastKey,args.value==='always');
+    }
+    render();
+    return{set:true,key:args.key,old,value:args.value};
+  },
+
+  'undo.last':async()=>{
+    if(!_undoStack.length)return{undone:false,reason:'Undo-Stack leer'};
+    const entry=_undoStack.pop();
+    _applyUndo(entry);
+    return{undone:true,label:entry.label,remaining:_undoStack.length};
+  },
+
+  'status':async()=>{
+    const topNodeId=stack.length?stack[stack.length-1].nodeId:null;
+    const topNode=topNodeId?nodes[topNodeId]:null;
+    return{
+      rootId,
+      stackDepth:stack.length,
+      top:topNode?{id:topNodeId,type:topNode.type,label:topNode.label,alias:topNode.alias||null}:null,
+      nodeCount:Object.keys(nodes).length,
+      aliasCount:Object.keys(aliasIndex).length,
+      undoStackSize:_undoStack.length,
+      editMode,
+      clientId:localStorage.getItem('bridgeClientId')||null,
+      appVersion:(typeof DATA_VERSION!=='undefined'?DATA_VERSION:null)
+    };
+  }
+});
+
+// ─── Sprint 4.6: template-Registry (synchron mit bridge/src/tools/template.ts) ──
+
+const MATRIX_TEMPLATES={
+  'projektplan':{label:'Projektplan',description:'Wochenraster mit Phasen × Wochentagen',
+    rows:['Planung','Umsetzung','Review'],cols:['Mo','Di','Mi','Do','Fr']},
+  'gtd':{label:'GTD (Getting Things Done)',description:'Inbox-Ablauf mit Status × Notizen',
+    rows:['Inbox','Heute','Woche','Projekte','Warten'],cols:['Status','Notizen']},
+  'life-layout':{label:'Life-Layout',description:'Lebensbereiche × Zeithorizonte',
+    rows:['Arbeit','Gesundheit','Familie','Finanzen','Lernen'],cols:['Kurzfristig','Mittelfristig','Langfristig']},
+  'decision':{label:'Decision-Matrix',description:'Optionen × Bewertungsdimensionen',
+    rows:['Option A','Option B','Option C'],cols:['Pros','Cons','Kosten','Risiken']},
+  'reading-list':{label:'Reading-List',description:'Inhaltstyp × Status',
+    rows:['Bücher','Artikel','Podcasts'],cols:['Offen','In Arbeit','Erledigt']}
+};
+
+Object.assign(MATRIX_TOOLS,{
+  'template.list':async()=>{
+    return{
+      templates:Object.entries(MATRIX_TEMPLATES).map(([id,t])=>({
+        id,label:t.label,description:t.description,
+        rows:t.rows.length,cols:t.cols.length
+      }))
+    };
+  },
+
+  'template.instantiate':async(args)=>{
+    const tpl=MATRIX_TEMPLATES[args.templateId];
+    if(!tpl)return{error:'Unbekanntes Template: '+args.templateId};
+    const label=(args.label&&String(args.label).trim())||tpl.label;
+    // Neue Matrix anlegen mit Template-Inhalt
+    const mid=mkMatrix(label);
+    const nm=nodes[mid];
+    nm.data.rows=tpl.rows.map(l=>({id:uid(),label:l}));
+    nm.data.cols=tpl.cols.map(l=>({id:uid(),label:l}));
+    nm.data.cells={};
+    // Optional: an Cell anhängen
+    let attached=null;
+    if(args.parentCellAlias){
+      const raw=String(args.parentCellAlias);
+      const key=(raw.startsWith('^')?raw.slice(1):raw).toLowerCase();
+      const entry=aliasIndex[key];
+      if(!entry||entry.type!=='cell'){
+        // Rollback: Matrix wieder löschen
+        delete nodes[mid];
+        return{error:'parentCellAlias verweist nicht auf eine Zelle: '+args.parentCellAlias};
+      }
+      const cell=getCell(entry.parentId,entry.rowId+'-'+entry.colId);
+      if(cell.matrixId){
+        delete nodes[mid];
+        return{error:'Zielzelle hat bereits eine Sub-Matrix'};
+      }
+      cell.matrixId=mid;
+      addFeature(cell,'matrix');
+      attached={parentId:entry.parentId,rowId:entry.rowId,colId:entry.colId};
+    }
+    rebuildAliasIndex();save();render();
+    return{instantiated:true,templateId:args.templateId,matrixId:mid,label,
+      rows:nm.data.rows.length,cols:nm.data.cols.length,attached};
+  }
+});
+
+// Bridge verbinden wenn konfiguriert
+if(localStorage.getItem('bridgeUrl'))BridgeClient.connect();
+
+// URL-Parameter für Bridge-Setup
+(function _bridgeUrlSetup(){
+  const p=new URLSearchParams(location.search);
+  const bUrl=p.get('bridge');
+  const bToken=p.get('token');
+  if(bUrl){
+    localStorage.setItem('bridgeUrl',bUrl);
+    if(bToken)localStorage.setItem('bridgeToken',bToken);
+    // URL bereinigen
+    const clean=new URL(location.href);
+    clean.searchParams.delete('bridge');
+    clean.searchParams.delete('token');
+    history.replaceState(null,'',clean.toString());
+    if(!BridgeClient.isConnected())BridgeClient.connect();
+  }
+})();
 </script>
 </body>
 </html>
