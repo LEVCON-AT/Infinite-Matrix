@@ -210,6 +210,12 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 /* ── CHECKLISTS TAB ── */
 .cl-list{padding:10px 13px;}
 .cl-item{display:flex;align-items:flex-start;gap:8px;padding:5px 0;padding-left:calc(var(--space-md) * var(--cl-level, 0));border-bottom:0.5px solid var(--border);}
+#alias-ac{position:absolute;z-index:3000;background:var(--bg);border:1px solid var(--border);border-radius:var(--rs);box-shadow:var(--shadow-md);min-width:180px;max-height:220px;overflow-y:auto;display:none;font-size:13px;}
+#alias-ac.is-open{display:block;}
+.alias-ac-item{display:flex;align-items:center;gap:6px;padding:4px 8px;cursor:pointer;color:var(--text);}
+.alias-ac-item:hover,.alias-ac-item.active{background:var(--bluebg);color:var(--bluetxt);}
+.alias-ac-item svg{flex-shrink:0;opacity:0.8;}
+.alias-ac-type{margin-left:auto;font-size:11px;color:var(--text3);}
 .cl-item:last-child{border-bottom:none;}
 .cl-check{width:15px;height:15px;border-radius:3px;border:1.5px solid var(--border2);flex-shrink:0;margin-top:2px;cursor:pointer;position:relative;}
 .cl-check.done{background:var(--teal);border-color:var(--teal);}
@@ -5044,6 +5050,97 @@ function delChecklist(boardId,clId){nodes[boardId].data.checklists=nodes[boardId
 function toggleCl(boardId,clId,itemId,keepFocus){const cl=nodes[boardId].data.checklists.find(x=>x.id===clId);if(!cl)return;const i=cl.items.find(x=>x.id===itemId);if(i)i.done=!i.done;save();render();if(keepFocus)setTimeout(()=>{const cb=document.querySelector(`.cl-item[data-cl-item="${itemId}"] .cl-check`);if(!cb)return;if(!editMode)_clRovingSet(cb);cb.focus({preventScroll:true});},FOCUS_RESTORE_MS);}
 function delClFromList(boardId,clId,itemId){const cl=nodes[boardId].data.checklists.find(x=>x.id===clId);if(cl)cl.items=cl.items.filter(i=>i.id!==itemId);save();render();}
 function addClItem2(boardId,clId){addClItemDirect(boardId,clId);}
+// ═══════════════════════════════════════════════════════
+// V2.1 Inline-Alias-Autocomplete
+// Triggert, wenn User `^` in einem .cl-text-edit/.cl-text-input tippt.
+// Kandidaten aus aliasIndex. Arrow/Enter/Space/Satzzeichen committen, Esc schliesst.
+// ═══════════════════════════════════════════════════════
+let _aaInput=null, _aaStart=-1, _aaCandidates=[], _aaSelected=0, _aaDropdown=null;
+const AA_SENTINEL_CLOSE=/[\s\n]/;
+function _aaIcon(type){
+  if(type==='matrix'||type==='cell'||type==='board')return SB_ICONS[type]||'';
+  if(type==='card')return '<svg width="13" height="13" viewBox="0 0 14 14" fill="none"><rect x="2" y="2" width="10" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3"/></svg>';
+  if(type==='link')return '<svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M6 4L4 4a3 3 0 0 0 0 6h2M8 10h2a3 3 0 0 0 0-6h-2M5 7h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
+  if(type==='mail')return '<svg width="13" height="13" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="3" width="11" height="8" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M2 4l5 4 5-4" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>';
+  return '';
+}
+function _aaEnsureDropdown(){
+  if(_aaDropdown)return _aaDropdown;
+  _aaDropdown=document.createElement('div');
+  _aaDropdown.id='alias-ac';
+  _aaDropdown.addEventListener('mousedown',e=>{
+    const el=e.target.closest('.alias-ac-item');
+    if(!el)return;
+    e.preventDefault();
+    const idx=_aaCandidates.findIndex(c=>c.alias===el.dataset.alias);
+    if(idx>=0){_aaSelected=idx;_aaCommit(e,' ');}
+  });
+  document.body.appendChild(_aaDropdown);
+  return _aaDropdown;
+}
+function _aaPosition(){
+  if(!_aaInput||!_aaDropdown)return;
+  const r=_aaInput.getBoundingClientRect();
+  _aaDropdown.style.left=(r.left+window.scrollX)+'px';
+  _aaDropdown.style.top=(r.bottom+window.scrollY+2)+'px';
+  _aaDropdown.style.minWidth=Math.max(180,r.width)+'px';
+}
+function _aaRender(){
+  const dd=_aaEnsureDropdown();
+  if(!_aaCandidates.length){_aaClose();return;}
+  dd.innerHTML=_aaCandidates.map((c,i)=>`<div class="alias-ac-item${i===_aaSelected?' active':''}" data-alias="${esc(c.alias)}">${_aaIcon(c.type)}<span>${esc(c.alias)}</span><span class="alias-ac-type">${esc(c.type)}</span></div>`).join('');
+  dd.classList.add('is-open');
+  _aaPosition();
+}
+function _aaClose(){
+  _aaInput=null;_aaStart=-1;_aaCandidates=[];_aaSelected=0;
+  if(_aaDropdown)_aaDropdown.classList.remove('is-open');
+}
+function _aaOnInput(input){
+  const v=input.value, pos=input.selectionStart|0;
+  let start=-1;
+  for(let i=pos-1;i>=0;i--){
+    if(v[i]==='^'){start=i;break;}
+    if(AA_SENTINEL_CLOSE.test(v[i]))break;
+  }
+  if(start<0){if(_aaInput===input)_aaClose();return;}
+  const query=v.slice(start+1,pos).toLowerCase();
+  const cands=Object.entries(aliasIndex)
+    .filter(([k])=>k.startsWith(query))
+    .slice(0,8)
+    .map(([k,entry])=>({alias:entry.alias||k,type:entry.type}));
+  if(!cands.length){if(_aaInput===input)_aaClose();return;}
+  _aaInput=input;_aaStart=start;_aaCandidates=cands;_aaSelected=0;
+  _aaRender();
+}
+function _aaCommit(e,tail){
+  if(!_aaInput||!_aaCandidates.length)return false;
+  const c=_aaCandidates[_aaSelected];
+  const v=_aaInput.value, pos=_aaInput.selectionStart|0;
+  const before=v.slice(0,_aaStart), after=v.slice(pos);
+  const inserted='^'+c.alias+(tail||'');
+  _aaInput.value=before+inserted+after;
+  const np=before.length+inserted.length;
+  try{_aaInput.setSelectionRange(np,np);}catch(_){}
+  _aaInput.dispatchEvent(new Event('change',{bubbles:true}));
+  _aaClose();
+  if(e&&e.preventDefault){e.preventDefault();e.stopImmediatePropagation();}
+  return true;
+}
+function _aaOnKeydown(e){
+  if(!_aaInput||e.target!==_aaInput||!_aaCandidates.length)return;
+  if(e.key==='ArrowDown'){_aaSelected=(_aaSelected+1)%_aaCandidates.length;_aaRender();e.preventDefault();e.stopImmediatePropagation();return;}
+  if(e.key==='ArrowUp'){_aaSelected=(_aaSelected-1+_aaCandidates.length)%_aaCandidates.length;_aaRender();e.preventDefault();e.stopImmediatePropagation();return;}
+  if(e.key==='Escape'){_aaClose();e.preventDefault();e.stopImmediatePropagation();return;}
+  if(e.key==='Enter'||e.key===' '){_aaCommit(e,' ');return;}
+  if(/^[,.;:?!)]$/.test(e.key)){_aaCommit(e,e.key);return;}
+}
+document.addEventListener('input',e=>{
+  if(e.target&&e.target.matches&&e.target.matches('.cl-text-edit, .cl-text-input'))_aaOnInput(e.target);
+});
+document.addEventListener('keydown',e=>{if(_aaInput)_aaOnKeydown(e);},true);
+document.addEventListener('blur',e=>{if(e.target===_aaInput)setTimeout(()=>{if(_aaInput===e.target)_aaClose();},150);},true);
+
 // V2.1 Nesting: Nachkommen eines Items (Positionen mit level > basisLevel, bis gleich-/kleiner-level).
 function _clDescendants(items,idx){
   if(!items||idx<0||idx>=items.length)return[];
