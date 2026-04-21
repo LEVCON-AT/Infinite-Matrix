@@ -27,6 +27,9 @@ describe('registerAllTools() Integration', () => {
       'cell.get',
       'checklist.add',
       'checklist.clone',
+      'checklist.close',
+      'checklist.history.delete',
+      'checklist.history.list',
       'checklist.item.add',
       'checklist.item.move',
       'checklist.item.set_level',
@@ -60,7 +63,7 @@ describe('registerAllTools() Integration', () => {
     ];
 
     expect(names).toEqual(expected);
-    expect(tools.size).toBe(43); // +2 aus V2.3a: checklist.set_recur, .set_close_mode
+    expect(tools.size).toBe(46); // +3 aus V2.3b: checklist.close, .history.list, .history.delete
   });
 
   it('jedes registrierte Tool hat schema + jsonSchema', () => {

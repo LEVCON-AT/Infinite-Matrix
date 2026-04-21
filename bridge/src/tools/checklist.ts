@@ -85,6 +85,24 @@ const checklistSetCloseModeSchema = z.object({
   mode: z.enum(['manual','auto-prompt','auto-silent']).describe('Abschluss-Verhalten'),
 });
 
+// ─── checklist.close / history (V2.3b) ─────────────────────────────
+const checklistCloseSchema = z.object({
+  boardRef: z.string().describe('Alias/ID des Boards'),
+  checklistId: z.string().describe('Checklisten-ID'),
+});
+
+const checklistHistoryListSchema = z.object({
+  boardRef: z.string().describe('Alias/ID des Boards'),
+  checklistId: z.string().describe('Checklisten-ID'),
+  limit: z.number().int().min(1).max(200).optional().describe('Max. Anzahl Einträge (neueste zuerst)'),
+});
+
+const checklistHistoryDeleteSchema = z.object({
+  boardRef: z.string().describe('Alias/ID des Boards'),
+  checklistId: z.string().describe('Checklisten-ID'),
+  entryIndex: z.number().int().min(0).describe('Index im History-Array (chronologisch, 0 = ältester)'),
+});
+
 export const checklistTools: ToolDef[] = [
   {
     name: 'checklist.add',
@@ -139,5 +157,23 @@ export const checklistTools: ToolDef[] = [
     description: 'Setzt das Abschluss-Verhalten einer Checkliste: manual | auto-prompt | auto-silent.',
     schema: checklistSetCloseModeSchema,
     jsonSchema: zodToJsonSchema(checklistSetCloseModeSchema),
+  },
+  {
+    name: 'checklist.close',
+    description: 'Schließt eine Checkliste manuell ab. Snapshot wandert in history[], bei recur wird done auf alle Items zurückgesetzt.',
+    schema: checklistCloseSchema,
+    jsonSchema: zodToJsonSchema(checklistCloseSchema),
+  },
+  {
+    name: 'checklist.history.list',
+    description: 'Listet History-Einträge einer Checkliste (neueste zuerst). Returns: {total, entries:[{idx, closedAt, items[]}]}.',
+    schema: checklistHistoryListSchema,
+    jsonSchema: zodToJsonSchema(checklistHistoryListSchema),
+  },
+  {
+    name: 'checklist.history.delete',
+    description: 'Löscht einen History-Eintrag per Index. Undo-fähig.',
+    schema: checklistHistoryDeleteSchema,
+    jsonSchema: zodToJsonSchema(checklistHistoryDeleteSchema),
   },
 ];

@@ -237,6 +237,16 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 .cl-settings-modal input[type="number"],.cl-settings-modal input[type="date"],.cl-settings-modal select{width:100%;margin-bottom:4px;padding:6px 8px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:12px;outline:none;}
 .cl-settings-modal input:focus-visible,.cl-settings-modal select:focus-visible{border-color:var(--blue);}
 .cl-wd-row{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;}
+.cl-history{border-top:0.5px solid var(--border);padding:4px 13px;}
+.cl-history-toggle{background:transparent;border:none;font-size:11px;color:var(--text3);cursor:pointer;padding:4px 0;display:inline-flex;align-items:center;gap:4px;}
+.cl-history-toggle:hover{color:var(--text);}
+.cl-history-list{max-height:0;overflow:hidden;transition:max-height var(--tr-std);}
+.cl-history.is-open .cl-history-list{max-height:240px;overflow-y:auto;padding-bottom:6px;}
+.cl-history-entry{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:11px;color:var(--text2);border-top:0.5px solid var(--border);}
+.cl-history-entry:first-child{border-top:none;}
+.cl-hist-date{flex:1;}
+.cl-hist-count{color:var(--text3);font-variant-numeric:tabular-nums;}
+.cl-close-now{margin-left:auto;}
 
 /* ── DAILY OVERVIEW ── */
 .daily-wrap{margin-top:22px;}
@@ -979,7 +989,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,[contenteditable
 /* modal-label als inline-Label innerhalb einer Row (überschreibt display:block/margin-bottom) */
 .modal-label.ml-inline{display:inline;margin:0;}
 /* Std-Checkliste / generische Helper */
-.cl-footer{padding:6px 13px;border-top:0.5px solid var(--border);}
+.cl-footer{padding:6px 13px;border-top:0.5px solid var(--border);display:flex;align-items:center;gap:8px;}
 .cl-count{font-size:10px;color:var(--text3);font-weight:400;}
 .cl-reset.ml4{margin-left:4px;}
 .cl-text.cl-text-edit{flex:1;border:none;outline:none;background:transparent;font-family:inherit;color:var(--text);}
@@ -1165,9 +1175,14 @@ function showToast(msg,opts){
   div.setAttribute('role',type==='error'?'alert':'status');
   div.id=id;
   const safe=String(msg).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  div.innerHTML=`<span class="toast-icon ${type}">${_toastIcon(type)}</span><div class="toast-body">${safe}</div><button class="toast-close" aria-label="Schließen">&times;</button>`;
+  const actionHtml=(o.actionLabel&&typeof o.onAction==='function')
+    ?`<button class="toast-action" type="button">${String(o.actionLabel).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</button>`:'';
+  div.innerHTML=`<span class="toast-icon ${type}">${_toastIcon(type)}</span><div class="toast-body">${safe}</div>${actionHtml}<button class="toast-close" aria-label="Schließen">&times;</button>`;
   const remove=()=>{ if(!div.isConnected)return; div.classList.add('closing'); setTimeout(()=>{if(div.parentNode)div.parentNode.removeChild(div);},160); };
   div.querySelector('.toast-close').onclick=remove;
+  if(actionHtml){
+    div.querySelector('.toast-action').onclick=()=>{try{o.onAction();}catch(_){}remove();};
+  }
   stack.appendChild(div);
   if(ms>0)setTimeout(remove,ms);
   return id;
@@ -5051,8 +5066,31 @@ function renderChecklists(node){
     h+=`</div>
       <div class="cl-footer">
         <button class="addfull edit-only" onclick="addClItemDirect('${node.id}','${cl.id}')" onkeydown="if(event.key==='ArrowUp'||event.key==='ArrowDown'){event.preventDefault();_clNav(this,event.key==='ArrowUp'?-1:1);}">+ Punkt</button>
-      </div>
-    </div>`;
+        ${(cl.closeMode==='manual'&&_clAllDone(cl))?`<button class="btn btn-small cl-close-now" onclick="_clClose('${node.id}','${cl.id}')">Jetzt abschließen</button>`:''}
+      </div>`;
+    // History-Section
+    const hist=Array.isArray(cl.history)?cl.history:[];
+    if(hist.length){
+      h+=`<div class="cl-history" data-cl-id-hist="${cl.id}" aria-expanded="false">
+        <button class="cl-history-toggle" onclick="_clToggleHistory('${node.id}','${cl.id}')" aria-label="Historie anzeigen">
+          ${ICO.recur(ICO_SIZE.XS)} Historie (${hist.length})
+        </button>
+        <div class="cl-history-list">`;
+      const sorted=[...hist].map((e,origIdx)=>({e,origIdx})).reverse();
+      sorted.forEach(({e,origIdx})=>{
+        const d=new Date(e.closedAt);
+        const dStr=isNaN(d.getTime())?e.closedAt:d.toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+        const total=Array.isArray(e.items)?e.items.length:0;
+        const doneCnt=Array.isArray(e.items)?e.items.filter(i=>i.done).length:0;
+        h+=`<div class="cl-history-entry">
+          <span class="cl-hist-date">${esc(dStr)}</span>
+          <span class="cl-hist-count">${doneCnt}/${total}</span>
+          ${editMode?`<span class="edel" tabindex="0" role="button" title="Eintrag löschen" onclick="_clDeleteHistoryEntry('${node.id}','${cl.id}',${origIdx})" onkeydown="if(event.key==='Enter'){event.preventDefault();_clDeleteHistoryEntry('${node.id}','${cl.id}',${origIdx});}">${ICO.close(ICO_SIZE.XS)}</span>`:''}
+        </div>`;
+      });
+      h+=`</div></div>`;
+    }
+    h+=`</div>`;
   });
   return h;
 }
@@ -5067,7 +5105,7 @@ function addChecklist(boardId){
 }
 function renameCl(boardId,clId,val){const c=nodes[boardId].data.checklists.find(x=>x.id===clId);if(c)c.label=val;save();}
 function delChecklist(boardId,clId){nodes[boardId].data.checklists=nodes[boardId].data.checklists.filter(c=>c.id!==clId);save();render();}
-function toggleCl(boardId,clId,itemId,keepFocus){const cl=nodes[boardId].data.checklists.find(x=>x.id===clId);if(!cl)return;const i=cl.items.find(x=>x.id===itemId);if(i)i.done=!i.done;save();render();if(keepFocus)setTimeout(()=>{const cb=document.querySelector(`.cl-item[data-cl-item="${itemId}"] .cl-check`);if(!cb)return;if(!editMode)_clRovingSet(cb);cb.focus({preventScroll:true});},FOCUS_RESTORE_MS);}
+function toggleCl(boardId,clId,itemId,keepFocus){const cl=nodes[boardId].data.checklists.find(x=>x.id===clId);if(!cl)return;const i=cl.items.find(x=>x.id===itemId);if(i)i.done=!i.done;save();_clCheckClose(boardId,cl);render();if(keepFocus)setTimeout(()=>{const cb=document.querySelector(`.cl-item[data-cl-item="${itemId}"] .cl-check`);if(!cb)return;if(!editMode)_clRovingSet(cb);cb.focus({preventScroll:true});},FOCUS_RESTORE_MS);}
 function delClFromList(boardId,clId,itemId){const cl=nodes[boardId].data.checklists.find(x=>x.id===clId);if(cl)cl.items=cl.items.filter(i=>i.id!==itemId);save();render();}
 function addClItem2(boardId,clId){addClItemDirect(boardId,clId);}
 // ═══════════════════════════════════════════════════════
@@ -5577,6 +5615,58 @@ function _clCloseSettings(e){
   const overlay=document.querySelector('#mc .smodal-overlay');
   if(overlay){overlay.classList.add('closing');setTimeout(()=>{document.getElementById('mc').innerHTML='';_popFocusRestore();},SMODAL_EXIT_MS);}
   else{document.getElementById('mc').innerHTML='';_popFocusRestore();}
+}
+
+// ═══════════════════════════════════════════════════════
+// V2.3b Close-Flow + History
+// _clCheckClose wird nach jedem toggleCl aufgerufen: wenn alle Items done,
+// gemaess closeMode entweder Toast + Action, oder direkt _clClose.
+// ═══════════════════════════════════════════════════════
+function _clAllDone(cl){
+  if(!cl||!Array.isArray(cl.items)||!cl.items.length)return false;
+  return cl.items.every(i=>i.done);
+}
+function _clCheckClose(boardId,cl){
+  if(!cl)return;
+  if(!_clAllDone(cl))return;
+  const mode=cl.closeMode||'auto-prompt';
+  if(mode==='manual')return; // Kein Auto-Close
+  if(mode==='auto-silent'){_clClose(boardId,cl.id);return;}
+  // auto-prompt: Toast mit "Abschliessen"-Action (10s Lebensdauer)
+  const _bid=boardId,_cid=cl.id;
+  showToast(`Checkliste „${cl.label}" ist komplett.`,{type:'info',ms:10000,actionLabel:'Abschliessen',onAction:()=>_clClose(_bid,_cid)});
+}
+function _clClose(boardId,clId){
+  const cl=nodes[boardId]&&nodes[boardId].data.checklists.find(c=>c.id===clId);
+  if(!cl)return;
+  pushUndo(`Checkliste „${cl.label}" abgeschlossen`);
+  if(!Array.isArray(cl.history))cl.history=[];
+  const snapshot={closedAt:new Date().toISOString(),items:JSON.parse(JSON.stringify(cl.items||[]))};
+  cl.history.push(snapshot);
+  const isRecur=cl.recur&&cl.recur.type&&cl.recur.type!=='none';
+  if(isRecur){cl.items.forEach(i=>{i.done=false;});}
+  // Event-Action (V2.3c erweitert Jump/Webhook/Mail; V2.3b nur Toast)
+  const act=cl.action&&cl.action.onClose;
+  if(!act||act.type==='toast'||!act.type){
+    showToast(`Checkliste „${cl.label}" abgeschlossen um ${new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}.`,{type:'success'});
+  }
+  save();render();
+  showUndoToast(`Checkliste „${cl.label}" abgeschlossen`);
+}
+// History-UI: Toggle + Snapshot-Liste
+function _clToggleHistory(boardId,clId){
+  const sec=document.querySelector(`[data-cl-id="${clId}"] .cl-history`);
+  if(!sec)return;
+  const open=sec.classList.toggle('is-open');
+  sec.setAttribute('aria-expanded',open?'true':'false');
+}
+function _clDeleteHistoryEntry(boardId,clId,entryIdx){
+  const cl=nodes[boardId]&&nodes[boardId].data.checklists.find(c=>c.id===clId);
+  if(!cl||!Array.isArray(cl.history)||entryIdx<0||entryIdx>=cl.history.length)return;
+  pushUndo('History-Eintrag geloescht');
+  cl.history.splice(entryIdx,1);
+  save();render();
+  showUndoToast('History-Eintrag geloescht');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -9010,6 +9100,43 @@ Object.assign(MATRIX_TOOLS,{
     cl.closeMode=args.mode;
     save();render();
     return{set:true,boardId:bid,checklistId:cl.id,mode:cl.closeMode};
+  },
+
+  'checklist.close':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const cl=nodes[bid].data.checklists.find(c=>c.id===args.checklistId);
+    if(!cl)return{error:'Checkliste nicht gefunden: '+args.checklistId};
+    const before=Array.isArray(cl.history)?cl.history.length:0;
+    _clClose(bid,cl.id);
+    return{closed:true,boardId:bid,checklistId:cl.id,historyLen:(cl.history||[]).length,snapshotAdded:(cl.history||[]).length>before};
+  },
+
+  'checklist.history.list':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const cl=nodes[bid].data.checklists.find(c=>c.id===args.checklistId);
+    if(!cl)return{error:'Checkliste nicht gefunden: '+args.checklistId};
+    const hist=Array.isArray(cl.history)?cl.history:[];
+    const limit=typeof args.limit==='number'?Math.max(1,Math.min(200,args.limit|0)):hist.length;
+    // Neueste zuerst (reverse chronologisch)
+    const entries=[...hist].map((e,i)=>({idx:i,closedAt:e.closedAt,items:JSON.parse(JSON.stringify(e.items||[]))})).reverse().slice(0,limit);
+    return{boardId:bid,checklistId:cl.id,total:hist.length,entries};
+  },
+
+  'checklist.history.delete':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const cl=nodes[bid].data.checklists.find(c=>c.id===args.checklistId);
+    if(!cl)return{error:'Checkliste nicht gefunden: '+args.checklistId};
+    if(!Array.isArray(cl.history))cl.history=[];
+    const idx=args.entryIndex|0;
+    if(idx<0||idx>=cl.history.length)return{error:'entryIndex out of range'};
+    pushUndo('History-Eintrag geloescht');
+    const removed=cl.history.splice(idx,1)[0];
+    save();render();
+    showUndoToast('History-Eintrag geloescht');
+    return{deleted:true,boardId:bid,checklistId:cl.id,entryIndex:idx,closedAt:removed.closedAt};
   },
 
   'checklist.item.move':async(args)=>{

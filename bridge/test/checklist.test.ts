@@ -9,12 +9,15 @@ function getTool(name: string) {
 }
 
 describe('checklist tool registrierung', () => {
-  it('enthält 9 Tools (Sprint 4.4b + V2.1 set_level + V2.2 paste/clone/move + V2.3a set_recur/close_mode)', () => {
-    expect(checklistTools).toHaveLength(9);
+  it('enthält 12 Tools (Sprint 4.4b + V2.1 + V2.2 + V2.3a/b)', () => {
+    expect(checklistTools).toHaveLength(12);
     const names = checklistTools.map((t) => t.name).sort();
     expect(names).toEqual([
       'checklist.add',
       'checklist.clone',
+      'checklist.close',
+      'checklist.history.delete',
+      'checklist.history.list',
       'checklist.item.add',
       'checklist.item.move',
       'checklist.item.set_level',
@@ -259,6 +262,45 @@ describe('checklist.set_close_mode schema (V2.3a)', () => {
     ).toBe(false);
   });
   it('lehnt ohne mode ab', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1' }).success).toBe(false);
+  });
+});
+
+describe('checklist.close schema (V2.3b)', () => {
+  const t = getTool('checklist.close');
+  it('akzeptiert Pflichtfelder', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1' }).success).toBe(true);
+  });
+  it('lehnt ohne checklistId ab', () => {
+    expect(t.schema.safeParse({ boardRef: '^b' }).success).toBe(false);
+  });
+});
+
+describe('checklist.history.list schema (V2.3b)', () => {
+  const t = getTool('checklist.history.list');
+  it('akzeptiert ohne limit', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1' }).success).toBe(true);
+  });
+  it('akzeptiert limit in Range', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', limit: 5 }).success).toBe(true);
+  });
+  it('lehnt limit 0 ab', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', limit: 0 }).success).toBe(false);
+  });
+  it('lehnt limit > 200 ab', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', limit: 201 }).success).toBe(false);
+  });
+});
+
+describe('checklist.history.delete schema (V2.3b)', () => {
+  const t = getTool('checklist.history.delete');
+  it('akzeptiert entryIndex 0', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', entryIndex: 0 }).success).toBe(true);
+  });
+  it('lehnt negativen Index ab', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', entryIndex: -1 }).success).toBe(false);
+  });
+  it('lehnt ohne entryIndex ab', () => {
     expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1' }).success).toBe(false);
   });
 });
