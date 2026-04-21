@@ -37,8 +37,11 @@ services:
       JWT_EXP: ${JWT_EXPIRY:-3600}
     volumes:
       - ./volumes/db/data:/var/lib/postgresql/data:Z
-      - ./volumes/db/init:/docker-entrypoint-initdb.d:Z
-      - ./volumes/db/logs:/var/log/postgresql:Z
+      # Eigene Init-Scripts: landen in /docker-entrypoint-initdb.d/init-scripts/
+      # Das Supabase-Image laedt diese nach seinen eigenen migrations (migrations/)
+      # und vor dem finalen Ready — so sehen Auth/Rest/Realtime die Rollen beim Connect.
+      - ./volumes/db/init/01-roles.sql:/docker-entrypoint-initdb.d/init-scripts/01-roles.sql:ro
+      - ./volumes/db/init/02-realtime.sql:/docker-entrypoint-initdb.d/init-scripts/02-realtime.sql:ro
     command:
       - postgres
       - -c
@@ -68,6 +71,7 @@ services:
     environment:
       GOTRUE_API_HOST: 0.0.0.0
       GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${API_EXTERNAL_URL}
       GOTRUE_DB_DRIVER: postgres
       GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-postgres}
       GOTRUE_SITE_URL: ${SITE_URL}

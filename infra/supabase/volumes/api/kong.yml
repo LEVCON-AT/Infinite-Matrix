@@ -1,11 +1,10 @@
-_format_version: "2.1"
+_format_version: '2.1'
 _transform: true
 
 ###
-### Consumers / Users
+### Consumers
 ###
 consumers:
-  - username: DASHBOARD
   - username: anon
     keyauth_credentials:
       - key: $SUPABASE_ANON_KEY
@@ -14,7 +13,7 @@ consumers:
       - key: $SUPABASE_SERVICE_KEY
 
 ###
-### Access Control List
+### ACLs
 ###
 acls:
   - consumer: anon
@@ -23,18 +22,10 @@ acls:
     group: admin
 
 ###
-### Dashboard credentials (Basic-Auth vor Studio)
-###
-basicauth_credentials:
-  - consumer: DASHBOARD
-    username: $DASHBOARD_USERNAME
-    password: $DASHBOARD_PASSWORD
-
-###
 ### API-Routes
 ###
 services:
-  ## Open-Auth (Login, Password-Reset) — kein Key noetig
+  ## Open-Auth (keine Key-Auth noetig)
   - name: auth-v1-open
     url: http://auth:9999/verify
     routes:
@@ -65,9 +56,8 @@ services:
     plugins:
       - name: cors
 
-  ## Sonstige Auth-Endpoints (brauchen Anon- oder Service-Key)
+  ## Sonstige Auth-Endpoints
   - name: auth-v1
-    _comment: "GoTrue: /auth/v1/* → http://auth:9999/*"
     url: http://auth:9999/
     routes:
       - name: auth-v1-all
@@ -86,9 +76,8 @@ services:
             - admin
             - anon
 
-  ## REST (PostgREST)
+  ## PostgREST
   - name: rest-v1
-    _comment: "PostgREST: /rest/v1/* → http://rest:3000/*"
     url: http://rest:3000/
     routes:
       - name: rest-v1-all
@@ -107,9 +96,8 @@ services:
             - admin
             - anon
 
-  ## Realtime (WebSocket)
+  ## Realtime-WebSocket
   - name: realtime-v1-ws
-    _comment: "Realtime WS: /realtime/v1/* → ws://realtime:4000/socket/*"
     url: http://realtime:4000/socket
     protocol: http
     routes:
@@ -120,33 +108,5 @@ services:
     plugins:
       - name: cors
       - name: key-auth
-        config:
-          hide_credentials: false
-
-  - name: realtime-v1-api
-    _comment: "Realtime API: /realtime/v1/api/* → http://realtime:4000/api/*"
-    url: http://realtime:4000/api
-    protocol: http
-    routes:
-      - name: realtime-v1-api
-        strip_path: true
-        paths:
-          - /realtime/v1/api
-    plugins:
-      - name: cors
-      - name: key-auth
-        config:
-          hide_credentials: false
-
-  ## Studio (Admin-UI) — nur mit Basic-Auth
-  - name: meta
-    _comment: "pg-meta API hinter Basic-Auth"
-    url: http://meta:8080/
-    routes:
-      - name: meta-all
-        paths:
-          - /pg/
-    plugins:
-      - name: basic-auth
         config:
           hide_credentials: false
