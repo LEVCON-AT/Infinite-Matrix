@@ -9,10 +9,27 @@ function getTool(name: string) {
 }
 
 describe('checklist tool registrierung', () => {
-  it('enthält alle 3 Sprint-4.4b-Tools', () => {
-    expect(checklistTools).toHaveLength(3);
+  it('enthält 16 Tools (Sprint 4.4b + V2.1 + V2.2 + V2.3a/b/c + V2.4)', () => {
+    expect(checklistTools).toHaveLength(16);
     const names = checklistTools.map((t) => t.name).sort();
-    expect(names).toEqual(['checklist.add', 'checklist.item.add', 'checklist.item.toggle']);
+    expect(names).toEqual([
+      'card.checklist.link_ref',
+      'card.checklist.unlink_ref',
+      'checklist.add',
+      'checklist.clone',
+      'checklist.close',
+      'checklist.history.delete',
+      'checklist.history.list',
+      'checklist.item.add',
+      'checklist.item.move',
+      'checklist.item.set_level',
+      'checklist.item.toggle',
+      'checklist.paste',
+      'checklist.set_action',
+      'checklist.set_close_mode',
+      'checklist.set_recur',
+      'checklist.to_card',
+    ]);
   });
 });
 
@@ -59,6 +76,47 @@ describe('checklist.item.add schema', () => {
       t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', text: 'x', afterItemId: 5 }).success,
     ).toBe(false);
   });
+  it('akzeptiert optionales level 0-2', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', text: 'x', level: 2 }).success,
+    ).toBe(true);
+  });
+  it('lehnt level 3 ab', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', text: 'x', level: 3 }).success,
+    ).toBe(false);
+  });
+  it('lehnt negatives level ab', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', text: 'x', level: -1 }).success,
+    ).toBe(false);
+  });
+});
+
+describe('checklist.item.set_level schema', () => {
+  const t = getTool('checklist.item.set_level');
+  it('akzeptiert gültige Args (level 0..2)', () => {
+    for (const lvl of [0, 1, 2]) {
+      expect(
+        t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', itemId: 'n8', level: lvl }).success,
+      ).toBe(true);
+    }
+  });
+  it('lehnt level 3 ab', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', itemId: 'n8', level: 3 }).success,
+    ).toBe(false);
+  });
+  it('lehnt level als float ab', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', itemId: 'n8', level: 1.5 }).success,
+    ).toBe(false);
+  });
+  it('lehnt fehlendes level ab', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', itemId: 'n8' }).success,
+    ).toBe(false);
+  });
 });
 
 describe('checklist.item.toggle schema', () => {
@@ -72,5 +130,323 @@ describe('checklist.item.toggle schema', () => {
     expect(
       t.schema.safeParse({ boardRef: '^b', checklistId: 'n7' }).success,
     ).toBe(false);
+  });
+});
+
+describe('checklist.paste schema (V2.2)', () => {
+  const t = getTool('checklist.paste');
+  it('akzeptiert Mindest-Args', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', text: 'a\nb' }).success,
+    ).toBe(true);
+  });
+  it('akzeptiert afterItemId + baseLevel', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', text: 'x', afterItemId: 'n8', baseLevel: 2 }).success,
+    ).toBe(true);
+  });
+  it('lehnt leeren Text ab', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', text: '' }).success,
+    ).toBe(false);
+  });
+  it('lehnt baseLevel 3 ab', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', text: 'x', baseLevel: 3 }).success,
+    ).toBe(false);
+  });
+  it('lehnt baseLevel als float ab', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'n7', text: 'x', baseLevel: 1.5 }).success,
+    ).toBe(false);
+  });
+});
+
+describe('checklist.clone schema (V2.2)', () => {
+  const t = getTool('checklist.clone');
+  it('akzeptiert nur sourceRef', () => {
+    expect(t.schema.safeParse({ sourceRef: '^src' }).success).toBe(true);
+  });
+  it('akzeptiert sourceRef + targetRef', () => {
+    expect(t.schema.safeParse({ sourceRef: '^src', targetRef: '^tgt' }).success).toBe(true);
+  });
+  it('lehnt ohne sourceRef ab', () => {
+    expect(t.schema.safeParse({ targetRef: '^tgt' }).success).toBe(false);
+  });
+});
+
+describe('checklist.item.move schema (V2.2)', () => {
+  const t = getTool('checklist.item.move');
+  it('akzeptiert alle Pflichtfelder', () => {
+    expect(
+      t.schema.safeParse({
+        boardRef: '^b',
+        fromChecklistId: 'cA',
+        toChecklistId: 'cB',
+        itemId: 'i1',
+      }).success,
+    ).toBe(true);
+  });
+  it('akzeptiert optionales afterItemId', () => {
+    expect(
+      t.schema.safeParse({
+        boardRef: '^b',
+        fromChecklistId: 'cA',
+        toChecklistId: 'cB',
+        itemId: 'i1',
+        afterItemId: 'i9',
+      }).success,
+    ).toBe(true);
+  });
+  it('lehnt ohne toChecklistId ab', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', fromChecklistId: 'cA', itemId: 'i1' }).success,
+    ).toBe(false);
+  });
+  it('lehnt ohne itemId ab', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', fromChecklistId: 'cA', toChecklistId: 'cB' }).success,
+    ).toBe(false);
+  });
+});
+
+describe('checklist.set_recur schema (V2.3a)', () => {
+  const t = getTool('checklist.set_recur');
+  it('akzeptiert type=none', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', recur: { type: 'none' } }).success,
+    ).toBe(true);
+  });
+  it('akzeptiert weekly mit weekdays', () => {
+    expect(
+      t.schema.safeParse({
+        boardRef: '^b', checklistId: 'c1',
+        recur: { type: 'weekly', every: 2, weekdays: [0, 2, 4] },
+      }).success,
+    ).toBe(true);
+  });
+  it('akzeptiert monthly mit day', () => {
+    expect(
+      t.schema.safeParse({
+        boardRef: '^b', checklistId: 'c1',
+        recur: { type: 'monthly', every: 1, day: 15 },
+      }).success,
+    ).toBe(true);
+  });
+  it('lehnt unbekannten type ab', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', recur: { type: 'quarterly' } }).success,
+    ).toBe(false);
+  });
+  it('lehnt weekday > 6 ab', () => {
+    expect(
+      t.schema.safeParse({
+        boardRef: '^b', checklistId: 'c1',
+        recur: { type: 'weekly', weekdays: [7] },
+      }).success,
+    ).toBe(false);
+  });
+  it('lehnt ohne recur ab', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1' }).success).toBe(false);
+  });
+});
+
+describe('checklist.set_close_mode schema (V2.3a)', () => {
+  const t = getTool('checklist.set_close_mode');
+  it('akzeptiert alle 3 modi', () => {
+    for (const m of ['manual', 'auto-prompt', 'auto-silent']) {
+      expect(
+        t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', mode: m }).success,
+      ).toBe(true);
+    }
+  });
+  it('lehnt unbekannten mode ab', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', mode: 'zombie' }).success,
+    ).toBe(false);
+  });
+  it('lehnt ohne mode ab', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1' }).success).toBe(false);
+  });
+});
+
+describe('checklist.close schema (V2.3b)', () => {
+  const t = getTool('checklist.close');
+  it('akzeptiert Pflichtfelder', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1' }).success).toBe(true);
+  });
+  it('lehnt ohne checklistId ab', () => {
+    expect(t.schema.safeParse({ boardRef: '^b' }).success).toBe(false);
+  });
+});
+
+describe('checklist.history.list schema (V2.3b)', () => {
+  const t = getTool('checklist.history.list');
+  it('akzeptiert ohne limit', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1' }).success).toBe(true);
+  });
+  it('akzeptiert limit in Range', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', limit: 5 }).success).toBe(true);
+  });
+  it('lehnt limit 0 ab', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', limit: 0 }).success).toBe(false);
+  });
+  it('lehnt limit > 200 ab', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', limit: 201 }).success).toBe(false);
+  });
+});
+
+describe('checklist.history.delete schema (V2.3b)', () => {
+  const t = getTool('checklist.history.delete');
+  it('akzeptiert entryIndex 0', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', entryIndex: 0 }).success).toBe(true);
+  });
+  it('lehnt negativen Index ab', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', entryIndex: -1 }).success).toBe(false);
+  });
+  it('lehnt ohne entryIndex ab', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1' }).success).toBe(false);
+  });
+});
+
+describe('checklist.set_action schema (V2.3c)', () => {
+  const t = getTool('checklist.set_action');
+  it('akzeptiert toast', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', action: { onClose: { type: 'toast' } } }).success,
+    ).toBe(true);
+  });
+  it('akzeptiert jump mit targetAlias', () => {
+    expect(
+      t.schema.safeParse({
+        boardRef: '^b', checklistId: 'c1',
+        action: { onClose: { type: 'jump', targetAlias: 'daily' } },
+      }).success,
+    ).toBe(true);
+  });
+  it('lehnt jump ohne targetAlias ab', () => {
+    expect(
+      t.schema.safeParse({
+        boardRef: '^b', checklistId: 'c1',
+        action: { onClose: { type: 'jump' } },
+      }).success,
+    ).toBe(false);
+  });
+  it('akzeptiert webhook mit url', () => {
+    expect(
+      t.schema.safeParse({
+        boardRef: '^b', checklistId: 'c1',
+        action: { onClose: { type: 'webhook', url: 'https://example.com/hook' } },
+      }).success,
+    ).toBe(true);
+  });
+  it('akzeptiert mail mit linkId', () => {
+    expect(
+      t.schema.safeParse({
+        boardRef: '^b', checklistId: 'c1',
+        action: { onClose: { type: 'mail', linkId: 'n12' } },
+      }).success,
+    ).toBe(true);
+  });
+  it('lehnt unbekannten type ab', () => {
+    expect(
+      t.schema.safeParse({
+        boardRef: '^b', checklistId: 'c1',
+        action: { onClose: { type: 'dance' } },
+      }).success,
+    ).toBe(false);
+  });
+  it('lehnt ohne action ab', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1' }).success).toBe(false);
+  });
+});
+
+// ─── V2.4: Transform + Ref-Management ──────────────────────────────
+describe('checklist.to_card schema', () => {
+  const t = getTool('checklist.to_card');
+  it('akzeptiert alle drei Modi', () => {
+    for (const mode of ['ref', 'del', 'keep'] as const) {
+      expect(
+        t.schema.safeParse({
+          boardRef: '^b',
+          checklistId: 'c1',
+          targetBoardRef: '^tgt',
+          mode,
+        }).success,
+      ).toBe(true);
+    }
+  });
+  it('akzeptiert optionales colId + name', () => {
+    expect(
+      t.schema.safeParse({
+        boardRef: '^b',
+        checklistId: 'c1',
+        targetBoardRef: '^tgt',
+        colId: 'todo',
+        name: 'Karte X',
+        mode: 'keep',
+      }).success,
+    ).toBe(true);
+  });
+  it('lehnt unbekannten Modus ab', () => {
+    expect(
+      t.schema.safeParse({
+        boardRef: '^b',
+        checklistId: 'c1',
+        targetBoardRef: '^tgt',
+        mode: 'copy',
+      }).success,
+    ).toBe(false);
+  });
+  it('lehnt ohne targetBoardRef ab', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', mode: 'keep' }).success,
+    ).toBe(false);
+  });
+  it('lehnt ohne mode ab', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', targetBoardRef: '^tgt' }).success,
+    ).toBe(false);
+  });
+});
+
+describe('card.checklist.link_ref schema', () => {
+  const t = getTool('card.checklist.link_ref');
+  it('akzeptiert boardRef + cardId + checklistId', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', cardId: 'cid', checklistId: 'clid' }).success,
+    ).toBe(true);
+  });
+  it('akzeptiert cardRef + checklistId', () => {
+    expect(t.schema.safeParse({ cardRef: '^card1', checklistId: 'clid' }).success).toBe(true);
+  });
+  it('akzeptiert optionales onConflict', () => {
+    for (const onConflict of ['drop-inline', 'overwrite-ref'] as const) {
+      expect(
+        t.schema.safeParse({ cardRef: '^c', checklistId: 'clid', onConflict }).success,
+      ).toBe(true);
+    }
+  });
+  it('lehnt unbekanntes onConflict ab', () => {
+    expect(
+      t.schema.safeParse({ cardRef: '^c', checklistId: 'clid', onConflict: 'merge' }).success,
+    ).toBe(false);
+  });
+  it('lehnt ohne checklistId ab', () => {
+    expect(t.schema.safeParse({ cardRef: '^c' }).success).toBe(false);
+  });
+});
+
+describe('card.checklist.unlink_ref schema', () => {
+  const t = getTool('card.checklist.unlink_ref');
+  it('akzeptiert boardRef + cardId', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', cardId: 'cid' }).success).toBe(true);
+  });
+  it('akzeptiert cardRef', () => {
+    expect(t.schema.safeParse({ cardRef: '^card1' }).success).toBe(true);
+  });
+  it('akzeptiert leeres Objekt (alle Refs optional)', () => {
+    // Schema-Level ist permissiv; Handler prüft, ob eine Ref auflösbar ist.
+    expect(t.schema.safeParse({}).success).toBe(true);
   });
 });

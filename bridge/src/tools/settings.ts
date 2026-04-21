@@ -11,9 +11,14 @@ const settingsGetSchema = z.object({
 });
 
 // ─── settings.set ──────────────────────────────────────────────────
+// z.any()/z.unknown() sind in Zod implizit optional (passen auch auf undefined).
+// Fuer Pflicht-Praesenz des Feldes refine() auf undefined-Ablehnung.
 const settingsSetSchema = z.object({
   key: z.string().describe('Settings-Key (top-level oder dot-path wie "vis.addRowCol")'),
-  value: z.unknown().describe('Neuer Wert (JSON-serialisierbar)'),
+  value: z
+    .any()
+    .refine((v) => v !== undefined, { message: 'value ist erforderlich' })
+    .describe('Neuer Wert (JSON-serialisierbar, null zum Leeren)'),
 });
 
 export const settingsTools: ToolDef[] = [

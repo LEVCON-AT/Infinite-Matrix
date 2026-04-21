@@ -12,10 +12,12 @@ describe('registerAllTools() Integration', () => {
     const tools = getTools();
     const names = [...tools.keys()].sort();
 
-    // Vollständige Liste aller 35 Tools aus Phase 4
+    // Vollständige Liste aller Tools (Phase 4 + V2.1 + V2.2)
     const expected = [
       'alias.resolve',
       'alias.set',
+      'card.checklist.link_ref',
+      'card.checklist.unlink_ref',
       'card.create',
       'card.delete',
       'card.done.toggle',
@@ -26,8 +28,19 @@ describe('registerAllTools() Integration', () => {
       'cell.feature.add',
       'cell.get',
       'checklist.add',
+      'checklist.clone',
+      'checklist.close',
+      'checklist.history.delete',
+      'checklist.history.list',
       'checklist.item.add',
+      'checklist.item.move',
+      'checklist.item.set_level',
       'checklist.item.toggle',
+      'checklist.paste',
+      'checklist.set_action',
+      'checklist.set_close_mode',
+      'checklist.set_recur',
+      'checklist.to_card',
       'col.add',
       'col.delete',
       'info.field.add',
@@ -54,7 +67,7 @@ describe('registerAllTools() Integration', () => {
     ];
 
     expect(names).toEqual(expected);
-    expect(tools.size).toBe(37); // Plan nennt ~35, tatsächliche Summe mit meta+status+edit_mode: 37
+    expect(tools.size).toBe(50); // +3 aus V2.4: checklist.to_card, card.checklist.link_ref, card.checklist.unlink_ref
   });
 
   it('jedes registrierte Tool hat schema + jsonSchema', () => {
