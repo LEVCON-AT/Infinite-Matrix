@@ -81,6 +81,23 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           echo "$KNOWN_HOSTS" > ~/.ssh/known_hosts
 
+      - name: SSH Sanity (Diagnose bei Auth-Fehlern)
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          echo "=== Private-Key-Datei-Info ==="
+          wc -l ~/.ssh/id_ed25519 || true
+          head -1 ~/.ssh/id_ed25519 || true
+          tail -1 ~/.ssh/id_ed25519 || true
+          echo ""
+          echo "=== Private-Key-Fingerprint (CI-seitig) ==="
+          ssh-keygen -lf ~/.ssh/id_ed25519 || echo "FEHLER: Private-Key ungueltig/malformed"
+          echo ""
+          echo "=== Verbose SSH-Connect-Test ==="
+          ssh -v -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/id_ed25519 \
+            "$USER@$HOST" "echo 'SSH_OK whoami=$(whoami) hostname=$(hostname)'" 2>&1 | tail -30 || echo "SSH-Test fehlgeschlagen"
+
       - name: Deploy bridge
         env:
           HOST: ${{ secrets.DEPLOY_HOST }}
