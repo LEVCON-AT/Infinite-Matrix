@@ -1,0 +1,17 @@
+api:
+  enabled: true
+  address: 0.0.0.0:9001
+
+# Minimaler Vector-Config — sammelt nichts aktiv, ist nur da weil Postgres
+# das im Zero-Config-Setup erwartet. Kann spaeter um Log-Forwarding erweitert
+# werden (z.B. an LogTail/Grafana Loki).
+sources:
+  noop:
+    type: demo_logs
+    format: apache_common
+    interval: 10000
+
+sinks:
+  noop:
+    type: blackhole
+    inputs: [noop]

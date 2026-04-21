@@ -44,6 +44,9 @@ desktop.ini
 # --- Logs ---
 *.log
 logs/
+# Ausnahme: infra/supabase/volumes/logs/ ist Config-Verzeichnis (Vector etc.)
+!infra/supabase/volumes/logs/
+!infra/supabase/volumes/logs/**
 
 # --- Runtime ---
 .pids/
