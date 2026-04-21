@@ -16,6 +16,9 @@ importers:
       '@fastify/websocket':
         specifier: ^11.0.2
         version: 11.2.0
+      '@hono/node-server':
+        specifier: ^1.19.9
+        version: 1.19.14(hono@4.12.14)
       '@modelcontextprotocol/sdk':
         specifier: ^1.12.1
         version: 1.29.0(zod@3.25.76)
