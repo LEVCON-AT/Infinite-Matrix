@@ -1,0 +1,17 @@
+{
+  "name": "infinite-matrix",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Infinite Matrix monorepo — Bridge (MCP/WS), shared types, standalone client, SaaS client.",
+  "scripts": {
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "build": "pnpm -r build"
+  },
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.15.9"
+}

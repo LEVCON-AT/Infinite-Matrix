@@ -792,7 +792,7 @@ Komplette yml-Dateien siehe [Artefakte](#artefakte-komplette-dateien-zum-copy-pa
 **Aufwand:** 3–5 Tage, parallel machbar
 
 Jedes Tool bekommt:
-1. Zod-Schema (Args) in `bridge/src/tools/<gruppe>.ts`
+1. Zod-Schema (Args) in `packages/bridge/src/tools/<gruppe>.ts`
 2. JSON-Schema-Ableitung für MCP
 3. Client-Implementierung in `client/matrix_tool_beta.html` (`MATRIX_TOOLS[name]`)
 4. Vitest auf Bridge-Seite (Schema-Validation + Dispatch-Mock)

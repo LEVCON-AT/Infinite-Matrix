@@ -98,9 +98,9 @@ Ab Phase 4 ist der **Bridge-Pfad** produktiv: externe AI-Clients (Claude Desktop
 
 Jedes MATRIX_TOOL hat **drei Artefakte** — fehlt eins, ist das Tool nicht merge-ready:
 
-1. **Bridge-Schema** in `bridge/src/tools/<gruppe>.ts`: Zod-Objekt + `zodToJsonSchema()` für MCP, registriert in `bridge/src/tools/index.ts`
+1. **Bridge-Schema** in `packages/bridge/src/tools/<gruppe>.ts`: Zod-Objekt + `zodToJsonSchema()` für MCP, registriert in `packages/bridge/src/tools/index.ts`
 2. **Client-Handler** in `client/matrix_tool_beta.html` (`MATRIX_TOOLS`-Registry): liest `args`, mutiert `nodes`/`aliasIndex`/etc., ruft `save()` + `render()`, gibt strukturiertes Ergebnis zurück
-3. **Vitest** in `bridge/test/<gruppe>.test.ts`: `safeParse` mit valid + invalid Args, Enum-Grenzen, required-Felder-Check — plus Integration via `bridge/test/tool-registry.test.ts` (Gesamtzahl)
+3. **Vitest** in `packages/bridge/test/<gruppe>.test.ts`: `safeParse` mit valid + invalid Args, Enum-Grenzen, required-Felder-Check — plus Integration via `packages/bridge/test/tool-registry.test.ts` (Gesamtzahl)
 
 ### Feature → MCP-Mapping-Pflicht
 
@@ -110,7 +110,7 @@ Jedes MATRIX_TOOL hat **drei Artefakte** — fehlt eins, ist das Tool nicht merg
 - Komposition bestehender Tools (AI kann `X.do()` + `Y.do()` selbst verketten) → im Plan oder Feature-Commit notieren „nutzt X+Y"
 - Einmalige Import-/Export-Flows → ggf. als `import.*`/`export.*`-Tool spezifisch, wenn AI-steuerbar sinnvoll
 
-**Selbst-Check am Feature-Ende:** „Kann die AI dieses Feature aufrufen, ohne im Browser zu klicken?" — Wenn nein: Tool ergänzen oder schreiben warum nicht. Das `registerAllTools`-Gate in `bridge/test/tool-registry.test.ts` ist die Regressions-Absicherung: neue Produktions-Tools dort in die `expected`-Liste + Count eintragen.
+**Selbst-Check am Feature-Ende:** „Kann die AI dieses Feature aufrufen, ohne im Browser zu klicken?" — Wenn nein: Tool ergänzen oder schreiben warum nicht. Das `registerAllTools`-Gate in `packages/bridge/test/tool-registry.test.ts` ist die Regressions-Absicherung: neue Produktions-Tools dort in die `expected`-Liste + Count eintragen.
 
 ### Ref-Resolver-Konventionen
 
@@ -184,8 +184,8 @@ Vorteil: minimalinvasive Diffs, sauber rückrollbar, leicht review-bar. Ein Help
 
 ### Testing-Level
 
-- **Schema-Tests (Vitest, Bridge)** — pro Gruppe eine Datei `bridge/test/<gruppe>.test.ts`. Decken: valid Args, fehlende required, Enum-Abweichungen, Range-Grenzen. Kein Dispatch, kein WS — reine Zod-Validation.
-- **Integration-Test** (`bridge/test/tool-registry.test.ts`) — `registerAllTools()` + `getTools()`-Count abgeglichen gegen explizite Expected-Liste. Regression-Gate: vergisst man den Import in `tools/index.ts`, bricht der Test.
+- **Schema-Tests (Vitest, Bridge)** — pro Gruppe eine Datei `packages/bridge/test/<gruppe>.test.ts`. Decken: valid Args, fehlende required, Enum-Abweichungen, Range-Grenzen. Kein Dispatch, kein WS — reine Zod-Validation.
+- **Integration-Test** (`packages/bridge/test/tool-registry.test.ts`) — `registerAllTools()` + `getTools()`-Count abgeglichen gegen explizite Expected-Liste. Regression-Gate: vergisst man den Import in `tools/index.ts`, bricht der Test.
 - **Client-Smoke (Preview)** — echte `MATRIX_TOOLS[name](args)`-Aufrufe via `preview_eval`, Roundtrip über Setup → Call → State-Check → Cleanup. `preview_console_logs level:"error"` nach jedem Szenario.
 - **Kein** lokaler WS/MCP-Full-Roundtrip — das ist Phase-5-E2E, läuft dann gegen VPS.
 
@@ -227,7 +227,7 @@ Die impliziten Qualitätsregeln im Projekt sind an formale Standards angelehnt. 
 | Standard | Geltungsbereich | Konkret bei uns |
 |---|---|---|
 | **WCAG 2.2 Level AA** — Web Content Accessibility Guidelines | Client-UI (`client/matrix_tool_beta.html`) | Tastatur-first (`^alias`, `Shift+A`, `+`-Menü), `:focus-visible` scoped (nicht `*:focus{outline:none}`), Kontrast ≥ 4.5:1 in Light+Dark (`--fs-*`-Tokens, Dark-Overrides), `role=`/`aria-*` auf interaktiven Elementen (Checkboxes, Dialogs), 44×44 Tap-Targets bei `@media (max-width:480px)` |
-| **OWASP ASVS v4 Level 2** — Application Security Verification Standard | Bridge (`bridge/`), Client-Crypto | V2 Auth: Bearer-Token (`/mcp`) + Query-Param-Token (`/ws`, Browser-Limitation dokumentiert). V5 Input: `sanitizeUrl()` bei `link.add`, `validateAlias()` bei allen Alias-Settern, Zod-Schema-Parse vor jedem Tool-Dispatch. V7 Errors: `translateError()` → deutsche Messages ohne Stack-Leak, `showToast`-Pipeline, niemals `alert()`. V7.1 Audit: `audit_log`-Table in SQLite, jeder Tool-Call mit `args`/`result`/`ok` geloggt |
+| **OWASP ASVS v4 Level 2** — Application Security Verification Standard | Bridge (`packages/bridge/`), Client-Crypto | V2 Auth: Bearer-Token (`/mcp`) + Query-Param-Token (`/ws`, Browser-Limitation dokumentiert). V5 Input: `sanitizeUrl()` bei `link.add`, `validateAlias()` bei allen Alias-Settern, Zod-Schema-Parse vor jedem Tool-Dispatch. V7 Errors: `translateError()` → deutsche Messages ohne Stack-Leak, `showToast`-Pipeline, niemals `alert()`. V7.1 Audit: `audit_log`-Table in SQLite, jeder Tool-Call mit `args`/`result`/`ok` geloggt |
 | **12-Factor App** — stateless, config-driven Service | `bridge/` (Phase 2+) | III Config: `/opt/matrix-bridge/.env` (`PORT`, `HOST`, `BRIDGE_TOKEN`, `DB_PATH`), niemals hardcoded. VI Processes: systemd-Service, stateless Bridge-Prozess, State in SQLite-File. X Dev/Prod-Parity: gleicher Branch, gleiches `pnpm install --frozen-lockfile`. XI Logs: pino → journald, strukturiertes JSON |
 | **RFC 6455 (WebSocket) + RFC 6750 (Bearer)** | Bridge Auth-Flow | WebSocket-Upgrade via nginx (`proxy_http_version 1.1`, `Upgrade`/`Connection` headers). Bearer-Token bei HTTP-Routes (`/mcp`), Query-Param-Token bei WS (`/ws?token=...`) — Browser-WebSocket-API kann keine Custom-Headers setzen, das ist explizit im Auth-Code kommentiert |
 | **Conventional Commits 1.0 + SemVer 2.0** | Git-Workflow | `<type>(<scope>): <titel>`-Format, Types siehe oben (`feat`/`fix`/`refactor`/…). Tags wie `v0.2.0-mcp-v1` bei Meilensteinen. Ein PR = eine Teilleistung. Squash-Merge auf `main` |
@@ -249,7 +249,7 @@ Konventionen beschreiben *was* gilt, Prüfroutinen *wann* was zu prüfen ist. Vo
 
 ### Trigger: Feature geändert / neues Feature
 
-- [ ] **MCP-Coverage**: existiert ein `MATRIX_TOOL` für die (neue/geänderte) Mutations-Aktion? Wenn nein: Schema in `bridge/src/tools/<gruppe>.ts` + Client-Handler in `MATRIX_TOOLS` + Vitest + `tool-registry.test.ts`-Count erhöhen. *Selbst-Check: „Kann die AI das Feature headless aufrufen?"*
+- [ ] **MCP-Coverage**: existiert ein `MATRIX_TOOL` für die (neue/geänderte) Mutations-Aktion? Wenn nein: Schema in `packages/bridge/src/tools/<gruppe>.ts` + Client-Handler in `MATRIX_TOOLS` + Vitest + `tool-registry.test.ts`-Count erhöhen. *Selbst-Check: „Kann die AI das Feature headless aufrufen?"*
 - [ ] **Destruktiv?** → `pushUndo(label)` vor Mutation, `showUndoToast(label)` danach. Kein `confirm()` in Tool-Handlern.
 - [ ] **Error-Pfade**: jeder erwartbare Fehler via `showToast(msg, {type:'error'}) + translateError(err, fallback)`. Niemals `alert()`, niemals nur `console.error`.
 - [ ] **Animation**: sichtbare State-Änderung via `transform`/`opacity` + `--tr-std` (220ms) oder `--tr-enter` (180ms). Keine `display:none`-Swaps, keine `setTimeout`-Animationen.
@@ -273,7 +273,7 @@ Konventionen beschreiben *was* gilt, Prüfroutinen *wann* was zu prüfen ist. Vo
 - [ ] **Tool-Trio vollständig**: Schema + Client-Handler + Vitest (siehe Abschnitt „Bridge + MCP-Tools").
 - [ ] **Zod-Schema**: jedes Feld mit `.describe('…')` für JSON-Schema-Readability in MCP-Inspector.
 - [ ] **zod-json-Deckung**: benutzter Zod-Typ ist in `util/zod-json.ts` abgedeckt? Wenn neu (z.B. `z.tuple`), erweitern.
-- [ ] **Registry-Test**: neuer Tool-Name in `bridge/test/tool-registry.test.ts` expected-Liste + `tools.size`-Count erhöht.
+- [ ] **Registry-Test**: neuer Tool-Name in `packages/bridge/test/tool-registry.test.ts` expected-Liste + `tools.size`-Count erhöht.
 - [ ] **Return-Shape**: Erfolg `{verb:true, …details}`, Fehler `{error:'<deutsch, konkret>'}`. Nie werfen, nie `undefined`.
 - [ ] **Defensive Kopien**: bei Array-/Object-Returns `.slice()` / `JSON.parse(JSON.stringify(…))` — kein Leak auf internen State.
 - [ ] **Ref-Resolver**: neue Ref-Form? Muster `^`-Prefix strippen + Alias-Index zuerst + Raw-ID-Fallback + Typ-Check, analog zu `_resolveNodeRef`/`_resolveBoardRef`/`_resolveCardRef`.
@@ -306,7 +306,7 @@ Niemals „mach ich später, merk ich mir eh" — wird garantiert vergessen.
 
 ## Kontext-Window & Sprint-Aufteilung
 
-Die Codebasis: **Client ~8.5k LOC** in `client/matrix_tool_beta.html` (Single-File), plus **Bridge ~900 LOC TypeScript** in `bridge/src/`. Ein Review- oder Refactor-Durchgang am Client kann das Kontext-Fenster sprengen. Deshalb:
+Die Codebasis: **Client ~8.5k LOC** in `client/matrix_tool_beta.html` (Single-File), plus **Bridge ~900 LOC TypeScript** in `packages/bridge/src/`. Ein Review- oder Refactor-Durchgang am Client kann das Kontext-Fenster sprengen. Deshalb:
 
 ### Kontext-Awareness während der Session
 
@@ -457,7 +457,7 @@ Diese Datei (CLAUDE.md) bleibt der **Single Entry Point** für Konventionen, Pri
 | Was | Wo | Wann lesen |
 |---|---|---|
 | Bridge-Architektur + Deployment-Plan | `docs/plan-bridge.md` | Bei Bridge-/MCP-/VPS-Arbeit, besonders Phase 2+ |
-| MCP-Tool-Beispiele (Schemas) | `bridge/src/tools/*.ts` | Beim Hinzufügen neuer Tools — Pattern kopieren |
+| MCP-Tool-Beispiele (Schemas) | `packages/bridge/src/tools/*.ts` | Beim Hinzufügen neuer Tools — Pattern kopieren |
 | Client-Handler-Patterns | `client/matrix_tool_beta.html` Suchmuster `MATRIX_TOOLS={` | Beim Hinzufügen neuer Tool-Handler |
 | nginx/systemd-Config | `infra/nginx/matrix.conf`, `infra/systemd/matrix-bridge.service` | Bei Deploy/Infra-Arbeit |
 | CI/CD-Workflow | `.github/workflows/deploy.yml`, `pr.yml` | Bei CI-Anpassungen |

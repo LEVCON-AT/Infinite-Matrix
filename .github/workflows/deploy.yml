@@ -4,9 +4,12 @@ on:
   push:
     branches: [main]
     paths:
-      - 'bridge/**'
+      - 'packages/bridge/**'
+      - 'packages/shared/**'
       - 'client/**'
       - 'infra/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
   workflow_dispatch:
 
 permissions:
@@ -29,12 +32,14 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: bridge/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
-      - name: Install & Build
-        working-directory: bridge
+      - name: Install (workspace)
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint + Typecheck + Test + Build (bridge)
+        working-directory: packages/bridge
         run: |
-          pnpm install --frozen-lockfile
           pnpm lint
           pnpm typecheck
           pnpm test -- --run
@@ -42,14 +47,12 @@ jobs:
 
       - name: Hash build
         id: hash
-        working-directory: bridge
+        working-directory: packages/bridge
         run: echo "sha=$(sha256sum dist/index.js | cut -d' ' -f1 | head -c 12)" >> "$GITHUB_OUTPUT"
 
-      - name: Package artifact
+      - name: Package artifact (pnpm deploy = standalone, keine Workspace-Symlinks)
         run: |
-          mkdir -p artifact/bridge
-          cp -r bridge/dist artifact/bridge/dist
-          cp bridge/package.json bridge/pnpm-lock.yaml artifact/bridge/
+          pnpm deploy --filter @infinite-matrix/bridge --prod artifact/bridge
           mkdir -p artifact/client
           cp client/matrix_tool_beta.html artifact/client/
 
@@ -92,9 +95,7 @@ jobs:
 
           ssh -i ~/.ssh/id_ed25519 "$USER@$HOST" bash -s <<'REMOTE'
             set -euo pipefail
-            cd /tmp/matrix-bridge-stage
-            pnpm install --prod --frozen-lockfile --ignore-scripts
-
+            # pnpm deploy-Artifakt enthaelt bereits node_modules — keine Install-Phase auf dem VPS.
             sudo rsync -az --delete \
               --chown=matrix-bridge:matrix-bridge \
               /tmp/matrix-bridge-stage/ \

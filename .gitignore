@@ -4,12 +4,14 @@ matrix-data.json
 backup_*.json
 backup_delete_*.json
 
-# --- Node / Build (Bridge) ---
+# --- Node / Build (Monorepo) ---
 node_modules/
 dist/
 build/
 coverage/
 *.tsbuildinfo
+.turbo/
+.vite/
 
 # --- Env / Secrets ---
 .env
