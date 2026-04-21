@@ -5570,8 +5570,34 @@ function _clRenderSettings(){
   }
   h+=`<label>Abschluss-Verhalten</label><select onchange="_clSetCloseModeDirect(this.value)">
     ${CL_CLOSE_MODES.map(([v,l])=>`<option value="${v}"${cm===v?' selected':''}>${l}</option>`).join('')}
-  </select>
-  <div class="smodal-actions"><button class="btn-p" onclick="_clCloseSettings()">Fertig</button></div>
+  </select>`;
+  // V2.3c: Action bei Abschluss
+  const act=(cl.action&&cl.action.onClose)||{type:'toast'};
+  h+=`<label>Ereignis bei Abschluss</label><select onchange="_clSetActionType(this.value)">
+    <option value="toast"${act.type==='toast'?' selected':''}>Nur Toast</option>
+    <option value="jump"${act.type==='jump'?' selected':''}>Sprung zu Alias</option>
+    <option value="webhook"${act.type==='webhook'?' selected':''}>Webhook (POST)</option>
+    <option value="mail"${act.type==='mail'?' selected':''}>E-Mail-Vorlage</option>
+  </select>`;
+  if(act.type==='jump'){
+    h+=`<label>Ziel-Alias (ohne ^)</label><input type="text" value="${esc(act.targetAlias||'')}" onchange="_clSetActionField('targetAlias',this.value.trim())" placeholder="z.B. daily"/>`;
+  }
+  if(act.type==='webhook'){
+    h+=`<label>Webhook-URL</label><input type="text" value="${esc(act.url||'')}" onchange="_clSetActionField('url',this.value.trim())" placeholder="https://..."/>`;
+  }
+  if(act.type==='mail'){
+    const mails=_clCollectMailLinks(boardId);
+    if(!mails.length){
+      h+=`<div class="cl-paste-empty">Keine Mail-Vorlagen auf diesem Board. Erst eine Mailvorlage im Info/Links-Bereich anlegen.</div>`;
+    }else{
+      h+=`<label>Mail-Vorlage</label><select onchange="_clSetActionField('linkId',this.value)">
+        <option value=""${!act.linkId?' selected':''}>— keine —</option>
+        ${mails.map(m=>`<option value="${m.id}"${act.linkId===m.id?' selected':''}>${esc(m.label||m.to||'Vorlage')}</option>`).join('')}
+      </select>`;
+      h+=`<label style="opacity:0.6;"><input type="checkbox" disabled style="width:auto;margin-right:4px;"/>SMTP-Versand (Bridge erforderlich, V2+)</label>`;
+    }
+  }
+  h+=`<div class="smodal-actions"><button class="btn-p" onclick="_clCloseSettings()">Fertig</button></div>
   </div></div>`;
   document.getElementById('mc').innerHTML=h;
 }
@@ -5607,6 +5633,29 @@ function _clSetCloseModeDirect(val){
   if(!CL_CLOSE_MODES.some(x=>x[0]===val))return;
   cl.closeMode=val;
   save();render();
+}
+// V2.3c: Action-Config
+function _clSetActionType(type){
+  if(!_clSettingsCtx)return;
+  const cl=_clFindCl(_clSettingsCtx.boardId,_clSettingsCtx.clId);
+  if(!cl)return;
+  if(!['toast','jump','webhook','mail'].includes(type))return;
+  cl.action={onClose:{type}};
+  save();render();_clRenderSettings();
+}
+function _clSetActionField(field,value){
+  if(!_clSettingsCtx)return;
+  const cl=_clFindCl(_clSettingsCtx.boardId,_clSettingsCtx.clId);
+  if(!cl)return;
+  if(!cl.action||!cl.action.onClose)cl.action={onClose:{type:'toast'}};
+  cl.action.onClose[field]=value;
+  save();render();_clRenderSettings();
+}
+// Sammelt Mail-Links des aktuellen Boards. Recursive Parent-Chain in V2+.
+function _clCollectMailLinks(boardId){
+  const n=nodes[boardId];
+  if(!n||n.type!=='board')return[];
+  return(n.data.links||[]).filter(l=>l.type==='mail');
 }
 function _clCloseSettings(e){
   if(e&&e.target&&e.target.classList&&!e.target.classList.contains('smodal-overlay')&&e.type==='click')return;
@@ -5645,13 +5694,45 @@ function _clClose(boardId,clId){
   cl.history.push(snapshot);
   const isRecur=cl.recur&&cl.recur.type&&cl.recur.type!=='none';
   if(isRecur){cl.items.forEach(i=>{i.done=false;});}
-  // Event-Action (V2.3c erweitert Jump/Webhook/Mail; V2.3b nur Toast)
-  const act=cl.action&&cl.action.onClose;
-  if(!act||act.type==='toast'||!act.type){
-    showToast(`Checkliste „${cl.label}" abgeschlossen um ${new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}.`,{type:'success'});
-  }
+  _clExecuteAction(boardId,cl);
   save();render();
   showUndoToast(`Checkliste „${cl.label}" abgeschlossen`);
+}
+// V2.3c: Dispatch der onClose-Action. Toast ist Fallback/Default.
+function _clExecuteAction(boardId,cl){
+  const act=cl.action&&cl.action.onClose;
+  const tStamp=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  if(!act||!act.type||act.type==='toast'){
+    showToast(`Checkliste „${cl.label}" abgeschlossen um ${tStamp}.`,{type:'success'});
+    return;
+  }
+  if(act.type==='jump'&&act.targetAlias){
+    const key=String(act.targetAlias).replace(/^\^/,'').toLowerCase();
+    if(aliasIndex[key]){showToast(`Abgeschlossen — Sprung zu ^${esc(key)}`,{type:'success',ms:2500});setTimeout(()=>executeCommand(key),100);}
+    else showToast(`Alias nicht gefunden: ^${esc(String(act.targetAlias))}`,{type:'warning'});
+    return;
+  }
+  if(act.type==='webhook'&&act.url){
+    const safeUrl=sanitizeUrl(String(act.url));
+    if(!safeUrl){showToast('Webhook-URL ungueltig.',{type:'error'});return;}
+    const payload={checklistId:cl.id,label:cl.label,boardId,closedAt:cl.history[cl.history.length-1]?.closedAt,items:(cl.items||[]).map(i=>({text:i.text,done:i.done,level:i.level|0}))};
+    try{
+      fetch(safeUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+        .then(r=>{if(r.ok)showToast(`Webhook gesendet (HTTP ${r.status}).`,{type:'success',ms:3000});
+          else showToast(`Webhook fehlgeschlagen: HTTP ${r.status}`,{type:'error'});})
+        .catch(e=>showToast('Webhook-Fehler: '+translateError(e,'Netzwerkfehler'),{type:'error'}));
+    }catch(e){showToast('Webhook-Fehler: '+translateError(e,'Unerwarteter Fehler'),{type:'error'});}
+    return;
+  }
+  if(act.type==='mail'&&act.linkId){
+    const link=nodes[boardId]&&nodes[boardId].data.links.find(l=>l.id===act.linkId&&l.type==='mail');
+    if(!link){showToast('Mail-Vorlage nicht gefunden.',{type:'warning'});return;}
+    try{window.location.href=buildMailto(link);showToast(`Mail-Vorlage „${esc(link.label||'')}" geöffnet.`,{type:'success',ms:2500});}
+    catch(e){showToast('Mail-Fehler: '+translateError(e,'Unerwarteter Fehler'),{type:'error'});}
+    return;
+  }
+  // Fallback-Toast, wenn Action zwar gesetzt aber unvollstaendig
+  showToast(`Checkliste „${cl.label}" abgeschlossen um ${tStamp}.`,{type:'success'});
 }
 // History-UI: Toggle + Snapshot-Liste
 function _clToggleHistory(boardId,clId){
@@ -9100,6 +9181,23 @@ Object.assign(MATRIX_TOOLS,{
     cl.closeMode=args.mode;
     save();render();
     return{set:true,boardId:bid,checklistId:cl.id,mode:cl.closeMode};
+  },
+
+  'checklist.set_action':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const cl=nodes[bid].data.checklists.find(c=>c.id===args.checklistId);
+    if(!cl)return{error:'Checkliste nicht gefunden: '+args.checklistId};
+    const a=args.action;
+    if(!a||!a.onClose||!['toast','jump','webhook','mail'].includes(a.onClose.type))return{error:'Ungueltige Action'};
+    if(a.onClose.type==='webhook'&&a.onClose.url){
+      const safe=sanitizeUrl(String(a.onClose.url));
+      if(!safe)return{error:'Webhook-URL unzulaessig (nur http/https)'};
+      a.onClose.url=safe;
+    }
+    cl.action=JSON.parse(JSON.stringify(a));
+    save();render();
+    return{set:true,boardId:bid,checklistId:cl.id,action:JSON.parse(JSON.stringify(cl.action))};
   },
 
   'checklist.close':async(args)=>{

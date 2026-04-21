@@ -103,6 +103,28 @@ const checklistHistoryDeleteSchema = z.object({
   entryIndex: z.number().int().min(0).describe('Index im History-Array (chronologisch, 0 = ältester)'),
 });
 
+// ─── checklist.set_action (V2.3c) ──────────────────────────────────
+const actionOnCloseSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('toast') }).describe('Nur Toast (Standard)'),
+  z.object({ type: z.literal('jump'), targetAlias: z.string().min(1).describe('Alias ohne führendes ^') }),
+  z.object({
+    type: z.literal('webhook'),
+    url: z.string().describe('HTTP/HTTPS-URL'),
+    delivery: z.enum(['fetch','smtp']).optional().describe('SMTP ist V2+; aktuell nur fetch'),
+  }),
+  z.object({
+    type: z.literal('mail'),
+    linkId: z.string().describe('ID eines Mail-Links im selben Board'),
+    delivery: z.enum(['mailto','smtp']).optional().describe('SMTP ist V2+; aktuell nur mailto'),
+  }),
+]);
+
+const checklistSetActionSchema = z.object({
+  boardRef: z.string().describe('Alias/ID des Boards'),
+  checklistId: z.string().describe('Checklisten-ID'),
+  action: z.object({ onClose: actionOnCloseSchema }).describe('Aktion bei Abschluss'),
+});
+
 export const checklistTools: ToolDef[] = [
   {
     name: 'checklist.add',
@@ -175,5 +197,11 @@ export const checklistTools: ToolDef[] = [
     description: 'Löscht einen History-Eintrag per Index. Undo-fähig.',
     schema: checklistHistoryDeleteSchema,
     jsonSchema: zodToJsonSchema(checklistHistoryDeleteSchema),
+  },
+  {
+    name: 'checklist.set_action',
+    description: 'Setzt die Aktion bei Abschluss einer Checkliste: toast (Default), jump (Sprung zu Alias), webhook (POST an URL), mail (Mail-Vorlage des Boards). SMTP ist V2+.',
+    schema: checklistSetActionSchema,
+    jsonSchema: zodToJsonSchema(checklistSetActionSchema),
   },
 ];

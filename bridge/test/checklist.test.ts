@@ -9,8 +9,8 @@ function getTool(name: string) {
 }
 
 describe('checklist tool registrierung', () => {
-  it('enthält 12 Tools (Sprint 4.4b + V2.1 + V2.2 + V2.3a/b)', () => {
-    expect(checklistTools).toHaveLength(12);
+  it('enthält 13 Tools (Sprint 4.4b + V2.1 + V2.2 + V2.3a/b/c)', () => {
+    expect(checklistTools).toHaveLength(13);
     const names = checklistTools.map((t) => t.name).sort();
     expect(names).toEqual([
       'checklist.add',
@@ -23,6 +23,7 @@ describe('checklist tool registrierung', () => {
       'checklist.item.set_level',
       'checklist.item.toggle',
       'checklist.paste',
+      'checklist.set_action',
       'checklist.set_close_mode',
       'checklist.set_recur',
     ]);
@@ -301,6 +302,58 @@ describe('checklist.history.delete schema (V2.3b)', () => {
     expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', entryIndex: -1 }).success).toBe(false);
   });
   it('lehnt ohne entryIndex ab', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1' }).success).toBe(false);
+  });
+});
+
+describe('checklist.set_action schema (V2.3c)', () => {
+  const t = getTool('checklist.set_action');
+  it('akzeptiert toast', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', action: { onClose: { type: 'toast' } } }).success,
+    ).toBe(true);
+  });
+  it('akzeptiert jump mit targetAlias', () => {
+    expect(
+      t.schema.safeParse({
+        boardRef: '^b', checklistId: 'c1',
+        action: { onClose: { type: 'jump', targetAlias: 'daily' } },
+      }).success,
+    ).toBe(true);
+  });
+  it('lehnt jump ohne targetAlias ab', () => {
+    expect(
+      t.schema.safeParse({
+        boardRef: '^b', checklistId: 'c1',
+        action: { onClose: { type: 'jump' } },
+      }).success,
+    ).toBe(false);
+  });
+  it('akzeptiert webhook mit url', () => {
+    expect(
+      t.schema.safeParse({
+        boardRef: '^b', checklistId: 'c1',
+        action: { onClose: { type: 'webhook', url: 'https://example.com/hook' } },
+      }).success,
+    ).toBe(true);
+  });
+  it('akzeptiert mail mit linkId', () => {
+    expect(
+      t.schema.safeParse({
+        boardRef: '^b', checklistId: 'c1',
+        action: { onClose: { type: 'mail', linkId: 'n12' } },
+      }).success,
+    ).toBe(true);
+  });
+  it('lehnt unbekannten type ab', () => {
+    expect(
+      t.schema.safeParse({
+        boardRef: '^b', checklistId: 'c1',
+        action: { onClose: { type: 'dance' } },
+      }).success,
+    ).toBe(false);
+  });
+  it('lehnt ohne action ab', () => {
     expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1' }).success).toBe(false);
   });
 });
