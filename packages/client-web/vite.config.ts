@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [solid()],
   server: {
     port: 5173,
-    host: '127.0.0.1',
+    host: 'localhost',
     strictPort: true,
   },
   build: {
