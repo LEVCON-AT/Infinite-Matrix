@@ -9,8 +9,8 @@ function getTool(name: string) {
 }
 
 describe('checklist tool registrierung', () => {
-  it('enthält 7 Tools (Sprint 4.4b + V2.1 set_level + V2.2 paste/clone/move)', () => {
-    expect(checklistTools).toHaveLength(7);
+  it('enthält 9 Tools (Sprint 4.4b + V2.1 set_level + V2.2 paste/clone/move + V2.3a set_recur/close_mode)', () => {
+    expect(checklistTools).toHaveLength(9);
     const names = checklistTools.map((t) => t.name).sort();
     expect(names).toEqual([
       'checklist.add',
@@ -20,6 +20,8 @@ describe('checklist tool registrierung', () => {
       'checklist.item.set_level',
       'checklist.item.toggle',
       'checklist.paste',
+      'checklist.set_close_mode',
+      'checklist.set_recur',
     ]);
   });
 });
@@ -198,5 +200,65 @@ describe('checklist.item.move schema (V2.2)', () => {
     expect(
       t.schema.safeParse({ boardRef: '^b', fromChecklistId: 'cA', toChecklistId: 'cB' }).success,
     ).toBe(false);
+  });
+});
+
+describe('checklist.set_recur schema (V2.3a)', () => {
+  const t = getTool('checklist.set_recur');
+  it('akzeptiert type=none', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', recur: { type: 'none' } }).success,
+    ).toBe(true);
+  });
+  it('akzeptiert weekly mit weekdays', () => {
+    expect(
+      t.schema.safeParse({
+        boardRef: '^b', checklistId: 'c1',
+        recur: { type: 'weekly', every: 2, weekdays: [0, 2, 4] },
+      }).success,
+    ).toBe(true);
+  });
+  it('akzeptiert monthly mit day', () => {
+    expect(
+      t.schema.safeParse({
+        boardRef: '^b', checklistId: 'c1',
+        recur: { type: 'monthly', every: 1, day: 15 },
+      }).success,
+    ).toBe(true);
+  });
+  it('lehnt unbekannten type ab', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', recur: { type: 'quarterly' } }).success,
+    ).toBe(false);
+  });
+  it('lehnt weekday > 6 ab', () => {
+    expect(
+      t.schema.safeParse({
+        boardRef: '^b', checklistId: 'c1',
+        recur: { type: 'weekly', weekdays: [7] },
+      }).success,
+    ).toBe(false);
+  });
+  it('lehnt ohne recur ab', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1' }).success).toBe(false);
+  });
+});
+
+describe('checklist.set_close_mode schema (V2.3a)', () => {
+  const t = getTool('checklist.set_close_mode');
+  it('akzeptiert alle 3 modi', () => {
+    for (const m of ['manual', 'auto-prompt', 'auto-silent']) {
+      expect(
+        t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', mode: m }).success,
+      ).toBe(true);
+    }
+  });
+  it('lehnt unbekannten mode ab', () => {
+    expect(
+      t.schema.safeParse({ boardRef: '^b', checklistId: 'c1', mode: 'zombie' }).success,
+    ).toBe(false);
+  });
+  it('lehnt ohne mode ab', () => {
+    expect(t.schema.safeParse({ boardRef: '^b', checklistId: 'c1' }).success).toBe(false);
   });
 });

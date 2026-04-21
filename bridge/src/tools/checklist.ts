@@ -56,6 +56,35 @@ const checklistItemMoveSchema = z.object({
   afterItemId: z.string().optional().describe('ID des Ziel-Items, nach dem eingefügt wird (Default: ans Ende)'),
 });
 
+// ─── checklist.set_recur / set_close_mode (V2.3) ───────────────────
+const recurShape = z.object({
+  type: z.enum(['none','daily','weekly','monthly','yearly']).describe('Wiederholungstyp'),
+  every: z.number().int().min(1).max(365).optional().describe('Intervall (alle N Einheiten)'),
+  weekdays: z.array(z.number().int().min(0).max(6)).optional().describe('Wochentage (0=Mo..6=So)'),
+  weekday: z.number().int().min(0).max(6).optional().describe('Einzel-Wochentag (legacy / monatlich)'),
+  weekdayOrd: z.number().int().min(-1).max(4).optional().describe('Ordinalzahl (1..4, -1=letzter)'),
+  monthType: z.enum(['day','weekday']).optional().describe('monatlich per Tag-im-Monat oder Wochentag'),
+  day: z.number().int().min(1).max(31).optional().describe('Tag im Monat'),
+  yearMonth: z.number().int().min(0).max(11).optional().describe('Monat (0=Januar..11=Dezember)'),
+  yearDay: z.number().int().min(1).max(31).optional().describe('Tag im Monat für jährlich'),
+  startDate: z.string().optional().describe('ISO-Datum YYYY-MM-DD, Beginn der Serie'),
+  endType: z.enum(['none','date','count']).optional(),
+  endDate: z.string().optional().describe('ISO-Datum YYYY-MM-DD'),
+  endCount: z.number().int().min(1).max(999).optional(),
+}).describe('Recur-Struktur analog card.recur');
+
+const checklistSetRecurSchema = z.object({
+  boardRef: z.string().describe('Alias/ID des Boards'),
+  checklistId: z.string().describe('Checklisten-ID'),
+  recur: recurShape,
+});
+
+const checklistSetCloseModeSchema = z.object({
+  boardRef: z.string().describe('Alias/ID des Boards'),
+  checklistId: z.string().describe('Checklisten-ID'),
+  mode: z.enum(['manual','auto-prompt','auto-silent']).describe('Abschluss-Verhalten'),
+});
+
 export const checklistTools: ToolDef[] = [
   {
     name: 'checklist.add',
@@ -98,5 +127,17 @@ export const checklistTools: ToolDef[] = [
     description: 'Verschiebt ein Item (mit allen Nachkommen) zwischen zwei Checklisten im selben Board. Level wird bei Cross-List-Move auf 0 normalisiert.',
     schema: checklistItemMoveSchema,
     jsonSchema: zodToJsonSchema(checklistItemMoveSchema),
+  },
+  {
+    name: 'checklist.set_recur',
+    description: 'Setzt das Wiederholungs-Muster einer Checkliste. Struktur analog card.recur (type, every, weekdays, startDate, endType, …).',
+    schema: checklistSetRecurSchema,
+    jsonSchema: zodToJsonSchema(checklistSetRecurSchema),
+  },
+  {
+    name: 'checklist.set_close_mode',
+    description: 'Setzt das Abschluss-Verhalten einer Checkliste: manual | auto-prompt | auto-silent.',
+    schema: checklistSetCloseModeSchema,
+    jsonSchema: zodToJsonSchema(checklistSetCloseModeSchema),
   },
 ];

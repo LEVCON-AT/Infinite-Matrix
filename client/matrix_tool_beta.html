@@ -230,6 +230,13 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 .cl-paste-prev{max-height:180px;overflow-y:auto;border:0.5px solid var(--border2);border-radius:var(--r);padding:6px 9px;background:var(--bg);margin-bottom:10px;}
 .cl-paste-item{font-size:12px;padding:2px 0;padding-left:calc(var(--space-md) * var(--cl-level, 0));color:var(--text);}
 .cl-paste-empty{font-size:12px;color:var(--text3);padding:4px 0;}
+.cl-recur-badge{font-size:10px;color:var(--text3);display:inline-flex;align-items:center;gap:3px;margin-left:6px;}
+.cl-settings-ico{font-size:12px;color:var(--text3);cursor:pointer;padding:2px;display:inline-flex;align-items:center;}
+.cl-settings-ico:hover{color:var(--text);}
+.cl-settings-modal label{display:block;margin-top:8px;margin-bottom:4px;font-size:11px;color:var(--text3);font-weight:500;}
+.cl-settings-modal input[type="number"],.cl-settings-modal input[type="date"],.cl-settings-modal select{width:100%;margin-bottom:4px;padding:6px 8px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:12px;outline:none;}
+.cl-settings-modal input:focus-visible,.cl-settings-modal select:focus-visible{border-color:var(--blue);}
+.cl-wd-row{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;}
 
 /* ── DAILY OVERVIEW ── */
 .daily-wrap{margin-top:22px;}
@@ -1898,10 +1905,14 @@ function loadData(d){
   currentTab=(d.currentTab&&typeof d.currentTab==='object'&&!Array.isArray(d.currentTab))?d.currentTab:{};
   stack=[{nodeId:rootId,label:nodes[rootId].label,cellRef:null}];
   migrateNodeAliasesToCells();
-  // V2.1: level-Feld auf Checklisten-Items (Board + Karte) backfillen
+  // V2.1: level-Feld + V2.3: closeMode/history/recur/action auf Checklisten backfillen
   Object.values(nodes).forEach(n=>{
     if(n.type==='board'){
-      (n.data.checklists||[]).forEach(cl=>(cl.items||[]).forEach(it=>{if(typeof it.level!=='number')it.level=0;}));
+      (n.data.checklists||[]).forEach(cl=>{
+        (cl.items||[]).forEach(it=>{if(typeof it.level!=='number')it.level=0;});
+        if(!cl.closeMode)cl.closeMode='auto-prompt';
+        if(!Array.isArray(cl.history))cl.history=[];
+      });
       (n.data.kbCards||[]).forEach(c=>(c.checklist||[]).forEach(it=>{if(typeof it.level!=='number')it.level=0;}));
     }
   });
@@ -5017,7 +5028,9 @@ function renderChecklists(node){
       <div class="cardhd">
         ${editMode?`<input class="ni ni-md" value="${esc(cl.label)}" onchange="renameCl('${node.id}','${cl.id}',this.value)"/>`:`<span>${esc(cl.label)}</span>`}
         <span class="cl-count">${done}/${cl.items.length}</span>
+        ${cl.recur&&cl.recur.type!=='none'?`<span class="cl-recur-badge" title="${esc(recurLabel(cl.recur))}">${ICO.recur(ICO_SIZE.XS)} ${esc(recurLabel(cl.recur,true))}</span>`:''}
         <span tabindex="0" role="button" title="Alle abchecken (Shift+R)" class="cl-reset ml4" onclick="resetCl('${node.id}','${cl.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();resetCl('${node.id}','${cl.id}');}">↺</span>
+        ${editMode?`<span class="cl-settings-ico" tabindex="0" role="button" title="Einstellungen (Wiederholung, Abschluss)" onclick="_clOpenSettings('${node.id}','${cl.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();_clOpenSettings('${node.id}','${cl.id}');}">${ICO.gear(ICO_SIZE.SM)}</span>`:''}
         ${editMode?`<span class="edel" tabindex="0" role="button" onclick="delChecklist('${node.id}','${cl.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delChecklist('${node.id}','${cl.id}');}">${ICO.close(ICO_SIZE.XS)}</span>`:''}
       </div>
       <div class="cl-list" ${editMode?`ondragover="clDragOver(event)" ondrop="clDragDropList(event,'std','${node.id}','${cl.id}')"`:''}>`;
@@ -5450,6 +5463,120 @@ function _clDragDropInto(scope,id1,id2,targetItemId){
     const el=document.querySelector(`[data-cl-item="${movedId}"]`);
     if(el){el.classList.add('anim-add');el.addEventListener('animationend',()=>el.classList.remove('anim-add'),{once:true});el.scrollIntoView({behavior:'smooth',block:'nearest'});}
   },20);
+}
+
+// ═══════════════════════════════════════════════════════
+// V2.3 Checklist-Settings (Wiederholung + Abschluss-Modus)
+// Dediziertes Overlay mit Re-Render bei jeder Aenderung.
+// ═══════════════════════════════════════════════════════
+const CL_CLOSE_MODES=[['manual','Manuell'],['auto-prompt','Automatisch fragen'],['auto-silent','Automatisch stumm']];
+let _clSettingsCtx=null;
+function _clFindCl(bid,clid){return nodes[bid]&&nodes[bid].data.checklists.find(c=>c.id===clid);}
+function _clOpenSettings(boardId,clId){
+  const cl=_clFindCl(boardId,clId);
+  if(!cl)return;
+  if(!cl.recur)cl.recur={type:'none'};
+  if(!cl.closeMode)cl.closeMode='auto-prompt';
+  _pushFocusRestore();_pushModal(_clCloseSettings);
+  _clSettingsCtx={boardId,clId};
+  _clRenderSettings();
+}
+function _clRenderSettings(){
+  if(!_clSettingsCtx)return;
+  const {boardId,clId}=_clSettingsCtx;
+  const cl=_clFindCl(boardId,clId);
+  if(!cl)return _clCloseSettings();
+  const r=cl.recur||{type:'none'};
+  const cm=cl.closeMode||'auto-prompt';
+  let h=`<div class="smodal-overlay" onclick="_clCloseSettings(event)"><div class="smodal cl-settings-modal" onclick="event.stopPropagation()">
+    <h3>Checklisten-Einstellungen</h3>
+    <div class="smodal-crumb"><span>${esc(cl.label)}</span></div>
+    <label>Wiederholung</label>
+    <select onchange="_clSetRecurField('type',this.value)">
+      <option value="none"${r.type==='none'?' selected':''}>keine</option>
+      <option value="daily"${r.type==='daily'?' selected':''}>täglich</option>
+      <option value="weekly"${r.type==='weekly'?' selected':''}>wöchentlich</option>
+      <option value="monthly"${r.type==='monthly'?' selected':''}>monatlich</option>
+      <option value="yearly"${r.type==='yearly'?' selected':''}>jährlich</option>
+    </select>`;
+  if(r.type!=='none'){
+    const everyMax=r.type==='daily'?365:r.type==='weekly'?52:r.type==='monthly'?12:10;
+    h+=`<label>Intervall (alle N ${r.type==='daily'?'Tage':r.type==='weekly'?'Wochen':r.type==='monthly'?'Monate':'Jahre'})</label>
+      <input type="number" min="1" max="${everyMax}" value="${r.every||1}" onchange="_clSetRecurField('every',Math.max(1,parseInt(this.value)||1))"/>`;
+    if(r.type==='weekly'){
+      const wds=r.weekdays||(r.weekday!==undefined?[r.weekday]:[]);
+      h+=`<label>Wochentage</label><div class="cl-wd-row">`;
+      WEEKDAY_NAMES.forEach((nm,i)=>{
+        const sel=wds.includes(i);
+        h+=`<label class="wd-chip${sel?' sel':''}"><input type="checkbox" class="mg-0" ${sel?'checked':''} onchange="_clToggleRecurWeekday(${i})"/>${nm.slice(0,2)}</label>`;
+      });
+      h+=`</div>`;
+    }
+    if(r.type==='monthly'){
+      h+=`<label>Tag im Monat</label><input type="number" min="1" max="31" value="${r.day||1}" onchange="_clSetRecurField('day',Math.max(1,Math.min(31,parseInt(this.value)||1)))"/>`;
+    }
+    if(r.type==='yearly'){
+      h+=`<label>Monat</label><select onchange="_clSetRecurField('yearMonth',parseInt(this.value)|0)">
+        ${MONTH_SHORT.map((m,i)=>`<option value="${i}"${(r.yearMonth||0)===i?' selected':''}>${m}</option>`).join('')}
+      </select>
+      <label>Tag</label><input type="number" min="1" max="31" value="${r.yearDay||1}" onchange="_clSetRecurField('yearDay',Math.max(1,Math.min(31,parseInt(this.value)||1)))"/>`;
+    }
+    h+=`<label>Beginn (optional)</label><input type="date" value="${r.startDate||''}" onchange="_clSetRecurField('startDate',this.value)"/>`;
+    h+=`<label>Ende</label><select onchange="_clSetRecurField('endType',this.value)">
+      <option value="none"${(r.endType||'none')==='none'?' selected':''}>Kein Enddatum</option>
+      <option value="date"${r.endType==='date'?' selected':''}>Endet am</option>
+      <option value="count"${r.endType==='count'?' selected':''}>Nach N Terminen</option>
+    </select>`;
+    if(r.endType==='date')h+=`<input type="date" value="${r.endDate||''}" onchange="_clSetRecurField('endDate',this.value)"/>`;
+    if(r.endType==='count')h+=`<input type="number" min="1" max="999" value="${r.endCount||10}" onchange="_clSetRecurField('endCount',Math.max(1,parseInt(this.value)||1))"/>`;
+  }
+  h+=`<label>Abschluss-Verhalten</label><select onchange="_clSetCloseModeDirect(this.value)">
+    ${CL_CLOSE_MODES.map(([v,l])=>`<option value="${v}"${cm===v?' selected':''}>${l}</option>`).join('')}
+  </select>
+  <div class="smodal-actions"><button class="btn-p" onclick="_clCloseSettings()">Fertig</button></div>
+  </div></div>`;
+  document.getElementById('mc').innerHTML=h;
+}
+function _clSetRecurField(field,value){
+  if(!_clSettingsCtx)return;
+  const cl=_clFindCl(_clSettingsCtx.boardId,_clSettingsCtx.clId);
+  if(!cl)return;
+  if(!cl.recur)cl.recur={type:'none'};
+  if(field==='type'){
+    cl.recur={type:value};
+    if(value==='weekly')cl.recur.weekdays=[new Date().getDay()===0?6:new Date().getDay()-1];
+  }else{
+    cl.recur[field]=value;
+  }
+  save();render();_clRenderSettings();
+}
+function _clToggleRecurWeekday(i){
+  if(!_clSettingsCtx)return;
+  const cl=_clFindCl(_clSettingsCtx.boardId,_clSettingsCtx.clId);
+  if(!cl||!cl.recur)return;
+  const wds=Array.isArray(cl.recur.weekdays)?cl.recur.weekdays.slice():(cl.recur.weekday!==undefined?[cl.recur.weekday]:[]);
+  const idx=wds.indexOf(i);
+  if(idx>=0)wds.splice(idx,1);else wds.push(i);
+  wds.sort((a,b)=>a-b);
+  cl.recur.weekdays=wds;
+  delete cl.recur.weekday;
+  save();render();_clRenderSettings();
+}
+function _clSetCloseModeDirect(val){
+  if(!_clSettingsCtx)return;
+  const cl=_clFindCl(_clSettingsCtx.boardId,_clSettingsCtx.clId);
+  if(!cl)return;
+  if(!CL_CLOSE_MODES.some(x=>x[0]===val))return;
+  cl.closeMode=val;
+  save();render();
+}
+function _clCloseSettings(e){
+  if(e&&e.target&&e.target.classList&&!e.target.classList.contains('smodal-overlay')&&e.type==='click')return;
+  _clSettingsCtx=null;
+  _popModal(_clCloseSettings);
+  const overlay=document.querySelector('#mc .smodal-overlay');
+  if(overlay){overlay.classList.add('closing');setTimeout(()=>{document.getElementById('mc').innerHTML='';_popFocusRestore();},SMODAL_EXIT_MS);}
+  else{document.getElementById('mc').innerHTML='';_popFocusRestore();}
 }
 
 // ═══════════════════════════════════════════════════════
@@ -8860,6 +8987,29 @@ Object.assign(MATRIX_TOOLS,{
     const res=_cloneByRef(args.sourceRef,args.targetRef||null);
     if(res&&res.error)return{error:res.error};
     return{cloned:true,count:res.count,targetBoardId:res.targetBoardId};
+  },
+
+  'checklist.set_recur':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const cl=nodes[bid].data.checklists.find(c=>c.id===args.checklistId);
+    if(!cl)return{error:'Checkliste nicht gefunden: '+args.checklistId};
+    const r=args.recur||{type:'none'};
+    if(!['none','daily','weekly','monthly','yearly'].includes(r.type))return{error:'Unbekannter recur.type: '+r.type};
+    cl.recur=JSON.parse(JSON.stringify(r));
+    save();render();
+    return{set:true,boardId:bid,checklistId:cl.id,recur:JSON.parse(JSON.stringify(cl.recur))};
+  },
+
+  'checklist.set_close_mode':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const cl=nodes[bid].data.checklists.find(c=>c.id===args.checklistId);
+    if(!cl)return{error:'Checkliste nicht gefunden: '+args.checklistId};
+    if(!CL_CLOSE_MODES.some(x=>x[0]===args.mode))return{error:'Unbekannter closeMode: '+args.mode};
+    cl.closeMode=args.mode;
+    save();render();
+    return{set:true,boardId:bid,checklistId:cl.id,mode:cl.closeMode};
   },
 
   'checklist.item.move':async(args)=>{
