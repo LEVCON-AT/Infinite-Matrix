@@ -4719,7 +4719,7 @@ function _renderCardModalHTML(boardId,cardId,b,card,cols){
   // Checklist
   h+=`<div class="section-divider row-g8">Checkliste <span tabindex="0" role="button" title="Alle abchecken (Shift+R)" class="cl-reset" data-action="cl:reset-card" onkeydown="if(event.key==='Enter'){event.preventDefault();resetCardCl('${boardId}','${cardId}');}">↺</span></div>`;
   h+=`<div id="card-cl-section" onkeydown="if(event.shiftKey&&(event.key==='R'||event.key==='r')&&!event.target.matches('input,textarea,[contenteditable]')){event.preventDefault();resetCardCl('${boardId}','${cardId}');}">`;
-  const cl=card.checklist||[];
+  const cl=_cardChecklistItemsSafe(boardId,card);
   cl.forEach((item,idx)=>{
     const canUp=idx>0,canDn=idx<cl.length-1;
     const lvl=item.level|0;
@@ -4934,14 +4934,42 @@ function addGlobalPerson(boardId,cardId){
     toggleCardWho(boardId,cardId,v.l);
   });
 }
+// V2.4a: Accessor fuer die Items einer Karten-Checkliste.
+// - card.checklistRef gesetzt + Ziel gefunden → Live-Referenz auf checklist.items
+// - card.checklistRef gesetzt + Ziel weg → null (Mutation darf nicht in Wegwerf-Array landen)
+// - sonst card.checklist (inline, lazy init)
+// MVP: Ref wird nur im Owner-Board aufgeloest (plan.offeneEntscheidungen).
+function _cardChecklistItems(boardId,card){
+  if(!card)return null;
+  if(card.checklistRef){
+    const cls=nodes[boardId]?.data?.checklists;
+    const cl=Array.isArray(cls)?cls.find(x=>x.id===card.checklistRef):null;
+    if(!cl)return null;
+    if(!Array.isArray(cl.items))cl.items=[];
+    return cl.items;
+  }
+  if(!Array.isArray(card.checklist))card.checklist=[];
+  return card.checklist;
+}
+// V2.4a: Items-Accessor mit Anzeige-Fallback (leerer Array statt null). Fuer Render-Pfade.
+function _cardChecklistItemsSafe(boardId,card){return _cardChecklistItems(boardId,card)||[];}
+// V2.4a: Owner-Board-Lookup der referenzierten Checkliste (fuer Label/Alias im Ref-Chip).
+function _cardChecklistRefObj(boardId,card){
+  if(!card||!card.checklistRef)return null;
+  const cls=nodes[boardId]?.data?.checklists;
+  return Array.isArray(cls)?(cls.find(x=>x.id===card.checklistRef)||null):null;
+}
+function _clRefBrokenToast(){showToast('Referenzierte Checkliste nicht mehr vorhanden.',{type:'warning'});}
 function addClItem(boardId,cardId,afterItemId,level){
   const c=getCard(boardId,cardId);
-  if(!c)return;if(!c.checklist)c.checklist=[];
+  if(!c)return;
+  const arr=_cardChecklistItems(boardId,c);
+  if(!arr){_clRefBrokenToast();return;}
   const lvl=typeof level==='number'?Math.max(0,Math.min(CL_MAX_LEVEL,level|0)):0;
   const newItem={id:uid(),text:'',done:false,level:lvl};
-  const idx=afterItemId?c.checklist.findIndex(i=>i.id===afterItemId):-1;
-  if(idx>=0)c.checklist.splice(idx+1,0,newItem);
-  else c.checklist.push(newItem);
+  const idx=afterItemId?arr.findIndex(i=>i.id===afterItemId):-1;
+  if(idx>=0)arr.splice(idx+1,0,newItem);
+  else arr.push(newItem);
   save();openCard(boardId,cardId);
   setTimeout(()=>{
     const el=document.querySelector(`#card-cl-section .cl-item[data-cl-item="${newItem.id}"] input`);
@@ -4950,17 +4978,27 @@ function addClItem(boardId,cardId,afterItemId,level){
 }
 function toggleClItem(boardId,cardId,itemId){
   const c=getCard(boardId,cardId);
-  if(!c)return;const i=c.checklist.find(x=>x.id===itemId);if(!i)return;
+  if(!c)return;
+  const arr=_cardChecklistItems(boardId,c);
+  if(!arr)return;
+  const i=arr.find(x=>x.id===itemId);if(!i)return;
   i.done=!i.done;save();openCard(boardId,cardId);
 }
 function updateClItem(boardId,cardId,itemId,val){
   const c=getCard(boardId,cardId);if(!c)return;
   if(!val.trim()){delClItem(boardId,cardId,itemId);return;}
-  const i=c.checklist.find(x=>x.id===itemId);if(i)i.text=val;save();
+  const arr=_cardChecklistItems(boardId,c);
+  if(!arr)return;
+  const i=arr.find(x=>x.id===itemId);if(i)i.text=val;save();
 }
 function delClItem(boardId,cardId,itemId){
   const c=getCard(boardId,cardId);
-  if(!c)return;c.checklist=c.checklist.filter(x=>x.id!==itemId);save();openCard(boardId,cardId);
+  if(!c)return;
+  const arr=_cardChecklistItems(boardId,c);
+  if(!arr)return;
+  const idx=arr.findIndex(x=>x.id===itemId);
+  if(idx>=0)arr.splice(idx,1);
+  save();openCard(boardId,cardId);
 }
 function setCardDone(boardId,cardId,toggle){
   const card=getCard(boardId,cardId);
@@ -5353,7 +5391,7 @@ function addClItemDirect(boardId,clId,afterItemId,level){
 function setClItemLevel(scope,id1,id2,itemId,delta){
   let arr;
   if(scope==='std'){const cl=nodes[id1].data.checklists.find(x=>x.id===id2);if(!cl)return;arr=cl.items;}
-  else{const c=getCard(id1,id2);if(!c||!c.checklist)return;arr=c.checklist;}
+  else{const c=getCard(id1,id2);if(!c)return;arr=_cardChecklistItems(id1,c);if(!arr)return;}
   const idx=arr.findIndex(i=>i.id===itemId);
   if(idx<0)return;
   const cur=arr[idx].level|0;
@@ -5378,7 +5416,7 @@ function setClItemLevel(scope,id1,id2,itemId,delta){
 function updateClText(scope,id1,id2,itemId,val){
   let arr;
   if(scope==='std'){const cl=nodes[id1].data.checklists.find(x=>x.id===id2);if(!cl)return;arr=cl.items;}
-  else{const c=getCard(id1,id2);if(!c||!c.checklist)return;arr=c.checklist;}
+  else{const c=getCard(id1,id2);if(!c)return;arr=_cardChecklistItems(id1,c);if(!arr)return;}
   const i=arr.find(x=>x.id===itemId);
   if(!i)return;
   const t=val.trim();
@@ -5393,14 +5431,16 @@ function resetCl(boardId,clId){
 }
 function resetCardCl(boardId,cardId){
   const c=getCard(boardId,cardId);
-  if(!c||!c.checklist)return;
-  c.checklist.forEach(i=>i.done=false);
+  if(!c)return;
+  const arr=_cardChecklistItems(boardId,c);
+  if(!arr)return;
+  arr.forEach(i=>i.done=false);
   save();openCard(boardId,cardId);
 }
 function moveClItem(scope,id1,id2,itemId,dir){
   let arr,rerender;
   if(scope==='std'){const cl=nodes[id1].data.checklists.find(x=>x.id===id2);if(!cl)return;arr=cl.items;rerender=()=>render();}
-  else{const c=getCard(id1,id2);if(!c||!c.checklist)return;arr=c.checklist;rerender=()=>openCard(id1,id2);}
+  else{const c=getCard(id1,id2);if(!c)return;arr=_cardChecklistItems(id1,c);if(!arr)return;rerender=()=>openCard(id1,id2);}
   const i=arr.findIndex(x=>x.id===itemId);
   const j=i+dir;
   if(i<0||j<0||j>=arr.length)return;
@@ -5464,8 +5504,10 @@ function _clDragDropInto(scope,id1,id2,targetItemId){
     srcArr=srcCl.items;tgtArr=tgtCl.items;rerender=()=>render();
   }else{
     const c=getCard(id1,id2);
-    if(!c||!c.checklist){clDragEnd();return;}
-    srcArr=c.checklist;tgtArr=c.checklist;rerender=()=>openCard(id1,id2);
+    if(!c){clDragEnd();return;}
+    const arr=_cardChecklistItems(id1,c);
+    if(!arr||!arr.length){clDragEnd();return;}
+    srcArr=arr;tgtArr=arr;rerender=()=>openCard(id1,id2);
   }
   const crossList=srcArr!==tgtArr;
   const srcIdx=srcArr.findIndex(x=>x.id===_clDrag.itemId);
