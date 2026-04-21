@@ -1,0 +1,16 @@
+# Gleichbehandlung aller Line-Endings — im Repo immer LF, Checkout OS-nativ.
+# Verhindert, dass Windows-commits CRLF einbringen, die Biome/Lint auf CI stoert.
+* text=auto eol=lf
+
+# Binaer-Dateien (werden nie konvertiert)
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.imx binary
+*.db binary
+
+# Shell-Scripts: immer LF (auch auf Checkout unter Windows), sonst brechen sie auf Linux
+*.sh text eol=lf
