@@ -4602,6 +4602,9 @@ const CARD_ACTIONS={
   'cl:add':                r=>addClItem(r.boardId,r.cardId),
   'cl:move':               (r,el)=>moveClItem('card',r.boardId,r.cardId,el.dataset.id,parseInt(el.dataset.dir)),
   'cl:reset-card':         r=>resetCardCl(r.boardId,r.cardId),
+  'cl:ref-jump':           r=>_cardChecklistRefJump(r.boardId,r.cardId),
+  'cl:unlink-ref':         r=>_cardChecklistUnlinkRef(r.boardId,r.cardId),
+  'cl:link-ref':           r=>_cardChecklistOpenLinkPicker(r.boardId,r.cardId),
 };
 function _cardDispatch(attrName){
   return function(e){
@@ -4724,6 +4727,20 @@ function _renderCardModalHTML(boardId,cardId,b,card,cols){
 
   // Checklist
   h+=`<div class="section-divider row-g8">Checkliste <span tabindex="0" role="button" title="Alle abchecken (Shift+R)" class="cl-reset" data-action="cl:reset-card" onkeydown="if(event.key==='Enter'){event.preventDefault();resetCardCl('${boardId}','${cardId}');}">↺</span></div>`;
+  // V2.4c: Ref-Chip (3 Zustaende: ref live, ref broken, sourceLabel/sourceClId)
+  if(card.checklistRef){
+    const refObj=_cardChecklistRefObj(boardId,card);
+    if(refObj){
+      h+=`<div class="cl-ref-chip" data-cl-state="ref-live">${ICO.link(ICO_SIZE.XS)} Referenz auf „${esc(refObj.label||'Checkliste')}"<a tabindex="0" role="button" data-action="cl:ref-jump" onkeydown="if(event.key==='Enter'){event.preventDefault();_cardChecklistRefJump('${boardId}','${cardId}');}">Öffnen</a>${editMode?` · <a tabindex="0" role="button" data-action="cl:unlink-ref" onkeydown="if(event.key==='Enter'){event.preventDefault();_cardChecklistUnlinkRef('${boardId}','${cardId}');}">Ref lösen</a>`:''}</div>`;
+    }else{
+      h+=`<div class="cl-ref-chip" data-cl-state="ref-broken">${ICO.warn(ICO_SIZE.XS)} Referenz ungültig${editMode?` · <a tabindex="0" role="button" data-action="cl:unlink-ref" onkeydown="if(event.key==='Enter'){event.preventDefault();_cardChecklistUnlinkRef('${boardId}','${cardId}');}">Zu Inline umwandeln</a>`:''}</div>`;
+    }
+  }else if(card.sourceClId){
+    const srcCl=nodes[boardId]?.data?.checklists?.find(x=>x.id===card.sourceClId);
+    if(srcCl)h+=`<div class="cl-ref-chip" data-cl-state="source">${ICO.recur(ICO_SIZE.XS)} stammt aus „${esc(srcCl.label||'Checkliste')}"</div>`;
+  }else if(card.sourceLabel){
+    h+=`<div class="cl-ref-chip" data-cl-state="source-gone">${ICO.recur(ICO_SIZE.XS)} ehemals Checkliste „${esc(card.sourceLabel)}"</div>`;
+  }
   h+=`<div id="card-cl-section" onkeydown="if(event.shiftKey&&(event.key==='R'||event.key==='r')&&!event.target.matches('input,textarea,[contenteditable]')){event.preventDefault();resetCardCl('${boardId}','${cardId}');}">`;
   const cl=_cardChecklistItemsSafe(boardId,card);
   cl.forEach((item,idx)=>{
@@ -4740,6 +4757,10 @@ function _renderCardModalHTML(boardId,cardId,b,card,cols){
   });
   h+=`</div>`;
   h+=`<button class="btn btn-small" data-action="cl:add">+ Punkt</button>`;
+  // V2.4c: Umkehrpfad — inline → Ref verknuepfen. Nur im Edit-Mode, ohne bestehende Ref, und wenn Owner-Board Standalone-Checklisten hat.
+  if(editMode&&!card.checklistRef&&(nodes[boardId]?.data?.checklists||[]).length){
+    h+=` <button class="btn btn-small" data-action="cl:link-ref" title="Inline-Checkliste als Referenz mit einer Standalone-Checkliste verknuepfen">Als Referenz verknüpfen</button>`;
+  }
 
   h+=`</div>`; // modal-body
   h+=`<div class="modal-actions">
@@ -5862,6 +5883,90 @@ function _transformChecklistToCard(boardId,clId,targetBoardId,colId,name,mode){
   showToast(`„${esc(cardName)}" in „${esc(tgt.label||'Board')}" angelegt.`,{type:'success'});
   showUndoToast('Checkliste in Karte umgewandelt');
   return{ok:true,cardId:card.id,boardId:targetBoardId};
+}
+// V2.4c: Sprung von einer Ref-Karte zur referenzierten Standalone-Checkliste.
+function _cardChecklistRefJump(boardId,cardId){
+  const c=getCard(boardId,cardId);
+  if(!c||!c.checklistRef)return;
+  const cl=_cardChecklistRefObj(boardId,c);
+  if(!cl){showToast('Referenz nicht auffindbar.',{type:'warning'});return;}
+  closeCard();
+  currentTab[boardId]='checklists';
+  render();
+  setTimeout(()=>{
+    const el=document.querySelector(`.card[data-cl-id="${cl.id}"]`);
+    if(el)el.scrollIntoView({behavior:'smooth',block:'center'});
+  },RENDER_DELAY_MS||50);
+}
+// V2.4c: Ref aufloesen — Karte bekommt Kopie der aktuellen Items zum Zeitpunkt der Aktion.
+function _cardChecklistUnlinkRef(boardId,cardId){
+  const c=getCard(boardId,cardId);
+  if(!c||!c.checklistRef)return{error:'Karte hat keine Ref'};
+  const arr=_cardChecklistItems(boardId,c)||[];
+  pushUndo('Referenz geloest');
+  c.checklist=arr.map(it=>({id:uid(),text:String(it.text||''),done:!!it.done,level:Math.max(0,Math.min(CL_MAX_LEVEL,it.level|0))}));
+  delete c.checklistRef;
+  save();openCard(boardId,cardId);
+  showUndoToast('Referenz geloest');
+  return{ok:true};
+}
+// V2.4c: Link-Ref: inline → ref. Sucht Standalone-Checklisten im Owner-Board und zeigt Picker.
+// onConflict: nur relevant wenn inline-Items bereits existieren. 'drop-inline' (default) | 'overwrite-ref'.
+function _cardChecklistLinkRef(boardId,cardId,clId,onConflict){
+  const c=getCard(boardId,cardId);
+  if(!c)return{error:'Karte nicht gefunden'};
+  if(c.checklistRef)return{error:'Karte hat bereits eine Ref. Zuerst loesen.'};
+  const cl=nodes[boardId]?.data?.checklists?.find(x=>x.id===clId);
+  if(!cl)return{error:'Checkliste nicht gefunden'};
+  const inline=Array.isArray(c.checklist)?c.checklist:[];
+  const hasInline=inline.length>0;
+  const hasTgt=Array.isArray(cl.items)&&cl.items.length>0;
+  if(hasInline&&hasTgt){
+    const mode=onConflict||'drop-inline';
+    if(mode==='overwrite-ref'){
+      pushUndo('Ref ueberschrieben');
+      cl.items=inline.map(it=>({id:uid(),text:String(it.text||''),done:!!it.done,level:Math.max(0,Math.min(CL_MAX_LEVEL,it.level|0))}));
+      delete c.checklist;
+      c.checklistRef=cl.id;
+      save();openCard(boardId,cardId);
+      showUndoToast('Ref ueberschrieben');
+      return{ok:true,mode:'overwrite-ref'};
+    }
+    // drop-inline (default)
+    pushUndo('Inline verworfen, Ref verknuepft');
+    delete c.checklist;
+    c.checklistRef=cl.id;
+    save();openCard(boardId,cardId);
+    showUndoToast('Inline verworfen, Ref verknuepft');
+    return{ok:true,mode:'drop-inline'};
+  }
+  // Keine Konflikte: einfach verknuepfen, Inline entfernen.
+  pushUndo('Ref verknuepft');
+  delete c.checklist;
+  c.checklistRef=cl.id;
+  save();openCard(boardId,cardId);
+  showUndoToast('Ref verknuepft');
+  return{ok:true,mode:'clean'};
+}
+// V2.4c: smodal zum Auswaehlen einer Standalone-Checkliste + (bei Konflikt) Merge-Strategie.
+function _cardChecklistOpenLinkPicker(boardId,cardId){
+  const c=getCard(boardId,cardId);
+  if(!c)return;
+  if(c.checklistRef){showToast('Karte hat bereits eine Ref.',{type:'warning'});return;}
+  const cls=(nodes[boardId]?.data?.checklists||[]);
+  if(!cls.length){showToast('Keine Standalone-Checkliste im Board.',{type:'warning'});return;}
+  const inline=Array.isArray(c.checklist)?c.checklist:[];
+  const fields=[
+    {label:'Standalone-Checkliste',id:'clid',sel:cls.map(x=>x.id),sellabels:cls.map(x=>x.label||'Checkliste')}
+  ];
+  if(inline.length){
+    fields.push({label:'Konflikt-Strategie',id:'mode',sel:['drop-inline','overwrite-ref'],sellabels:['Inline verwerfen','Ziel mit Inline ueberschreiben']});
+  }
+  smodal('Als Referenz verknuepfen',fields,v=>{
+    if(!v.clid)return;
+    const res=_cardChecklistLinkRef(boardId,cardId,v.clid,v.mode||'drop-inline');
+    if(res&&res.error)showToast(res.error,{type:'error'});
+  });
 }
 
 // ═══════════════════════════════════════════════════════
