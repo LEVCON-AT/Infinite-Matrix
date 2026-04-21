@@ -1,0 +1,42 @@
+:root {
+  --bg: #0f1115;
+  --fg: #e6e8eb;
+  --muted: #9aa0a6;
+  --accent: #4c8bf5;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.app-shell {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.login,
+.workspace {
+  padding: 2rem;
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin: 0 0 1rem;
+}
+
+p {
+  color: var(--muted);
+}
