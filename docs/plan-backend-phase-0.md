@@ -48,6 +48,26 @@ Dein VPS (systemd + docker-compose, nginx-TLS-terminiert)
 - **Team-Workspaces / Invites**: Schema ab Tag 1, UI ab Phase 1.
 - **Zero-Downtime-Deploys**: ein VPS, ein Service-Restart ist OK. Blau/Grün kommt später.
 
+## Status (Stand 2026-04-21)
+
+| Phase | Scope | Status |
+|---|---|---|
+| 0a | Supabase-Stack, nginx, Hardening | ✅ done |
+| 0b | Magic-Link-Auth + Workspace-Trigger | ✅ done |
+| 0c.1 | Workspaces + Memberships + RLS-Helper | ✅ done |
+| 0c.2 | Matrix-Schema (10 Tabellen, Composite-FKs, Uniform-RLS) | ✅ done |
+| 0c.3 | Import-Endpoint | ➡ verschmolzen in 0d.6 (Client-seitig) |
+| 0c.4 | RLS-Policy-Tests | ⏸ nach 0d mit Echtdaten |
+| 0d.1 | SolidJS-Skeleton (Vite 5 + SolidJS 1.9 + TS + Router + Supabase-JS) | ✅ done |
+| 0d.2 | Magic-Link-Login + Route-Guard | ✅ done |
+| 0d.3 | Workspace-Switcher + Node-Tree | ✅ done |
+| 0d.4 | MatrixView (read-only Rendering) | ➡ **nächster Sprint** |
+| 0d.5 | BoardView (Kanban + Checklisten-Read) | pending |
+| 0d.6 | Import-Dialog (localStorage-JSON → DB, UUID-Mapping) | pending |
+| 0e | Write-API + Realtime + Bridge-Rolle neu | pending |
+| 0f | Feature-Parität (Keyboard, Aliases, Undo) + `/frontend-design`-Style-Pass | pending |
+| 0g | Standalone-Freeze + PWA-Cache | pending |
+
 ## Voraussetzungen (vor Phase 0a)
 
 | # | Prüfpunkt | Aktion falls nicht gegeben |
@@ -237,7 +257,9 @@ Analog für `cells`, `kb_cards`, `checklists`, `checklist_items`, `links`, `audi
 
 `workspaces` hat eigene Policy: lesen wenn Member, updaten wenn owner.
 
-### 0c.3 — Import-Endpoint
+### 0c.3 — Import-Endpoint *(gestrichen — verschmolzen in 0d.6)*
+
+> **Entscheidung 2026-04-21:** Der Import wird client-seitig im SolidJS-Client gemacht (parsen + Inserts via Supabase-JS mit User-Token → RLS greift automatisch). Spart ~300 Zeilen PL/pgSQL und Postgres-RPC-Exposition. Ursprünglicher Entwurf bleibt als Referenz untenstehend.
 
 - Edge-Function (Deno, supabase-eigen) oder Bridge-Endpoint (Node): `POST /import/localstorage`.
 - Input: der komplette `getPayload()`-JSON-Dump aus dem Single-File-Client.
