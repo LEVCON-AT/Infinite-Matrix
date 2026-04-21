@@ -113,7 +113,11 @@ jobs:
           ssh -i ~/.ssh/id_ed25519 "$USER@$HOST" bash -s <<'REMOTE'
             set -euo pipefail
             # pnpm deploy-Artifakt enthaelt bereits node_modules — keine Install-Phase auf dem VPS.
+            # --exclude bewahrt die Produktions-Dateien (.env, Laufzeit-State in data/) auf
+            # dem VPS; sie liegen nicht im Artifact und wuerden sonst durch --delete geloescht.
             sudo rsync -az --delete \
+              --exclude='.env' \
+              --exclude='data/' \
               --chown=matrix-bridge:matrix-bridge \
               /tmp/matrix-bridge-stage/ \
               /opt/matrix-bridge/
