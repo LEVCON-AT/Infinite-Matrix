@@ -125,6 +125,30 @@ const checklistSetActionSchema = z.object({
   action: z.object({ onClose: actionOnCloseSchema }).describe('Aktion bei Abschluss'),
 });
 
+// ─── V2.4: Transform + Ref-Management ──────────────────────────────
+const checklistToCardSchema = z.object({
+  boardRef: z.string().describe('Alias/ID des Quell-Boards (enthält die Checkliste)'),
+  checklistId: z.string().describe('Checklisten-ID'),
+  targetBoardRef: z.string().describe('Alias/ID des Ziel-Boards'),
+  colId: z.string().optional().describe('Spalten-ID im Ziel-Board (Default: erste Spalte)'),
+  name: z.string().optional().describe('Name der neuen Karte (Default: Checklisten-Label)'),
+  mode: z.enum(['ref','del','keep']).describe('ref: bidirektionale Live-Referenz; del: Karte erhält Kopie, Quelle gelöscht; keep: Karte erhält Kopie, Quelle bleibt (+ sourceClId).'),
+});
+
+const cardChecklistLinkRefSchema = z.object({
+  boardRef: z.string().optional().describe('Alias/ID des Boards (mit cardId)'),
+  cardId: z.string().optional().describe('Karten-ID (mit boardRef)'),
+  cardRef: z.string().optional().describe('Karten-Alias (alternativ zu boardRef+cardId)'),
+  checklistId: z.string().describe('ID der Standalone-Checkliste im Owner-Board der Karte'),
+  onConflict: z.enum(['drop-inline','overwrite-ref']).optional().describe('Bei Konflikt (inline+ziel beides mit Items): drop-inline = Inline verwerfen; overwrite-ref = Ziel mit Inline überschreiben (Default: drop-inline)'),
+});
+
+const cardChecklistUnlinkRefSchema = z.object({
+  boardRef: z.string().optional().describe('Alias/ID des Boards (mit cardId)'),
+  cardId: z.string().optional().describe('Karten-ID (mit boardRef)'),
+  cardRef: z.string().optional().describe('Karten-Alias (alternativ zu boardRef+cardId)'),
+});
+
 export const checklistTools: ToolDef[] = [
   {
     name: 'checklist.add',
@@ -203,5 +227,23 @@ export const checklistTools: ToolDef[] = [
     description: 'Setzt die Aktion bei Abschluss einer Checkliste: toast (Default), jump (Sprung zu Alias), webhook (POST an URL), mail (Mail-Vorlage des Boards). SMTP ist V2+.',
     schema: checklistSetActionSchema,
     jsonSchema: zodToJsonSchema(checklistSetActionSchema),
+  },
+  {
+    name: 'checklist.to_card',
+    description: 'Verwandelt eine Checkliste in eine Kanban-Karte im Ziel-Board. Modi: ref (bidirektional live), del (Kopie + Quelle gelöscht), keep (Kopie + Rückverweis).',
+    schema: checklistToCardSchema,
+    jsonSchema: zodToJsonSchema(checklistToCardSchema),
+  },
+  {
+    name: 'card.checklist.link_ref',
+    description: 'Verknüpft die Checkliste einer Karte als Referenz mit einer Standalone-Checkliste im Owner-Board. Ersetzt eine vorhandene Inline-Checkliste (onConflict steuert Konflikt-Handhabung).',
+    schema: cardChecklistLinkRefSchema,
+    jsonSchema: zodToJsonSchema(cardChecklistLinkRefSchema),
+  },
+  {
+    name: 'card.checklist.unlink_ref',
+    description: 'Löst die checklistRef einer Karte: Karte erhält eine unabhängige Kopie der aktuell referenzierten Items zum Zeitpunkt der Aktion.',
+    schema: cardChecklistUnlinkRefSchema,
+    jsonSchema: zodToJsonSchema(cardChecklistUnlinkRefSchema),
   },
 ];

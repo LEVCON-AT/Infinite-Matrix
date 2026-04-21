@@ -16,6 +16,8 @@ describe('registerAllTools() Integration', () => {
     const expected = [
       'alias.resolve',
       'alias.set',
+      'card.checklist.link_ref',
+      'card.checklist.unlink_ref',
       'card.create',
       'card.delete',
       'card.done.toggle',
@@ -38,6 +40,7 @@ describe('registerAllTools() Integration', () => {
       'checklist.set_action',
       'checklist.set_close_mode',
       'checklist.set_recur',
+      'checklist.to_card',
       'col.add',
       'col.delete',
       'info.field.add',
@@ -64,7 +67,7 @@ describe('registerAllTools() Integration', () => {
     ];
 
     expect(names).toEqual(expected);
-    expect(tools.size).toBe(47); // +1 aus V2.3c: checklist.set_action
+    expect(tools.size).toBe(50); // +3 aus V2.4: checklist.to_card, card.checklist.link_ref, card.checklist.unlink_ref
   });
 
   it('jedes registrierte Tool hat schema + jsonSchema', () => {

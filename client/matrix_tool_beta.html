@@ -8133,6 +8133,10 @@ function parseCommand(raw){
   if(parts[0]==='move'||parts[0]==='delete'){
     return{type:parts[0],source:parts[1]||null,target:parts[2]||null};
   }
+  // V2.4: ^cl-to-card quelleBoard [ziel-board] [spalte] [mode]
+  if(parts[0]==='cl-to-card'){
+    return{type:'cl-to-card',source:parts[1]||null,boardRef:parts[2]||null,colName:parts[3]||null,mode:parts[4]||null};
+  }
   // Navigation: kürzel [subCmd] [cardAlias]
   const alias=parts[0];
   const subCmd=parts[1]||null; // m, i, b, c
@@ -8216,6 +8220,30 @@ function executeCommand(raw){
   if(cmd.type==='move'||cmd.type==='delete'){
     closeSearch();
     showToast(`^${cmd.type} kommt in V2+.`,{type:'info'});
+    return;
+  }
+  if(cmd.type==='cl-to-card'){
+    closeSearch();
+    if(!cmd.source)return showCmdError('Keine Quelle fuer ^cl-to-card.');
+    const srcBid=_resolveBoardRef(cmd.source);
+    if(!srcBid)return showCmdError(`Quelle ist kein Board: ^${cmd.source}`);
+    const srcCls=(nodes[srcBid].data.checklists||[]);
+    if(!srcCls.length)return showCmdError('Quelle hat keine Checklisten.');
+    if(srcCls.length>1)showToast(`Mehrere Checklisten — erste "${esc(srcCls[0].label||'')}" wird verwendet.`,{type:'info'});
+    const cl=srcCls[0];
+    const tgtBid=cmd.boardRef?_resolveBoardRef(cmd.boardRef):srcBid;
+    if(!tgtBid)return showCmdError(`Ziel-Board nicht gefunden: ^${cmd.boardRef}`);
+    const cols=nodes[tgtBid].data.kbCols||[];
+    if(!cols.length)return showCmdError('Ziel-Board hat keine Spalten.');
+    let colId=cols[0].id;
+    if(cmd.colName){
+      const cn=String(cmd.colName).toLowerCase();
+      const match=cols.find(c=>(c.label||'').toLowerCase()===cn)||cols.find(c=>(c.label||'').toLowerCase().startsWith(cn));
+      if(match)colId=match.id;
+    }
+    const mode=['ref','del','keep'].includes(cmd.mode)?cmd.mode:'keep';
+    const res=_transformChecklistToCard(srcBid,cl.id,tgtBid,colId,cl.label||'Karte',mode);
+    if(res&&res.error)showToast(res.error,{type:'error'});
     return;
   }
   if(cmd.type==='cleanup'){
@@ -9147,8 +9175,16 @@ const MATRIX_TOOLS={
 // ─── Sprint 4.3: board-card Resolver + Handler via Object.assign ──
 function _resolveBoardRef(ref){
   const id=_resolveNodeRef(ref);
-  if(!id||!nodes[id]||nodes[id].type!=='board')return null;
-  return id;
+  if(id&&nodes[id]&&nodes[id].type==='board')return id;
+  // Cell-Alias → Board via cell.boardId (konsistent mit ^n/^nav/^movecard)
+  if(!ref||typeof ref!=='string')return null;
+  const r=ref.startsWith('^')?ref.slice(1):ref;
+  const entry=aliasIndex[r.toLowerCase()];
+  if(entry&&entry.type==='cell'){
+    const cell=getCell(entry.parentId,entry.rowId+'-'+entry.colId);
+    if(cell&&cell.boardId&&nodes[cell.boardId]?.type==='board')return cell.boardId;
+  }
+  return null;
 }
 function _resolveCardRef(args){
   if(args.cardRef){
@@ -9538,6 +9574,43 @@ Object.assign(MATRIX_TOOLS,{
     save();render();
     showUndoToast('History-Eintrag geloescht');
     return{deleted:true,boardId:bid,checklistId:cl.id,entryIndex:idx,closedAt:removed.closedAt};
+  },
+
+  // ─── V2.4: Transform + Ref-Management ─────────────────
+  'checklist.to_card':async(args)=>{
+    const bid=_resolveBoardRef(args.boardRef);
+    if(!bid)return{error:'Board nicht gefunden: '+args.boardRef};
+    const cl=nodes[bid].data.checklists.find(c=>c.id===args.checklistId);
+    if(!cl)return{error:'Checkliste nicht gefunden: '+args.checklistId};
+    const tgtBid=_resolveBoardRef(args.targetBoardRef);
+    if(!tgtBid)return{error:'Ziel-Board nicht gefunden: '+args.targetBoardRef};
+    const tgt=nodes[tgtBid];
+    const cols=tgt.data.kbCols||[];
+    if(!cols.length)return{error:'Ziel-Board hat keine Spalten.'};
+    const colId=args.colId||cols[0].id;
+    if(!cols.find(c=>c.id===colId))return{error:'Spalte nicht gefunden: '+args.colId};
+    const mode=['ref','del','keep'].includes(args.mode)?args.mode:'keep';
+    const name=(args.name&&String(args.name).trim())||cl.label||'Karte';
+    const res=_transformChecklistToCard(bid,cl.id,tgtBid,colId,name,mode);
+    if(res&&res.error)return{error:res.error};
+    return{transformed:true,mode,boardId:tgtBid,cardId:res.cardId};
+  },
+
+  'card.checklist.link_ref':async(args)=>{
+    const ref=_resolveCardRef(args);
+    if(!ref)return{error:'Karte nicht gefunden'};
+    const onConflict=args.onConflict==='overwrite-ref'?'overwrite-ref':'drop-inline';
+    const res=_cardChecklistLinkRef(ref.boardId,ref.cardId,args.checklistId,onConflict);
+    if(res&&res.error)return{error:res.error};
+    return{linked:true,boardId:ref.boardId,cardId:ref.cardId,checklistId:args.checklistId,mode:res.mode};
+  },
+
+  'card.checklist.unlink_ref':async(args)=>{
+    const ref=_resolveCardRef(args);
+    if(!ref)return{error:'Karte nicht gefunden'};
+    const res=_cardChecklistUnlinkRef(ref.boardId,ref.cardId);
+    if(res&&res.error)return{error:res.error};
+    return{unlinked:true,boardId:ref.boardId,cardId:ref.cardId};
   },
 
   'checklist.item.move':async(args)=>{
