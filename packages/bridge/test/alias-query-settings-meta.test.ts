@@ -80,9 +80,7 @@ describe('settings schemas', () => {
     ).toBe(true);
   });
   it('settings.set ohne value lehnt ab', () => {
-    expect(
-      get(settingsTools, 'settings.set').schema.safeParse({ key: 'x' }).success,
-    ).toBe(false);
+    expect(get(settingsTools, 'settings.set').schema.safeParse({ key: 'x' }).success).toBe(false);
   });
 });
 

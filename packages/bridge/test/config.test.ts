@@ -1,12 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 describe('loadConfig', () => {
   const origEnv = { ...process.env };
-
-  beforeEach(() => {
-    // Reset module cache so loadConfig re-reads env
-    delete require.cache;
-  });
 
   afterEach(() => {
     process.env = { ...origEnv };
@@ -14,9 +9,7 @@ describe('loadConfig', () => {
 
   it('wirft bei fehlendem BRIDGE_TOKEN', async () => {
     process.env.BRIDGE_TOKEN = '';
-    // Dynamic import to get fresh module
-    const { loadConfig } = await import('../src/config.js');
-    // loadConfig caches, so we need to test the schema directly
+    // loadConfig cached beim ersten Aufruf; wir testen das Schema direkt.
     const { z } = await import('zod');
     const schema = z.object({
       BRIDGE_TOKEN: z.string().min(16),

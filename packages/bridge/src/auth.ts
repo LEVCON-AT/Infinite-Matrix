@@ -17,7 +17,7 @@ export function registerAuth(app: FastifyInstance, config: Config): void {
       token = url.searchParams.get('token');
     } else {
       const auth = request.headers.authorization;
-      if (auth && auth.startsWith('Bearer ')) token = auth.slice(7);
+      if (auth?.startsWith('Bearer ')) token = auth.slice(7);
     }
 
     if (!token) {

@@ -64,8 +64,7 @@ export const matrixCrudTools: ToolDef[] = [
   },
   {
     name: 'row.delete',
-    description:
-      'Löscht eine Zeile inkl. aller Zelleninhalte aus einer Matrix. Mit Undo.',
+    description: 'Löscht eine Zeile inkl. aller Zelleninhalte aus einer Matrix. Mit Undo.',
     schema: rowDeleteSchema,
     jsonSchema: zodToJsonSchema(rowDeleteSchema),
   },
@@ -77,8 +76,7 @@ export const matrixCrudTools: ToolDef[] = [
   },
   {
     name: 'col.delete',
-    description:
-      'Löscht eine Spalte inkl. aller Zelleninhalte aus einer Matrix. Mit Undo.',
+    description: 'Löscht eine Spalte inkl. aller Zelleninhalte aus einer Matrix. Mit Undo.',
     schema: colDeleteSchema,
     jsonSchema: zodToJsonSchema(colDeleteSchema),
   },

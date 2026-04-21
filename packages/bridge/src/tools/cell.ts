@@ -14,13 +14,8 @@ const cellFeatureAddSchema = z.object({
   matrixRef: z.string().describe('Alias/ID der Matrix'),
   rowId: z.string().describe('Zeilen-ID'),
   colId: z.string().describe('Spalten-ID'),
-  feature: z
-    .enum(['matrix', 'board', 'info', 'checklists'])
-    .describe('Zu aktivierendes Feature'),
-  label: z
-    .string()
-    .optional()
-    .describe('Optionaler Name für die neu erzeugte Sub-Matrix/Board'),
+  feature: z.enum(['matrix', 'board', 'info', 'checklists']).describe('Zu aktivierendes Feature'),
+  label: z.string().optional().describe('Optionaler Name für die neu erzeugte Sub-Matrix/Board'),
 });
 
 // ─── cell.alias.set ────────────────────────────────────────────────
@@ -28,9 +23,7 @@ const cellAliasSetSchema = z.object({
   matrixRef: z.string().describe('Alias/ID der Matrix'),
   rowId: z.string().describe('Zeilen-ID'),
   colId: z.string().describe('Spalten-ID'),
-  alias: z
-    .string()
-    .describe('Alias (a-z, 0-9, max 16). Leer-String löscht den Alias.'),
+  alias: z.string().describe('Alias (a-z, 0-9, max 16). Leer-String löscht den Alias.'),
 });
 
 export const cellTools: ToolDef[] = [

@@ -28,9 +28,9 @@ describe('info.field.add schema', () => {
     expect(t.schema.safeParse({ boardRef: '^b', label: 'Status' }).success).toBe(true);
   });
   it('mit Wert', () => {
-    expect(
-      t.schema.safeParse({ boardRef: '^b', label: 'Owner', value: 'Enric' }).success,
-    ).toBe(true);
+    expect(t.schema.safeParse({ boardRef: '^b', label: 'Owner', value: 'Enric' }).success).toBe(
+      true,
+    );
   });
   it('leeres Label lehnt ab', () => {
     expect(t.schema.safeParse({ boardRef: '^b', label: '' }).success).toBe(false);
@@ -40,14 +40,12 @@ describe('info.field.add schema', () => {
 describe('info.field.update schema', () => {
   const t = getTool('info.field.update');
   it('value-only', () => {
-    expect(
-      t.schema.safeParse({ boardRef: '^b', fieldId: 'n7', value: 'Neu' }).success,
-    ).toBe(true);
+    expect(t.schema.safeParse({ boardRef: '^b', fieldId: 'n7', value: 'Neu' }).success).toBe(true);
   });
   it('label-only', () => {
-    expect(
-      t.schema.safeParse({ boardRef: '^b', fieldId: 'n7', label: 'Umbenannt' }).success,
-    ).toBe(true);
+    expect(t.schema.safeParse({ boardRef: '^b', fieldId: 'n7', label: 'Umbenannt' }).success).toBe(
+      true,
+    );
   });
   it('weder value noch label (Handler-Error)', () => {
     expect(t.schema.safeParse({ boardRef: '^b', fieldId: 'n7' }).success).toBe(true);

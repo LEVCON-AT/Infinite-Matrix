@@ -13,7 +13,10 @@ const checklistItemAddSchema = z.object({
   boardRef: z.string().describe('Alias/ID des Boards'),
   checklistId: z.string().describe('Checklisten-ID'),
   text: z.string().min(1).describe('Item-Text'),
-  afterItemId: z.string().optional().describe('ID des Items, nach dem eingefügt wird (Default: ans Ende)'),
+  afterItemId: z
+    .string()
+    .optional()
+    .describe('ID des Items, nach dem eingefügt wird (Default: ans Ende)'),
   level: z.number().int().min(0).max(2).optional().describe('Einrückungs-Level 0-2 (Default: 0)'),
 });
 
@@ -36,15 +39,32 @@ const checklistItemSetLevelSchema = z.object({
 const checklistPasteSchema = z.object({
   boardRef: z.string().describe('Alias/ID des Boards'),
   checklistId: z.string().describe('Checklisten-ID'),
-  text: z.string().min(1).describe('Zu parsender Text. Erkennt Bullets (-, *, •, "1.") und Einrückung (2 Spaces oder Tab)'),
-  afterItemId: z.string().optional().describe('ID des Items, nach dem eingefügt wird (Default: ans Ende)'),
-  baseLevel: z.number().int().min(0).max(2).optional().describe('Basis-Level für alle eingefügten Items 0-2 (Default: 0)'),
+  text: z
+    .string()
+    .min(1)
+    .describe(
+      'Zu parsender Text. Erkennt Bullets (-, *, •, "1.") und Einrückung (2 Spaces oder Tab)',
+    ),
+  afterItemId: z
+    .string()
+    .optional()
+    .describe('ID des Items, nach dem eingefügt wird (Default: ans Ende)'),
+  baseLevel: z
+    .number()
+    .int()
+    .min(0)
+    .max(2)
+    .optional()
+    .describe('Basis-Level für alle eingefügten Items 0-2 (Default: 0)'),
 });
 
 // ─── checklist.clone (V2.2) ────────────────────────────────────────
 const checklistCloneSchema = z.object({
   sourceRef: z.string().describe('Alias/ID des Quell-Boards'),
-  targetRef: z.string().optional().describe('Alias/ID des Ziel-Boards (Default: aktuelles Board im Stack)'),
+  targetRef: z
+    .string()
+    .optional()
+    .describe('Alias/ID des Ziel-Boards (Default: aktuelles Board im Stack)'),
 });
 
 // ─── checklist.item.move (V2.2) ────────────────────────────────────
@@ -53,25 +73,48 @@ const checklistItemMoveSchema = z.object({
   fromChecklistId: z.string().describe('Quell-Checklisten-ID'),
   toChecklistId: z.string().describe('Ziel-Checklisten-ID'),
   itemId: z.string().describe('Item-ID (Nachkommen werden mitverschoben)'),
-  afterItemId: z.string().optional().describe('ID des Ziel-Items, nach dem eingefügt wird (Default: ans Ende)'),
+  afterItemId: z
+    .string()
+    .optional()
+    .describe('ID des Ziel-Items, nach dem eingefügt wird (Default: ans Ende)'),
 });
 
 // ─── checklist.set_recur / set_close_mode (V2.3) ───────────────────
-const recurShape = z.object({
-  type: z.enum(['none','daily','weekly','monthly','yearly']).describe('Wiederholungstyp'),
-  every: z.number().int().min(1).max(365).optional().describe('Intervall (alle N Einheiten)'),
-  weekdays: z.array(z.number().int().min(0).max(6)).optional().describe('Wochentage (0=Mo..6=So)'),
-  weekday: z.number().int().min(0).max(6).optional().describe('Einzel-Wochentag (legacy / monatlich)'),
-  weekdayOrd: z.number().int().min(-1).max(4).optional().describe('Ordinalzahl (1..4, -1=letzter)'),
-  monthType: z.enum(['day','weekday']).optional().describe('monatlich per Tag-im-Monat oder Wochentag'),
-  day: z.number().int().min(1).max(31).optional().describe('Tag im Monat'),
-  yearMonth: z.number().int().min(0).max(11).optional().describe('Monat (0=Januar..11=Dezember)'),
-  yearDay: z.number().int().min(1).max(31).optional().describe('Tag im Monat für jährlich'),
-  startDate: z.string().optional().describe('ISO-Datum YYYY-MM-DD, Beginn der Serie'),
-  endType: z.enum(['none','date','count']).optional(),
-  endDate: z.string().optional().describe('ISO-Datum YYYY-MM-DD'),
-  endCount: z.number().int().min(1).max(999).optional(),
-}).describe('Recur-Struktur analog card.recur');
+const recurShape = z
+  .object({
+    type: z.enum(['none', 'daily', 'weekly', 'monthly', 'yearly']).describe('Wiederholungstyp'),
+    every: z.number().int().min(1).max(365).optional().describe('Intervall (alle N Einheiten)'),
+    weekdays: z
+      .array(z.number().int().min(0).max(6))
+      .optional()
+      .describe('Wochentage (0=Mo..6=So)'),
+    weekday: z
+      .number()
+      .int()
+      .min(0)
+      .max(6)
+      .optional()
+      .describe('Einzel-Wochentag (legacy / monatlich)'),
+    weekdayOrd: z
+      .number()
+      .int()
+      .min(-1)
+      .max(4)
+      .optional()
+      .describe('Ordinalzahl (1..4, -1=letzter)'),
+    monthType: z
+      .enum(['day', 'weekday'])
+      .optional()
+      .describe('monatlich per Tag-im-Monat oder Wochentag'),
+    day: z.number().int().min(1).max(31).optional().describe('Tag im Monat'),
+    yearMonth: z.number().int().min(0).max(11).optional().describe('Monat (0=Januar..11=Dezember)'),
+    yearDay: z.number().int().min(1).max(31).optional().describe('Tag im Monat für jährlich'),
+    startDate: z.string().optional().describe('ISO-Datum YYYY-MM-DD, Beginn der Serie'),
+    endType: z.enum(['none', 'date', 'count']).optional(),
+    endDate: z.string().optional().describe('ISO-Datum YYYY-MM-DD'),
+    endCount: z.number().int().min(1).max(999).optional(),
+  })
+  .describe('Recur-Struktur analog card.recur');
 
 const checklistSetRecurSchema = z.object({
   boardRef: z.string().describe('Alias/ID des Boards'),
@@ -82,7 +125,7 @@ const checklistSetRecurSchema = z.object({
 const checklistSetCloseModeSchema = z.object({
   boardRef: z.string().describe('Alias/ID des Boards'),
   checklistId: z.string().describe('Checklisten-ID'),
-  mode: z.enum(['manual','auto-prompt','auto-silent']).describe('Abschluss-Verhalten'),
+  mode: z.enum(['manual', 'auto-prompt', 'auto-silent']).describe('Abschluss-Verhalten'),
 });
 
 // ─── checklist.close / history (V2.3b) ─────────────────────────────
@@ -94,28 +137,41 @@ const checklistCloseSchema = z.object({
 const checklistHistoryListSchema = z.object({
   boardRef: z.string().describe('Alias/ID des Boards'),
   checklistId: z.string().describe('Checklisten-ID'),
-  limit: z.number().int().min(1).max(200).optional().describe('Max. Anzahl Einträge (neueste zuerst)'),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(200)
+    .optional()
+    .describe('Max. Anzahl Einträge (neueste zuerst)'),
 });
 
 const checklistHistoryDeleteSchema = z.object({
   boardRef: z.string().describe('Alias/ID des Boards'),
   checklistId: z.string().describe('Checklisten-ID'),
-  entryIndex: z.number().int().min(0).describe('Index im History-Array (chronologisch, 0 = ältester)'),
+  entryIndex: z
+    .number()
+    .int()
+    .min(0)
+    .describe('Index im History-Array (chronologisch, 0 = ältester)'),
 });
 
 // ─── checklist.set_action (V2.3c) ──────────────────────────────────
 const actionOnCloseSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('toast') }).describe('Nur Toast (Standard)'),
-  z.object({ type: z.literal('jump'), targetAlias: z.string().min(1).describe('Alias ohne führendes ^') }),
+  z.object({
+    type: z.literal('jump'),
+    targetAlias: z.string().min(1).describe('Alias ohne führendes ^'),
+  }),
   z.object({
     type: z.literal('webhook'),
     url: z.string().describe('HTTP/HTTPS-URL'),
-    delivery: z.enum(['fetch','smtp']).optional().describe('SMTP ist V2+; aktuell nur fetch'),
+    delivery: z.enum(['fetch', 'smtp']).optional().describe('SMTP ist V2+; aktuell nur fetch'),
   }),
   z.object({
     type: z.literal('mail'),
     linkId: z.string().describe('ID eines Mail-Links im selben Board'),
-    delivery: z.enum(['mailto','smtp']).optional().describe('SMTP ist V2+; aktuell nur mailto'),
+    delivery: z.enum(['mailto', 'smtp']).optional().describe('SMTP ist V2+; aktuell nur mailto'),
   }),
 ]);
 
@@ -132,7 +188,11 @@ const checklistToCardSchema = z.object({
   targetBoardRef: z.string().describe('Alias/ID des Ziel-Boards'),
   colId: z.string().optional().describe('Spalten-ID im Ziel-Board (Default: erste Spalte)'),
   name: z.string().optional().describe('Name der neuen Karte (Default: Checklisten-Label)'),
-  mode: z.enum(['ref','del','keep']).describe('ref: bidirektionale Live-Referenz; del: Karte erhält Kopie, Quelle gelöscht; keep: Karte erhält Kopie, Quelle bleibt (+ sourceClId).'),
+  mode: z
+    .enum(['ref', 'del', 'keep'])
+    .describe(
+      'ref: bidirektionale Live-Referenz; del: Karte erhält Kopie, Quelle gelöscht; keep: Karte erhält Kopie, Quelle bleibt (+ sourceClId).',
+    ),
 });
 
 const cardChecklistLinkRefSchema = z.object({
@@ -140,7 +200,12 @@ const cardChecklistLinkRefSchema = z.object({
   cardId: z.string().optional().describe('Karten-ID (mit boardRef)'),
   cardRef: z.string().optional().describe('Karten-Alias (alternativ zu boardRef+cardId)'),
   checklistId: z.string().describe('ID der Standalone-Checkliste im Owner-Board der Karte'),
-  onConflict: z.enum(['drop-inline','overwrite-ref']).optional().describe('Bei Konflikt (inline+ziel beides mit Items): drop-inline = Inline verwerfen; overwrite-ref = Ziel mit Inline überschreiben (Default: drop-inline)'),
+  onConflict: z
+    .enum(['drop-inline', 'overwrite-ref'])
+    .optional()
+    .describe(
+      'Bei Konflikt (inline+ziel beides mit Items): drop-inline = Inline verwerfen; overwrite-ref = Ziel mit Inline überschreiben (Default: drop-inline)',
+    ),
 });
 
 const cardChecklistUnlinkRefSchema = z.object({
@@ -170,49 +235,57 @@ export const checklistTools: ToolDef[] = [
   },
   {
     name: 'checklist.item.set_level',
-    description: 'Setzt den Einrückungs-Level eines Items (0-2). Nachkommen werden mit-verschoben; lehnt ab, wenn Level-Sprung oder Grenzen verletzt werden.',
+    description:
+      'Setzt den Einrückungs-Level eines Items (0-2). Nachkommen werden mit-verschoben; lehnt ab, wenn Level-Sprung oder Grenzen verletzt werden.',
     schema: checklistItemSetLevelSchema,
     jsonSchema: zodToJsonSchema(checklistItemSetLevelSchema),
   },
   {
     name: 'checklist.paste',
-    description: 'Fügt Items aus einem Text-Block in eine Checkliste ein. Parser erkennt Bullets und Einrückung (2 Spaces/Tab pro Level, max. 2). baseLevel offset ist optional.',
+    description:
+      'Fügt Items aus einem Text-Block in eine Checkliste ein. Parser erkennt Bullets und Einrückung (2 Spaces/Tab pro Level, max. 2). baseLevel offset ist optional.',
     schema: checklistPasteSchema,
     jsonSchema: zodToJsonSchema(checklistPasteSchema),
   },
   {
     name: 'checklist.clone',
-    description: 'Klont alle Checklisten eines Quell-Boards in ein Ziel-Board (oder aktuelles Board). Labels bekommen "(Kopie)"-Suffix, Items behalten Levels, done wird zurückgesetzt.',
+    description:
+      'Klont alle Checklisten eines Quell-Boards in ein Ziel-Board (oder aktuelles Board). Labels bekommen "(Kopie)"-Suffix, Items behalten Levels, done wird zurückgesetzt.',
     schema: checklistCloneSchema,
     jsonSchema: zodToJsonSchema(checklistCloneSchema),
   },
   {
     name: 'checklist.item.move',
-    description: 'Verschiebt ein Item (mit allen Nachkommen) zwischen zwei Checklisten im selben Board. Level wird bei Cross-List-Move auf 0 normalisiert.',
+    description:
+      'Verschiebt ein Item (mit allen Nachkommen) zwischen zwei Checklisten im selben Board. Level wird bei Cross-List-Move auf 0 normalisiert.',
     schema: checklistItemMoveSchema,
     jsonSchema: zodToJsonSchema(checklistItemMoveSchema),
   },
   {
     name: 'checklist.set_recur',
-    description: 'Setzt das Wiederholungs-Muster einer Checkliste. Struktur analog card.recur (type, every, weekdays, startDate, endType, …).',
+    description:
+      'Setzt das Wiederholungs-Muster einer Checkliste. Struktur analog card.recur (type, every, weekdays, startDate, endType, …).',
     schema: checklistSetRecurSchema,
     jsonSchema: zodToJsonSchema(checklistSetRecurSchema),
   },
   {
     name: 'checklist.set_close_mode',
-    description: 'Setzt das Abschluss-Verhalten einer Checkliste: manual | auto-prompt | auto-silent.',
+    description:
+      'Setzt das Abschluss-Verhalten einer Checkliste: manual | auto-prompt | auto-silent.',
     schema: checklistSetCloseModeSchema,
     jsonSchema: zodToJsonSchema(checklistSetCloseModeSchema),
   },
   {
     name: 'checklist.close',
-    description: 'Schließt eine Checkliste manuell ab. Snapshot wandert in history[], bei recur wird done auf alle Items zurückgesetzt.',
+    description:
+      'Schließt eine Checkliste manuell ab. Snapshot wandert in history[], bei recur wird done auf alle Items zurückgesetzt.',
     schema: checklistCloseSchema,
     jsonSchema: zodToJsonSchema(checklistCloseSchema),
   },
   {
     name: 'checklist.history.list',
-    description: 'Listet History-Einträge einer Checkliste (neueste zuerst). Returns: {total, entries:[{idx, closedAt, items[]}]}.',
+    description:
+      'Listet History-Einträge einer Checkliste (neueste zuerst). Returns: {total, entries:[{idx, closedAt, items[]}]}.',
     schema: checklistHistoryListSchema,
     jsonSchema: zodToJsonSchema(checklistHistoryListSchema),
   },
@@ -224,25 +297,29 @@ export const checklistTools: ToolDef[] = [
   },
   {
     name: 'checklist.set_action',
-    description: 'Setzt die Aktion bei Abschluss einer Checkliste: toast (Default), jump (Sprung zu Alias), webhook (POST an URL), mail (Mail-Vorlage des Boards). SMTP ist V2+.',
+    description:
+      'Setzt die Aktion bei Abschluss einer Checkliste: toast (Default), jump (Sprung zu Alias), webhook (POST an URL), mail (Mail-Vorlage des Boards). SMTP ist V2+.',
     schema: checklistSetActionSchema,
     jsonSchema: zodToJsonSchema(checklistSetActionSchema),
   },
   {
     name: 'checklist.to_card',
-    description: 'Verwandelt eine Checkliste in eine Kanban-Karte im Ziel-Board. Modi: ref (bidirektional live), del (Kopie + Quelle gelöscht), keep (Kopie + Rückverweis).',
+    description:
+      'Verwandelt eine Checkliste in eine Kanban-Karte im Ziel-Board. Modi: ref (bidirektional live), del (Kopie + Quelle gelöscht), keep (Kopie + Rückverweis).',
     schema: checklistToCardSchema,
     jsonSchema: zodToJsonSchema(checklistToCardSchema),
   },
   {
     name: 'card.checklist.link_ref',
-    description: 'Verknüpft die Checkliste einer Karte als Referenz mit einer Standalone-Checkliste im Owner-Board. Ersetzt eine vorhandene Inline-Checkliste (onConflict steuert Konflikt-Handhabung).',
+    description:
+      'Verknüpft die Checkliste einer Karte als Referenz mit einer Standalone-Checkliste im Owner-Board. Ersetzt eine vorhandene Inline-Checkliste (onConflict steuert Konflikt-Handhabung).',
     schema: cardChecklistLinkRefSchema,
     jsonSchema: zodToJsonSchema(cardChecklistLinkRefSchema),
   },
   {
     name: 'card.checklist.unlink_ref',
-    description: 'Löst die checklistRef einer Karte: Karte erhält eine unabhängige Kopie der aktuell referenzierten Items zum Zeitpunkt der Aktion.',
+    description:
+      'Löst die checklistRef einer Karte: Karte erhält eine unabhängige Kopie der aktuell referenzierten Items zum Zeitpunkt der Aktion.',
     schema: cardChecklistUnlinkRefSchema,
     jsonSchema: zodToJsonSchema(cardChecklistUnlinkRefSchema),
   },

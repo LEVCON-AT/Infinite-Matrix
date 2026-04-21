@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { clientMsgSchema, bridgeMsgSchema } from '../src/protocol.js';
+import { describe, expect, it } from 'vitest';
+import { bridgeMsgSchema, clientMsgSchema } from '../src/protocol.js';
 
 describe('clientMsgSchema', () => {
   it('parsed gültiges hello', () => {
