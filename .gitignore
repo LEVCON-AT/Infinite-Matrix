@@ -52,4 +52,5 @@ logs/
 .pids/
 
 # misc
-Secrets_aus_claude_chat.txt.playwright-mcp/
+Secrets_aus_claude_chat.txt
+.playwright-mcp/
