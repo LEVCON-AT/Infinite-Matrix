@@ -233,6 +233,12 @@ body.vis-exportImport .edit-only[data-vis="exportImport"]{display:inline-flex !i
 .cl-recur-badge{font-size:10px;color:var(--text3);display:inline-flex;align-items:center;gap:3px;margin-left:6px;}
 .cl-settings-ico{font-size:12px;color:var(--text3);cursor:pointer;padding:2px;display:inline-flex;align-items:center;}
 .cl-settings-ico:hover{color:var(--text);}
+.cl-totask-ico{font-size:12px;color:var(--text3);cursor:pointer;padding:2px;display:inline-flex;align-items:center;}
+.cl-totask-ico:hover{color:var(--text);}
+.cl-mode-hint{font-size:12px;color:var(--text3);padding:4px 0 8px;line-height:1.35;}
+.cl-ref-chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--text2);background:var(--chip-bg,rgba(120,140,200,.12));padding:2px 8px;border-radius:10px;margin-bottom:6px;}
+.cl-ref-chip a{color:var(--blue);cursor:pointer;text-decoration:none;}
+.cl-ref-chip a:hover{text-decoration:underline;}
 .cl-settings-modal label{display:block;margin-top:8px;margin-bottom:4px;font-size:11px;color:var(--text3);font-weight:500;}
 .cl-settings-modal input[type="number"],.cl-settings-modal input[type="date"],.cl-settings-modal select{width:100%;margin-bottom:4px;padding:6px 8px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:12px;outline:none;}
 .cl-settings-modal input:focus-visible,.cl-settings-modal select:focus-visible{border-color:var(--blue);}
@@ -5084,6 +5090,7 @@ function renderChecklists(node){
         ${cl.recur&&cl.recur.type!=='none'?`<span class="cl-recur-badge" title="${esc(recurLabel(cl.recur))}">${ICO.recur(ICO_SIZE.XS)} ${esc(recurLabel(cl.recur,true))}</span>`:''}
         <span tabindex="0" role="button" title="Alle abchecken (Shift+R)" class="cl-reset ml4" onclick="resetCl('${node.id}','${cl.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();resetCl('${node.id}','${cl.id}');}">↺</span>
         ${editMode?`<span class="cl-settings-ico" tabindex="0" role="button" title="Einstellungen (Wiederholung, Abschluss)" onclick="_clOpenSettings('${node.id}','${cl.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();_clOpenSettings('${node.id}','${cl.id}');}">${ICO.gear(ICO_SIZE.SM)}</span>`:''}
+        ${editMode?`<span class="cl-totask-ico" tabindex="0" role="button" title="In Karte verwandeln" onclick="_clOpenTransformModal('${node.id}','${cl.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();_clOpenTransformModal('${node.id}','${cl.id}');}">${ICO.transpose(ICO_SIZE.SM)}</span>`:''}
         ${editMode?`<span class="edel" tabindex="0" role="button" onclick="delChecklist('${node.id}','${cl.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();delChecklist('${node.id}','${cl.id}');}">${ICO.close(ICO_SIZE.XS)}</span>`:''}
       </div>
       <div class="cl-list" ${editMode?`ondragover="clDragOver(event)" ondrop="clDragDropList(event,'std','${node.id}','${cl.id}')"`:''}>`;
@@ -5706,6 +5713,155 @@ function _clCloseSettings(e){
   const overlay=document.querySelector('#mc .smodal-overlay');
   if(overlay){overlay.classList.add('closing');setTimeout(()=>{document.getElementById('mc').innerHTML='';_popFocusRestore();},SMODAL_EXIT_MS);}
   else{document.getElementById('mc').innerHTML='';_popFocusRestore();}
+}
+
+// ═══════════════════════════════════════════════════════
+// V2.4 Transform: Checkliste → Karte (ref/del/keep)
+// Dediziertes Overlay mit dynamischem Board→Spalten-Dropdown.
+// ═══════════════════════════════════════════════════════
+const CL_TRANSFORM_MODES=[
+  ['keep','Quelle belassen (Kopie)'],
+  ['ref','Referenz (synchron)'],
+  ['del','Quelle löschen (Kopie)']
+];
+let _clTransformCtx=null;
+// Liste aller Boards im System (fuer Ziel-Dropdown). Kein „Board-Alias nicht gesetzt"-Filter: User muss Board erkennen.
+function _clCollectBoards(){
+  return Object.entries(nodes)
+    .filter(([,n])=>n&&n.type==='board')
+    .map(([id,n])=>({id,label:n.label||'Board',alias:n.alias||''}));
+}
+function _clOpenTransformModal(boardId,clId){
+  const cl=_clFindCl(boardId,clId);
+  if(!cl)return;
+  const boards=_clCollectBoards();
+  if(!boards.length){showToast('Keine Boards vorhanden.',{type:'warning'});return;}
+  // Default-Ziel: aktuelles Board (das die Checkliste enthaelt).
+  const defBoard=boards.find(b=>b.id===boardId)||boards[0];
+  const defCols=nodes[defBoard.id].data.kbCols||[];
+  _pushFocusRestore();_pushModal(_clCloseTransform);
+  _clTransformCtx={
+    boardId,clId,
+    targetBoardId:defBoard.id,
+    colId:defCols[0]?defCols[0].id:'',
+    name:cl.label||'Karte',
+    mode:'keep'
+  };
+  _clRenderTransform();
+}
+function _clRenderTransform(){
+  if(!_clTransformCtx)return;
+  const ctx=_clTransformCtx;
+  const cl=_clFindCl(ctx.boardId,ctx.clId);
+  if(!cl)return _clCloseTransform();
+  const boards=_clCollectBoards();
+  const tgt=nodes[ctx.targetBoardId];
+  const cols=(tgt&&tgt.data.kbCols)||[];
+  // Falls gewaehlte Spalte nicht mehr existiert (Board-Wechsel) → erste Spalte.
+  if(cols.length&&!cols.find(c=>c.id===ctx.colId))ctx.colId=cols[0].id;
+  let h=`<div class="smodal-overlay" onclick="_clCloseTransform(event)"><div class="smodal cl-transform-modal" onclick="event.stopPropagation()">
+    <h3>In Karte verwandeln</h3>
+    <div class="smodal-crumb"><span>${esc(cl.label)}</span></div>
+    <label>Ziel-Board</label>
+    <select onchange="_clSetTransformField('targetBoardId',this.value)">
+      ${boards.map(b=>`<option value="${b.id}"${ctx.targetBoardId===b.id?' selected':''}>${esc(b.label)}${b.alias?' ^'+esc(b.alias):''}</option>`).join('')}
+    </select>`;
+  if(!cols.length){
+    h+=`<div class="cl-paste-empty">Ziel-Board hat keine Spalten. Zuerst Spalte anlegen.</div>`;
+  }else{
+    h+=`<label>Ziel-Spalte</label>
+    <select onchange="_clSetTransformField('colId',this.value)">
+      ${cols.map(c=>`<option value="${c.id}"${ctx.colId===c.id?' selected':''}>${esc(c.label||'Spalte')}</option>`).join('')}
+    </select>`;
+  }
+  h+=`<label>Kartenname</label>
+    <input type="text" value="${esc(ctx.name)}" onchange="_clSetTransformField('name',this.value)" placeholder="Karten-Titel"/>
+    <label>Modus</label>
+    <select onchange="_clSetTransformField('mode',this.value)">
+      ${CL_TRANSFORM_MODES.map(([v,l])=>`<option value="${v}"${ctx.mode===v?' selected':''}>${l}</option>`).join('')}
+    </select>
+    <div class="cl-mode-hint">${_clTransformModeHint(ctx.mode)}</div>
+    <div class="smodal-actions">
+      <button class="btn-c" onclick="_clCloseTransform()">Abbrechen</button>
+      <button class="btn-p"${cols.length?'':' disabled'} onclick="_clCommitTransform()">Umwandeln</button>
+    </div>
+  </div></div>`;
+  document.getElementById('mc').innerHTML=h;
+}
+function _clTransformModeHint(mode){
+  if(mode==='ref')return 'Karte zeigt dieselbe Checkliste; Aenderungen spiegeln sich bidirektional. Keine Kopie.';
+  if(mode==='del')return 'Karte erhaelt unabhaengige Kopie; Standalone-Checkliste wird entfernt. Rueckgaengig via Undo.';
+  return 'Karte erhaelt unabhaengige Kopie; Standalone-Checkliste bleibt. Rueckverweis auf Quelle.';
+}
+function _clSetTransformField(f,v){
+  if(!_clTransformCtx)return;
+  _clTransformCtx[f]=v;
+  if(f==='targetBoardId'){
+    const cols=nodes[v]&&nodes[v].data.kbCols||[];
+    _clTransformCtx.colId=cols[0]?cols[0].id:'';
+  }
+  _clRenderTransform();
+}
+function _clCommitTransform(){
+  if(!_clTransformCtx)return;
+  const ctx=_clTransformCtx;
+  const res=_transformChecklistToCard(ctx.boardId,ctx.clId,ctx.targetBoardId,ctx.colId,ctx.name,ctx.mode);
+  if(res&&res.error){showToast(res.error,{type:'error'});return;}
+  _clCloseTransform();
+}
+function _clCloseTransform(e){
+  if(e&&e.target&&e.target.classList&&!e.target.classList.contains('smodal-overlay')&&e.type==='click')return;
+  _clTransformCtx=null;
+  _popModal(_clCloseTransform);
+  const overlay=document.querySelector('#mc .smodal-overlay');
+  if(overlay){overlay.classList.add('closing');setTimeout(()=>{document.getElementById('mc').innerHTML='';_popFocusRestore();},SMODAL_EXIT_MS);}
+  else{document.getElementById('mc').innerHTML='';_popFocusRestore();}
+}
+// Mutations-Helper: Checkliste → Karte. Mode: 'ref' | 'del' | 'keep'.
+function _transformChecklistToCard(boardId,clId,targetBoardId,colId,name,mode){
+  const srcBoard=nodes[boardId];
+  if(!srcBoard||srcBoard.type!=='board')return{error:'Quell-Board nicht gefunden.'};
+  const cl=(srcBoard.data.checklists||[]).find(c=>c.id===clId);
+  if(!cl)return{error:'Checkliste nicht gefunden.'};
+  const tgt=nodes[targetBoardId];
+  if(!tgt||tgt.type!=='board')return{error:'Ziel-Board nicht gefunden.'};
+  const cols=tgt.data.kbCols||[];
+  if(!cols.length)return{error:'Ziel-Board hat keine Spalten.'};
+  const targetCol=cols.find(c=>c.id===colId)||cols[0];
+  const cardName=String(name||cl.label||'Karte').trim()||'Karte';
+  if(!['keep','ref','del'].includes(mode))return{error:'Unbekannter Modus: '+mode};
+  pushUndo('Checkliste in Karte umgewandelt');
+  const card={
+    id:uid(),
+    colId:targetCol.id,
+    name:cardName,
+    note:'',
+    tags:[],who:[],
+    deadline:'',
+    recur:{type:'none'},
+    priority:0,
+    done:false,
+    doneDate:'',
+    doneOccurrences:[]
+  };
+  const deepItems=()=>cl.items.map(it=>({id:uid(),text:String(it.text||''),done:!!it.done,level:Math.max(0,Math.min(CL_MAX_LEVEL,it.level|0))}));
+  if(mode==='ref'){
+    card.checklistRef=cl.id;
+  }else if(mode==='del'){
+    card.checklist=deepItems();
+    card.sourceLabel=cl.label||'';
+    srcBoard.data.checklists=srcBoard.data.checklists.filter(c=>c.id!==cl.id);
+  }else{
+    card.checklist=deepItems();
+    card.sourceClId=cl.id;
+  }
+  if(!Array.isArray(tgt.data.kbCards))tgt.data.kbCards=[];
+  tgt.data.kbCards.push(card);
+  if(mode==='del')rebuildAliasIndex();
+  save();render();
+  showToast(`„${esc(cardName)}" in „${esc(tgt.label||'Board')}" angelegt.`,{type:'success'});
+  showUndoToast('Checkliste in Karte umgewandelt');
+  return{ok:true,cardId:card.id,boardId:targetBoardId};
 }
 
 // ═══════════════════════════════════════════════════════
