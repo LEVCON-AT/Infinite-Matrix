@@ -50,9 +50,20 @@ jobs:
         working-directory: packages/bridge
         run: echo "sha=$(sha256sum dist/index.js | cut -d' ' -f1 | head -c 12)" >> "$GITHUB_OUTPUT"
 
-      - name: Package artifact (pnpm deploy = standalone, keine Workspace-Symlinks)
+      - name: Package artifact (pnpm deploy mit flachem node_modules-Layout)
+        env:
+          # Erzwingt flaches node_modules (npm-Stil) statt pnpm-isolated/symlink.
+          # Ohne das hoistet pnpm deploy transitive Deps des MCP-SDK (@hono/node-server,
+          # zod-to-json-schema, …) nicht zuverlaessig auf Top-Level → ESM-Resolver
+          # findet sie beim Start nicht.
+          NPM_CONFIG_NODE_LINKER: hoisted
         run: |
           pnpm deploy --filter @infinite-matrix/bridge --prod artifact/bridge
+          echo "=== Top-Level node_modules im Artifact ==="
+          ls artifact/bridge/node_modules/ | head -20
+          echo "=== Wichtige Transitiven ==="
+          ls artifact/bridge/node_modules/@hono 2>&1 || echo "@hono FEHLT"
+          ls artifact/bridge/node_modules/zod-to-json-schema 2>&1 || echo "zod-to-json-schema FEHLT"
           mkdir -p artifact/client
           cp client/matrix_tool_beta.html artifact/client/
 
