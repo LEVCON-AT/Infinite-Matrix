@@ -83,8 +83,8 @@ fi
 # ─── 5. DB zuerst starten ─────────────────────────────────────
 if ask "Stack starten? (db zuerst, dann Rest wenn db healthy)"; then
   cd "$SUPABASE_DIR"
-  info "Starte Vector + DB…"
-  docker compose up -d vector db
+  info "Starte DB…"
+  docker compose up -d db
   # Auf healthy warten
   info "Warte auf db health (max 60 s)…"
   for i in {1..30}; do

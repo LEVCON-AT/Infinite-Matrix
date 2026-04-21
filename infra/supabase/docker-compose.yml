@@ -26,9 +26,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-    depends_on:
-      vector:
-        condition: service_healthy
     ports:
       - "127.0.0.1:54322:5432" # psql-Debug-Zugriff via SSH-Tunnel
     environment:
@@ -205,27 +202,6 @@ services:
       resources:
         limits:
           memory: 200M
-
-  # ═══════════════════════════════════════════════════════════════
-  # Vector (Log-Collector — benoetigt von Postgres-Image)
-  # ═══════════════════════════════════════════════════════════════
-  vector:
-    image: timberio/vector:0.28.1-alpine
-    container_name: matrix-supabase-vector
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9001/health"]
-      timeout: 5s
-      interval: 15s
-      retries: 3
-    volumes:
-      - ./volumes/logs/vector.yml:/etc/vector/vector.yml:ro
-      - ${DOCKER_SOCKET_LOCATION:-/var/run/docker.sock}:/var/run/docker.sock:ro
-    command: ["--config", "/etc/vector/vector.yml"]
-    deploy:
-      resources:
-        limits:
-          memory: 100M
 
   # ═══════════════════════════════════════════════════════════════
   # Studio (Admin-UI, optional — nur via profile=admin starten)
