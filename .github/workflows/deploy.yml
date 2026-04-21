@@ -26,8 +26,8 @@ jobs:
       bridge-sha: ${{ steps.hash.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
+      # pnpm-Version aus package.json "packageManager"-Feld (pnpm@9.15.9).
       - uses: pnpm/action-setup@v4
-        with: { version: 9 }
       - uses: actions/setup-node@v4
         with:
           node-version: 22
