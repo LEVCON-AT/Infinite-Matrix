@@ -470,6 +470,67 @@ button[type='submit']:hover:not(:disabled) {
   outline-offset: var(--focus-offset);
 }
 
+/* ── Alias-Quicknav (Ctrl+K Modal) ────────────────────────────── */
+.alias-quicknav-scrim {
+  align-items: flex-start;
+  padding-top: 15vh;
+}
+
+.alias-quicknav-card {
+  max-width: 480px;
+  padding: var(--space-md) var(--space-lg) var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.alias-quicknav-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  border-bottom: 0.5px solid var(--border);
+  padding: var(--space-xs) 0;
+}
+
+.alias-quicknav-prefix {
+  font-size: 20px;
+  color: var(--blue);
+  font-weight: 600;
+  line-height: 1;
+  user-select: none;
+}
+
+.alias-quicknav-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 18px;
+  padding: 4px 0;
+  outline: none;
+  font-family: inherit;
+}
+
+.alias-quicknav-input::placeholder {
+  color: var(--text3);
+}
+
+.alias-quicknav-error {
+  margin: 0;
+  color: var(--red);
+  background: var(--redbg);
+  font-size: 12px;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--rs);
+}
+
+.alias-quicknav-hint {
+  margin: 0;
+  color: var(--text3);
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 /* Sidebar-Tree */
 .ws-actions {
   padding: 0 var(--space-xs);

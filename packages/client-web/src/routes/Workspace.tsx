@@ -26,6 +26,7 @@ import MatrixView from '../components/MatrixView';
 import BoardView from '../components/BoardView';
 import CellChecklistsPage from '../components/CellChecklistsPage';
 import CellInfoPage from '../components/CellInfoPage';
+import AliasQuicknav from '../components/AliasQuicknav';
 import ImportDialog from '../components/ImportDialog';
 
 const Workspace: Component = () => {
@@ -52,6 +53,7 @@ const Workspace: Component = () => {
 
   const [workspaces] = createResource(() => fetchMyWorkspaces());
   const [showImport, setShowImport] = createSignal(false);
+  const [showQuicknav, setShowQuicknav] = createSignal(false);
 
   // Default-Workspace auswaehlen, wenn URL keinen fuehrt.
   createEffect(() => {
@@ -166,6 +168,21 @@ const Workspace: Component = () => {
     onCleanup(() => document.removeEventListener('keydown', onKey));
   });
 
+  // Quicknav: Ctrl+K / Cmd+K oeffnet das Alias-Modal. Greift nicht,
+  // wenn der User gerade in einem Input/Textarea tippt — dann schluckt
+  // das OS-Handler (Safari Address-Bar) bzw. ein anderes Element.
+  onMount(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+      if (e.key !== 'k' && e.key !== 'K') return;
+      if (!params.workspaceId) return;
+      e.preventDefault();
+      setShowQuicknav(true);
+    };
+    document.addEventListener('keydown', onKey);
+    onCleanup(() => document.removeEventListener('keydown', onKey));
+  });
+
   async function onImported(rootNodeId: string) {
     // Tree neu laden, damit der Import im Sidebar sichtbar wird,
     // dann zur neuen Root-Node navigieren.
@@ -215,6 +232,13 @@ const Workspace: Component = () => {
           workspaceId={params.workspaceId as string}
           onClose={() => setShowImport(false)}
           onImported={onImported}
+        />
+      </Show>
+
+      <Show when={showQuicknav() && params.workspaceId}>
+        <AliasQuicknav
+          workspaceId={params.workspaceId as string}
+          onClose={() => setShowQuicknav(false)}
         />
       </Show>
 
