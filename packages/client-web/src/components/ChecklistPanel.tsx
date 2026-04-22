@@ -1,0 +1,242 @@
+// Rendert eine einzelne Checkliste inkl. Items-CRUD.
+// Shell-Aenderungen (Rename/Alias/Del/CloseMode) sind Edit-gated —
+// Checkliste ist ein struktureller Container am Board, wie Spalten.
+// Item-Aenderungen (Add/Toggle/Rename/Del/Level) sind immer verfuegbar —
+// Items sind Inhalt, wie Karten-Felder.
+
+import { For, Show, createSignal, type Component } from 'solid-js';
+import type { ChecklistItemRow, ChecklistRow } from '../lib/types';
+import { useEditMode } from '../lib/edit-mode';
+import {
+  addChecklistItem,
+  delChecklist,
+  delChecklistItem,
+  renameChecklist,
+  renameChecklistItem,
+  setChecklistAlias,
+  setChecklistItemLevel,
+  toggleChecklistItemDone,
+} from '../lib/mutations';
+import { showToast } from '../lib/toasts';
+import { translateDbError } from '../lib/errors';
+import { flashError } from '../lib/flash';
+
+type Props = {
+  checklist: ChecklistRow;
+  items: ChecklistItemRow[]; // bereits nach position sortiert
+  workspaceId: string;
+  onChanged: () => void;
+};
+
+const ChecklistPanel: Component<Props> = (p) => {
+  const editMode = useEditMode();
+  const [busy, setBusy] = createSignal(false);
+  let aliasInputRef: HTMLInputElement | undefined;
+
+  async function wrap<T>(fn: () => Promise<T>, successMsg?: string) {
+    if (busy()) return;
+    setBusy(true);
+    try {
+      await fn();
+      if (successMsg) showToast(successMsg, 'success');
+      p.onChanged();
+    } catch (err) {
+      showToast(translateDbError(err), 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onRename(val: string) {
+    const trimmed = val.trim();
+    if (trimmed === p.checklist.label) return;
+    await wrap(() => renameChecklist(p.checklist.id, trimmed));
+  }
+
+  async function onAliasBlur(val: string) {
+    const t = val.trim();
+    const next = t === '' ? null : t;
+    if (next === (p.checklist.alias ?? null)) return;
+    if (busy()) return;
+    setBusy(true);
+    try {
+      await setChecklistAlias(p.checklist.id, next);
+      p.onChanged();
+    } catch (err) {
+      showToast(translateDbError(err), 'error');
+      flashError(aliasInputRef);
+      if (aliasInputRef) aliasInputRef.value = p.checklist.alias ?? '';
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDel() {
+    const count = p.items.length;
+    if (count > 0) {
+      if (
+        !window.confirm(
+          `Checkliste "${p.checklist.label || '(Liste)'}" loeschen? Enthaelt ${count} Punkt(e).`,
+        )
+      ) {
+        return;
+      }
+    }
+    await wrap(() => delChecklist(p.checklist.id), 'Checkliste geloescht.');
+  }
+
+  async function onAddItem() {
+    await wrap(() =>
+      addChecklistItem({
+        workspaceId: p.workspaceId,
+        checklistId: p.checklist.id,
+      }),
+    );
+  }
+
+  async function onToggleItem(item: ChecklistItemRow, done: boolean) {
+    if (done === item.done) return;
+    await wrap(() => toggleChecklistItemDone(item.id, done));
+  }
+
+  async function onRenameItem(item: ChecklistItemRow, text: string) {
+    if (text === item.text) return;
+    await wrap(() => renameChecklistItem(item.id, text));
+  }
+
+  async function onDelItem(item: ChecklistItemRow) {
+    await wrap(() => delChecklistItem(item.id));
+  }
+
+  async function onLevelItem(item: ChecklistItemRow, dir: 1 | -1) {
+    const next = Math.max(0, Math.min(2, item.level + dir)) as 0 | 1 | 2;
+    if (next === item.level) return;
+    await wrap(() => setChecklistItemLevel(item.id, next));
+  }
+
+  const done = () => p.items.filter((i) => i.done).length;
+
+  return (
+    <li class="cl-item">
+      <header class="cl-head" classList={{ 'mx-editable': editMode() }}>
+        <Show
+          when={editMode()}
+          fallback={
+            <>
+              <span class="cl-label">{p.checklist.label || '(Liste)'}</span>
+              <Show when={p.checklist.alias}>
+                <span class="cl-alias">^{p.checklist.alias}</span>
+              </Show>
+            </>
+          }
+        >
+          <input
+            class="mx-head-input cl-head-input"
+            type="text"
+            value={p.checklist.label}
+            placeholder="(Liste)"
+            onBlur={(e) => onRename(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                (e.currentTarget as HTMLInputElement).blur();
+              }
+            }}
+          />
+          <input
+            ref={aliasInputRef}
+            class="cl-alias-input"
+            type="text"
+            value={p.checklist.alias ?? ''}
+            placeholder="^alias"
+            onBlur={(e) => onAliasBlur(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                (e.currentTarget as HTMLInputElement).blur();
+              }
+            }}
+          />
+          <button
+            type="button"
+            class="mx-del-btn"
+            title="Checkliste loeschen"
+            aria-label="Checkliste loeschen"
+            onClick={onDel}
+            disabled={busy()}
+          >
+            ✕
+          </button>
+        </Show>
+        <span class="cl-progress">
+          {done()}/{p.items.length}
+        </span>
+        <Show when={p.checklist.recur}>
+          <span class="cl-recur" title="wiederkehrend">
+            ↻
+          </span>
+        </Show>
+      </header>
+
+      <ul class="cl-items">
+        <For each={p.items}>
+          {(it) => (
+            <li
+              class="cl-it"
+              classList={{ 'cl-it-done': it.done }}
+              style={{ '--cl-level': it.level }}
+            >
+              <input
+                type="checkbox"
+                class="cl-checkbox-input"
+                checked={it.done}
+                aria-label="Erledigt"
+                onChange={(e) => onToggleItem(it, e.currentTarget.checked)}
+              />
+              <input
+                class="cl-text-input"
+                type="text"
+                value={it.text}
+                placeholder="(Punkt)"
+                onBlur={(e) => onRenameItem(it, e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    (e.currentTarget as HTMLInputElement).blur();
+                  } else if (e.altKey && e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    void onLevelItem(it, 1);
+                  } else if (e.altKey && e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    void onLevelItem(it, -1);
+                  }
+                }}
+              />
+              <button
+                type="button"
+                class="cl-it-del"
+                title="Punkt loeschen"
+                aria-label="Punkt loeschen"
+                onClick={() => onDelItem(it)}
+                disabled={busy()}
+              >
+                ✕
+              </button>
+            </li>
+          )}
+        </For>
+      </ul>
+
+      <button
+        type="button"
+        class="cl-add-item-btn"
+        onClick={onAddItem}
+        disabled={busy()}
+      >
+        + Punkt
+      </button>
+    </li>
+  );
+};
+
+export default ChecklistPanel;

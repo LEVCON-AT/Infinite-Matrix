@@ -13,6 +13,7 @@ import type {
 import { useEditMode } from '../lib/edit-mode';
 import {
   addCard,
+  addChecklist,
   addKbCol,
   delCard,
   delKbCol,
@@ -23,6 +24,7 @@ import {
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import CardOverlay from './CardOverlay';
+import ChecklistPanel from './ChecklistPanel';
 
 type Props = {
   workspaceId: string;
@@ -156,6 +158,12 @@ const BoardView: Component<Props> = (p) => {
         workspaceId: p.workspaceId,
         toColId,
       }),
+    );
+  }
+
+  async function onAddChecklist() {
+    await wrap(() =>
+      addChecklist({ workspaceId: p.workspaceId, boardId: p.boardId }),
     );
   }
 
@@ -437,60 +445,46 @@ const BoardView: Component<Props> = (p) => {
             </div>
           </Show>
 
-          {/* Standalone-Checklisten */}
-          <Show when={(p.content!.checklists ?? []).length > 0}>
+          {/* Standalone-Checklisten. Section wird gerendert, sobald
+              Listen da sind ODER der Edit-Mode aktiv ist (damit der
+              "+ Checkliste"-Button erreichbar bleibt). */}
+          <Show
+            when={
+              (p.content!.checklists ?? []).length > 0 || editMode()
+            }
+          >
             <section class="board-checklists">
               <h3 class="board-section-title">Checklisten</h3>
-              <ul class="cl-list">
-                <For each={p.content!.checklists}>
-                  {(cl) => {
-                    const items = () =>
-                      p.content!.checklistItems.filter(
-                        (it) => it.checklist_id === cl.id,
+              <Show when={(p.content!.checklists ?? []).length > 0}>
+                <ul class="cl-list">
+                  <For each={p.content!.checklists}>
+                    {(cl) => {
+                      const items = () =>
+                        p.content!.checklistItems
+                          .filter((it) => it.checklist_id === cl.id)
+                          .sort((a, b) => a.position - b.position);
+                      return (
+                        <ChecklistPanel
+                          checklist={cl}
+                          items={items()}
+                          workspaceId={p.workspaceId}
+                          onChanged={() => p.onChanged?.()}
+                        />
                       );
-                    const done = () => items().filter((i) => i.done).length;
-                    return (
-                      <li class="cl-item">
-                        <header class="cl-head">
-                          <span class="cl-label">{cl.label || '(Liste)'}</span>
-                          <Show when={cl.alias}>
-                            <span class="cl-alias">^{cl.alias}</span>
-                          </Show>
-                          <span class="cl-progress">
-                            {done()}/{items().length}
-                          </span>
-                          <Show when={cl.recur}>
-                            <span class="cl-recur" title="wiederkehrend">
-                              ↻
-                            </span>
-                          </Show>
-                        </header>
-                        <Show
-                          when={items().length > 0}
-                          fallback={<p class="hint cl-empty">leer</p>}
-                        >
-                          <ul class="cl-items">
-                            <For each={items()}>
-                              {(it) => (
-                                <li
-                                  class="cl-it"
-                                  classList={{ 'cl-it-done': it.done }}
-                                  style={{ '--cl-level': it.level }}
-                                >
-                                  <span class="cl-checkbox" aria-hidden>
-                                    {it.done ? '☑' : '☐'}
-                                  </span>
-                                  <span class="cl-text">{it.text}</span>
-                                </li>
-                              )}
-                            </For>
-                          </ul>
-                        </Show>
-                      </li>
-                    );
-                  }}
-                </For>
-              </ul>
+                    }}
+                  </For>
+                </ul>
+              </Show>
+              <Show when={editMode()}>
+                <button
+                  type="button"
+                  class="btn-subtle cl-add-btn"
+                  onClick={onAddChecklist}
+                  disabled={busy()}
+                >
+                  + Checkliste
+                </button>
+              </Show>
             </section>
           </Show>
 

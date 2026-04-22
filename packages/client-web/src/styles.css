@@ -925,6 +925,123 @@ button[type='button']:disabled {
   color: var(--fg);
 }
 
+/* ─── Checklist Edit / Item-Input ─── */
+.cl-head.mx-editable {
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.cl-head-input {
+  flex: 1;
+  min-width: 120px;
+}
+
+.cl-alias-input {
+  width: 100px;
+  padding: 0.25rem 0.4rem;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.cl-alias-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+.cl-checkbox-input {
+  margin: 0;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.cl-text-input {
+  flex: 1;
+  padding: 0.2rem 0.35rem;
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+
+.cl-text-input:hover {
+  border-color: var(--border);
+}
+
+.cl-text-input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--bg);
+}
+
+.cl-it-done .cl-text-input {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.cl-it-del {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  opacity: 0;
+  transition: opacity 180ms cubic-bezier(0.4, 0, 0.2, 1),
+    background 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cl-it:hover .cl-it-del,
+.cl-it-del:focus-visible {
+  opacity: 1;
+}
+
+.cl-it-del:hover:not(:disabled) {
+  background: var(--bg);
+  color: var(--err);
+  border-color: var(--border);
+}
+
+.cl-add-item-btn {
+  align-self: flex-start;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.78rem;
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 180ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 180ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cl-add-item-btn:hover:not(:disabled) {
+  background: var(--bg);
+  color: var(--fg);
+  border-color: var(--accent);
+}
+
+.cl-add-item-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cl-add-btn {
+  margin-top: 0.5rem;
+}
+
 /* ─── Card-Overlay ─── */
 .overlay-scrim {
   position: fixed;
