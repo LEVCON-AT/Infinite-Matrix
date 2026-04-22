@@ -603,6 +603,65 @@ button[type='button']:disabled {
   margin: 0;
 }
 
+/* Edit-Mode: Spalten-Head mit Input + Color-Picker + Del */
+.kb-col-head.mx-editable {
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.kb-col-color-picker {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.kb-col-color-picker::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.kb-col-color-picker::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
+}
+
+/* "+ Spalte"-Platzhalter am Ende der Board-Cols-Zeile */
+.kb-col-add {
+  border: 1px dashed var(--border);
+  border-top: 1px dashed var(--border);
+  background: transparent;
+  align-items: center;
+  justify-content: center;
+  min-height: 100px;
+}
+
+.kb-col-add-btn {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 1rem;
+  border-radius: 6px;
+  transition: background 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.kb-col-add-btn:hover:not(:disabled) {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.kb-col-add-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .kb-cards {
   list-style: none;
   margin: 0;

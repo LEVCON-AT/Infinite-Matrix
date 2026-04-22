@@ -1,15 +1,31 @@
-import { For, Show, createMemo, createSignal, type Component } from 'solid-js';
+import {
+  For,
+  Show,
+  createMemo,
+  createSignal,
+  type Component,
+} from 'solid-js';
 import type {
   BoardContent,
   KbCardRow,
   KbColRow,
 } from '../lib/types';
+import { useEditMode } from '../lib/edit-mode';
+import {
+  addKbCol,
+  delKbCol,
+  renameKbCol,
+  setKbColColor,
+} from '../lib/mutations';
+import { showToast } from '../lib/toasts';
+import { translateDbError } from '../lib/errors';
 import CardOverlay from './CardOverlay';
 
 type Props = {
   workspaceId: string;
   boardId: string;
   content: BoardContent | undefined;
+  onChanged?: () => void;
 };
 
 // Liefert N/M fuer eine Karte — inline-Checkliste oder resolved via ref.
@@ -36,14 +52,15 @@ function checklistProgress(
 
 function fmtDate(iso: string | null): string | null {
   if (!iso) return null;
-  // ISO date-only (YYYY-MM-DD); keep locale-agnostic but readable.
   const [y, m, d] = iso.split('-');
   if (!y || !m || !d) return iso;
   return `${d}.${m}.${y}`;
 }
 
 const BoardView: Component<Props> = (p) => {
+  const editMode = useEditMode();
   const [selectedCardId, setSelectedCardId] = createSignal<string | null>(null);
+  const [busy, setBusy] = createSignal(false);
 
   const visibleCols = createMemo<KbColRow[]>(() => p.content?.kbCols ?? []);
   const activeCards = createMemo<KbCardRow[]>(() =>
@@ -66,11 +83,52 @@ const BoardView: Component<Props> = (p) => {
     return (p.content?.kbCards ?? []).find((c) => c.id === id);
   });
 
+  async function wrap<T>(fn: () => Promise<T>, successMsg?: string) {
+    if (busy()) return;
+    setBusy(true);
+    try {
+      await fn();
+      if (successMsg) showToast(successMsg, 'success');
+      p.onChanged?.();
+    } catch (err) {
+      showToast(translateDbError(err), 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onAddCol() {
+    await wrap(() =>
+      addKbCol({ workspaceId: p.workspaceId, boardId: p.boardId }),
+    );
+  }
+
+  async function onRenameCol(col: KbColRow, newLabel: string) {
+    if (newLabel === col.label) return;
+    await wrap(() => renameKbCol(col.id, newLabel));
+  }
+
+  async function onColorCol(col: KbColRow, color: string | null) {
+    if ((color ?? null) === (col.color ?? null)) return;
+    await wrap(() => setKbColColor(col.id, color));
+  }
+
+  async function onDelCol(col: KbColRow) {
+    const count = (cardsByCol().get(col.id) ?? []).length;
+    if (count > 0) {
+      if (
+        !window.confirm(
+          `Spalte "${col.label || '(leer)'}" loeschen? Enthaelt ${count} Karte(n) — werden mitgeloescht.`,
+        )
+      ) {
+        return;
+      }
+    }
+    await wrap(() => delKbCol(col.id), 'Spalte geloescht.');
+  }
+
   return (
-    <Show
-      when={p.content}
-      fallback={<p class="hint">Lade Board…</p>}
-    >
+    <Show when={p.content} fallback={<p class="hint">Lade Board…</p>}>
       {(_) => (
         <div class="board">
           {/* Links-Leiste */}
@@ -105,8 +163,22 @@ const BoardView: Component<Props> = (p) => {
             fallback={
               <div class="board-empty">
                 <p class="hint">
-                  Board ohne Spalten — Kanban-Konfiguration kommt ab 0e.
+                  Board ohne Spalten.
+                  <Show when={editMode()}>
+                    {' '}
+                    + Spalte, um zu starten.
+                  </Show>
                 </p>
+                <Show when={editMode()}>
+                  <button
+                    type="button"
+                    class="btn-subtle"
+                    onClick={onAddCol}
+                    disabled={busy()}
+                  >
+                    + Spalte
+                  </button>
+                </Show>
               </div>
             }
           >
@@ -120,11 +192,64 @@ const BoardView: Component<Props> = (p) => {
                       style={col.color ? { '--kb-col-color': col.color } : undefined}
                       data-has-color={col.color ? 'yes' : 'no'}
                     >
-                      <header class="kb-col-head">
-                        <span class="kb-col-label">
-                          {col.label || '(Spalte)'}
-                        </span>
-                        <span class="kb-col-count">{list().length}</span>
+                      <header class="kb-col-head" classList={{ 'mx-editable': editMode() }}>
+                        <Show
+                          when={editMode()}
+                          fallback={
+                            <span class="kb-col-label">
+                              {col.label || '(Spalte)'}
+                            </span>
+                          }
+                        >
+                          <input
+                            class="mx-head-input"
+                            type="text"
+                            value={col.label}
+                            placeholder="(Spalte)"
+                            onBlur={(e) =>
+                              onRenameCol(col, e.currentTarget.value.trim())
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                (e.currentTarget as HTMLInputElement).blur();
+                              }
+                            }}
+                          />
+                          <input
+                            type="color"
+                            class="kb-col-color-picker"
+                            value={col.color ?? '#888888'}
+                            title="Spalten-Farbe"
+                            onChange={(e) =>
+                              onColorCol(col, e.currentTarget.value)
+                            }
+                          />
+                          <Show when={col.color}>
+                            <button
+                              type="button"
+                              class="mx-del-btn"
+                              title="Farbe entfernen"
+                              aria-label="Farbe entfernen"
+                              onClick={() => onColorCol(col, null)}
+                            >
+                              ○
+                            </button>
+                          </Show>
+                          <button
+                            type="button"
+                            class="mx-del-btn"
+                            title="Spalte loeschen"
+                            aria-label="Spalte loeschen"
+                            onClick={() => onDelCol(col)}
+                            disabled={busy()}
+                          >
+                            ✕
+                          </button>
+                        </Show>
+                        <Show when={!editMode()}>
+                          <span class="kb-col-count">{list().length}</span>
+                        </Show>
                       </header>
 
                       <Show
@@ -214,6 +339,21 @@ const BoardView: Component<Props> = (p) => {
                   );
                 }}
               </For>
+
+              {/* Letzte Spalte im Edit-Mode: "+ Spalte" */}
+              <Show when={editMode()}>
+                <div class="kb-col kb-col-add">
+                  <button
+                    type="button"
+                    class="kb-col-add-btn"
+                    onClick={onAddCol}
+                    disabled={busy()}
+                    title="Spalte hinzufuegen"
+                  >
+                    + Spalte
+                  </button>
+                </div>
+              </Show>
             </div>
           </Show>
 

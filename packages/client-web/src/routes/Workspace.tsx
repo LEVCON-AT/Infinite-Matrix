@@ -77,7 +77,7 @@ const Workspace: Component = () => {
   );
 
   // Board-Content fuer die aktuelle Node (nur wenn Typ=board).
-  const [boardContent] = createResource(
+  const [boardContent, { refetch: refetchBoard }] = createResource(
     () => {
       const n = currentNode();
       if (!n || n.type !== 'board') return null;
@@ -218,6 +218,9 @@ const Workspace: Component = () => {
                   workspaceId={currentNode()!.workspace_id}
                   boardId={currentNode()!.id}
                   content={boardContent()}
+                  onChanged={() => {
+                    void refetchBoard();
+                  }}
                 />
               </Show>
             </section>
