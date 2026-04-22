@@ -158,25 +158,58 @@ const MatrixView: Component<Props> = (p) => {
     setOverlayTarget({ row, col, cell });
   }
 
-  // ─── Hotkeys 1/2 auf fokussierter Zelle: direkt zum Sub-Feature ──
-  // Wenn die fokussierte Zelle eine Sub-Matrix/Board hat, springt der
-  // entsprechende Hotkey (aus CELL_FEATURES) dorthin. Flag-Features
-  // (info/checklists) haben keine Navigation; nichts passiert.
+  // ─── Keyboard auf fokussierter Zelle ─────────────────────────
+  // 1/2       : Sub-Matrix / Sub-Board oeffnen (structural Hotkey)
+  // Arrows    : Focus auf Nachbar-Zelle verschieben (clamp am Rand)
+  // Greift nur wenn Fokus auf einer .mx-cell und ohne Modifier.
   onMount(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
       const ae = document.activeElement as HTMLElement | null;
       if (!ae || !ae.classList.contains('mx-cell')) return;
 
-      const def = findFeatureByHotkey(e.key);
-      if (!def || def.kind !== 'structural') return;
-
       const rowId = ae.getAttribute('data-row-id');
       const colId = ae.getAttribute('data-col-id');
       if (!rowId || !colId) return;
+
+      // Pfeiltasten — Nachbar-Zelle fokussieren.
+      if (
+        e.key === 'ArrowUp' ||
+        e.key === 'ArrowDown' ||
+        e.key === 'ArrowLeft' ||
+        e.key === 'ArrowRight'
+      ) {
+        const rows = p.content?.rows ?? [];
+        const cols = p.content?.cols ?? [];
+        const ri = rows.findIndex((r) => r.id === rowId);
+        const ci = cols.findIndex((c) => c.id === colId);
+        if (ri < 0 || ci < 0) return;
+
+        let nr = ri;
+        let nc = ci;
+        if (e.key === 'ArrowUp') nr = Math.max(0, ri - 1);
+        else if (e.key === 'ArrowDown') nr = Math.min(rows.length - 1, ri + 1);
+        else if (e.key === 'ArrowLeft') nc = Math.max(0, ci - 1);
+        else if (e.key === 'ArrowRight') nc = Math.min(cols.length - 1, ci + 1);
+        if (nr === ri && nc === ci) return;
+
+        e.preventDefault();
+        const nrow = rows[nr];
+        const ncol = cols[nc];
+        if (!nrow || !ncol) return;
+        const el = document.querySelector(
+          `.mx-cell[data-row-id="${nrow.id}"][data-col-id="${ncol.id}"]`,
+        ) as HTMLElement | null;
+        el?.focus({ preventScroll: false });
+        return;
+      }
+
+      // 1/2 — Sub-Feature direkt oeffnen.
+      const def = findFeatureByHotkey(e.key);
+      if (!def || def.kind !== 'structural') return;
+
       const cell = cellMap().get(`${rowId}::${colId}`);
       if (!cell) return;
-
       const targetNode =
         def.key === 'matrix' ? cell.child_matrix_id : cell.board_id;
       if (!targetNode) return;
@@ -376,24 +409,25 @@ const MatrixView: Component<Props> = (p) => {
                         //   - Chip-Click:
                         //       Matrix/Board → navigiere zum Sub-Node
                         //       Info/Checklisten → Panel (WIP, siehe onChipClick)
-                        const isClickable = () => editMode();
+                        // tabIndex=0 immer, damit der User per Tab/Arrow durch
+                        // die Matrix navigieren kann (auch im View-Mode).
                         return (
                           <div
                             class="mx-cell"
                             classList={{
                               'mx-cell-empty': !cell(),
-                              'mx-cell-clickable': isClickable(),
+                              'mx-cell-clickable': editMode(),
                               'mx-cell-editable': editMode(),
                             }}
-                            role={isClickable() ? 'button' : undefined}
-                            tabIndex={isClickable() ? 0 : -1}
+                            role={editMode() ? 'button' : 'gridcell'}
+                            tabIndex={0}
                             data-row-id={row.id}
                             data-col-id={col.id}
                             onClick={() => {
                               if (editMode()) onCellEdit(row, col, cell());
                             }}
                             onKeyDown={(e) => {
-                              if (!isClickable()) return;
+                              if (!editMode()) return;
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
                                 onCellEdit(row, col, cell());
