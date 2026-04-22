@@ -117,10 +117,13 @@ export type KbCardRow = {
 
 export type ChecklistCloseMode = 'manual' | 'auto-prompt' | 'auto-silent';
 
+// XOR-Invariante (DB-enforced): genau eines von board_id | cell_id ist gesetzt.
+// Client-Code, der eine neue Checkliste anlegt, setzt entsprechend nur einen Parent.
 export type ChecklistRow = {
   id: string;
   workspace_id: string;
-  board_id: string;
+  board_id: string | null;
+  cell_id: string | null;
   label: string;
   position: number;
   recur: Record<string, unknown> | null;
