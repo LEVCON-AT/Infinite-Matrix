@@ -24,6 +24,7 @@ import {
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
+import { ALIAS_TABLE_LABEL, findAliasConflict } from '../lib/alias-check';
 
 type Props = {
   card: KbCardRow;
@@ -79,6 +80,18 @@ const CardOverlay: Component<Props> = (p) => {
     await wrap(() => renameCard(p.card.id, trimmed));
   }
 
+  function rejectAlias(msg: string) {
+    showToast(msg, 'error');
+    flashError(aliasInputRef);
+    // Nach Shake-Animation Fokus zurueck + Text markieren, damit das
+    // naechste Tippen direkt ueberschreibt. Eingabe NICHT revertieren —
+    // User soll korrigieren koennen. (Pattern aus CellOverlay.)
+    window.setTimeout(() => {
+      aliasInputRef?.focus();
+      aliasInputRef?.select();
+    }, 420);
+  }
+
   async function onAlias(newAlias: string) {
     const t = newAlias.trim();
     const next = t === '' ? null : t;
@@ -86,14 +99,28 @@ const CardOverlay: Component<Props> = (p) => {
     if (busy()) return;
     setBusy(true);
     try {
+      // Preflight: Cross-Table-Alias-Check (Karten/Zellen/Matrizen/
+      // Checklisten/Links). Die DB hat nur pro-Tabelle Unique-Indizes —
+      // ohne diesen Check wuerde ein Kollisionsfall mit z.B. einer
+      // Zelle oder Checkliste stumm bleiben.
+      if (next) {
+        const conflict = await findAliasConflict({
+          workspaceId: p.card.workspace_id,
+          alias: next,
+          exclude: { table: 'kb_cards', id: p.card.id },
+        });
+        if (conflict) {
+          rejectAlias(
+            `Alias ist bereits bei einer ${ALIAS_TABLE_LABEL[conflict]} im Workspace vergeben.`,
+          );
+          return;
+        }
+      }
       await setCardAlias(p.card.id, next);
       p.onChanged?.();
     } catch (err) {
-      const msg = translateDbError(err);
-      showToast(msg, 'error');
-      flashError(aliasInputRef);
-      // Wert zuruecksetzen, damit der DB-Stand sichtbar bleibt.
-      if (aliasInputRef) aliasInputRef.value = p.card.alias ?? '';
+      // Falls die DB doch noch 23505 wirft (Race), selben Pfad gehen.
+      rejectAlias(translateDbError(err));
     } finally {
       setBusy(false);
     }
