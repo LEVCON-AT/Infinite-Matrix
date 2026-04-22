@@ -93,18 +93,10 @@ const Workspace: Component = () => {
   // ESC in Matrix/Board-View = eine Ebene hoch (zur Parent-Matrix).
   // Bubble-Phase — Modals (CellOverlay, ImportDialog) haengen in Capture
   // mit stopImmediatePropagation, schlucken ihr ESC vor uns weg.
+  // Greift konsequent auch in Inputs (ESC ist ESC — keine Input-Ausnahme).
   onMount(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      const t = e.target as HTMLElement | null;
-      if (
-        t &&
-        (t.tagName === 'INPUT' ||
-          t.tagName === 'TEXTAREA' ||
-          t.isContentEditable)
-      ) {
-        return;
-      }
       const n = currentNode();
       if (!n || !n.parent_cell_id) return;
       const parentCell = (cells() ?? []).find((c) => c.id === n.parent_cell_id);
