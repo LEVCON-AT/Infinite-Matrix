@@ -167,6 +167,48 @@ export async function fetchBoardContent(
   };
 }
 
+// ─── Node-Leer-Probe (fuer Confirm-vor-Delete) ────────────────────
+// Gibt true zurueck, wenn der Node weder strukturelle Kinder (rows/cols
+// bzw. kb_cols/kb_cards/checklists/links) hat. Ein leerer Sub-Node
+// kann ohne Rueckfrage geloescht werden — User hat nichts zu verlieren.
+export async function isNodeEmpty(
+  nodeId: string,
+  nodeType: 'matrix' | 'board',
+): Promise<boolean> {
+  if (nodeType === 'matrix') {
+    const [r, c] = await Promise.all([
+      supabase
+        .from('rows')
+        .select('id', { head: true, count: 'exact' })
+        .eq('matrix_id', nodeId),
+      supabase
+        .from('cols')
+        .select('id', { head: true, count: 'exact' })
+        .eq('matrix_id', nodeId),
+    ]);
+    return (r.count ?? 0) === 0 && (c.count ?? 0) === 0;
+  }
+  const [cards, cols, cls, links] = await Promise.all([
+    supabase
+      .from('kb_cards')
+      .select('id', { head: true, count: 'exact' })
+      .eq('board_id', nodeId),
+    supabase
+      .from('kb_cols')
+      .select('id', { head: true, count: 'exact' })
+      .eq('board_id', nodeId),
+    supabase
+      .from('checklists')
+      .select('id', { head: true, count: 'exact' })
+      .eq('board_id', nodeId),
+    supabase
+      .from('links')
+      .select('id', { head: true, count: 'exact' })
+      .eq('board_id', nodeId),
+  ]);
+  return [cards, cols, cls, links].every((res) => (res.count ?? 0) === 0);
+}
+
 // ─── Tree-Aufbau ─────────────────────────────────────────────────
 // Jede Node kann einen parent_cell_id haben (= die Zelle in der sie als
 // Sub-Feature lebt). Diese Zelle selbst gehoert zu einer anderen Matrix

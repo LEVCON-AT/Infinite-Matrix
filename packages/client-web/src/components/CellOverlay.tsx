@@ -18,8 +18,10 @@ import {
   insertCell,
   updateCell,
 } from '../lib/mutations';
+import { isNodeEmpty } from '../lib/queries';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
+import { flashError } from '../lib/flash';
 
 type Props = {
   workspaceId: string;
@@ -35,7 +37,8 @@ const CellOverlay: Component<Props> = (p) => {
   const navigate = useNavigate();
   const [current, setCurrent] = createSignal<CellRow | undefined>(p.cell);
   const [aliasDraft, setAliasDraft] = createSignal(p.cell?.alias ?? '');
-  const [busy, setBusy] = createSignal<string | null>(null); // welches Feature gerade arbeitet
+  const [busy, setBusy] = createSignal<string | null>(null);
+  let aliasInput: HTMLInputElement | undefined;
 
   // Zellen-Row-Helper: legt Row an falls noch nicht da, sonst UPDATE.
   async function ensureCell(patch: Partial<CellRow>): Promise<CellRow> {
@@ -109,15 +112,22 @@ const CellOverlay: Component<Props> = (p) => {
     const isOn = hasActive(def.key);
     const cur = current();
     if (isOn) {
-      // Off: Sub-Node loeschen (mit Confirm), Feature weg, FK auf null.
+      // Off: Sub-Node loeschen. Confirm NUR wenn Sub-Content hat —
+      // leerer Sub-Node wird direkt entfernt (kein Datenverlust).
       const nodeId =
         def.key === 'matrix' ? cur?.child_matrix_id : cur?.board_id;
-      const confirmMsg = nodeId
-        ? `Sub-${def.label} und alle Inhalte loeschen? Das kann nicht rueckgaengig gemacht werden.`
-        : `Feature "${def.label}" entfernen?`;
-      if (!window.confirm(confirmMsg)) return;
-
       if (nodeId) {
+        const nodeType = def.key === 'matrix' ? 'matrix' : 'board';
+        const empty = await isNodeEmpty(nodeId, nodeType);
+        if (!empty) {
+          if (
+            !window.confirm(
+              `Sub-${def.label} und alle Inhalte loeschen? Das kann nicht rueckgaengig gemacht werden.`,
+            )
+          ) {
+            return;
+          }
+        }
         await deleteNode(nodeId);
       }
       const nextFeatures = (cur?.features ?? []).filter((f) => f !== def.key);
@@ -174,6 +184,7 @@ const CellOverlay: Component<Props> = (p) => {
       p.onChanged();
     } catch (err) {
       showToast(translateDbError(err), 'error');
+      flashError(aliasInput);
       setAliasDraft(cur?.alias ?? '');
     } finally {
       setBusy(null);
@@ -233,8 +244,11 @@ const CellOverlay: Component<Props> = (p) => {
     }
   }
 
-  // ─── ESC / Global Hotkeys 1-9 ────────────────────────────────
+  // ─── ESC / Global Hotkeys 1-9 + Autofocus ────────────────────
   onMount(() => {
+    // Alias-Input sofort fokussieren — User kann ohne Klick tippen.
+    aliasInput?.focus();
+
     const onKey = (e: KeyboardEvent) => {
       // Nicht greifen, wenn User im Alias-Input / Textarea tippt.
       const t = e.target as HTMLElement | null;
@@ -300,9 +314,11 @@ const CellOverlay: Component<Props> = (p) => {
           <label class="cell-alias-label">
             Alias (optional)
             <input
+              ref={aliasInput}
               type="text"
               value={aliasDraft()}
               placeholder="z.B. ^heute"
+              autocomplete="off"
               onInput={(e) => setAliasDraft(e.currentTarget.value)}
               onBlur={onAliasBlur}
               onKeyDown={(e) => {
