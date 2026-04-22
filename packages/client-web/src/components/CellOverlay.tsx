@@ -399,12 +399,6 @@ const CellOverlay: Component<Props> = (p) => {
               ↗ Oeffnen (Enter)
             </button>
           </Show>
-          <Show when={navTargetCount() === 2}>
-            <p class="hint cell-ambig-hint">
-              Matrix und Board vorhanden — per Chip-Klick in der Zelle
-              waehlen.
-            </p>
-          </Show>
 
           <div class="cell-overlay-footer">
             <Show when={hasAnyContent()}>

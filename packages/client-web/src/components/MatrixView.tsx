@@ -1,8 +1,19 @@
-import { For, Show, createMemo, createSignal, type Component } from 'solid-js';
+import {
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  onMount,
+  type Component,
+} from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import type { CellFeature, CellRow, ColRow, MatrixContent, RowRow } from '../lib/types';
 import { useEditMode } from '../lib/edit-mode';
+import { findFeatureByHotkey } from '../lib/features';
 import { addCol, addRow, delCol, delRow, renameCol, renameRow } from '../lib/mutations';
+import { lastFocusCell, setLastFocusCell } from '../lib/navigation-focus';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import CellOverlay from './CellOverlay';
@@ -45,18 +56,29 @@ const MatrixView: Component<Props> = (p) => {
     return m;
   });
 
-  function onCellClick(cell: CellRow | undefined) {
+  // Fokus-Koordinate der Zelle fuer Back-Navigation merken, BEVOR navigiert
+  // wird. Nach ESC-zurueck fokussiert Matrix-View die Zelle wieder — User
+  // kann ohne weitere Klicks mit 1/2 in ein anderes Feature derselben Zelle.
+  function rememberCellFocus(rowId: string, colId: string) {
+    setLastFocusCell({ matrixId: p.matrixId, rowId, colId });
+  }
+
+  function onCellClick(cell: CellRow | undefined, row: RowRow, col: ColRow) {
     if (!cell) return;
     const targetNode = cell.child_matrix_id ?? cell.board_id;
     if (!targetNode) return;
+    rememberCellFocus(row.id, col.id);
     navigate(`/w/${p.workspaceId}/n/${targetNode}`);
   }
 
-  function onChipClick(e: MouseEvent, cell: CellRow | undefined, featKey: string) {
+  function onChipClick(
+    e: MouseEvent,
+    cell: CellRow | undefined,
+    featKey: string,
+    row: RowRow,
+    col: ColRow,
+  ) {
     if (!cell) return;
-    // Chips im Edit-Mode sollen NICHT das Cell-Overlay oeffnen, sondern
-    // direkt zum Ziel-Node navigieren (Alt-Client-Muster). stopPropagation
-    // verhindert den Cell-Click-Handler.
     const targetNode =
       featKey === 'matrix'
         ? cell.child_matrix_id
@@ -65,6 +87,7 @@ const MatrixView: Component<Props> = (p) => {
           : null;
     if (!targetNode) return;
     e.stopPropagation();
+    rememberCellFocus(row.id, col.id);
     navigate(`/w/${p.workspaceId}/n/${targetNode}`);
   }
 
@@ -121,8 +144,59 @@ const MatrixView: Component<Props> = (p) => {
   }
 
   function onCellEdit(row: RowRow, col: ColRow, cell: CellRow | undefined) {
+    rememberCellFocus(row.id, col.id);
     setOverlayTarget({ row, col, cell });
   }
+
+  // ─── Hotkeys 1/2 auf fokussierter Zelle: direkt zum Sub-Feature ──
+  // Wenn die fokussierte Zelle eine Sub-Matrix/Board hat, springt der
+  // entsprechende Hotkey (aus CELL_FEATURES) dorthin. Flag-Features
+  // (info/checklists) haben keine Navigation; nichts passiert.
+  onMount(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      const ae = document.activeElement as HTMLElement | null;
+      if (!ae || !ae.classList.contains('mx-cell')) return;
+
+      const def = findFeatureByHotkey(e.key);
+      if (!def || def.kind !== 'structural') return;
+
+      const rowId = ae.getAttribute('data-row-id');
+      const colId = ae.getAttribute('data-col-id');
+      if (!rowId || !colId) return;
+      const cell = cellMap().get(`${rowId}::${colId}`);
+      if (!cell) return;
+
+      const targetNode =
+        def.key === 'matrix' ? cell.child_matrix_id : cell.board_id;
+      if (!targetNode) return;
+
+      e.preventDefault();
+      rememberCellFocus(rowId, colId);
+      navigate(`/w/${p.workspaceId}/n/${targetNode}`);
+    };
+    document.addEventListener('keydown', onKey);
+    onCleanup(() => document.removeEventListener('keydown', onKey));
+  });
+
+  // ─── Focus-Restore nach Back-Navigation ─────────────────────────
+  // Nach Navigate -> Sub-Node -> ESC zurueck: wenn die Zelle im neuen
+  // Content existiert und matrixId passt, focus zurueck. queueMicrotask
+  // stellt sicher, dass das DOM gerendert ist.
+  createEffect(() => {
+    const target = lastFocusCell();
+    if (!target) return;
+    if (target.matrixId !== p.matrixId) return;
+    if (!p.content) return;
+    queueMicrotask(() => {
+      const el = document.querySelector(
+        `.mx-cell[data-row-id="${target.rowId}"][data-col-id="${target.colId}"]`,
+      ) as HTMLElement | null;
+      if (el && document.activeElement !== el) {
+        el.focus({ preventScroll: true });
+      }
+    });
+  });
 
   return (
     <div class="matrix-wrap">
@@ -289,16 +363,18 @@ const MatrixView: Component<Props> = (p) => {
                             }}
                             role={isClickable() ? 'button' : undefined}
                             tabIndex={isClickable() ? 0 : -1}
+                            data-row-id={row.id}
+                            data-col-id={col.id}
                             onClick={() => {
                               if (editMode()) onCellEdit(row, col, cell());
-                              else if (isReadClickable()) onCellClick(cell());
+                              else if (isReadClickable()) onCellClick(cell(), row, col);
                             }}
                             onKeyDown={(e) => {
                               if (!isClickable()) return;
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
                                 if (editMode()) onCellEdit(row, col, cell());
-                                else onCellClick(cell());
+                                else onCellClick(cell(), row, col);
                               }
                             }}
                           >
@@ -328,7 +404,9 @@ const MatrixView: Component<Props> = (p) => {
                                             ? `${FEATURE_LABEL[f]} oeffnen`
                                             : FEATURE_LABEL[f]
                                         }
-                                        onClick={(e) => onChipClick(e, cell(), f)}
+                                        onClick={(e) =>
+                                          onChipClick(e, cell(), f, row, col)
+                                        }
                                       >
                                         {FEATURE_ICON[f]}
                                       </span>
