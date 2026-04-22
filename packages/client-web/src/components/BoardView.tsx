@@ -12,8 +12,11 @@ import type {
 } from '../lib/types';
 import { useEditMode } from '../lib/edit-mode';
 import {
+  addCard,
   addKbCol,
+  delCard,
   delKbCol,
+  moveCard,
   renameKbCol,
   setKbColColor,
 } from '../lib/mutations';
@@ -125,6 +128,35 @@ const BoardView: Component<Props> = (p) => {
       }
     }
     await wrap(() => delKbCol(col.id), 'Spalte geloescht.');
+  }
+
+  async function onAddCard(col: KbColRow) {
+    await wrap(() =>
+      addCard({
+        workspaceId: p.workspaceId,
+        boardId: p.boardId,
+        colId: col.id,
+      }),
+    );
+  }
+
+  async function onDelCard(card: KbCardRow) {
+    if (!window.confirm(`Karte "${card.name || '(ohne Titel)'}" loeschen?`)) {
+      return;
+    }
+    await wrap(() => delCard(card.id), 'Karte geloescht.');
+  }
+
+  async function onMoveCard(card: KbCardRow, toColId: string) {
+    if (toColId === card.col_id) return;
+    await wrap(() =>
+      moveCard({
+        cardId: card.id,
+        boardId: p.boardId,
+        workspaceId: p.workspaceId,
+        toColId,
+      }),
+    );
   }
 
   return (
@@ -254,7 +286,14 @@ const BoardView: Component<Props> = (p) => {
 
                       <Show
                         when={list().length > 0}
-                        fallback={<p class="kb-col-empty hint">leer</p>}
+                        fallback={
+                          <Show
+                            when={editMode()}
+                            fallback={<p class="kb-col-empty hint">leer</p>}
+                          >
+                            <p class="kb-col-empty hint">leer</p>
+                          </Show>
+                        }
                       >
                         <ul class="kb-cards">
                           <For each={list()}>
@@ -329,11 +368,60 @@ const BoardView: Component<Props> = (p) => {
                                       </Show>
                                     </div>
                                   </Show>
+
+                                  <Show when={editMode()}>
+                                    <div
+                                      class="kb-card-edit-bar"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <select
+                                        class="kb-card-move"
+                                        value={card.col_id}
+                                        title="In andere Spalte verschieben"
+                                        onChange={(e) =>
+                                          onMoveCard(
+                                            card,
+                                            (e.currentTarget as HTMLSelectElement).value,
+                                          )
+                                        }
+                                      >
+                                        <For each={visibleCols()}>
+                                          {(opt) => (
+                                            <option value={opt.id}>
+                                              → {opt.label || '(Spalte)'}
+                                            </option>
+                                          )}
+                                        </For>
+                                      </select>
+                                      <button
+                                        type="button"
+                                        class="mx-del-btn"
+                                        title="Karte loeschen"
+                                        aria-label="Karte loeschen"
+                                        onClick={() => onDelCard(card)}
+                                        disabled={busy()}
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
+                                  </Show>
                                 </li>
                               );
                             }}
                           </For>
                         </ul>
+                      </Show>
+
+                      <Show when={editMode()}>
+                        <button
+                          type="button"
+                          class="kb-card-add-btn"
+                          onClick={() => onAddCard(col)}
+                          disabled={busy()}
+                          title="Karte hinzufuegen"
+                        >
+                          + Karte
+                        </button>
                       </Show>
                     </div>
                   );
