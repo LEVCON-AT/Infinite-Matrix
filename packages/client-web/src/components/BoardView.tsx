@@ -286,14 +286,7 @@ const BoardView: Component<Props> = (p) => {
 
                       <Show
                         when={list().length > 0}
-                        fallback={
-                          <Show
-                            when={editMode()}
-                            fallback={<p class="kb-col-empty hint">leer</p>}
-                          >
-                            <p class="kb-col-empty hint">leer</p>
-                          </Show>
-                        }
+                        fallback={<p class="kb-col-empty hint">leer</p>}
                       >
                         <ul class="kb-cards">
                           <For each={list()}>
@@ -369,42 +362,42 @@ const BoardView: Component<Props> = (p) => {
                                     </div>
                                   </Show>
 
-                                  <Show when={editMode()}>
-                                    <div
-                                      class="kb-card-edit-bar"
-                                      onClick={(e) => e.stopPropagation()}
+                                  {/* Karten-Aktionen (Move/Del) immer sichtbar —
+                                      Karten sind keine strukturellen Daten. */}
+                                  <div
+                                    class="kb-card-edit-bar"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <select
+                                      class="kb-card-move"
+                                      value={card.col_id}
+                                      title="In andere Spalte verschieben"
+                                      onChange={(e) =>
+                                        onMoveCard(
+                                          card,
+                                          (e.currentTarget as HTMLSelectElement).value,
+                                        )
+                                      }
                                     >
-                                      <select
-                                        class="kb-card-move"
-                                        value={card.col_id}
-                                        title="In andere Spalte verschieben"
-                                        onChange={(e) =>
-                                          onMoveCard(
-                                            card,
-                                            (e.currentTarget as HTMLSelectElement).value,
-                                          )
-                                        }
-                                      >
-                                        <For each={visibleCols()}>
-                                          {(opt) => (
-                                            <option value={opt.id}>
-                                              → {opt.label || '(Spalte)'}
-                                            </option>
-                                          )}
-                                        </For>
-                                      </select>
-                                      <button
-                                        type="button"
-                                        class="mx-del-btn"
-                                        title="Karte loeschen"
-                                        aria-label="Karte loeschen"
-                                        onClick={() => onDelCard(card)}
-                                        disabled={busy()}
-                                      >
-                                        ✕
-                                      </button>
-                                    </div>
-                                  </Show>
+                                      <For each={visibleCols()}>
+                                        {(opt) => (
+                                          <option value={opt.id}>
+                                            → {opt.label || '(Spalte)'}
+                                          </option>
+                                        )}
+                                      </For>
+                                    </select>
+                                    <button
+                                      type="button"
+                                      class="mx-del-btn"
+                                      title="Karte loeschen"
+                                      aria-label="Karte loeschen"
+                                      onClick={() => onDelCard(card)}
+                                      disabled={busy()}
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
                                 </li>
                               );
                             }}
@@ -412,17 +405,16 @@ const BoardView: Component<Props> = (p) => {
                         </ul>
                       </Show>
 
-                      <Show when={editMode()}>
-                        <button
-                          type="button"
-                          class="kb-card-add-btn"
-                          onClick={() => onAddCard(col)}
-                          disabled={busy()}
-                          title="Karte hinzufuegen"
-                        >
-                          + Karte
-                        </button>
-                      </Show>
+                      {/* "+ Karte" immer verfuegbar — Karten sind keine Struktur. */}
+                      <button
+                        type="button"
+                        class="kb-card-add-btn"
+                        onClick={() => onAddCard(col)}
+                        disabled={busy()}
+                        title="Karte hinzufuegen"
+                      >
+                        + Karte
+                      </button>
                     </div>
                   );
                 }}

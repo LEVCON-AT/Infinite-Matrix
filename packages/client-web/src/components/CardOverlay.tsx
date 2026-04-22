@@ -12,7 +12,6 @@ import type {
   InlineChecklistItem,
   KbCardRow,
 } from '../lib/types';
-import { useEditMode } from '../lib/edit-mode';
 import {
   delCard,
   renameCard,
@@ -24,6 +23,7 @@ import {
 } from '../lib/mutations';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
+import { flashError } from '../lib/flash';
 
 type Props = {
   card: KbCardRow;
@@ -38,16 +38,13 @@ type OverlayItem = {
   level: 0 | 1 | 2;
 };
 
-function fmtDate(iso: string | null): string | null {
-  if (!iso) return null;
-  const [y, m, d] = iso.split('-');
-  if (!y || !m || !d) return iso;
-  return `${d}.${m}.${y}`;
-}
-
+// Karten sind keine strukturellen Daten — Namens-, Note-, Deadline-,
+// Priority- und Done-Aenderungen sind immer moeglich, unabhaengig vom
+// globalen Edit-Mode. Der Edit-Mode gated nur strukturelle Board-Ops
+// (Spalten-CRUD, Card Add/Delete/Move in der BoardView).
 const CardOverlay: Component<Props> = (p) => {
-  const editMode = useEditMode();
   const [busy, setBusy] = createSignal(false);
+  let aliasInputRef: HTMLInputElement | undefined;
 
   // ESC schliesst; wir haengen den Handler in Capture, damit er
   // ueber globalen Back-Handlern greift (CLAUDE.md-Konvention).
@@ -86,7 +83,20 @@ const CardOverlay: Component<Props> = (p) => {
     const t = newAlias.trim();
     const next = t === '' ? null : t;
     if (next === (p.card.alias ?? null)) return;
-    await wrap(() => setCardAlias(p.card.id, next));
+    if (busy()) return;
+    setBusy(true);
+    try {
+      await setCardAlias(p.card.id, next);
+      p.onChanged?.();
+    } catch (err) {
+      const msg = translateDbError(err);
+      showToast(msg, 'error');
+      flashError(aliasInputRef);
+      // Wert zuruecksetzen, damit der DB-Stand sichtbar bleibt.
+      if (aliasInputRef) aliasInputRef.value = p.card.alias ?? '';
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function onNote(newNote: string) {
@@ -165,32 +175,24 @@ const CardOverlay: Component<Props> = (p) => {
       <div class="overlay-card" role="dialog" aria-modal="true">
         <header class="overlay-head">
           <div class="overlay-title">
-            <Show when={p.card.done && !editMode()}>
+            <Show when={p.card.done}>
               <span class="kb-done-mark" aria-hidden>
                 ✓
               </span>
             </Show>
-            <Show
-              when={editMode()}
-              fallback={<h2>{p.card.name || '(ohne Titel)'}</h2>}
-            >
-              <input
-                class="overlay-title-input"
-                type="text"
-                value={p.card.name}
-                placeholder="(ohne Titel)"
-                onBlur={(e) => onRename(e.currentTarget.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    (e.currentTarget as HTMLInputElement).blur();
-                  }
-                }}
-              />
-            </Show>
-            <Show when={!editMode() && p.card.alias}>
-              <span class="kb-card-alias">^{p.card.alias}</span>
-            </Show>
+            <input
+              class="overlay-title-input"
+              type="text"
+              value={p.card.name}
+              placeholder="(ohne Titel)"
+              onBlur={(e) => onRename(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  (e.currentTarget as HTMLInputElement).blur();
+                }
+              }}
+            />
           </div>
           <button
             type="button"
@@ -203,73 +205,69 @@ const CardOverlay: Component<Props> = (p) => {
         </header>
 
         <div class="overlay-body">
-          <Show when={editMode()}>
-            <section class="overlay-section overlay-edit-grid">
-              <label class="overlay-field">
-                <span class="overlay-field-label">Alias</span>
-                <input
-                  type="text"
-                  class="overlay-input"
-                  value={p.card.alias ?? ''}
-                  placeholder="(kein Alias)"
-                  onBlur={(e) => onAlias(e.currentTarget.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      (e.currentTarget as HTMLInputElement).blur();
-                    }
-                  }}
-                />
-              </label>
+          <section class="overlay-section overlay-edit-grid">
+            <label class="overlay-field">
+              <span class="overlay-field-label">Alias</span>
+              <input
+                ref={aliasInputRef}
+                type="text"
+                class="overlay-input"
+                value={p.card.alias ?? ''}
+                placeholder="(kein Alias)"
+                onBlur={(e) => onAlias(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    (e.currentTarget as HTMLInputElement).blur();
+                  }
+                }}
+              />
+            </label>
 
-              <label class="overlay-field">
-                <span class="overlay-field-label">Deadline</span>
-                <input
-                  type="date"
-                  class="overlay-input"
-                  value={p.card.deadline ?? ''}
-                  onChange={(e) => onDeadline(e.currentTarget.value)}
-                />
-              </label>
+            <label class="overlay-field">
+              <span class="overlay-field-label">Deadline</span>
+              <input
+                type="date"
+                class="overlay-input"
+                value={p.card.deadline ?? ''}
+                onChange={(e) => onDeadline(e.currentTarget.value)}
+              />
+            </label>
 
-              <label class="overlay-field">
-                <span class="overlay-field-label">Prioritaet</span>
-                <input
-                  type="number"
-                  class="overlay-input"
-                  value={p.card.priority ?? ''}
-                  placeholder="(keine)"
-                  min="0"
-                  max="9"
-                  onBlur={(e) => onPriority(e.currentTarget.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      (e.currentTarget as HTMLInputElement).blur();
-                    }
-                  }}
-                />
-              </label>
+            <label class="overlay-field">
+              <span class="overlay-field-label">Prioritaet</span>
+              <input
+                type="number"
+                class="overlay-input"
+                value={p.card.priority ?? ''}
+                placeholder="(keine)"
+                min="0"
+                max="9"
+                onBlur={(e) => onPriority(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    (e.currentTarget as HTMLInputElement).blur();
+                  }
+                }}
+              />
+            </label>
 
-              <label class="overlay-field overlay-field-done">
-                <input
-                  type="checkbox"
-                  checked={p.card.done}
-                  onChange={(e) => onToggleDone(e.currentTarget.checked)}
-                />
-                <span>Erledigt</span>
-              </label>
-            </section>
-          </Show>
+            <label class="overlay-field overlay-field-done">
+              <input
+                type="checkbox"
+                checked={p.card.done}
+                onChange={(e) => onToggleDone(e.currentTarget.checked)}
+              />
+              <span>Erledigt</span>
+            </label>
+          </section>
 
           <Show
             when={
-              !editMode() &&
-              ((p.card.tags?.length ?? 0) > 0 ||
-                (p.card.who?.length ?? 0) > 0 ||
-                p.card.deadline ||
-                p.card.priority != null ||
-                p.card.recur != null)
+              (p.card.tags?.length ?? 0) > 0 ||
+              (p.card.who?.length ?? 0) > 0 ||
+              p.card.recur != null
             }
           >
             <div class="overlay-meta">
@@ -279,12 +277,6 @@ const CardOverlay: Component<Props> = (p) => {
               <For each={p.card.who ?? []}>
                 {(w) => <span class="kb-who">@{w}</span>}
               </For>
-              <Show when={p.card.deadline}>
-                <span class="kb-deadline">⏱ {fmtDate(p.card.deadline)}</span>
-              </Show>
-              <Show when={p.card.priority != null}>
-                <span class="kb-prio">P{p.card.priority}</span>
-              </Show>
               <Show when={p.card.recur}>
                 <span class="kb-recur" title="wiederkehrend">
                   ↻
@@ -295,25 +287,13 @@ const CardOverlay: Component<Props> = (p) => {
 
           <section class="overlay-section">
             <h4>Notiz</h4>
-            <Show
-              when={editMode()}
-              fallback={
-                <Show
-                  when={p.card.note}
-                  fallback={<p class="hint">(keine Notiz)</p>}
-                >
-                  <p class="overlay-note">{p.card.note}</p>
-                </Show>
-              }
-            >
-              <textarea
-                class="overlay-textarea"
-                value={p.card.note}
-                placeholder="(keine Notiz)"
-                rows="4"
-                onBlur={(e) => onNote(e.currentTarget.value)}
-              />
-            </Show>
+            <textarea
+              class="overlay-textarea"
+              value={p.card.note}
+              placeholder="(keine Notiz)"
+              rows="4"
+              onBlur={(e) => onNote(e.currentTarget.value)}
+            />
           </section>
 
           <Show when={items().length > 0}>
@@ -358,18 +338,16 @@ const CardOverlay: Component<Props> = (p) => {
             </p>
           </Show>
 
-          <Show when={editMode()}>
-            <footer class="overlay-edit-footer">
-              <button
-                type="button"
-                class="btn-danger"
-                onClick={onDelete}
-                disabled={busy()}
-              >
-                Karte loeschen
-              </button>
-            </footer>
-          </Show>
+          <footer class="overlay-edit-footer">
+            <button
+              type="button"
+              class="btn-danger"
+              onClick={onDelete}
+              disabled={busy()}
+            >
+              Karte loeschen
+            </button>
+          </footer>
         </div>
       </div>
     </div>

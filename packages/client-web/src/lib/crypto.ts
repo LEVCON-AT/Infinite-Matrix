@@ -24,8 +24,11 @@ async function deriveKey(pw: string, salt: Uint8Array): Promise<CryptoKey> {
     false,
     ['deriveKey'],
   );
+  // TS 5.7: Uint8Array<ArrayBufferLike> erfuellt nicht BufferSource-Constraint
+  // (verlangt ArrayBufferView<ArrayBuffer>). Cast am Aufrufpunkt reicht,
+  // da salt zur Laufzeit ein echter Uint8Array<ArrayBuffer> ist.
   return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: HASH },
+    { name: 'PBKDF2', salt: salt as BufferSource, iterations: PBKDF2_ITERATIONS, hash: HASH },
     km,
     { name: 'AES-GCM', length: KEY_LEN },
     false,
