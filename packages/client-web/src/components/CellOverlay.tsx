@@ -287,24 +287,27 @@ const CellOverlay: Component<Props> = (p) => {
   const capturedRowId = p.row.id;
   const capturedColId = p.col.id;
 
-  // Alias-Input sofort fokussieren.
+  // Alias-Input sofort fokussieren + globaler Keyboard-Handler.
   onMount(() => {
     aliasInput?.focus();
+    document.addEventListener('keydown', onGlobalKeyDown, true);
   });
 
   // Fokus zurueck auf die DOM-Zelle bei Unmount — damit Enter/Pfeil im
   // Read/Edit-Mode sofort weiter funktioniert.
   onCleanup(() => {
+    document.removeEventListener('keydown', onGlobalKeyDown, true);
     const el = document.querySelector(
       `.mx-cell[data-row-id="${capturedRowId}"][data-col-id="${capturedColId}"]`,
     ) as HTMLElement | null;
     el?.focus({ preventScroll: true });
   });
 
-  // Lokaler Tastatur-Handler am Scrim. Bubble-Phase: Events vom Alias-
-  // Input oder einem Feature-Button steigen hoch. stopPropagation haelt
-  // sie vom Workspace-ESC-Handler (Parent-Navigation) ab.
-  function onScrimKeyDown(e: KeyboardEvent) {
+  // Globaler Keyboard-Handler auf document (Capture-Phase). Greift auch
+  // wenn der Fokus ausserhalb des Overlays landet (z.B. nach Alias-blur
+  // auf body). stopImmediatePropagation verhindert, dass der Workspace-
+  // ESC-Handler (Parent-Navigation) den Event zu sehen bekommt.
+  function onGlobalKeyDown(e: KeyboardEvent) {
     const t = e.target as HTMLElement | null;
     const inEditable =
       !!t &&
@@ -313,7 +316,7 @@ const CellOverlay: Component<Props> = (p) => {
         t.isContentEditable);
 
     if (e.key === 'Escape') {
-      e.stopPropagation();
+      e.stopImmediatePropagation();
       e.preventDefault();
       p.onClose();
       return;
@@ -321,7 +324,7 @@ const CellOverlay: Component<Props> = (p) => {
 
     if (e.key === 'Enter') {
       if (inEditable) return; // Input-lokaler Handler macht blur -> save
-      e.stopPropagation();
+      e.stopImmediatePropagation();
       e.preventDefault();
       onOpen();
       return;
@@ -331,7 +334,7 @@ const CellOverlay: Component<Props> = (p) => {
     // dass die Ziffer in den Text wandert.
     const def = findFeatureByHotkey(e.key);
     if (def) {
-      e.stopPropagation();
+      e.stopImmediatePropagation();
       e.preventDefault();
       void onToggle(def);
     }
@@ -347,7 +350,6 @@ const CellOverlay: Component<Props> = (p) => {
       onClick={(e) => {
         if (e.target === e.currentTarget) p.onClose();
       }}
-      onKeyDown={onScrimKeyDown}
     >
       <div class="overlay-card cell-overlay" role="dialog" aria-modal="true">
         <header class="overlay-head">
