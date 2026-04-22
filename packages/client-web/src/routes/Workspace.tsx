@@ -19,6 +19,7 @@ import {
   fetchNodesForWorkspace,
 } from '../lib/queries';
 import { toggleEditMode, useEditMode } from '../lib/edit-mode';
+import { toggleTheme, useTheme } from '../lib/theme';
 import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
 import NodeTree from '../components/NodeTree';
 import MatrixView from '../components/MatrixView';
@@ -37,6 +38,7 @@ const Workspace: Component = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const editMode = useEditMode();
+  const theme = useTheme();
 
   // Zell-Page-Section: der letzte URL-Segment hinter /c/:cellId/ entscheidet,
   // welches Feature-Panel gerendert wird. "checklists" | "info" | sonst leer.
@@ -223,6 +225,15 @@ const Workspace: Component = () => {
         >
           <header class="ws-main-header">
             <h1>{currentWs()?.name}</h1>
+            <button
+              type="button"
+              class="theme-toggle-btn"
+              onClick={() => toggleTheme()}
+              title={theme() === 'dark' ? 'Light-Mode' : 'Dark-Mode'}
+              aria-label={theme() === 'dark' ? 'Light-Mode' : 'Dark-Mode'}
+            >
+              {theme() === 'dark' ? '☀' : '☾'}
+            </button>
             <button
               type="button"
               class="edit-mode-btn"
