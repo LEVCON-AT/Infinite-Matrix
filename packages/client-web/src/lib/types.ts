@@ -71,6 +71,100 @@ export type MatrixContent = {
 
 export type CellFeature = 'matrix' | 'board' | 'info' | 'checklists';
 
+// ─── Kanban ─────────────────────────────────────────────────────
+export type KbColRow = {
+  id: string;
+  workspace_id: string;
+  board_id: string;
+  label: string;
+  position: number;
+  color: string | null;
+};
+
+// Inline-Checkliste auf einer Karte (kb_cards.checklist jsonb).
+// Entspricht dem Item-Shape aus dem Alt-Client (V2.1: +level).
+export type InlineChecklistItem = {
+  id?: string;
+  text: string;
+  done: boolean;
+  level?: 0 | 1 | 2;
+};
+
+export type KbCardRow = {
+  id: string;
+  workspace_id: string;
+  board_id: string;
+  col_id: string;
+  alias: string | null;
+  name: string;
+  note: string;
+  tags: string[];
+  who: string[];
+  deadline: string | null;
+  priority: number | null;
+  done: boolean;
+  archived: boolean;
+  position: number;
+  recur: Record<string, unknown> | null;
+  done_occurrences: string[];
+  source_cl_id: string | null;
+  source_label: string | null;
+  checklist_ref: string | null;
+  checklist: InlineChecklistItem[] | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ChecklistCloseMode = 'manual' | 'auto-prompt' | 'auto-silent';
+
+export type ChecklistRow = {
+  id: string;
+  workspace_id: string;
+  board_id: string;
+  label: string;
+  position: number;
+  recur: Record<string, unknown> | null;
+  close_mode: ChecklistCloseMode;
+  action: Record<string, unknown> | null;
+  history: unknown[];
+  alias: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ChecklistItemRow = {
+  id: string;
+  workspace_id: string;
+  checklist_id: string;
+  text: string;
+  done: boolean;
+  level: 0 | 1 | 2;
+  position: number;
+};
+
+export type LinkType = 'url' | 'mail';
+
+export type LinkRow = {
+  id: string;
+  workspace_id: string;
+  board_id: string;
+  type: LinkType;
+  label: string;
+  url: string;
+  alias: string | null;
+  position: number;
+  data: Record<string, unknown>;
+  created_at: string;
+};
+
+export type BoardContent = {
+  kbCols: KbColRow[];
+  kbCards: KbCardRow[];
+  checklists: ChecklistRow[];
+  checklistItems: ChecklistItemRow[];
+  links: LinkRow[];
+};
+
 // Hilfs-Shape fuer den Sidebar-Tree. Nodes werden nach parent_cell_id
 // verschachtelt; die Zelle wiederum kennt ihre Matrix (= parent-Node).
 export type TreeNode = {

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from '@solidjs/router';
 import { signOut, useUser } from '../lib/auth';
 import {
   buildTree,
+  fetchBoardContent,
   fetchCellsForWorkspace,
   fetchMatrixContent,
   fetchMyWorkspaces,
@@ -11,6 +12,7 @@ import {
 import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
 import NodeTree from '../components/NodeTree';
 import MatrixView from '../components/MatrixView';
+import BoardView from '../components/BoardView';
 
 const Workspace: Component = () => {
   const user = useUser();
@@ -59,6 +61,16 @@ const Workspace: Component = () => {
       return { matrixId: n.id, workspaceId: n.workspace_id };
     },
     async (key) => (key ? fetchMatrixContent(key.matrixId, key.workspaceId) : undefined),
+  );
+
+  // Board-Content fuer die aktuelle Node (nur wenn Typ=board).
+  const [boardContent] = createResource(
+    () => {
+      const n = currentNode();
+      if (!n || n.type !== 'board') return null;
+      return { boardId: n.id, workspaceId: n.workspace_id };
+    },
+    async (key) => (key ? fetchBoardContent(key.boardId, key.workspaceId) : undefined),
   );
 
   async function onLogout() {
@@ -122,9 +134,11 @@ const Workspace: Component = () => {
               </Show>
 
               <Show when={currentNode()?.type === 'board'}>
-                <div class="node-placeholder">
-                  <p class="hint">BoardView kommt in 0d.5.</p>
-                </div>
+                <BoardView
+                  workspaceId={currentNode()!.workspace_id}
+                  boardId={currentNode()!.id}
+                  content={boardContent()}
+                />
               </Show>
             </section>
           </Show>

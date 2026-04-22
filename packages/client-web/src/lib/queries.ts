@@ -1,7 +1,13 @@
 import { supabase } from './supabase';
 import type {
+  BoardContent,
   CellRow,
+  ChecklistItemRow,
+  ChecklistRow,
   ColRow,
+  KbCardRow,
+  KbColRow,
+  LinkRow,
   MatrixContent,
   NodeRow,
   RowRow,
@@ -94,6 +100,70 @@ export async function fetchMatrixContent(
     rows: (rowsRes.data ?? []) as RowRow[],
     cols: (colsRes.data ?? []) as ColRow[],
     cells: (cellsRes.data ?? []) as CellRow[],
+  };
+}
+
+// ─── Board-Inhalt (Kanban-Spalten + Karten + Checklisten + Links) ─
+// 4 parallele Queries. checklist_items werden via in-Filter auf die
+// Board-Checklisten eingeschraenkt — nicht via RLS-only, weil es sonst
+// alle items ueber den Workspace laedt.
+export async function fetchBoardContent(
+  boardId: string,
+  workspaceId: string,
+): Promise<BoardContent> {
+  const [colsRes, cardsRes, checklistsRes, linksRes] = await Promise.all([
+    supabase
+      .from('kb_cols')
+      .select('*')
+      .eq('board_id', boardId)
+      .eq('workspace_id', workspaceId)
+      .order('position', { ascending: true }),
+    supabase
+      .from('kb_cards')
+      .select('*')
+      .eq('board_id', boardId)
+      .eq('workspace_id', workspaceId)
+      .order('position', { ascending: true }),
+    supabase
+      .from('checklists')
+      .select('*')
+      .eq('board_id', boardId)
+      .eq('workspace_id', workspaceId)
+      .order('position', { ascending: true }),
+    supabase
+      .from('links')
+      .select('*')
+      .eq('board_id', boardId)
+      .eq('workspace_id', workspaceId)
+      .order('position', { ascending: true }),
+  ]);
+
+  if (colsRes.error) throw colsRes.error;
+  if (cardsRes.error) throw cardsRes.error;
+  if (checklistsRes.error) throw checklistsRes.error;
+  if (linksRes.error) throw linksRes.error;
+
+  const checklists = (checklistsRes.data ?? []) as ChecklistRow[];
+
+  let checklistItems: ChecklistItemRow[] = [];
+  if (checklists.length > 0) {
+    const ids = checklists.map((c) => c.id);
+    const itemsRes = await supabase
+      .from('checklist_items')
+      .select('*')
+      .in('checklist_id', ids)
+      .eq('workspace_id', workspaceId)
+      .order('position', { ascending: true });
+    if (itemsRes.error) throw itemsRes.error;
+    checklistItems = (itemsRes.data ?? []) as ChecklistItemRow[];
+  }
+
+  return {
+    kbCols: (colsRes.data ?? []) as KbColRow[],
+    kbCards: (cardsRes.data ?? []) as KbCardRow[],
+    checklists,
+    checklistItems,
+    links: (linksRes.data ?? []) as LinkRow[],
   };
 }
 
