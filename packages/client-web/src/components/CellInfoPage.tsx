@@ -14,15 +14,21 @@
 //   - "+ Feld": nur sichtbar im Edit-Mode
 
 import { For, Show, createSignal, type Component } from 'solid-js';
-import type { CellRow, ColRow, InfoField, RowRow } from '../lib/types';
+import type { CellRow, ColRow, InfoField, InfoLink, RowRow } from '../lib/types';
 import { useEditMode } from '../lib/edit-mode';
 import {
   addCellInfoField,
+  addCellLink,
   delCellInfoField,
+  delCellLink,
   moveCellInfoField,
+  moveCellLink,
   renameCellInfoField,
   setCellInfoFieldValue,
+  setCellLinkLabel,
+  setCellLinkUrl,
 } from '../lib/mutations';
+import { sanitizeUrl } from '../lib/url';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 
@@ -47,11 +53,25 @@ function readInfoFieldsFromCell(cell: CellRow): InfoField[] {
   );
 }
 
+function readLinksFromCell(cell: CellRow): InfoLink[] {
+  const raw = (cell.data as { links?: unknown })?.links;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (l): l is InfoLink =>
+      !!l &&
+      typeof l === 'object' &&
+      typeof (l as InfoLink).id === 'string' &&
+      typeof (l as InfoLink).label === 'string' &&
+      typeof (l as InfoLink).url === 'string',
+  );
+}
+
 const CellInfoPage: Component<Props> = (p) => {
   const editMode = useEditMode();
   const [busy, setBusy] = createSignal(false);
 
   const fields = () => readInfoFieldsFromCell(p.cell);
+  const links = () => readLinksFromCell(p.cell);
 
   async function wrap<T>(fn: () => Promise<T>, successMsg?: string) {
     if (busy()) return;
@@ -99,6 +119,42 @@ const CellInfoPage: Component<Props> = (p) => {
     await wrap(() => delCellInfoField(p.cell.id, f.id), 'Feld geloescht.');
   }
 
+  async function onAddLink() {
+    const url = window.prompt('URL:', 'https://');
+    if (url == null) return;
+    const clean = sanitizeUrl(url);
+    if (!clean) {
+      showToast('URL ungueltig.', 'error');
+      return;
+    }
+    const label = window.prompt('Bezeichnung (optional):', '') ?? '';
+    await wrap(() =>
+      addCellLink({ cellId: p.cell.id, label, url: clean }),
+    );
+  }
+
+  async function onRenameLink(l: InfoLink, label: string) {
+    if (label === l.label) return;
+    await wrap(() => setCellLinkLabel(p.cell.id, l.id, label));
+  }
+
+  async function onSetLinkUrl(l: InfoLink, url: string) {
+    if (url === l.url) return;
+    if (!sanitizeUrl(url)) {
+      showToast('URL ungueltig.', 'error');
+      return;
+    }
+    await wrap(() => setCellLinkUrl(p.cell.id, l.id, url));
+  }
+
+  async function onMoveLink(l: InfoLink, dir: -1 | 1) {
+    await wrap(() => moveCellLink(p.cell.id, l.id, dir));
+  }
+
+  async function onDelLink(l: InfoLink) {
+    await wrap(() => delCellLink(p.cell.id, l.id), 'Link geloescht.');
+  }
+
   const breadcrumb = () => {
     const r = p.row?.label || '(Zeile)';
     const c = p.col?.label || '(Spalte)';
@@ -109,7 +165,7 @@ const CellInfoPage: Component<Props> = (p) => {
     <div class="cell-info-page">
       <header class="cell-page-head">
         <div class="cell-page-head-text">
-          <h3>Info-Felder</h3>
+          <h3>Info</h3>
           <span class="cell-page-sub">{breadcrumb()}</span>
           <Show when={p.cell.alias}>
             <span class="node-alias">^{p.cell.alias}</span>
@@ -214,6 +270,119 @@ const CellInfoPage: Component<Props> = (p) => {
           + Feld
         </button>
       </Show>
+
+      <section class="info-links-block">
+        <h4 class="info-block-title">Links & Abspruenge</h4>
+        <Show
+          when={links().length > 0}
+          fallback={
+            <p class="hint">
+              Keine Links.
+              <Show when={editMode()}>{' '}+ Link unten.</Show>
+            </p>
+          }
+        >
+          <ul class="info-link-list">
+            <For each={links()}>
+              {(l) => (
+                <li class="info-link" attr:data-edit={editMode() ? 'true' : 'false'}>
+                  <div class="info-link-hd" classList={{ 'mx-editable': editMode() }}>
+                    <div class="info-arrow-stack">
+                      <button
+                        type="button"
+                        class="info-arrow"
+                        title="Nach oben"
+                        aria-label="Link nach oben verschieben"
+                        tabIndex={editMode() ? 0 : -1}
+                        onClick={() => onMoveLink(l, -1)}
+                        disabled={busy() || !editMode()}
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        class="info-arrow"
+                        title="Nach unten"
+                        aria-label="Link nach unten verschieben"
+                        tabIndex={editMode() ? 0 : -1}
+                        onClick={() => onMoveLink(l, 1)}
+                        disabled={busy() || !editMode()}
+                      >
+                        ▼
+                      </button>
+                    </div>
+                    <Show
+                      when={editMode()}
+                      fallback={
+                        <a
+                          class="info-link-label info-link-label-anchor"
+                          href={sanitizeUrl(l.url) ?? '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={l.url}
+                        >
+                          {l.label || l.url}
+                        </a>
+                      }
+                    >
+                      <input
+                        class="mx-head-input info-link-label-input"
+                        type="text"
+                        value={l.label}
+                        placeholder="(Bezeichnung)"
+                        onBlur={(e) => onRenameLink(l, e.currentTarget.value.trim())}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            (e.currentTarget as HTMLInputElement).blur();
+                          }
+                        }}
+                      />
+                    </Show>
+                    <button
+                      type="button"
+                      class="mx-del-btn info-del"
+                      title="Link loeschen"
+                      aria-label="Link loeschen"
+                      tabIndex={editMode() ? 0 : -1}
+                      onClick={() => onDelLink(l)}
+                      disabled={busy() || !editMode()}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <Show when={editMode()}>
+                    <input
+                      class="mx-head-input info-link-url-input"
+                      type="url"
+                      value={l.url}
+                      placeholder="https://..."
+                      onBlur={(e) => onSetLinkUrl(l, e.currentTarget.value.trim())}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          (e.currentTarget as HTMLInputElement).blur();
+                        }
+                      }}
+                    />
+                  </Show>
+                </li>
+              )}
+            </For>
+          </ul>
+        </Show>
+
+        <Show when={editMode()}>
+          <button
+            type="button"
+            class="btn-subtle info-add-link-btn"
+            onClick={onAddLink}
+            disabled={busy()}
+          >
+            + Link
+          </button>
+        </Show>
+      </section>
     </div>
   );
 };

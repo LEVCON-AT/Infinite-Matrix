@@ -80,6 +80,18 @@ export type InfoField = {
   value: string;
 };
 
+// URL-Link auf einer Zelle. Lebt in cell.data.links[].
+// Bewusst OHNE Alias-Feld: cell-JSONB-Links koennen nicht am DB-Unique-
+// Constraint der board-scoped links-Tabelle teilnehmen; Alias-Quicknav
+// zu JSONB-Links wuerde einen Workspace-weiten Tree-Scan erfordern,
+// was den aliasIndex-Pfad sprengt. Wird bei Bedarf nach einer Migration
+// auf eine eigene Tabelle (cell_links) nachgeruestet.
+export type InfoLink = {
+  id: string;
+  label: string;
+  url: string;
+};
+
 // ─── Kanban ─────────────────────────────────────────────────────
 export type KbColRow = {
   id: string;

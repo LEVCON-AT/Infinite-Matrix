@@ -14,11 +14,13 @@ import type {
   ChecklistRow,
   ColRow,
   InfoField,
+  InfoLink,
   KbCardRow,
   KbColRow,
   NodeRow,
   RowRow,
 } from './types';
+import { sanitizeUrl } from './url';
 
 // ─── Helpers ───────────────────────────────────────────────────
 async function nextPosition(
@@ -713,5 +715,110 @@ export async function delCellInfoField(
   await mutateCellData(cellId, (cellData) => {
     const fields = readInfoFields(cellData).filter((f) => f.id !== fieldId);
     return { data: { ...cellData, infoFields: fields }, result: undefined };
+  });
+}
+
+// ─── Zell-Links (cell.data.links[]) ────────────────────────────
+// Analog zu infoFields: JSONB-Array auf cell.data. URL wird per
+// sanitizeUrl gefiltert (javascript:/data:/vbscript: werden abgelehnt).
+// Kein DB-Unique-Constraint auf Alias — JSONB-Links fuehren (vorerst)
+// keinen Alias; siehe types.ts/InfoLink-Kommentar.
+function readInfoLinks(data: Record<string, unknown>): InfoLink[] {
+  const raw = (data as { links?: unknown }).links;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (l): l is InfoLink =>
+      !!l &&
+      typeof l === 'object' &&
+      typeof (l as InfoLink).id === 'string' &&
+      typeof (l as InfoLink).label === 'string' &&
+      typeof (l as InfoLink).url === 'string',
+  );
+}
+
+function genInfoLinkId(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'il_' + Math.random().toString(36).slice(2, 10);
+}
+
+export class InvalidUrlError extends Error {
+  constructor() {
+    super('URL ungueltig.');
+    this.name = 'InvalidUrlError';
+  }
+}
+
+export async function addCellLink(args: {
+  cellId: string;
+  label: string;
+  url: string;
+}): Promise<InfoLink> {
+  const safeUrl = sanitizeUrl(args.url);
+  if (!safeUrl) throw new InvalidUrlError();
+  return mutateCellData(args.cellId, (cellData) => {
+    const links = readInfoLinks(cellData);
+    const link: InfoLink = {
+      id: genInfoLinkId(),
+      label: args.label.trim() || safeUrl,
+      url: safeUrl,
+    };
+    const next = { ...cellData, links: [...links, link] };
+    return { data: next, result: link };
+  });
+}
+
+export async function setCellLinkLabel(
+  cellId: string,
+  linkId: string,
+  label: string,
+): Promise<void> {
+  await mutateCellData(cellId, (cellData) => {
+    const links = readInfoLinks(cellData).map((l) =>
+      l.id === linkId ? { ...l, label } : l,
+    );
+    return { data: { ...cellData, links }, result: undefined };
+  });
+}
+
+export async function setCellLinkUrl(
+  cellId: string,
+  linkId: string,
+  url: string,
+): Promise<void> {
+  const safeUrl = sanitizeUrl(url);
+  if (!safeUrl) throw new InvalidUrlError();
+  await mutateCellData(cellId, (cellData) => {
+    const links = readInfoLinks(cellData).map((l) =>
+      l.id === linkId ? { ...l, url: safeUrl } : l,
+    );
+    return { data: { ...cellData, links }, result: undefined };
+  });
+}
+
+export async function moveCellLink(
+  cellId: string,
+  linkId: string,
+  dir: -1 | 1,
+): Promise<void> {
+  await mutateCellData(cellId, (cellData) => {
+    const links = readInfoLinks(cellData);
+    const idx = links.findIndex((l) => l.id === linkId);
+    const next = idx + dir;
+    if (idx < 0 || next < 0 || next >= links.length) {
+      return { data: cellData, result: undefined };
+    }
+    const copy = links.slice();
+    [copy[idx], copy[next]] = [copy[next], copy[idx]];
+    return { data: { ...cellData, links: copy }, result: undefined };
+  });
+}
+
+export async function delCellLink(
+  cellId: string,
+  linkId: string,
+): Promise<void> {
+  await mutateCellData(cellId, (cellData) => {
+    const links = readInfoLinks(cellData).filter((l) => l.id !== linkId);
+    return { data: { ...cellData, links }, result: undefined };
   });
 }
