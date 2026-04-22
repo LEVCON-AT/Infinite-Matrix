@@ -144,7 +144,10 @@ const MatrixView: Component<Props> = (p) => {
   }
 
   function onCellEdit(row: RowRow, col: ColRow, cell: CellRow | undefined) {
-    rememberCellFocus(row.id, col.id);
+    // KEIN rememberCellFocus hier — sonst triggert der Focus-Restore-
+    // Effect parallel zum Overlay-onMount und klaut den Alias-Autofocus
+    // (Race). Den Focus-Rueckweg erledigt der Overlay selbst via
+    // onCleanup (fokussiert die data-row-id/data-col-id-Zelle).
     setOverlayTarget({ row, col, cell });
   }
 
@@ -189,6 +192,19 @@ const MatrixView: Component<Props> = (p) => {
     if (target.matrixId !== p.matrixId) return;
     if (!p.content) return;
     queueMicrotask(() => {
+      // Schutz: wenn ein Overlay offen ist oder gerade ein Input/Textarea
+      // fokussiert ist (z.B. Alias im CellOverlay), nicht in die Zelle
+      // zurueckspringen.
+      const ae = document.activeElement as HTMLElement | null;
+      if (
+        ae &&
+        (ae.tagName === 'INPUT' ||
+          ae.tagName === 'TEXTAREA' ||
+          ae.isContentEditable)
+      ) {
+        return;
+      }
+      if (document.querySelector('.overlay-scrim')) return;
       const el = document.querySelector(
         `.mx-cell[data-row-id="${target.rowId}"][data-col-id="${target.colId}"]`,
       ) as HTMLElement | null;

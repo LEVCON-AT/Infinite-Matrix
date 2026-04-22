@@ -287,7 +287,6 @@ const CellOverlay: Component<Props> = (p) => {
     aliasInput?.focus();
 
     const onKey = (e: KeyboardEvent) => {
-      // Nicht greifen, wenn User im Alias-Input / Textarea tippt.
       const t = e.target as HTMLElement | null;
       const inEditable =
         !!t &&
@@ -301,14 +300,18 @@ const CellOverlay: Component<Props> = (p) => {
         return;
       }
 
-      if (inEditable) return;
-
+      // Enter: im Input committet der lokale onKeyDown (blur -> save),
+      // deshalb hier nur ausserhalb Inputs greifen.
       if (e.key === 'Enter') {
+        if (inEditable) return;
         e.preventDefault();
         onOpen();
         return;
       }
 
+      // Hotkeys 1-9: IMMER greifen, auch im Alias-Input. preventDefault
+      // verhindert, dass die Ziffer ins Textfeld wandert. Ohne das
+      // waere "Alias tippen dann 1 druecken" nicht moeglich.
       const def = findFeatureByHotkey(e.key);
       if (def) {
         e.preventDefault();
@@ -316,7 +319,15 @@ const CellOverlay: Component<Props> = (p) => {
       }
     };
     document.addEventListener('keydown', onKey, true);
-    onCleanup(() => document.removeEventListener('keydown', onKey, true));
+    onCleanup(() => {
+      document.removeEventListener('keydown', onKey, true);
+      // Fokus zurueck auf die DOM-Zelle, damit User im Read/Edit-Mode
+      // weiter navigieren kann (Enter -> Sub, Pfeil, 1/2-Hotkey).
+      const el = document.querySelector(
+        `.mx-cell[data-row-id="${p.row.id}"][data-col-id="${p.col.id}"]`,
+      ) as HTMLElement | null;
+      el?.focus({ preventScroll: true });
+    });
   });
 
   // Breadcrumb-Label oben
