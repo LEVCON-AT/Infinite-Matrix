@@ -1,8 +1,8 @@
-// Rendert eine einzelne Checkliste inkl. Items-CRUD.
-// Shell-Aenderungen (Rename/Alias/Del/CloseMode) sind Edit-gated —
-// Checkliste ist ein struktureller Container am Board, wie Spalten.
-// Item-Aenderungen (Add/Toggle/Rename/Del/Level) sind immer verfuegbar —
-// Items sind Inhalt, wie Karten-Felder.
+// Rendert eine einzelne Checkliste inkl. Items.
+// Analog zur HTML-Vorlage (renderChecklists): NUR Toggle ist View-Mode-
+// erlaubt. Add / Rename / Del / Level / Reorder sind Edit-gated —
+// Aenderungen an Items sind struktur-aehnlich, nicht blosse Zustands-
+// Flips.
 
 import { For, Show, createSignal, type Component } from 'solid-js';
 import type { ChecklistItemRow, ChecklistRow } from '../lib/types';
@@ -20,6 +20,7 @@ import {
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
+import { validateAlias } from '../lib/alias';
 
 type Props = {
   checklist: ChecklistRow;
@@ -54,18 +55,28 @@ const ChecklistPanel: Component<Props> = (p) => {
   }
 
   async function onAliasBlur(val: string) {
-    const t = val.trim();
-    const next = t === '' ? null : t;
-    if (next === (p.checklist.alias ?? null)) return;
     if (busy()) return;
+    const current = p.checklist.alias ?? null;
     setBusy(true);
     try {
+      const res = await validateAlias(val, p.workspaceId, {
+        type: 'checklist',
+        id: p.checklist.id,
+      });
+      if (!res.ok) {
+        showToast(res.msg, 'error');
+        flashError(aliasInputRef);
+        if (aliasInputRef) aliasInputRef.value = current ?? '';
+        return;
+      }
+      const next = res.canonical;
+      if (next === current) return;
       await setChecklistAlias(p.checklist.id, next);
       p.onChanged();
     } catch (err) {
       showToast(translateDbError(err), 'error');
       flashError(aliasInputRef);
-      if (aliasInputRef) aliasInputRef.value = p.checklist.alias ?? '';
+      if (aliasInputRef) aliasInputRef.value = current ?? '';
     } finally {
       setBusy(false);
     }
@@ -193,48 +204,59 @@ const ChecklistPanel: Component<Props> = (p) => {
                 aria-label="Erledigt"
                 onChange={(e) => onToggleItem(it, e.currentTarget.checked)}
               />
-              <input
-                class="cl-text-input"
-                type="text"
-                value={it.text}
-                placeholder="(Punkt)"
-                onBlur={(e) => onRenameItem(it, e.currentTarget.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    (e.currentTarget as HTMLInputElement).blur();
-                  } else if (e.altKey && e.key === 'ArrowRight') {
-                    e.preventDefault();
-                    void onLevelItem(it, 1);
-                  } else if (e.altKey && e.key === 'ArrowLeft') {
-                    e.preventDefault();
-                    void onLevelItem(it, -1);
-                  }
-                }}
-              />
-              <button
-                type="button"
-                class="cl-it-del"
-                title="Punkt loeschen"
-                aria-label="Punkt loeschen"
-                onClick={() => onDelItem(it)}
-                disabled={busy()}
+              <Show
+                when={editMode()}
+                fallback={
+                  <span class="cl-text-ro" classList={{ 'cl-text-done': it.done }}>
+                    {it.text || '(Punkt)'}
+                  </span>
+                }
               >
-                ✕
-              </button>
+                <input
+                  class="cl-text-input"
+                  type="text"
+                  value={it.text}
+                  placeholder="(Punkt)"
+                  onBlur={(e) => onRenameItem(it, e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      (e.currentTarget as HTMLInputElement).blur();
+                    } else if (e.altKey && e.key === 'ArrowRight') {
+                      e.preventDefault();
+                      void onLevelItem(it, 1);
+                    } else if (e.altKey && e.key === 'ArrowLeft') {
+                      e.preventDefault();
+                      void onLevelItem(it, -1);
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  class="cl-it-del"
+                  title="Punkt loeschen"
+                  aria-label="Punkt loeschen"
+                  onClick={() => onDelItem(it)}
+                  disabled={busy()}
+                >
+                  ✕
+                </button>
+              </Show>
             </li>
           )}
         </For>
       </ul>
 
-      <button
-        type="button"
-        class="cl-add-item-btn"
-        onClick={onAddItem}
-        disabled={busy()}
-      >
-        + Punkt
-      </button>
+      <Show when={editMode()}>
+        <button
+          type="button"
+          class="cl-add-item-btn"
+          onClick={onAddItem}
+          disabled={busy()}
+        >
+          + Punkt
+        </button>
+      </Show>
     </li>
   );
 };

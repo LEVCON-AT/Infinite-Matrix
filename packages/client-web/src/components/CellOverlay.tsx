@@ -22,6 +22,7 @@ import { isNodeEmpty } from '../lib/queries';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
+import { validateAlias } from '../lib/alias';
 
 type Props = {
   workspaceId: string;
@@ -178,21 +179,37 @@ const CellOverlay: Component<Props> = (p) => {
   }
 
   // ─── Alias-Speichern (on blur) ───────────────────────────────
+  // Cross-Table-Alias-Check (Zelle vs. Karten/Matrizen/Checklisten/
+  // Links/Nodes) laeuft ueber den zentralen validateAlias-Helper.
   async function onAliasBlur() {
-    const next = aliasDraft().trim() || null;
-    const cur = current();
-    if ((cur?.alias ?? null) === next) return;
     if (busy()) return;
+    const cur = current();
+    const currentAlias = cur?.alias ?? null;
     setBusy('alias');
     try {
+      // Neue Zelle hat noch keine id — Platzhalter ist harmlos im
+      // neq()-Filter, weil dann alle DB-Matches als Konflikt gelten.
+      const selfId = cur?.id ?? '__new__';
+      const res = await validateAlias(aliasDraft(), p.workspaceId, {
+        type: 'cell',
+        id: selfId,
+      });
+      if (!res.ok) {
+        showToast(res.msg, 'error');
+        flashError(aliasInput);
+        window.setTimeout(() => {
+          aliasInput?.focus();
+          aliasInput?.select();
+        }, 420);
+        return;
+      }
+      const next = res.canonical;
+      if (next === currentAlias) return;
       await ensureCell({ alias: next });
       p.onChanged();
     } catch (err) {
       showToast(translateDbError(err), 'error');
       flashError(aliasInput);
-      // Eingabe NICHT revertieren — User soll korrigieren koennen.
-      // Nach Shake-Animation Fokus zurueck + Text markieren, damit das
-      // naechste Tippen direkt ueberschreibt.
       window.setTimeout(() => {
         aliasInput?.focus();
         aliasInput?.select();

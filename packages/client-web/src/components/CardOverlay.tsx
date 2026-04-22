@@ -24,7 +24,7 @@ import {
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
-import { ALIAS_TABLE_LABEL, findAliasConflict } from '../lib/alias-check';
+import { validateAlias } from '../lib/alias';
 
 type Props = {
   card: KbCardRow;
@@ -93,29 +93,20 @@ const CardOverlay: Component<Props> = (p) => {
   }
 
   async function onAlias(newAlias: string) {
-    const t = newAlias.trim();
-    const next = t === '' ? null : t;
-    if (next === (p.card.alias ?? null)) return;
     if (busy()) return;
+    const current = p.card.alias ?? null;
     setBusy(true);
     try {
-      // Preflight: Cross-Table-Alias-Check (Karten/Zellen/Matrizen/
-      // Checklisten/Links). Die DB hat nur pro-Tabelle Unique-Indizes —
-      // ohne diesen Check wuerde ein Kollisionsfall mit z.B. einer
-      // Zelle oder Checkliste stumm bleiben.
-      if (next) {
-        const conflict = await findAliasConflict({
-          workspaceId: p.card.workspace_id,
-          alias: next,
-          exclude: { table: 'kb_cards', id: p.card.id },
-        });
-        if (conflict) {
-          rejectAlias(
-            `Alias ist bereits bei einer ${ALIAS_TABLE_LABEL[conflict]} im Workspace vergeben.`,
-          );
-          return;
-        }
+      const res = await validateAlias(newAlias, p.card.workspace_id, {
+        type: 'card',
+        id: p.card.id,
+      });
+      if (!res.ok) {
+        rejectAlias(res.msg);
+        return;
       }
+      const next = res.canonical;
+      if (next === current) return;
       await setCardAlias(p.card.id, next);
       p.onChanged?.();
     } catch (err) {
