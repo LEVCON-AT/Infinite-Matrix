@@ -1,10 +1,12 @@
 import {
   For,
   Show,
+  createEffect,
   createMemo,
   createSignal,
   type Component,
 } from 'solid-js';
+import { useSearchParams } from '@solidjs/router';
 import type {
   BoardContent,
   KbCardRow,
@@ -64,8 +66,24 @@ function fmtDate(iso: string | null): string | null {
 
 const BoardView: Component<Props> = (p) => {
   const editMode = useEditMode();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedCardId, setSelectedCardId] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
+
+  // Deep-Link ?card=<id> → CardOverlay direkt oeffnen (Quicknav).
+  // Erst wenn content vorhanden ist und die Karte wirklich existiert.
+  // Query-Param danach aufraeumen, damit ein Refresh die Karte nicht
+  // erneut oeffnet und die URL sauber bleibt.
+  createEffect(() => {
+    const content = p.content;
+    if (!content) return;
+    const want = searchParams.card;
+    if (!want || typeof want !== 'string') return;
+    const exists = content.kbCards.some((c) => c.id === want);
+    if (!exists) return;
+    setSelectedCardId(want);
+    setSearchParams({ card: undefined }, { replace: true });
+  });
 
   const visibleCols = createMemo<KbColRow[]>(() => p.content?.kbCols ?? []);
   const activeCards = createMemo<KbCardRow[]>(() =>

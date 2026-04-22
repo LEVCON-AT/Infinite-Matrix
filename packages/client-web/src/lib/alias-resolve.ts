@@ -15,7 +15,16 @@ import { validateAliasFormat } from './alias';
 
 export type AliasResolveResult =
   | { kind: 'node'; nodeId: string; nodeType: 'matrix' | 'board'; label: string }
-  | { kind: 'cell'; cellId: string; matrixId: string; rowId: string; colId: string }
+  | {
+      kind: 'cell';
+      cellId: string;
+      matrixId: string;
+      rowId: string;
+      colId: string;
+      features: string[];
+      childMatrixId: string | null;
+      boardId: string | null;
+    }
   | { kind: 'card'; cardId: string; boardId: string; name: string }
   | { kind: 'checklist-board'; checklistId: string; boardId: string; label: string }
   | { kind: 'checklist-cell'; checklistId: string; cellId: string; matrixId: string; label: string }
@@ -49,7 +58,7 @@ export async function resolveAlias(
       .limit(1),
     supabase
       .from('cells')
-      .select('id, matrix_id, row_id, col_id')
+      .select('id, matrix_id, row_id, col_id, features, child_matrix_id, board_id')
       .eq('workspace_id', workspaceId)
       .ilike('alias', a)
       .limit(1),
@@ -88,6 +97,9 @@ export async function resolveAlias(
       matrix_id: string;
       row_id: string;
       col_id: string;
+      features: string[] | null;
+      child_matrix_id: string | null;
+      board_id: string | null;
     };
     return {
       ok: true,
@@ -98,6 +110,9 @@ export async function resolveAlias(
         matrixId: c.matrix_id,
         rowId: c.row_id,
         colId: c.col_id,
+        features: Array.isArray(c.features) ? c.features : [],
+        childMatrixId: c.child_matrix_id,
+        boardId: c.board_id,
       },
     };
   }

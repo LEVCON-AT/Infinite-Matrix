@@ -8,7 +8,7 @@ import {
   onMount,
   type Component,
 } from 'solid-js';
-import { useNavigate } from '@solidjs/router';
+import { useNavigate, useSearchParams } from '@solidjs/router';
 import type { CellFeature, CellRow, ColRow, MatrixContent, RowRow } from '../lib/types';
 import { useEditMode } from '../lib/edit-mode';
 import { findFeatureByHotkey } from '../lib/features';
@@ -45,6 +45,7 @@ type OverlayTarget = { row: RowRow; col: ColRow; cell: CellRow | undefined };
 
 const MatrixView: Component<Props> = (p) => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const editMode = useEditMode();
 
   const [busy, setBusy] = createSignal(false);
@@ -243,6 +244,26 @@ const MatrixView: Component<Props> = (p) => {
     };
     document.addEventListener('keydown', onKey);
     onCleanup(() => document.removeEventListener('keydown', onKey));
+  });
+
+  // ─── Deep-Link ?cell=<id> → CellOverlay direkt oeffnen ─────────
+  // Quicknav setzt diesen Query-Param, wenn eine Zelle mehrere oder
+  // keine Sub-Features hat (sonst navigiert sie direkt ins Feature).
+  // Wir holen die Zelle aus p.content, bauen overlayTarget auf, und
+  // loeschen den Param aus der URL — so dass ein Refresh das Overlay
+  // nicht nochmal aufmacht und die URL sauber bleibt.
+  createEffect(() => {
+    const content = p.content;
+    if (!content || !contentMatches()) return;
+    const want = searchParams.cell;
+    if (!want || typeof want !== 'string') return;
+    const cell = content.cells.find((x) => x.id === want);
+    if (!cell) return;
+    const row = content.rows.find((r) => r.id === cell.row_id);
+    const col = content.cols.find((c) => c.id === cell.col_id);
+    if (!row || !col) return;
+    setOverlayTarget({ row, col, cell });
+    setSearchParams({ cell: undefined }, { replace: true });
   });
 
   // ─── Focus: Initial + Restore nach Navigation ─────────────────

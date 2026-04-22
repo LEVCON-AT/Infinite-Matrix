@@ -19,6 +19,7 @@ import { useNavigate } from '@solidjs/router';
 import { resolveAlias, type AliasResolveResult } from '../lib/alias-resolve';
 import { rememberFocus } from '../lib/navigation-focus';
 import { sanitizeUrl } from '../lib/url';
+import { flashError } from '../lib/flash';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 
@@ -62,19 +63,46 @@ const AliasQuicknav: Component<Props> = (p) => {
     onCleanup(() => document.removeEventListener('keydown', onKey, true));
   });
 
+  // Cell-Quicknav: Priorisiert das eindeutige Ziel. Wenn die Zelle genau
+  // ein primaeres Feature (Sub-Matrix/Sub-Board/Checklisten/Info) hat,
+  // springen wir direkt dorthin. Sonst navigieren wir zur Parent-Matrix
+  // und oeffnen das CellOverlay per ?cell=<id> — der User sieht sofort
+  // die Zell-Konfiguration.
+  function cellTarget(
+    wsId: string,
+    c: Extract<AliasResolveResult, { kind: 'cell' }>,
+  ): string {
+    if (c.childMatrixId) {
+      return `/w/${wsId}/n/${c.childMatrixId}`;
+    }
+    if (c.boardId) {
+      return `/w/${wsId}/n/${c.boardId}`;
+    }
+    if (c.features.includes('checklists')) {
+      return `/w/${wsId}/c/${c.cellId}/checklists`;
+    }
+    if (c.features.includes('info')) {
+      return `/w/${wsId}/c/${c.cellId}/info`;
+    }
+    // Zelle ohne Feature (oder mehrdeutig) — Overlay auf Parent-Matrix.
+    return `/w/${wsId}/n/${c.matrixId}?cell=${c.cellId}`;
+  }
+
   function dispatch(result: AliasResolveResult) {
     switch (result.kind) {
       case 'node':
         navigate(`/w/${p.workspaceId}/n/${result.nodeId}`);
         return;
       case 'cell':
+        // Focus der Zelle in der Parent-Matrix merken — falls der User
+        // spaeter per ESC zurueck zur Matrix kommt, ist die Zelle im
+        // Focus.
         rememberFocus(result.matrixId, result.rowId, result.colId);
-        navigate(`/w/${p.workspaceId}/n/${result.matrixId}`);
+        navigate(cellTarget(p.workspaceId, result));
         return;
       case 'card':
-        // V0: Board oeffnen — Karte-Overlay-Autoopen kommt in einem
-        // spaeteren Sprint (braucht URL-Param fuer cardId).
-        navigate(`/w/${p.workspaceId}/n/${result.boardId}`);
+        // BoardView liest ?card=<id> und oeffnet das CardOverlay.
+        navigate(`/w/${p.workspaceId}/n/${result.boardId}?card=${result.cardId}`);
         return;
       case 'checklist-board':
         navigate(`/w/${p.workspaceId}/n/${result.boardId}`);
@@ -94,12 +122,18 @@ const AliasQuicknav: Component<Props> = (p) => {
     }
   }
 
+  function fail(msg: string) {
+    setError(msg);
+    flashError(inputRef);
+    setBusy(false);
+  }
+
   async function onSubmit(e: SubmitEvent) {
     e.preventDefault();
     if (busy()) return;
     const q = query().trim();
     if (!q) {
-      setError('Bitte Kuerzel eingeben.');
+      fail('Bitte Kuerzel eingeben.');
       return;
     }
     setBusy(true);
@@ -108,13 +142,11 @@ const AliasQuicknav: Component<Props> = (p) => {
     try {
       outcomeSnapshot = await resolveAlias(q, p.workspaceId);
     } catch (err) {
-      setError(translateDbError(err));
-      setBusy(false);
+      fail(translateDbError(err));
       return;
     }
     if (!outcomeSnapshot.ok) {
-      setError(outcomeSnapshot.msg);
-      setBusy(false);
+      fail(outcomeSnapshot.msg);
       return;
     }
     // Dispatch + Close in eigenem Try: wenn navigate() wirft (z.B. weil
@@ -126,7 +158,7 @@ const AliasQuicknav: Component<Props> = (p) => {
       p.onClose();
     } catch (err) {
       console.error('[quicknav] dispatch failed', err);
-      setError(translateDbError(err));
+      fail(translateDbError(err));
     }
   }
 
