@@ -17,6 +17,7 @@ import { rememberFocus, useLastFocus } from '../lib/navigation-focus';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import CellOverlay from './CellOverlay';
+import CellChecklistsOverlay from './CellChecklistsOverlay';
 
 const FEATURE_ORDER: CellFeature[] = ['matrix', 'board', 'info', 'checklists'];
 
@@ -42,6 +43,7 @@ type Props = {
 };
 
 type OverlayTarget = { row: RowRow; col: ColRow; cell: CellRow | undefined };
+type ChecklistsTarget = { row: RowRow; col: ColRow; cell: CellRow };
 
 const MatrixView: Component<Props> = (p) => {
   const navigate = useNavigate();
@@ -49,6 +51,8 @@ const MatrixView: Component<Props> = (p) => {
 
   const [busy, setBusy] = createSignal(false);
   const [overlayTarget, setOverlayTarget] = createSignal<OverlayTarget | null>(null);
+  const [checklistsTarget, setChecklistsTarget] =
+    createSignal<ChecklistsTarget | null>(null);
   // Guard: Initial-Focus (0,0) nur einmal pro Matrix-Besuch. Verhindert,
   // dass jede Content-Mutation den Fokus auf (0,0) zurueckreisst.
   const [initialFocusedFor, setInitialFocusedFor] = createSignal<string | null>(
@@ -107,12 +111,10 @@ const MatrixView: Component<Props> = (p) => {
       navigate(`/w/${p.workspaceId}/n/${cell.board_id}`);
       return;
     }
-    // Flag-Features: Info-/Checklist-Panel pro Zelle sind noch nicht
-    // gebaut. Hinweis ueber Toast. Echtes Panel kommt:
-    //   - Checkliste:  0e.1.d.x (Cell-Checklist-Panel, reuses ChecklistPanel)
-    //   - Info:        0e.1.f  (Info-Field Content-Editor)
+    // Flag-Feature Checklisten: oeffnet das Cell-Checklists-Overlay
+    // (reuses ChecklistPanel). Info-Editor folgt in 0e.1.f.
     if (featKey === 'checklists') {
-      showToast('Cell-Checkliste: Panel kommt in 0e.1.d.x.', 'info');
+      setChecklistsTarget({ row, col, cell });
       return;
     }
     if (featKey === 'info') {
@@ -318,6 +320,16 @@ const MatrixView: Component<Props> = (p) => {
           cell={overlayTarget()!.cell}
           onClose={() => setOverlayTarget(null)}
           onChanged={() => p.onChanged?.()}
+        />
+      </Show>
+
+      <Show when={checklistsTarget()}>
+        <CellChecklistsOverlay
+          workspaceId={p.workspaceId}
+          cell={checklistsTarget()!.cell}
+          row={checklistsTarget()!.row}
+          col={checklistsTarget()!.col}
+          onClose={() => setChecklistsTarget(null)}
         />
       </Show>
 

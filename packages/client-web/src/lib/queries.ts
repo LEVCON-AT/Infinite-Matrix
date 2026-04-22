@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import type {
   BoardContent,
+  CellChecklistsContent,
   CellRow,
   ChecklistItemRow,
   ChecklistRow,
@@ -165,6 +166,38 @@ export async function fetchBoardContent(
     checklistItems,
     links: (linksRes.data ?? []) as LinkRow[],
   };
+}
+
+// ─── Cell-Checklisten (cell_id=X, board_id=NULL) ──────────────────
+// Wie der Board-Pfad, aber gefiltert auf eine Zelle. RLS + workspace_id
+// als Guard.
+export async function fetchCellChecklists(
+  cellId: string,
+  workspaceId: string,
+): Promise<CellChecklistsContent> {
+  const { data: clData, error: clErr } = await supabase
+    .from('checklists')
+    .select('*')
+    .eq('cell_id', cellId)
+    .eq('workspace_id', workspaceId)
+    .order('position', { ascending: true });
+  if (clErr) throw clErr;
+
+  const checklists = (clData ?? []) as ChecklistRow[];
+  let checklistItems: ChecklistItemRow[] = [];
+  if (checklists.length > 0) {
+    const ids = checklists.map((c) => c.id);
+    const { data: itData, error: itErr } = await supabase
+      .from('checklist_items')
+      .select('*')
+      .in('checklist_id', ids)
+      .eq('workspace_id', workspaceId)
+      .order('position', { ascending: true });
+    if (itErr) throw itErr;
+    checklistItems = (itData ?? []) as ChecklistItemRow[];
+  }
+
+  return { checklists, checklistItems };
 }
 
 // ─── Node-Leer-Probe (fuer Confirm-vor-Delete) ────────────────────

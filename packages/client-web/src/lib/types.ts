@@ -168,6 +168,13 @@ export type BoardContent = {
   links: LinkRow[];
 };
 
+// Checklisten einer einzelnen Zelle (cell_id=X, board_id=NULL).
+// Wird lazy geladen, wenn der User den Checklist-Chip einer Zelle oeffnet.
+export type CellChecklistsContent = {
+  checklists: ChecklistRow[];
+  checklistItems: ChecklistItemRow[];
+};
+
 // Hilfs-Shape fuer den Sidebar-Tree. Nodes werden nach parent_cell_id
 // verschachtelt; die Zelle wiederum kennt ihre Matrix (= parent-Node).
 export type TreeNode = {

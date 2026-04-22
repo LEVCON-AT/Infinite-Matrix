@@ -412,8 +412,9 @@ export async function delCard(cardId: string): Promise<void> {
 }
 
 // ─── Checklisten (standalone am Board) ─────────────────────────
-// Zell-attached Checklisten kommen separat (andere Parent-Spalte:
-// cell_id statt board_id). Hier nur Board-scoped.
+// Zell-attached Checklisten haengen via cell_id (statt board_id) —
+// siehe addCellChecklist unten. DB-XOR-Constraint stellt sicher, dass
+// nie beides zugleich gesetzt ist.
 export async function addChecklist(args: {
   workspaceId: string;
   boardId: string;
@@ -425,6 +426,44 @@ export async function addChecklist(args: {
     .insert({
       workspace_id: args.workspaceId,
       board_id: args.boardId,
+      label: args.label ?? '',
+      position: pos,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as ChecklistRow;
+}
+
+// Zellen-Checkliste: cell_id statt board_id. Position innerhalb der
+// Zelle (eigene Reihenfolge pro cell_id).
+async function nextCellChecklistPosition(
+  cellId: string,
+  workspaceId: string,
+): Promise<number> {
+  const { data, error } = await supabase
+    .from('checklists')
+    .select('position')
+    .eq('cell_id', cellId)
+    .eq('workspace_id', workspaceId)
+    .order('position', { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  const top = data && data.length > 0 ? (data[0] as { position: number }).position : -1;
+  return top + 1;
+}
+
+export async function addCellChecklist(args: {
+  workspaceId: string;
+  cellId: string;
+  label?: string;
+}): Promise<ChecklistRow> {
+  const pos = await nextCellChecklistPosition(args.cellId, args.workspaceId);
+  const { data, error } = await supabase
+    .from('checklists')
+    .insert({
+      workspace_id: args.workspaceId,
+      cell_id: args.cellId,
       label: args.label ?? '',
       position: pos,
     })
