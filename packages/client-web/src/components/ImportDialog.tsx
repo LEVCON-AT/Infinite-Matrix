@@ -14,6 +14,7 @@ import {
 import { ImportExecError, executeImport } from '../lib/import-exec';
 import type { ImportPlan, ImportStats } from '../lib/import-types';
 import { planStats } from '../lib/import-types';
+import { decryptPayload, isEncrypted } from '../lib/crypto';
 
 type Props = {
   workspaceId: string;
@@ -21,7 +22,7 @@ type Props = {
   onImported: (rootNodeId: string) => void;
 };
 
-type Phase = 'select' | 'preview' | 'running' | 'done' | 'error';
+type Phase = 'select' | 'password' | 'preview' | 'running' | 'done' | 'error';
 
 const ImportDialog: Component<Props> = (p) => {
   const [phase, setPhase] = createSignal<Phase>('select');
@@ -32,6 +33,9 @@ const ImportDialog: Component<Props> = (p) => {
   const [progressStep, setProgressStep] = createSignal<string>('');
   const [progressCur, setProgressCur] = createSignal(0);
   const [progressTotal, setProgressTotal] = createSignal(0);
+  const [encryptedText, setEncryptedText] = createSignal<string>('');
+  const [password, setPassword] = createSignal<string>('');
+  const [decrypting, setDecrypting] = createSignal(false);
 
   onMount(() => {
     const h = (e: KeyboardEvent) => {
@@ -48,9 +52,38 @@ const ImportDialog: Component<Props> = (p) => {
     const input = e.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
-    const text = await file.text();
+    const text = (await file.text()).trim();
+    handleInput(text);
+  }
+
+  function handleInput(text: string) {
+    if (isEncrypted(text)) {
+      setEncryptedText(text);
+      setPassword('');
+      setErrorMsg('');
+      setPhase('password');
+      return;
+    }
     setJsonText(text);
     doParse(text);
+  }
+
+  async function doDecrypt() {
+    const pw = password();
+    if (!pw) return;
+    setDecrypting(true);
+    setErrorMsg('');
+    try {
+      const plain = await decryptPayload(encryptedText(), pw);
+      setJsonText(plain);
+      setPassword('');
+      setEncryptedText('');
+      doParse(plain);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDecrypting(false);
+    }
   }
 
   function doParse(text: string) {
@@ -129,10 +162,10 @@ const ImportDialog: Component<Props> = (p) => {
             </p>
             <div class="import-actions">
               <label class="import-file-label">
-                JSON-Datei
+                Datei (.json / .imx)
                 <input
                   type="file"
-                  accept="application/json,.json"
+                  accept="application/json,.json,.imx"
                   onChange={onFileChange}
                 />
               </label>
@@ -140,20 +173,68 @@ const ImportDialog: Component<Props> = (p) => {
               <button
                 type="button"
                 onClick={() => {
-                  if (!jsonText().trim()) return;
-                  doParse(jsonText());
+                  const t = jsonText().trim();
+                  if (!t) return;
+                  handleInput(t);
                 }}
               >
-                Eingefuegtes JSON parsen
+                Eingefuegten Text parsen
               </button>
             </div>
             <textarea
               class="import-textarea"
-              placeholder="JSON hier einfuegen..."
+              placeholder="JSON oder IMATRIX_ENC:... hier einfuegen..."
               rows={8}
               value={jsonText()}
               onInput={(e) => setJsonText(e.currentTarget.value)}
             />
+          </Show>
+
+          <Show when={phase() === 'password'}>
+            <p class="hint">
+              Verschluesselte Datei (<code>.imx</code>). Passwort aus dem
+              Alt-Client eingeben.
+            </p>
+            <form
+              class="import-password-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                doDecrypt();
+              }}
+            >
+              <label class="import-file-label">
+                Passwort
+                <input
+                  type="password"
+                  autofocus
+                  autocomplete="current-password"
+                  value={password()}
+                  onInput={(e) => setPassword(e.currentTarget.value)}
+                  disabled={decrypting()}
+                />
+              </label>
+              <Show when={errorMsg()}>
+                <p class="error">{errorMsg()}</p>
+              </Show>
+              <div class="import-actions-bottom">
+                <button
+                  type="button"
+                  class="btn-secondary"
+                  onClick={() => {
+                    setEncryptedText('');
+                    setPassword('');
+                    setErrorMsg('');
+                    setPhase('select');
+                  }}
+                  disabled={decrypting()}
+                >
+                  Zurueck
+                </button>
+                <button type="submit" disabled={decrypting() || !password()}>
+                  {decrypting() ? 'Entschluessle...' : 'Entschluesseln'}
+                </button>
+              </div>
+            </form>
           </Show>
 
           <Show when={phase() === 'preview' && stats()}>
