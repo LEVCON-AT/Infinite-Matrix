@@ -4,11 +4,13 @@ import { signOut, useUser } from '../lib/auth';
 import {
   buildTree,
   fetchCellsForWorkspace,
+  fetchMatrixContent,
   fetchMyWorkspaces,
   fetchNodesForWorkspace,
 } from '../lib/queries';
 import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
 import NodeTree from '../components/NodeTree';
+import MatrixView from '../components/MatrixView';
 
 const Workspace: Component = () => {
   const user = useUser();
@@ -49,6 +51,16 @@ const Workspace: Component = () => {
     return (nodes() ?? []).find((n) => n.id === params.nodeId);
   });
 
+  // Matrix-Content fuer die aktuelle Node (nur wenn Typ=matrix).
+  const [matrixContent] = createResource(
+    () => {
+      const n = currentNode();
+      if (!n || n.type !== 'matrix') return null;
+      return { matrixId: n.id, workspaceId: n.workspace_id };
+    },
+    async (key) => (key ? fetchMatrixContent(key.matrixId, key.workspaceId) : undefined),
+  );
+
   async function onLogout() {
     await signOut();
   }
@@ -87,17 +99,33 @@ const Workspace: Component = () => {
           <Show
             when={currentNode()}
             fallback={
-              <p class="hint">
-                Waehle links eine Matrix oder ein Board. Inhalt erscheint ab 0d.4.
-              </p>
+              <p class="hint">Waehle links eine Matrix oder ein Board.</p>
             }
           >
-            <section class="node-preview">
-              <h2>{currentNode()?.label || '(ohne Label)'}</h2>
-              <p class="muted">
-                Typ: {currentNode()?.type} · ID: <code>{currentNode()?.id}</code>
-              </p>
-              <p class="hint">Render ab 0d.4 (Matrix) bzw. 0d.5 (Board).</p>
+            <section class="node-view">
+              <div class="node-view-head">
+                <h2>{currentNode()?.label || '(ohne Label)'}</h2>
+                <Show when={currentNode()?.alias}>
+                  <span class="node-alias">^{currentNode()!.alias}</span>
+                </Show>
+                <span class="node-type-badge" data-type={currentNode()?.type}>
+                  {currentNode()?.type}
+                </span>
+              </div>
+
+              <Show when={currentNode()?.type === 'matrix'}>
+                <MatrixView
+                  workspaceId={currentNode()!.workspace_id}
+                  matrixId={currentNode()!.id}
+                  content={matrixContent()}
+                />
+              </Show>
+
+              <Show when={currentNode()?.type === 'board'}>
+                <div class="node-placeholder">
+                  <p class="hint">BoardView kommt in 0d.5.</p>
+                </div>
+              </Show>
             </section>
           </Show>
         </Show>

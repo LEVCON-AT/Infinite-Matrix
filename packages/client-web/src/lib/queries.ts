@@ -1,5 +1,13 @@
 import { supabase } from './supabase';
-import type { CellRow, NodeRow, TreeNode, WorkspaceWithRole } from './types';
+import type {
+  CellRow,
+  ColRow,
+  MatrixContent,
+  NodeRow,
+  RowRow,
+  TreeNode,
+  WorkspaceWithRole,
+} from './types';
 
 // ─── Workspaces ──────────────────────────────────────────────────
 // Gibt alle Workspaces zurueck, in denen der aktuelle User Mitglied ist.
@@ -47,6 +55,46 @@ export async function fetchCellsForWorkspace(workspaceId: string): Promise<CellR
 
   if (error) throw error;
   return (data ?? []) as CellRow[];
+}
+
+// ─── Matrix-Inhalt (rows + cols + cells) ─────────────────────────
+// Laedt alle drei Tabellen parallel, gefiltert auf die Matrix. RLS
+// blockiert Fremd-Workspaces automatisch; workspace_id ist zusaetzlich
+// als Guard gesetzt, damit ein falscher Param nicht versehentlich
+// Zeilen anderer Matrizen durchschmuggelt.
+export async function fetchMatrixContent(
+  matrixId: string,
+  workspaceId: string,
+): Promise<MatrixContent> {
+  const [rowsRes, colsRes, cellsRes] = await Promise.all([
+    supabase
+      .from('rows')
+      .select('*')
+      .eq('matrix_id', matrixId)
+      .eq('workspace_id', workspaceId)
+      .order('position', { ascending: true }),
+    supabase
+      .from('cols')
+      .select('*')
+      .eq('matrix_id', matrixId)
+      .eq('workspace_id', workspaceId)
+      .order('position', { ascending: true }),
+    supabase
+      .from('cells')
+      .select('*')
+      .eq('matrix_id', matrixId)
+      .eq('workspace_id', workspaceId),
+  ]);
+
+  if (rowsRes.error) throw rowsRes.error;
+  if (colsRes.error) throw colsRes.error;
+  if (cellsRes.error) throw cellsRes.error;
+
+  return {
+    rows: (rowsRes.data ?? []) as RowRow[],
+    cols: (colsRes.data ?? []) as ColRow[],
+    cells: (cellsRes.data ?? []) as CellRow[],
+  };
 }
 
 // ─── Tree-Aufbau ─────────────────────────────────────────────────

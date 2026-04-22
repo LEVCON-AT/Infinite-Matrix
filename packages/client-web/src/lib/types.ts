@@ -47,6 +47,30 @@ export type CellRow = {
   data: Record<string, unknown>;
 };
 
+export type RowRow = {
+  id: string;
+  matrix_id: string;
+  workspace_id: string;
+  label: string;
+  position: number;
+};
+
+export type ColRow = {
+  id: string;
+  matrix_id: string;
+  workspace_id: string;
+  label: string;
+  position: number;
+};
+
+export type MatrixContent = {
+  rows: RowRow[];
+  cols: ColRow[];
+  cells: CellRow[];
+};
+
+export type CellFeature = 'matrix' | 'board' | 'info' | 'checklists';
+
 // Hilfs-Shape fuer den Sidebar-Tree. Nodes werden nach parent_cell_id
 // verschachtelt; die Zelle wiederum kennt ihre Matrix (= parent-Node).
 export type TreeNode = {
