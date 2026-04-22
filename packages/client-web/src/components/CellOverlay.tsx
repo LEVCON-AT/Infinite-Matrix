@@ -379,10 +379,10 @@ const CellOverlay: Component<Props> = (p) => {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
-                  // blur -> onAliasBlur speichert, dann onOpen (navigate
-                  // wenn genau 1 Sub-Node, sonst close).
+                  // Enter im Alias = nur save (via blur). Dialog bleibt
+                  // offen, damit User anschliessend mit 1-9 Features
+                  // auswaehlen und dann selbst mit Enter oeffnen kann.
                   (e.currentTarget as HTMLInputElement).blur();
-                  onOpen();
                 }
               }}
             />
