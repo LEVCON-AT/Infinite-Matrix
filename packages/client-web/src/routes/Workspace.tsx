@@ -1,4 +1,11 @@
-import { Show, createEffect, createMemo, createResource, type Component } from 'solid-js';
+import {
+  Show,
+  createEffect,
+  createMemo,
+  createResource,
+  createSignal,
+  type Component,
+} from 'solid-js';
 import { useNavigate, useParams } from '@solidjs/router';
 import { signOut, useUser } from '../lib/auth';
 import {
@@ -13,6 +20,7 @@ import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
 import NodeTree from '../components/NodeTree';
 import MatrixView from '../components/MatrixView';
 import BoardView from '../components/BoardView';
+import ImportDialog from '../components/ImportDialog';
 
 const Workspace: Component = () => {
   const user = useUser();
@@ -20,6 +28,7 @@ const Workspace: Component = () => {
   const navigate = useNavigate();
 
   const [workspaces] = createResource(() => fetchMyWorkspaces());
+  const [showImport, setShowImport] = createSignal(false);
 
   // Default-Workspace auswaehlen, wenn URL keinen fuehrt.
   createEffect(() => {
@@ -36,12 +45,12 @@ const Workspace: Component = () => {
     return list.find((w) => w.id === params.workspaceId);
   });
 
-  const [nodes] = createResource(
+  const [nodes, { refetch: refetchNodes }] = createResource(
     () => params.workspaceId,
     async (wid) => (wid ? fetchNodesForWorkspace(wid) : []),
   );
 
-  const [cells] = createResource(
+  const [cells, { refetch: refetchCells }] = createResource(
     () => params.workspaceId,
     async (wid) => (wid ? fetchCellsForWorkspace(wid) : []),
   );
@@ -77,6 +86,16 @@ const Workspace: Component = () => {
     await signOut();
   }
 
+  async function onImported(rootNodeId: string) {
+    // Tree neu laden, damit der Import im Sidebar sichtbar wird,
+    // dann zur neuen Root-Node navigieren.
+    await Promise.all([refetchNodes(), refetchCells()]);
+    setShowImport(false);
+    if (params.workspaceId) {
+      navigate(`/w/${params.workspaceId}/n/${rootNodeId}`);
+    }
+  }
+
   return (
     <div class="ws-shell">
       <aside class="ws-sidebar">
@@ -91,6 +110,18 @@ const Workspace: Component = () => {
             currentNodeId={params.nodeId}
           />
         </Show>
+        <div class="ws-actions">
+          <Show when={params.workspaceId}>
+            <button
+              type="button"
+              class="btn-subtle"
+              onClick={() => setShowImport(true)}
+            >
+              + JSON importieren
+            </button>
+          </Show>
+        </div>
+
         <div class="ws-user-block">
           <span class="ws-email">{user()?.email}</span>
           <button type="button" onClick={onLogout}>
@@ -98,6 +129,14 @@ const Workspace: Component = () => {
           </button>
         </div>
       </aside>
+
+      <Show when={showImport() && params.workspaceId}>
+        <ImportDialog
+          workspaceId={params.workspaceId as string}
+          onClose={() => setShowImport(false)}
+          onImported={onImported}
+        />
+      </Show>
 
       <main class="ws-main">
         <Show
