@@ -128,57 +128,58 @@ const ChecklistPanel: Component<Props> = (p) => {
   const done = () => p.items.filter((i) => i.done).length;
 
   return (
-    <li class="cl-item">
+    <li class="cl-item" attr:data-edit={editMode() ? 'true' : 'false'}>
       <header class="cl-head" classList={{ 'mx-editable': editMode() }}>
-        <Show
-          when={editMode()}
-          fallback={
-            <>
-              <span class="cl-label">{p.checklist.label || '(Liste)'}</span>
-              <Show when={p.checklist.alias}>
-                <span class="cl-alias">^{p.checklist.alias}</span>
-              </Show>
-            </>
-          }
+        <input
+          class="mx-head-input cl-head-input"
+          type="text"
+          value={p.checklist.label}
+          placeholder="(Liste)"
+          readOnly={!editMode()}
+          tabIndex={editMode() ? 0 : -1}
+          onBlur={(e) => {
+            if (!editMode()) return;
+            onRename(e.currentTarget.value);
+          }}
+          onKeyDown={(e) => {
+            if (!editMode()) return;
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              (e.currentTarget as HTMLInputElement).blur();
+            }
+          }}
+        />
+        <input
+          ref={aliasInputRef}
+          class="cl-alias-input"
+          type="text"
+          value={p.checklist.alias ?? ''}
+          placeholder="^alias"
+          readOnly={!editMode()}
+          tabIndex={editMode() ? 0 : -1}
+          onBlur={(e) => {
+            if (!editMode()) return;
+            onAliasBlur(e.currentTarget.value);
+          }}
+          onKeyDown={(e) => {
+            if (!editMode()) return;
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              (e.currentTarget as HTMLInputElement).blur();
+            }
+          }}
+        />
+        <button
+          type="button"
+          class="mx-del-btn"
+          title="Checkliste loeschen"
+          aria-label="Checkliste loeschen"
+          tabIndex={editMode() ? 0 : -1}
+          onClick={onDel}
+          disabled={busy() || !editMode()}
         >
-          <input
-            class="mx-head-input cl-head-input"
-            type="text"
-            value={p.checklist.label}
-            placeholder="(Liste)"
-            onBlur={(e) => onRename(e.currentTarget.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                (e.currentTarget as HTMLInputElement).blur();
-              }
-            }}
-          />
-          <input
-            ref={aliasInputRef}
-            class="cl-alias-input"
-            type="text"
-            value={p.checklist.alias ?? ''}
-            placeholder="^alias"
-            onBlur={(e) => onAliasBlur(e.currentTarget.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                (e.currentTarget as HTMLInputElement).blur();
-              }
-            }}
-          />
-          <button
-            type="button"
-            class="mx-del-btn"
-            title="Checkliste loeschen"
-            aria-label="Checkliste loeschen"
-            onClick={onDel}
-            disabled={busy()}
-          >
-            ✕
-          </button>
-        </Show>
+          ✕
+        </button>
         <span class="cl-progress">
           {done()}/{p.items.length}
         </span>
@@ -204,44 +205,45 @@ const ChecklistPanel: Component<Props> = (p) => {
                 aria-label="Erledigt"
                 onChange={(e) => onToggleItem(it, e.currentTarget.checked)}
               />
-              <Show
-                when={editMode()}
-                fallback={
-                  <span class="cl-text-ro" classList={{ 'cl-text-done': it.done }}>
-                    {it.text || '(Punkt)'}
-                  </span>
-                }
+              {/* Text immer Input, readOnly togglet; Del immer im DOM
+                  mit opacity/pointer-events. So bleibt jedes Item beim
+                  Edit-Mode-Toggle form- und groessenstabil. */}
+              <input
+                class="cl-text-input"
+                type="text"
+                value={it.text}
+                placeholder="(Punkt)"
+                readOnly={!editMode()}
+                tabIndex={editMode() ? 0 : -1}
+                onBlur={(e) => {
+                  if (!editMode()) return;
+                  onRenameItem(it, e.currentTarget.value);
+                }}
+                onKeyDown={(e) => {
+                  if (!editMode()) return;
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    (e.currentTarget as HTMLInputElement).blur();
+                  } else if (e.altKey && e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    void onLevelItem(it, 1);
+                  } else if (e.altKey && e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    void onLevelItem(it, -1);
+                  }
+                }}
+              />
+              <button
+                type="button"
+                class="cl-it-del"
+                title="Punkt loeschen"
+                aria-label="Punkt loeschen"
+                tabIndex={editMode() ? 0 : -1}
+                onClick={() => onDelItem(it)}
+                disabled={busy() || !editMode()}
               >
-                <input
-                  class="cl-text-input"
-                  type="text"
-                  value={it.text}
-                  placeholder="(Punkt)"
-                  onBlur={(e) => onRenameItem(it, e.currentTarget.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      (e.currentTarget as HTMLInputElement).blur();
-                    } else if (e.altKey && e.key === 'ArrowRight') {
-                      e.preventDefault();
-                      void onLevelItem(it, 1);
-                    } else if (e.altKey && e.key === 'ArrowLeft') {
-                      e.preventDefault();
-                      void onLevelItem(it, -1);
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  class="cl-it-del"
-                  title="Punkt loeschen"
-                  aria-label="Punkt loeschen"
-                  onClick={() => onDelItem(it)}
-                  disabled={busy()}
-                >
-                  ✕
-                </button>
-              </Show>
+                ✕
+              </button>
             </li>
           )}
         </For>

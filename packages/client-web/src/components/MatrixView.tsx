@@ -371,34 +371,38 @@ const MatrixView: Component<Props> = (p) => {
               <For each={cols()}>
                 {(col) => (
                   <div class="mx-col-head" classList={{ 'mx-editable': editMode() }}>
-                    <Show
-                      when={editMode()}
-                      fallback={<span class="mx-col-label">{col.label || '(Spalte)'}</span>}
+                    {/* IMMER Input: readOnly togglet statt span-swap — so
+                        bleibt die Kopfzeile beim Edit-Toggle formstabil. */}
+                    <input
+                      class="mx-head-input"
+                      type="text"
+                      value={col.label}
+                      placeholder="(Spalte)"
+                      readOnly={!editMode()}
+                      tabIndex={editMode() ? 0 : -1}
+                      onBlur={(e) => {
+                        if (!editMode()) return;
+                        onRenameCol(col, e.currentTarget.value.trim());
+                      }}
+                      onKeyDown={(e) => {
+                        if (!editMode()) return;
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          (e.currentTarget as HTMLInputElement).blur();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      class="mx-del-btn"
+                      title="Spalte loeschen"
+                      aria-label="Spalte loeschen"
+                      tabIndex={editMode() ? 0 : -1}
+                      onClick={() => onDelCol(col)}
+                      disabled={busy() || !editMode()}
                     >
-                      <input
-                        class="mx-head-input"
-                        type="text"
-                        value={col.label}
-                        placeholder="(Spalte)"
-                        onBlur={(e) => onRenameCol(col, e.currentTarget.value.trim())}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            (e.currentTarget as HTMLInputElement).blur();
-                          }
-                        }}
-                      />
-                      <button
-                        type="button"
-                        class="mx-del-btn"
-                        title="Spalte loeschen"
-                        aria-label="Spalte loeschen"
-                        onClick={() => onDelCol(col)}
-                        disabled={busy()}
-                      >
-                        ✕
-                      </button>
-                    </Show>
+                      ✕
+                    </button>
                   </div>
                 )}
               </For>
@@ -423,36 +427,36 @@ const MatrixView: Component<Props> = (p) => {
                 {(row) => (
                   <>
                     <div class="mx-row-head" classList={{ 'mx-editable': editMode() }}>
-                      <Show
-                        when={editMode()}
-                        fallback={
-                          <span class="mx-row-label">{row.label || '(Zeile)'}</span>
-                        }
+                      <input
+                        class="mx-head-input"
+                        type="text"
+                        value={row.label}
+                        placeholder="(Zeile)"
+                        readOnly={!editMode()}
+                        tabIndex={editMode() ? 0 : -1}
+                        onBlur={(e) => {
+                          if (!editMode()) return;
+                          onRenameRow(row, e.currentTarget.value.trim());
+                        }}
+                        onKeyDown={(e) => {
+                          if (!editMode()) return;
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            (e.currentTarget as HTMLInputElement).blur();
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        class="mx-del-btn"
+                        title="Zeile loeschen"
+                        aria-label="Zeile loeschen"
+                        tabIndex={editMode() ? 0 : -1}
+                        onClick={() => onDelRow(row)}
+                        disabled={busy() || !editMode()}
                       >
-                        <input
-                          class="mx-head-input"
-                          type="text"
-                          value={row.label}
-                          placeholder="(Zeile)"
-                          onBlur={(e) => onRenameRow(row, e.currentTarget.value.trim())}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              (e.currentTarget as HTMLInputElement).blur();
-                            }
-                          }}
-                        />
-                        <button
-                          type="button"
-                          class="mx-del-btn"
-                          title="Zeile loeschen"
-                          aria-label="Zeile loeschen"
-                          onClick={() => onDelRow(row)}
-                          disabled={busy()}
-                        >
-                          ✕
-                        </button>
-                      </Show>
+                        ✕
+                      </button>
                     </div>
                     <For each={cols()}>
                       {(col) => {

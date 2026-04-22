@@ -233,63 +233,57 @@ const BoardView: Component<Props> = (p) => {
                       data-has-color={col.color ? 'yes' : 'no'}
                     >
                       <header class="kb-col-head" classList={{ 'mx-editable': editMode() }}>
-                        <Show
-                          when={editMode()}
-                          fallback={
-                            <span class="kb-col-label">
-                              {col.label || '(Spalte)'}
-                            </span>
-                          }
+                        <input
+                          class="mx-head-input"
+                          type="text"
+                          value={col.label}
+                          placeholder="(Spalte)"
+                          readOnly={!editMode()}
+                          tabIndex={editMode() ? 0 : -1}
+                          onBlur={(e) => {
+                            if (!editMode()) return;
+                            onRenameCol(col, e.currentTarget.value.trim());
+                          }}
+                          onKeyDown={(e) => {
+                            if (!editMode()) return;
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              (e.currentTarget as HTMLInputElement).blur();
+                            }
+                          }}
+                        />
+                        <input
+                          type="color"
+                          class="kb-col-color-picker"
+                          value={col.color ?? '#888888'}
+                          title="Spalten-Farbe"
+                          disabled={!editMode()}
+                          tabIndex={editMode() ? 0 : -1}
+                          onChange={(e) => onColorCol(col, e.currentTarget.value)}
+                        />
+                        <button
+                          type="button"
+                          class="mx-del-btn"
+                          title="Farbe entfernen"
+                          aria-label="Farbe entfernen"
+                          tabIndex={editMode() && col.color ? 0 : -1}
+                          onClick={() => onColorCol(col, null)}
+                          disabled={!editMode() || !col.color}
                         >
-                          <input
-                            class="mx-head-input"
-                            type="text"
-                            value={col.label}
-                            placeholder="(Spalte)"
-                            onBlur={(e) =>
-                              onRenameCol(col, e.currentTarget.value.trim())
-                            }
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                (e.currentTarget as HTMLInputElement).blur();
-                              }
-                            }}
-                          />
-                          <input
-                            type="color"
-                            class="kb-col-color-picker"
-                            value={col.color ?? '#888888'}
-                            title="Spalten-Farbe"
-                            onChange={(e) =>
-                              onColorCol(col, e.currentTarget.value)
-                            }
-                          />
-                          <Show when={col.color}>
-                            <button
-                              type="button"
-                              class="mx-del-btn"
-                              title="Farbe entfernen"
-                              aria-label="Farbe entfernen"
-                              onClick={() => onColorCol(col, null)}
-                            >
-                              ○
-                            </button>
-                          </Show>
-                          <button
-                            type="button"
-                            class="mx-del-btn"
-                            title="Spalte loeschen"
-                            aria-label="Spalte loeschen"
-                            onClick={() => onDelCol(col)}
-                            disabled={busy()}
-                          >
-                            ✕
-                          </button>
-                        </Show>
-                        <Show when={!editMode()}>
-                          <span class="kb-col-count">{list().length}</span>
-                        </Show>
+                          ○
+                        </button>
+                        <button
+                          type="button"
+                          class="mx-del-btn"
+                          title="Spalte loeschen"
+                          aria-label="Spalte loeschen"
+                          tabIndex={editMode() ? 0 : -1}
+                          onClick={() => onDelCol(col)}
+                          disabled={busy() || !editMode()}
+                        >
+                          ✕
+                        </button>
+                        <span class="kb-col-count">{list().length}</span>
                       </header>
 
                       <Show

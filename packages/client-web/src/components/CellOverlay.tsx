@@ -144,7 +144,9 @@ const CellOverlay: Component<Props> = (p) => {
       return;
     }
     // On: Zelle sicherstellen, Node anlegen, Feature rein, FK setzen.
-    const baseCell = cur ?? (await ensureCell({ features: cur?.features ?? [] }));
+    // Wenn cur null ist, ist cur?.features ebenfalls undefined — also
+    // direkt [] starten, das spart die redundante Narrowing-Fehlspur.
+    const baseCell = cur ?? (await ensureCell({ features: [] }));
     const newNode =
       def.key === 'matrix'
         ? await createChildMatrix({
