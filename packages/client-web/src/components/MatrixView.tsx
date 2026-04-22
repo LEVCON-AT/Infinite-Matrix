@@ -217,17 +217,15 @@ const MatrixView: Component<Props> = (p) => {
   return (
     <div class="matrix-wrap">
       <Show when={overlayTarget()}>
-        {(t) => (
-          <CellOverlay
-            workspaceId={p.workspaceId}
-            matrixId={p.matrixId}
-            row={t().row}
-            col={t().col}
-            cell={t().cell}
-            onClose={() => setOverlayTarget(null)}
-            onChanged={() => p.onChanged?.()}
-          />
-        )}
+        <CellOverlay
+          workspaceId={p.workspaceId}
+          matrixId={p.matrixId}
+          row={overlayTarget()!.row}
+          col={overlayTarget()!.col}
+          cell={overlayTarget()!.cell}
+          onClose={() => setOverlayTarget(null)}
+          onChanged={() => p.onChanged?.()}
+        />
       </Show>
 
       <Show

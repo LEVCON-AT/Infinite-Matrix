@@ -281,6 +281,12 @@ const CellOverlay: Component<Props> = (p) => {
     }
   }
 
+  // Props sind in Solid accessor-basiert. Nach Unmount kann der Zugriff
+  // auf p.row.id / p.col.id stale werden — hier bei Mount einmalig in
+  // Konstanten capturen, damit der onCleanup safe ist.
+  const capturedRowId = p.row.id;
+  const capturedColId = p.col.id;
+
   // Alias-Input sofort fokussieren.
   onMount(() => {
     aliasInput?.focus();
@@ -290,7 +296,7 @@ const CellOverlay: Component<Props> = (p) => {
   // Read/Edit-Mode sofort weiter funktioniert.
   onCleanup(() => {
     const el = document.querySelector(
-      `.mx-cell[data-row-id="${p.row.id}"][data-col-id="${p.col.id}"]`,
+      `.mx-cell[data-row-id="${capturedRowId}"][data-col-id="${capturedColId}"]`,
     ) as HTMLElement | null;
     el?.focus({ preventScroll: true });
   });
@@ -373,7 +379,10 @@ const CellOverlay: Component<Props> = (p) => {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
+                  // blur -> onAliasBlur speichert, dann onOpen (navigate
+                  // wenn genau 1 Sub-Node, sonst close).
                   (e.currentTarget as HTMLInputElement).blur();
+                  onOpen();
                 }
               }}
             />
