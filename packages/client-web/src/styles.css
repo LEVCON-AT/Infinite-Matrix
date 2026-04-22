@@ -335,6 +335,37 @@ button[type='button']:disabled {
   margin: 0;
 }
 
+.cell-checklists-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.cell-page-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.cell-page-head-text {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.cell-page-head-text h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.cell-page-sub {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 .node-alias {
   color: var(--muted);
   font-size: 0.9rem;

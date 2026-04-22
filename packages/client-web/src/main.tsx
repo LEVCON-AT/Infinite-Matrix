@@ -15,6 +15,7 @@ render(
       <Route path="/login" component={Login} />
       <Route path="/w/:workspaceId" component={Workspace} />
       <Route path="/w/:workspaceId/n/:nodeId" component={Workspace} />
+      <Route path="/w/:workspaceId/c/:cellId/checklists" component={Workspace} />
     </Router>
   ),
   root,
