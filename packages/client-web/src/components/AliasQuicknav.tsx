@@ -102,9 +102,12 @@ const AliasQuicknav: Component<Props> = (p) => {
 
   async function onSubmit(e: SubmitEvent) {
     e.preventDefault();
-    const q = query().trim();
-    if (!q) return;
     if (busy()) return;
+    const q = query().trim();
+    if (!q) {
+      setError('Bitte Kuerzel eingeben.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
