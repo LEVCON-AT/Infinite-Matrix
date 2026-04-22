@@ -107,15 +107,16 @@ const MatrixView: Component<Props> = (p) => {
       navigate(`/w/${p.workspaceId}/n/${cell.board_id}`);
       return;
     }
-    // Flag-Feature Checklisten: navigiere auf die Zell-Seite, die die
-    // Checklisten als Vollbild rendert (wie Sub-Matrix/Sub-Board).
+    // Flag-Features (info/checklists): eigene Zell-Seite als Vollbild,
+    // analog zu Sub-Matrix/Sub-Board. ESC auf der Page bringt zurueck.
     if (featKey === 'checklists') {
       rememberCellFocus(row.id, col.id);
       navigate(`/w/${p.workspaceId}/c/${cell.id}/checklists`);
       return;
     }
     if (featKey === 'info') {
-      showToast('Info-Feld: Editor kommt in 0e.1.f.', 'info');
+      rememberCellFocus(row.id, col.id);
+      navigate(`/w/${p.workspaceId}/c/${cell.id}/info`);
       return;
     }
   }
@@ -513,13 +514,12 @@ const MatrixView: Component<Props> = (p) => {
                               <div class="mx-cell-feats">
                                 <For each={features()}>
                                   {(f) => {
-                                    const navTarget =
-                                      f === 'matrix'
-                                        ? cell()?.child_matrix_id
-                                        : f === 'board'
-                                          ? cell()?.board_id
-                                          : null;
-                                    const chipClickable = () => !!navTarget;
+                                    // Alle Features sind klickbar, sobald die
+                                    // Zelle existiert: Strukturelle (matrix/
+                                    // board) navigieren zum Sub-Node, Flag-
+                                    // Features (info/checklists) auf die
+                                    // Zell-Page.
+                                    const chipClickable = () => !!cell();
                                     return (
                                       <span
                                         class="mx-feat-chip"
@@ -527,11 +527,7 @@ const MatrixView: Component<Props> = (p) => {
                                           'mx-feat-chip-link': chipClickable(),
                                         }}
                                         data-feat={f}
-                                        title={
-                                          navTarget
-                                            ? `${FEATURE_LABEL[f]} oeffnen`
-                                            : FEATURE_LABEL[f]
-                                        }
+                                        title={`${FEATURE_LABEL[f]} oeffnen`}
                                         onClick={(e) =>
                                           onChipClick(e, cell(), f, row, col)
                                         }

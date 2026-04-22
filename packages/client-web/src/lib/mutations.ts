@@ -13,6 +13,7 @@ import type {
   ChecklistItemRow,
   ChecklistRow,
   ColRow,
+  InfoField,
   KbCardRow,
   KbColRow,
   NodeRow,
@@ -600,4 +601,117 @@ export function setChecklistItemPosition(
 export async function delChecklistItem(itemId: string): Promise<void> {
   const { error } = await supabase.from('checklist_items').delete().eq('id', itemId);
   if (error) throw error;
+}
+
+// ─── Info-Felder (cell.data.infoFields[]) ──────────────────────
+// Read-modify-write auf cell.data. Jede Mutation liest die Zelle frisch,
+// merged das Array und schreibt zurueck. Race-Fenster ist eng; ein
+// paralleler Writer mit anderen Schluesseln in cell.data ueberschreibt
+// nichts Fremdes, weil wir nur infoFields ersetzen.
+async function mutateCellData<T>(
+  cellId: string,
+  mutator: (data: Record<string, unknown>) => { data: Record<string, unknown>; result: T },
+): Promise<T> {
+  const { data: cur, error: readErr } = await supabase
+    .from('cells')
+    .select('data')
+    .eq('id', cellId)
+    .single();
+  if (readErr) throw readErr;
+  const cellData = (cur?.data ?? {}) as Record<string, unknown>;
+  const { data: nextData, result } = mutator(cellData);
+  const { error: writeErr } = await supabase
+    .from('cells')
+    .update({ data: nextData })
+    .eq('id', cellId);
+  if (writeErr) throw writeErr;
+  return result;
+}
+
+function readInfoFields(data: Record<string, unknown>): InfoField[] {
+  const raw = (data as { infoFields?: unknown }).infoFields;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (f): f is InfoField =>
+      !!f &&
+      typeof f === 'object' &&
+      typeof (f as InfoField).id === 'string' &&
+      typeof (f as InfoField).label === 'string' &&
+      typeof (f as InfoField).value === 'string',
+  );
+}
+
+function genInfoFieldId(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'if_' + Math.random().toString(36).slice(2, 10);
+}
+
+export async function addCellInfoField(args: {
+  cellId: string;
+  label?: string;
+}): Promise<InfoField> {
+  return mutateCellData(args.cellId, (cellData) => {
+    const fields = readInfoFields(cellData);
+    const field: InfoField = {
+      id: genInfoFieldId(),
+      label: args.label ?? '',
+      value: '',
+    };
+    const next = { ...cellData, infoFields: [...fields, field] };
+    return { data: next, result: field };
+  });
+}
+
+export async function renameCellInfoField(
+  cellId: string,
+  fieldId: string,
+  label: string,
+): Promise<void> {
+  await mutateCellData(cellId, (cellData) => {
+    const fields = readInfoFields(cellData).map((f) =>
+      f.id === fieldId ? { ...f, label } : f,
+    );
+    return { data: { ...cellData, infoFields: fields }, result: undefined };
+  });
+}
+
+export async function setCellInfoFieldValue(
+  cellId: string,
+  fieldId: string,
+  value: string,
+): Promise<void> {
+  await mutateCellData(cellId, (cellData) => {
+    const fields = readInfoFields(cellData).map((f) =>
+      f.id === fieldId ? { ...f, value } : f,
+    );
+    return { data: { ...cellData, infoFields: fields }, result: undefined };
+  });
+}
+
+export async function moveCellInfoField(
+  cellId: string,
+  fieldId: string,
+  dir: -1 | 1,
+): Promise<void> {
+  await mutateCellData(cellId, (cellData) => {
+    const fields = readInfoFields(cellData);
+    const idx = fields.findIndex((f) => f.id === fieldId);
+    const next = idx + dir;
+    if (idx < 0 || next < 0 || next >= fields.length) {
+      return { data: cellData, result: undefined };
+    }
+    const copy = fields.slice();
+    [copy[idx], copy[next]] = [copy[next], copy[idx]];
+    return { data: { ...cellData, infoFields: copy }, result: undefined };
+  });
+}
+
+export async function delCellInfoField(
+  cellId: string,
+  fieldId: string,
+): Promise<void> {
+  await mutateCellData(cellId, (cellData) => {
+    const fields = readInfoFields(cellData).filter((f) => f.id !== fieldId);
+    return { data: { ...cellData, infoFields: fields }, result: undefined };
+  });
 }

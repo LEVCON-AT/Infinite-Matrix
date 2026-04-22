@@ -8,7 +8,7 @@ import {
   onMount,
   type Component,
 } from 'solid-js';
-import { useNavigate, useParams } from '@solidjs/router';
+import { useLocation, useNavigate, useParams } from '@solidjs/router';
 import { signOut, useUser } from '../lib/auth';
 import {
   buildTree,
@@ -24,6 +24,7 @@ import NodeTree from '../components/NodeTree';
 import MatrixView from '../components/MatrixView';
 import BoardView from '../components/BoardView';
 import CellChecklistsPage from '../components/CellChecklistsPage';
+import CellInfoPage from '../components/CellInfoPage';
 import ImportDialog from '../components/ImportDialog';
 
 const Workspace: Component = () => {
@@ -34,7 +35,18 @@ const Workspace: Component = () => {
     cellId?: string;
   }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const editMode = useEditMode();
+
+  // Zell-Page-Section: der letzte URL-Segment hinter /c/:cellId/ entscheidet,
+  // welches Feature-Panel gerendert wird. "checklists" | "info" | sonst leer.
+  const cellSection = createMemo<'checklists' | 'info' | null>(() => {
+    const p = location.pathname;
+    if (!params.cellId) return null;
+    if (p.endsWith('/checklists')) return 'checklists';
+    if (p.endsWith('/info')) return 'info';
+    return null;
+  });
 
   const [workspaces] = createResource(() => fetchMyWorkspaces());
   const [showImport, setShowImport] = createSignal(false);
@@ -231,12 +243,25 @@ const Workspace: Component = () => {
           >
             <Show when={currentCell()}>
               <section class="node-view">
-                <CellChecklistsPage
-                  workspaceId={currentCell()!.workspace_id}
-                  cell={currentCell()!}
-                  row={cellRow()}
-                  col={cellCol()}
-                />
+                <Show when={cellSection() === 'checklists'}>
+                  <CellChecklistsPage
+                    workspaceId={currentCell()!.workspace_id}
+                    cell={currentCell()!}
+                    row={cellRow()}
+                    col={cellCol()}
+                  />
+                </Show>
+                <Show when={cellSection() === 'info'}>
+                  <CellInfoPage
+                    workspaceId={currentCell()!.workspace_id}
+                    cell={currentCell()!}
+                    row={cellRow()}
+                    col={cellCol()}
+                    onChanged={() => {
+                      void refetchCells();
+                    }}
+                  />
+                </Show>
               </section>
             </Show>
 

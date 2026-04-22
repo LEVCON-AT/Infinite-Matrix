@@ -1469,6 +1469,136 @@ button[type='submit']:hover:not(:disabled) {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+/* ── Cell-Info-Page ───────────────────────────────────────────── */
+.cell-info-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.info-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* Einzelnes Feld — Box mit Label-Kopf und Wert-Textarea. Analog
+   HTML-Vorbild .info-field (border-bottom zwischen Feldern statt
+   Card-Style). */
+.info-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border: 0.5px solid var(--border);
+  border-radius: var(--r);
+  background: var(--bg);
+  transition: border-color var(--tr-std), background var(--tr-std);
+}
+
+.info-field[data-edit='true'] {
+  background: var(--bg2);
+  border-color: var(--border2);
+}
+
+.info-field-hd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 24px;
+}
+
+/* Arrow-Stack: ▲ / ▼ als kleine Square-Buttons, immer im DOM, im
+   View-Mode transparent (zero layout shift). */
+.info-arrow-stack {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-right: var(--space-xs);
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.info-arrow {
+  padding: 0;
+  height: 11px;
+  width: 16px;
+  line-height: 1;
+  font-size: 9px;
+  background: transparent;
+  color: var(--text3);
+  border: 0.5px solid transparent;
+  border-radius: 2px;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: var(--tr-std);
+}
+
+.info-field[data-edit='true'] .info-arrow:not(:disabled) {
+  opacity: 0.65;
+  pointer-events: auto;
+}
+
+.info-field[data-edit='true'] .info-arrow:not(:disabled):hover,
+.info-arrow:not(:disabled):focus-visible {
+  opacity: 1;
+  color: var(--text);
+  background: var(--bg3);
+  border-color: var(--border2);
+}
+
+/* Label-Input: HTML-Vorbild rendert als "info-label" (Span mit Bold).
+   Wir nutzen dasselbe readOnly-Pattern wie die Matrix-Header: Input
+   immer da, nur Hintergrund/Border gelkich transparent im View. */
+.info-label-input {
+  flex: 1;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+/* Value: Textarea, im View transparent ohne Border. auto-resize via
+   CSS field-sizing (modern Browser) — Fallback auf fixe rows=3. */
+.info-val {
+  width: 100%;
+  min-height: 64px;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg);
+  color: var(--text);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  transition: background var(--tr-std), border-color var(--tr-std);
+  field-sizing: content;
+}
+
+.info-val:focus-visible {
+  border-color: var(--focus-color);
+  outline: none;
+}
+
+.info-val:read-only {
+  background: transparent;
+  border-color: transparent;
+  cursor: default;
+  resize: none;
+  padding: var(--space-xs) 0;
+}
+
+.info-val:read-only:empty::before,
+.info-val:read-only:placeholder-shown {
+  color: var(--text3);
+  font-style: italic;
+}
+
+.info-add-btn {
+  align-self: flex-start;
+  margin-top: var(--space-sm);
+}
+
 /* ── Overlays / Modals (HTML-smodal-Vorbild) ──────────────────── */
 .overlay-scrim {
   position: fixed;

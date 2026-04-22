@@ -71,6 +71,15 @@ export type MatrixContent = {
 
 export type CellFeature = 'matrix' | 'board' | 'info' | 'checklists';
 
+// Info-Feld auf einer Zelle. Lebt in cell.data.infoFields[].
+// value ist plain text (newlines preserved); HTML-Rendering kommt spaeter
+// mit sanitizeHtml-Port — fuer V0 reicht Textarea, kein XSS-Risiko.
+export type InfoField = {
+  id: string;
+  label: string;
+  value: string;
+};
+
 // ─── Kanban ─────────────────────────────────────────────────────
 export type KbColRow = {
   id: string;
