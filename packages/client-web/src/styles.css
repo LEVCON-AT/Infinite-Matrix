@@ -437,13 +437,19 @@ button[type='button']:disabled {
 
 /* Hover + Focus auf ALLEN Zellen — auch im View-Mode: der User
    muss sehen, wo der Tastatur-/Maus-Fokus liegt, um mit Pfeiltasten
-   zu navigieren. cursor:pointer ist nur dort, wo Klick auch wirkt. */
+   zu navigieren. cursor:pointer ist nur dort, wo Klick auch wirkt.
+
+   Hintergrund auf :focus (nicht :focus-visible), weil Browser nach
+   programmatischem element.focus() (Restore via Map nach Sidebar-Nav)
+   :focus-visible oft nicht matchen — dann saehe der User nichts.
+   Outline bleibt :focus-visible: dezent bei Maus-Click, deutlich bei
+   Keyboard-Navigation. */
 .mx-cell:hover,
-.mx-cell:focus-visible {
+.mx-cell:focus {
   background: var(--bg-elev-2);
 }
 
-.mx-cell:focus-visible {
+.mx-cell:focus {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
