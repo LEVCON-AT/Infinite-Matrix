@@ -1076,3 +1076,247 @@ button[type='button']:disabled {
   background: var(--accent);
   transition: width 180ms cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* ─── Edit-Mode-Button im Workspace-Header ─── */
+.ws-main-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.edit-mode-btn {
+  padding: 0.35rem 0.85rem;
+  font-size: 0.85rem;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    background 180ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 180ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.edit-mode-btn:hover {
+  background: var(--bg-elev-2);
+  color: var(--fg);
+}
+
+.edit-mode-btn.active {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  border-color: var(--accent);
+}
+
+/* ─── Matrix Edit-Mode: Add-Cells + Inline-Rename + Delete-Btn ─── */
+body.edit-mode .matrix-grid {
+  position: relative;
+}
+
+.mx-toolbar {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.mx-toolbar button {
+  padding: 0.4rem 0.85rem;
+  font-size: 0.85rem;
+  border-radius: 4px;
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  transition:
+    background 180ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mx-toolbar button:hover:not(:disabled) {
+  background: var(--bg-elev-2);
+  border-color: var(--accent);
+}
+
+.mx-col-head.mx-editable,
+.mx-row-head.mx-editable {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.5rem;
+}
+
+.mx-head-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.35rem 0.5rem;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mx-head-input:focus-visible {
+  border-color: var(--accent);
+}
+
+.mx-del-btn {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 180ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mx-del-btn:hover:not(:disabled) {
+  background: var(--danger);
+  color: #fff;
+}
+
+.mx-add-col-cell,
+.mx-add-row-cell {
+  background: var(--bg-elev);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem;
+}
+
+.mx-add-row-filler {
+  background: var(--bg-elev);
+}
+
+.mx-row-tail {
+  background: var(--bg-elev);
+}
+
+.mx-add-btn {
+  width: 100%;
+  height: 100%;
+  min-height: 28px;
+  padding: 0.25rem 0.5rem;
+  background: transparent;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: 3px;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 180ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 180ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mx-add-btn:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  border-color: var(--accent);
+}
+
+/* ─── Toast-System ─── */
+.toast-stack {
+  position: fixed;
+  bottom: 1.25rem;
+  right: 1.25rem;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: min(420px, calc(100vw - 2.5rem));
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem 0.6rem 1rem;
+  background: var(--bg-elev);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 5px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  font-size: 0.9rem;
+  line-height: 1.35;
+  animation: toast-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.toast[data-kind='success'] {
+  border-left-color: var(--ok);
+}
+
+.toast[data-kind='error'] {
+  border-left-color: var(--danger);
+}
+
+.toast[data-kind='info'] {
+  border-left-color: var(--accent);
+}
+
+.toast-msg {
+  flex: 1;
+  min-width: 0;
+  word-wrap: break-word;
+}
+
+.toast-close {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 3px;
+  transition:
+    background 180ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toast-close:hover {
+  background: var(--bg-elev-2);
+  color: var(--fg);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+  .edit-mode-btn,
+  .mx-toolbar button,
+  .mx-del-btn,
+  .mx-add-btn,
+  .toast-close {
+    transition: none;
+  }
+}

@@ -16,6 +16,7 @@ import {
   fetchMyWorkspaces,
   fetchNodesForWorkspace,
 } from '../lib/queries';
+import { toggleEditMode, useEditMode } from '../lib/edit-mode';
 import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
 import NodeTree from '../components/NodeTree';
 import MatrixView from '../components/MatrixView';
@@ -26,6 +27,7 @@ const Workspace: Component = () => {
   const user = useUser();
   const params = useParams<{ workspaceId?: string; nodeId?: string }>();
   const navigate = useNavigate();
+  const editMode = useEditMode();
 
   const [workspaces] = createResource(() => fetchMyWorkspaces());
   const [showImport, setShowImport] = createSignal(false);
@@ -63,7 +65,7 @@ const Workspace: Component = () => {
   });
 
   // Matrix-Content fuer die aktuelle Node (nur wenn Typ=matrix).
-  const [matrixContent] = createResource(
+  const [matrixContent, { refetch: refetchMatrix }] = createResource(
     () => {
       const n = currentNode();
       if (!n || n.type !== 'matrix') return null;
@@ -145,6 +147,16 @@ const Workspace: Component = () => {
         >
           <header class="ws-main-header">
             <h1>{currentWs()?.name}</h1>
+            <button
+              type="button"
+              class="edit-mode-btn"
+              classList={{ active: editMode() }}
+              onClick={() => toggleEditMode()}
+              title="Edit-Mode (Shift+E)"
+              aria-pressed={editMode()}
+            >
+              {editMode() ? 'Edit: an' : 'Edit: aus'}
+            </button>
           </header>
 
           <Show
@@ -169,6 +181,7 @@ const Workspace: Component = () => {
                   workspaceId={currentNode()!.workspace_id}
                   matrixId={currentNode()!.id}
                   content={matrixContent()}
+                  onChanged={() => refetchMatrix()}
                 />
               </Show>
 
