@@ -78,6 +78,10 @@ const MatrixView: Component<Props> = (p) => {
     row: RowRow,
     col: ColRow,
   ) {
+    // stopPropagation IMMER — sonst bubbelt der Click zur Cell und
+    // navigiert faelschlich zum child_matrix_id, wenn der Chip ein
+    // Flag-Feature (info/checklists) ohne eigenes Nav-Target ist.
+    e.stopPropagation();
     if (!cell) return;
     const targetNode =
       featKey === 'matrix'
@@ -85,8 +89,13 @@ const MatrixView: Component<Props> = (p) => {
         : featKey === 'board'
           ? cell.board_id
           : null;
-    if (!targetNode) return;
-    e.stopPropagation();
+    if (!targetNode) {
+      // Flag-Chip ohne Sub-Node → Zell-Overlay oeffnen, damit der User
+      // die Feature-Konfiguration sieht. (Ein echtes Checklist-Panel
+      // kommt separat in 0e.1.d.x.)
+      onCellEdit(row, col, cell);
+      return;
+    }
     rememberCellFocus(row.id, col.id);
     navigate(`/w/${p.workspaceId}/n/${targetNode}`);
   }
@@ -364,34 +373,52 @@ const MatrixView: Component<Props> = (p) => {
                           );
                         const targetNode = () =>
                           cell()?.child_matrix_id ?? cell()?.board_id ?? null;
-                        const isReadClickable = () => targetNode() != null && !editMode();
-                        const isEditClickable = () => editMode();
-                        const isClickable = () => isReadClickable() || isEditClickable();
+                        // Navigation hat Vorrang — auch im Edit-Mode. Zelle
+                        // mit Sub-Node navigiert dorthin; Zelle ohne Sub-Node
+                        // oeffnet im Edit-Mode das Overlay (Konfiguration).
+                        // Fuer Konfiguration einer Zelle MIT Sub-Node gibts
+                        // den ⚙-Button rechts oben.
+                        const isNavigable = () => targetNode() != null;
+                        const isClickable = () => isNavigable() || editMode();
                         return (
                           <div
                             class="mx-cell"
                             classList={{
                               'mx-cell-empty': !cell(),
                               'mx-cell-clickable': isClickable(),
-                              'mx-cell-editable': isEditClickable(),
+                              'mx-cell-editable': editMode(),
                             }}
                             role={isClickable() ? 'button' : undefined}
                             tabIndex={isClickable() ? 0 : -1}
                             data-row-id={row.id}
                             data-col-id={col.id}
                             onClick={() => {
-                              if (editMode()) onCellEdit(row, col, cell());
-                              else if (isReadClickable()) onCellClick(cell(), row, col);
+                              if (isNavigable()) onCellClick(cell(), row, col);
+                              else if (editMode()) onCellEdit(row, col, cell());
                             }}
                             onKeyDown={(e) => {
                               if (!isClickable()) return;
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
-                                if (editMode()) onCellEdit(row, col, cell());
-                                else onCellClick(cell(), row, col);
+                                if (isNavigable()) onCellClick(cell(), row, col);
+                                else onCellEdit(row, col, cell());
                               }
                             }}
                           >
+                            <Show when={editMode()}>
+                              <button
+                                type="button"
+                                class="mx-cell-edit-btn"
+                                title="Zelle bearbeiten"
+                                aria-label="Zelle bearbeiten"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onCellEdit(row, col, cell());
+                                }}
+                              >
+                                ⚙
+                              </button>
+                            </Show>
                             <Show when={cell()?.alias}>
                               <span class="mx-cell-alias">^{cell()!.alias}</span>
                             </Show>
