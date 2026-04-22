@@ -435,18 +435,21 @@ button[type='button']:disabled {
   background: transparent;
 }
 
-.mx-cell-clickable {
-  cursor: pointer;
-}
-
-.mx-cell-clickable:hover,
-.mx-cell-clickable:focus-visible {
+/* Hover + Focus auf ALLEN Zellen — auch im View-Mode: der User
+   muss sehen, wo der Tastatur-/Maus-Fokus liegt, um mit Pfeiltasten
+   zu navigieren. cursor:pointer ist nur dort, wo Klick auch wirkt. */
+.mx-cell:hover,
+.mx-cell:focus-visible {
   background: var(--bg-elev-2);
 }
 
-.mx-cell-clickable:focus-visible {
+.mx-cell:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
+}
+
+.mx-cell-clickable {
+  cursor: pointer;
 }
 
 .mx-cell-alias {

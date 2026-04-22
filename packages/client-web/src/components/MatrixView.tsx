@@ -49,6 +49,11 @@ const MatrixView: Component<Props> = (p) => {
 
   const [busy, setBusy] = createSignal(false);
   const [overlayTarget, setOverlayTarget] = createSignal<OverlayTarget | null>(null);
+  // Guard: Initial-Focus (0,0) nur einmal pro Matrix-Besuch. Verhindert,
+  // dass jede Content-Mutation den Fokus auf (0,0) zurueckreisst.
+  const [initialFocusedFor, setInitialFocusedFor] = createSignal<string | null>(
+    null,
+  );
 
   const cellMap = createMemo(() => {
     const m = new Map<string, CellRow>();
@@ -222,15 +227,26 @@ const MatrixView: Component<Props> = (p) => {
     onCleanup(() => document.removeEventListener('keydown', onKey));
   });
 
-  // ─── Focus-Restore nach Back-Navigation ─────────────────────────
-  // Nach Navigate -> Sub-Node -> ESC zurueck: wenn die Zelle im neuen
-  // Content existiert und matrixId passt, focus zurueck. queueMicrotask
-  // stellt sicher, dass das DOM gerendert ist.
+  // ─── Focus: Initial + Restore nach Back-Navigation ─────────────
+  // Zwei Faelle gemeinsam behandelt:
+  //   a) Neu geladene Matrix ohne lastFocusCell → Fokus auf (0,0),
+  //      damit Pfeiltasten-Nav sofort funktioniert. Einmal pro Matrix
+  //      (guarded durch initialFocusedFor).
+  //   b) lastFocusCell trifft die aktuelle Matrix (ESC-Back aus einem
+  //      Sub-Node) → dort fokussieren, auch bei Content-Updates.
+  // queueMicrotask stellt sicher, dass das DOM gerendert ist.
   createEffect(() => {
+    const content = p.content;
+    if (!content) return;
+    const currentMid = p.matrixId;
+    const rows = content.rows;
+    const cols = content.cols;
+    if (rows.length === 0 || cols.length === 0) return;
+
     const target = lastFocusCell();
-    if (!target) return;
-    if (target.matrixId !== p.matrixId) return;
-    if (!p.content) return;
+    const hasRestore = target && target.matrixId === currentMid;
+    if (!hasRestore && initialFocusedFor() === currentMid) return;
+
     queueMicrotask(() => {
       // Schutz: wenn ein Overlay offen ist oder gerade ein Input/Textarea
       // fokussiert ist (z.B. Alias im CellOverlay), nicht in die Zelle
@@ -245,11 +261,17 @@ const MatrixView: Component<Props> = (p) => {
         return;
       }
       if (document.querySelector('.overlay-scrim')) return;
+
+      const rowId = hasRestore ? target.rowId : rows[0].id;
+      const colId = hasRestore ? target.colId : cols[0].id;
       const el = document.querySelector(
-        `.mx-cell[data-row-id="${target.rowId}"][data-col-id="${target.colId}"]`,
+        `.mx-cell[data-row-id="${rowId}"][data-col-id="${colId}"]`,
       ) as HTMLElement | null;
       if (el && document.activeElement !== el) {
         el.focus({ preventScroll: true });
+      }
+      if (!hasRestore) {
+        setInitialFocusedFor(currentMid);
       }
     });
   });
