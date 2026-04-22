@@ -13,7 +13,7 @@ import type { CellFeature, CellRow, ColRow, MatrixContent, RowRow } from '../lib
 import { useEditMode } from '../lib/edit-mode';
 import { findFeatureByHotkey } from '../lib/features';
 import { addCol, addRow, delCol, delRow, renameCol, renameRow } from '../lib/mutations';
-import { lastFocusCell, setLastFocusCell } from '../lib/navigation-focus';
+import { rememberFocus, useLastFocus } from '../lib/navigation-focus';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import CellOverlay from './CellOverlay';
@@ -62,10 +62,11 @@ const MatrixView: Component<Props> = (p) => {
   });
 
   // Fokus-Koordinate der Zelle fuer Back-Navigation merken, BEVOR navigiert
-  // wird. Nach ESC-zurueck fokussiert Matrix-View die Zelle wieder — User
-  // kann ohne weitere Klicks mit 1/2 in ein anderes Feature derselben Zelle.
+  // wird. Wird auch bei jedem onFocus der Zelle gerufen (Pfeiltasten/Tab/
+  // Maus) — so ueberlebt die Position einen Matrix-Wechsel via Sidebar
+  // und Rueckkehr landet auf derselben Zelle.
   function rememberCellFocus(rowId: string, colId: string) {
-    setLastFocusCell({ matrixId: p.matrixId, rowId, colId });
+    rememberFocus(p.matrixId, rowId, colId);
   }
 
   function onChipClick(
@@ -227,13 +228,12 @@ const MatrixView: Component<Props> = (p) => {
     onCleanup(() => document.removeEventListener('keydown', onKey));
   });
 
-  // ─── Focus: Initial + Restore nach Back-Navigation ─────────────
+  // ─── Focus: Initial + Restore nach Navigation ─────────────────
   // Zwei Faelle gemeinsam behandelt:
-  //   a) Neu geladene Matrix ohne lastFocusCell → Fokus auf (0,0),
-  //      damit Pfeiltasten-Nav sofort funktioniert. Einmal pro Matrix
-  //      (guarded durch initialFocusedFor).
-  //   b) lastFocusCell trifft die aktuelle Matrix (ESC-Back aus einem
-  //      Sub-Node) → dort fokussieren, auch bei Content-Updates.
+  //   a) Neu geladene Matrix ohne vorherigen Besuch → Fokus auf (0,0),
+  //      damit Pfeiltasten-Nav sofort funktioniert.
+  //   b) Rueckkehr via Sidebar ODER ESC-Back aus Sub-Node → letzte
+  //      Zelle derselben Matrix aus focusMap wiederherstellen.
   // queueMicrotask stellt sicher, dass das DOM gerendert ist.
   createEffect(() => {
     const content = p.content;
@@ -243,8 +243,8 @@ const MatrixView: Component<Props> = (p) => {
     const cols = content.cols;
     if (rows.length === 0 || cols.length === 0) return;
 
-    const target = lastFocusCell();
-    const hasRestore = target && target.matrixId === currentMid;
+    const saved = useLastFocus(currentMid);
+    const hasRestore = !!saved;
     if (!hasRestore && initialFocusedFor() === currentMid) return;
 
     queueMicrotask(() => {
@@ -262,8 +262,18 @@ const MatrixView: Component<Props> = (p) => {
       }
       if (document.querySelector('.overlay-scrim')) return;
 
-      const rowId = hasRestore ? target.rowId : rows[0].id;
-      const colId = hasRestore ? target.colId : cols[0].id;
+      // Gespeicherte Zelle kann durch Row/Col-Delete verschwunden sein —
+      // Fallback: (0,0).
+      let rowId = rows[0].id;
+      let colId = cols[0].id;
+      if (saved) {
+        const rowStill = rows.some((r) => r.id === saved.rowId);
+        const colStill = cols.some((c) => c.id === saved.colId);
+        if (rowStill && colStill) {
+          rowId = saved.rowId;
+          colId = saved.colId;
+        }
+      }
       const el = document.querySelector(
         `.mx-cell[data-row-id="${rowId}"][data-col-id="${colId}"]`,
       ) as HTMLElement | null;
@@ -445,6 +455,15 @@ const MatrixView: Component<Props> = (p) => {
                             tabIndex={0}
                             data-row-id={row.id}
                             data-col-id={col.id}
+                            onFocus={() => {
+                              // Jeder Cell-Focus (Pfeiltasten, Tab, Maus)
+                              // aktualisiert lastFocusCell. So kann der
+                              // User die Matrix via Sidebar verlassen und
+                              // beim Zurueckkommen auf derselben Zelle
+                              // landen. Ohne das greift nur der Chip-Click-
+                              // oder 1/2-Hotkey-Setter.
+                              rememberCellFocus(row.id, col.id);
+                            }}
                             onClick={() => {
                               if (editMode()) onCellEdit(row, col, cell());
                             }}
