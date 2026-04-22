@@ -14,7 +14,7 @@
 //   checklist-cell  → /w/:ws/c/:cellId/checklists
 //   link → window.open(url)
 
-import { createEffect, createSignal, onCleanup, onMount, Show, type Component } from 'solid-js';
+import { createSignal, onCleanup, onMount, Show, type Component } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { resolveAlias, type AliasResolveResult } from '../lib/alias-resolve';
 import { rememberFocus } from '../lib/navigation-focus';
@@ -62,12 +62,6 @@ const AliasQuicknav: Component<Props> = (p) => {
     onCleanup(() => document.removeEventListener('keydown', onKey, true));
   });
 
-  // Input-Feld leert automatisch den Fehlertext, wenn der User weitertippt.
-  createEffect(() => {
-    query();
-    if (error()) setError(null);
-  });
-
   function dispatch(result: AliasResolveResult) {
     switch (result.kind) {
       case 'node':
@@ -110,18 +104,29 @@ const AliasQuicknav: Component<Props> = (p) => {
     }
     setBusy(true);
     setError(null);
+    let outcomeSnapshot: Awaited<ReturnType<typeof resolveAlias>> | null = null;
     try {
-      const outcome = await resolveAlias(q, p.workspaceId);
-      if (!outcome.ok) {
-        setError(outcome.msg);
-        return;
-      }
-      dispatch(outcome.result);
-      p.onClose();
+      outcomeSnapshot = await resolveAlias(q, p.workspaceId);
     } catch (err) {
       setError(translateDbError(err));
-    } finally {
       setBusy(false);
+      return;
+    }
+    if (!outcomeSnapshot.ok) {
+      setError(outcomeSnapshot.msg);
+      setBusy(false);
+      return;
+    }
+    // Dispatch + Close in eigenem Try: wenn navigate() wirft (z.B. weil
+    // die Target-Route noch nicht registriert ist), bleibt das UI
+    // wenigstens bedienbar und der User sieht einen Fehler.
+    setBusy(false);
+    try {
+      dispatch(outcomeSnapshot.result);
+      p.onClose();
+    } catch (err) {
+      console.error('[quicknav] dispatch failed', err);
+      setError(translateDbError(err));
     }
   }
 
@@ -167,6 +172,11 @@ const AliasQuicknav: Component<Props> = (p) => {
                 e.currentTarget.value = cleaned;
               }
               setQuery(cleaned);
+              // Vorherigen Fehlertext aufraeumen sobald der User tippt —
+              // direkt, nicht via createEffect (der wuerde error() als
+              // Dependency ziehen und den gerade-gesetzten Error sofort
+              // wieder loeschen).
+              if (error()) setError(null);
             }}
           />
         </form>
