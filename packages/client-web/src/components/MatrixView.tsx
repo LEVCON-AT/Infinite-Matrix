@@ -61,6 +61,23 @@ const MatrixView: Component<Props> = (p) => {
     return m;
   });
 
+  // Race-Schutz: Beim Matrix-Wechsel via Sidebar wird p.matrixId sofort
+  // vom Router auf das neue Ziel gesetzt, aber createResource
+  // (matrixContent) haelt waehrend des Refetches den alten Wert. In diesem
+  // Zwischenzustand haette MatrixView rows/cols der ALTEN Matrix unter
+  // NEUER matrixId — onFocus wuerde die focusMap der Ziel-Matrix mit
+  // fremden Row-/Col-IDs vergiften, und der Restore nach Sidebar-Nav
+  // landet ewig auf (0,0). Also: Content-Matrix-Fingerprint vergleichen
+  // und stale Content ignorieren.
+  const contentMatches = createMemo(() => {
+    const c = p.content;
+    if (!c) return false;
+    const ref = c.rows[0]?.matrix_id ?? c.cols[0]?.matrix_id;
+    // Leere Matrix (keine Rows + Cols) — nichts zu vergleichen, passt.
+    if (!ref) return true;
+    return ref === p.matrixId;
+  });
+
   // Fokus-Koordinate der Zelle fuer Back-Navigation merken, BEVOR navigiert
   // wird. Wird auch bei jedem onFocus der Zelle gerufen (Pfeiltasten/Tab/
   // Maus) — so ueberlebt die Position einen Matrix-Wechsel via Sidebar
@@ -238,6 +255,10 @@ const MatrixView: Component<Props> = (p) => {
   createEffect(() => {
     const content = p.content;
     if (!content) return;
+    // Stale content (alte Matrix unter neuer matrixId) — Restore darf
+    // nicht auf fremden rows/cols laufen, sonst faelscht der folgende
+    // onFocus die focusMap des neuen Ziels.
+    if (!contentMatches()) return;
     const currentMid = p.matrixId;
     const rows = content.rows;
     const cols = content.cols;
@@ -301,10 +322,17 @@ const MatrixView: Component<Props> = (p) => {
       </Show>
 
       <Show
-        when={(p.content?.rows.length ?? 0) > 0 && (p.content?.cols.length ?? 0) > 0}
+        when={
+          contentMatches() &&
+          (p.content?.rows.length ?? 0) > 0 &&
+          (p.content?.cols.length ?? 0) > 0
+        }
         fallback={
           <div class="matrix-empty">
-            <Show when={p.content} fallback={<p class="hint">Lade Matrix…</p>}>
+            <Show
+              when={p.content && contentMatches()}
+              fallback={<p class="hint">Lade Matrix…</p>}
+            >
               <p class="hint">
                 Leere Matrix.
                 <Show when={editMode()}>
