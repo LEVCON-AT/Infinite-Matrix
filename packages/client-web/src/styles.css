@@ -1547,3 +1547,25 @@ body.edit-mode .mx-cell-empty:hover {
     animation: none;
   }
 }
+
+/* Chip mit Navigate-Ziel: cursor + leichter Hover-Effekt */
+.mx-feat-chip-link {
+  cursor: pointer;
+  transition:
+    transform 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mx-feat-chip-link:hover {
+  transform: scale(1.08);
+  box-shadow: 0 0 0 1px currentColor;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mx-feat-chip-link {
+    transition: none;
+  }
+  .mx-feat-chip-link:hover {
+    transform: none;
+  }
+}

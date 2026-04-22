@@ -4,6 +4,8 @@ import {
   createMemo,
   createResource,
   createSignal,
+  onCleanup,
+  onMount,
   type Component,
 } from 'solid-js';
 import { useNavigate, useParams } from '@solidjs/router';
@@ -87,6 +89,33 @@ const Workspace: Component = () => {
   async function onLogout() {
     await signOut();
   }
+
+  // ESC in Matrix/Board-View = eine Ebene hoch (zur Parent-Matrix).
+  // Bubble-Phase — Modals (CellOverlay, ImportDialog) haengen in Capture
+  // mit stopImmediatePropagation, schlucken ihr ESC vor uns weg.
+  onMount(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === 'INPUT' ||
+          t.tagName === 'TEXTAREA' ||
+          t.isContentEditable)
+      ) {
+        return;
+      }
+      const n = currentNode();
+      if (!n || !n.parent_cell_id) return;
+      const parentCell = (cells() ?? []).find((c) => c.id === n.parent_cell_id);
+      if (!parentCell) return;
+      if (params.workspaceId) {
+        navigate(`/w/${params.workspaceId}/n/${parentCell.matrix_id}`);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    onCleanup(() => document.removeEventListener('keydown', onKey));
+  });
 
   async function onImported(rootNodeId: string) {
     // Tree neu laden, damit der Import im Sidebar sichtbar wird,
@@ -181,7 +210,14 @@ const Workspace: Component = () => {
                   workspaceId={currentNode()!.workspace_id}
                   matrixId={currentNode()!.id}
                   content={matrixContent()}
-                  onChanged={() => refetchMatrix()}
+                  onChanged={() => {
+                    // Nach strukturellen Aenderungen koennen neue/entfernte Sub-Nodes
+                    // im Tree sichtbar werden, und cells.child_matrix_id/board_id
+                    // aendern sich. Daher: nodes+cells auch refetchen.
+                    void refetchMatrix();
+                    void refetchNodes();
+                    void refetchCells();
+                  }}
                 />
               </Show>
 

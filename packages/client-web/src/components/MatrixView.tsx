@@ -52,6 +52,22 @@ const MatrixView: Component<Props> = (p) => {
     navigate(`/w/${p.workspaceId}/n/${targetNode}`);
   }
 
+  function onChipClick(e: MouseEvent, cell: CellRow | undefined, featKey: string) {
+    if (!cell) return;
+    // Chips im Edit-Mode sollen NICHT das Cell-Overlay oeffnen, sondern
+    // direkt zum Ziel-Node navigieren (Alt-Client-Muster). stopPropagation
+    // verhindert den Cell-Click-Handler.
+    const targetNode =
+      featKey === 'matrix'
+        ? cell.child_matrix_id
+        : featKey === 'board'
+          ? cell.board_id
+          : null;
+    if (!targetNode) return;
+    e.stopPropagation();
+    navigate(`/w/${p.workspaceId}/n/${targetNode}`);
+  }
+
   async function wrap<T>(fn: () => Promise<T>, successMsg?: string) {
     if (busy()) return;
     setBusy(true);
@@ -292,15 +308,32 @@ const MatrixView: Component<Props> = (p) => {
                             <Show when={features().length > 0}>
                               <div class="mx-cell-feats">
                                 <For each={features()}>
-                                  {(f) => (
-                                    <span
-                                      class="mx-feat-chip"
-                                      data-feat={f}
-                                      title={FEATURE_LABEL[f]}
-                                    >
-                                      {FEATURE_ICON[f]}
-                                    </span>
-                                  )}
+                                  {(f) => {
+                                    const navTarget =
+                                      f === 'matrix'
+                                        ? cell()?.child_matrix_id
+                                        : f === 'board'
+                                          ? cell()?.board_id
+                                          : null;
+                                    const chipClickable = () => !!navTarget;
+                                    return (
+                                      <span
+                                        class="mx-feat-chip"
+                                        classList={{
+                                          'mx-feat-chip-link': chipClickable(),
+                                        }}
+                                        data-feat={f}
+                                        title={
+                                          navTarget
+                                            ? `${FEATURE_LABEL[f]} oeffnen`
+                                            : FEATURE_LABEL[f]
+                                        }
+                                        onClick={(e) => onChipClick(e, cell(), f)}
+                                      >
+                                        {FEATURE_ICON[f]}
+                                      </span>
+                                    );
+                                  }}
                                 </For>
                               </div>
                             </Show>

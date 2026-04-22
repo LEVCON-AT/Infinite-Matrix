@@ -185,7 +185,13 @@ const CellOverlay: Component<Props> = (p) => {
     } catch (err) {
       showToast(translateDbError(err), 'error');
       flashError(aliasInput);
-      setAliasDraft(cur?.alias ?? '');
+      // Eingabe NICHT revertieren — User soll korrigieren koennen.
+      // Nach Shake-Animation Fokus zurueck + Text markieren, damit das
+      // naechste Tippen direkt ueberschreibt.
+      window.setTimeout(() => {
+        aliasInput?.focus();
+        aliasInput?.select();
+      }, 420);
     } finally {
       setBusy(null);
     }
@@ -203,6 +209,8 @@ const CellOverlay: Component<Props> = (p) => {
   }
 
   // ─── Zelle komplett leeren ───────────────────────────────────
+  // hasAnyContent: sichtbarer "Zelle leeren"-Button — erscheint sobald
+  // irgendetwas an der Zelle dranhaengt (Features, Alias oder Sub-Node).
   const hasAnyContent = createMemo(() => {
     const c = current();
     if (!c) return false;
@@ -214,23 +222,45 @@ const CellOverlay: Component<Props> = (p) => {
     );
   });
 
+  // hasDestructiveContent: nur Sub-Nodes gelten als destruktiv
+  // (Datenverlust). Features + Alias werden ohne Rueckfrage entfernt —
+  // leicht rekonstruierbar, kein Schaden bei Fehlklick.
+  const hasDestructiveContent = createMemo(() => {
+    const c = current();
+    if (!c) return false;
+    return !!c.child_matrix_id || !!c.board_id;
+  });
+
   async function onClear() {
     const c = current();
     if (!c) {
       p.onClose();
       return;
     }
-    if (
-      hasAnyContent() &&
-      !window.confirm('Zelle leeren? Sub-Strukturen werden mit geloescht.')
-    ) {
-      return;
-    }
     if (busy()) return;
+
+    // Confirm nur wenn echte Sub-Struktur mitgeloescht wird.
+    if (hasDestructiveContent()) {
+      // Wenn die Sub-Nodes leer sind, ueberspringen wir das Confirm.
+      const matrixEmpty = c.child_matrix_id
+        ? await isNodeEmpty(c.child_matrix_id, 'matrix')
+        : true;
+      const boardEmpty = c.board_id
+        ? await isNodeEmpty(c.board_id, 'board')
+        : true;
+      if (!matrixEmpty || !boardEmpty) {
+        if (
+          !window.confirm(
+            'Zelle leeren? Sub-Strukturen werden mit geloescht.',
+          )
+        ) {
+          return;
+        }
+      }
+    }
+
     setBusy('clear');
     try {
-      // Sub-Nodes zuerst (Cascade via FK loescht cell-row-FKs; aber cells
-      // kommt zum Schluss, damit die Row explizit weg ist).
       if (c.child_matrix_id) await deleteNode(c.child_matrix_id);
       if (c.board_id) await deleteNode(c.board_id);
       await delCellRow(c.id);
