@@ -38,7 +38,13 @@ const AliasQuicknav: Component<Props> = (p) => {
   let prevFocus: HTMLElement | null = null;
   onMount(() => {
     prevFocus = document.activeElement as HTMLElement | null;
-    queueMicrotask(() => inputRef?.focus());
+    // setTimeout(0) statt queueMicrotask: Wenn das Modal via ^-Dead-Key
+    // auf deutscher Tastatur geoeffnet wurde, haelt der Browser noch
+    // einen Composition-State, der den naechsten Vokal zu â/ê/î/… machen
+    // wuerde. Ein Macrotask-Break laesst die Dead-Key-Phase durchlaufen,
+    // bevor das Input Fokus bekommt — der Akzent landet dann nicht mehr
+    // im Input.
+    setTimeout(() => inputRef?.focus(), 0);
   });
   onCleanup(() => {
     prevFocus?.focus?.();
@@ -141,7 +147,24 @@ const AliasQuicknav: Component<Props> = (p) => {
             autocomplete="off"
             spellcheck={false}
             disabled={busy()}
-            onInput={(e) => setQuery(e.currentTarget.value)}
+            onInput={(e) => {
+              // NFD-Normalize + diakritische Marker entfernen (â → a),
+              // danach auf [a-z0-9] klemmen. Wenn das Modal via Dead-
+              // Key geoeffnet wird und der Browser-Composition-State
+              // noch klebt, wandert der Akzent so sofort aus dem Input.
+              // Gleichzeitig schneidet das die Fehlermeldung "nur a-z
+              // und 0-9" fuer den Normal-Input ab.
+              const raw = e.currentTarget.value;
+              const cleaned = raw
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[̀-ͯ]/g, '')
+                .replace(/[^a-z0-9]/g, '');
+              if (cleaned !== raw) {
+                e.currentTarget.value = cleaned;
+              }
+              setQuery(cleaned);
+            }}
           />
         </form>
         <Show when={error()}>
