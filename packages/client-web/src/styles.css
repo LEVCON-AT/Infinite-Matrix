@@ -1019,6 +1019,94 @@ button[type='button']:disabled {
   font-weight: 600;
 }
 
+/* Card-Edit: Titel-Input, Feld-Grid, Textarea, Delete-Footer */
+.overlay-title-input {
+  flex: 1;
+  font-size: 1.15rem;
+  font-weight: 600;
+  padding: 0.35rem 0.5rem;
+  background: var(--bg-elev);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.overlay-title-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+.overlay-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.5rem 0.75rem;
+}
+
+.overlay-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+}
+
+.overlay-field-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.overlay-field-done {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  padding-top: 1rem;
+}
+
+.overlay-input {
+  padding: 0.35rem 0.5rem;
+  background: var(--bg-elev);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.overlay-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+.overlay-textarea {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  background: var(--bg-elev);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 80px;
+}
+
+.overlay-textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+.overlay-edit-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
 .overlay-note {
   white-space: pre-wrap;
   margin: 0;

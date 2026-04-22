@@ -507,6 +507,7 @@ const BoardView: Component<Props> = (p) => {
               card={selectedCard()!}
               content={p.content!}
               onClose={() => setSelectedCardId(null)}
+              onChanged={() => p.onChanged?.()}
             />
           </Show>
         </div>
