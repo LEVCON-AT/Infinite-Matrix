@@ -1320,3 +1320,196 @@ body.edit-mode .matrix-grid {
     transition: none;
   }
 }
+
+/* ─── Cell-Overlay (0e.1.b) ─── */
+.cell-overlay {
+  width: min(480px, calc(100vw - 2rem));
+}
+
+.overlay-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.overlay-sub {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.cell-alias-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.75rem;
+}
+
+.cell-alias-label input {
+  padding: 0.55rem 0.75rem;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.95rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  text-transform: none;
+  letter-spacing: 0;
+  outline: none;
+  transition: border-color 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cell-alias-label input:focus-visible {
+  border-color: var(--accent);
+}
+
+.cell-feat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.cell-feat-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.75rem 0.5rem 0.6rem;
+  background: var(--bg);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+  transition:
+    background 180ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 180ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cell-feat-btn:hover:not(:disabled) {
+  background: var(--bg-elev-2);
+  color: var(--fg);
+}
+
+.cell-feat-btn.active {
+  color: var(--fg);
+  border-color: currentColor;
+}
+
+.cell-feat-btn.active[data-feat='matrix'] {
+  color: var(--feat-matrix);
+  background: color-mix(in srgb, var(--feat-matrix) 12%, transparent);
+}
+
+.cell-feat-btn.active[data-feat='board'] {
+  color: var(--feat-board);
+  background: color-mix(in srgb, var(--feat-board) 12%, transparent);
+}
+
+.cell-feat-btn.active[data-feat='info'] {
+  color: var(--feat-info);
+  background: color-mix(in srgb, var(--feat-info) 12%, transparent);
+}
+
+.cell-feat-btn.active[data-feat='checklists'] {
+  color: var(--feat-checklists);
+  background: color-mix(in srgb, var(--feat-checklists) 12%, transparent);
+}
+
+.cell-feat-btn.busy {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.cell-feat-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.cell-feat-hotkey {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.cell-feat-ico {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.cell-feat-label {
+  font-size: 0.8rem;
+}
+
+.cell-open-btn {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  margin-bottom: 0.75rem;
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cell-open-btn:hover {
+  background: color-mix(in srgb, var(--accent-soft) 100%, var(--accent) 15%);
+}
+
+.cell-overlay-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.btn-danger {
+  padding: 0.5rem 0.9rem;
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition:
+    background 180ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--danger);
+  color: #fff;
+}
+
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Zell-Hover im Edit-Mode, damit User sieht "klickbar" */
+.mx-cell-editable {
+  cursor: pointer;
+}
+
+body.edit-mode .mx-cell:hover {
+  background: var(--bg-elev-2);
+}
+
+body.edit-mode .mx-cell-empty:hover {
+  background: color-mix(in srgb, var(--bg-elev-2) 50%, transparent);
+  outline: 1px dashed var(--border);
+  outline-offset: -2px;
+}

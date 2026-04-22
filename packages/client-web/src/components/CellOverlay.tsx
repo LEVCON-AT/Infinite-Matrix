@@ -1,0 +1,372 @@
+import {
+  For,
+  Show,
+  createMemo,
+  createSignal,
+  onCleanup,
+  onMount,
+  type Component,
+} from 'solid-js';
+import { useNavigate } from '@solidjs/router';
+import type { CellRow, ColRow, RowRow } from '../lib/types';
+import { CELL_FEATURES, findFeatureByHotkey, type FeatureDef } from '../lib/features';
+import {
+  createChildBoard,
+  createChildMatrix,
+  delCellRow,
+  deleteNode,
+  insertCell,
+  updateCell,
+} from '../lib/mutations';
+import { showToast } from '../lib/toasts';
+import { translateDbError } from '../lib/errors';
+
+type Props = {
+  workspaceId: string;
+  matrixId: string;
+  row: RowRow;
+  col: ColRow;
+  cell: CellRow | undefined; // undefined wenn noch keine Row in DB
+  onClose: () => void;
+  onChanged: () => void; // triggert Parent-Refetch
+};
+
+const CellOverlay: Component<Props> = (p) => {
+  const navigate = useNavigate();
+  const [current, setCurrent] = createSignal<CellRow | undefined>(p.cell);
+  const [aliasDraft, setAliasDraft] = createSignal(p.cell?.alias ?? '');
+  const [busy, setBusy] = createSignal<string | null>(null); // welches Feature gerade arbeitet
+
+  // Zellen-Row-Helper: legt Row an falls noch nicht da, sonst UPDATE.
+  async function ensureCell(patch: Partial<CellRow>): Promise<CellRow> {
+    const cur = current();
+    if (cur) {
+      const up = await updateCell(cur.id, {
+        alias: patch.alias ?? cur.alias,
+        features: patch.features ?? cur.features,
+        child_matrix_id:
+          patch.child_matrix_id !== undefined ? patch.child_matrix_id : cur.child_matrix_id,
+        board_id: patch.board_id !== undefined ? patch.board_id : cur.board_id,
+      });
+      setCurrent(up);
+      return up;
+    }
+    const ins = await insertCell({
+      workspaceId: p.workspaceId,
+      matrixId: p.matrixId,
+      rowId: p.row.id,
+      colId: p.col.id,
+      patch: {
+        alias: patch.alias ?? null,
+        features: patch.features ?? [],
+        child_matrix_id: patch.child_matrix_id ?? null,
+        board_id: patch.board_id ?? null,
+      },
+    });
+    setCurrent(ins);
+    return ins;
+  }
+
+  function hasActive(key: string): boolean {
+    return (current()?.features ?? []).includes(key);
+  }
+
+  function targetNodeId(): string | null {
+    const c = current();
+    if (!c) return null;
+    return c.child_matrix_id ?? c.board_id ?? null;
+  }
+
+  function canOpen(): boolean {
+    return targetNodeId() !== null;
+  }
+
+  async function wrap<T>(key: string, fn: () => Promise<T>) {
+    if (busy()) return;
+    setBusy(key);
+    try {
+      await fn();
+      p.onChanged();
+    } catch (err) {
+      showToast(translateDbError(err), 'error');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // ─── Toggle-Dispatch ─────────────────────────────────────────
+  async function toggleFlag(def: FeatureDef) {
+    const isOn = hasActive(def.key);
+    const cur = current();
+    const existing = cur?.features ?? [];
+    const next = isOn
+      ? existing.filter((f) => f !== def.key)
+      : [...existing, def.key];
+    await ensureCell({ features: next });
+  }
+
+  async function toggleStructural(def: FeatureDef) {
+    const isOn = hasActive(def.key);
+    const cur = current();
+    if (isOn) {
+      // Off: Sub-Node loeschen (mit Confirm), Feature weg, FK auf null.
+      const nodeId =
+        def.key === 'matrix' ? cur?.child_matrix_id : cur?.board_id;
+      const confirmMsg = nodeId
+        ? `Sub-${def.label} und alle Inhalte loeschen? Das kann nicht rueckgaengig gemacht werden.`
+        : `Feature "${def.label}" entfernen?`;
+      if (!window.confirm(confirmMsg)) return;
+
+      if (nodeId) {
+        await deleteNode(nodeId);
+      }
+      const nextFeatures = (cur?.features ?? []).filter((f) => f !== def.key);
+      await ensureCell({
+        features: nextFeatures,
+        ...(def.key === 'matrix' ? { child_matrix_id: null } : { board_id: null }),
+      });
+      return;
+    }
+    // On: Zelle sicherstellen, Node anlegen, Feature rein, FK setzen.
+    const baseCell = cur ?? (await ensureCell({ features: cur?.features ?? [] }));
+    const newNode =
+      def.key === 'matrix'
+        ? await createChildMatrix({
+            workspaceId: p.workspaceId,
+            parentCellId: baseCell.id,
+            label: p.row.label && p.col.label
+              ? `${p.row.label} × ${p.col.label}`
+              : undefined,
+          })
+        : await createChildBoard({
+            workspaceId: p.workspaceId,
+            parentCellId: baseCell.id,
+            label: p.row.label && p.col.label
+              ? `${p.row.label} × ${p.col.label}`
+              : undefined,
+          });
+    const nextFeatures = [...(baseCell.features ?? []), def.key];
+    await ensureCell({
+      features: nextFeatures,
+      ...(def.key === 'matrix'
+        ? { child_matrix_id: newNode.id }
+        : { board_id: newNode.id }),
+    });
+  }
+
+  async function onToggle(def: FeatureDef) {
+    if (busy()) return;
+    await wrap(def.key, async () => {
+      if (def.kind === 'flag') await toggleFlag(def);
+      else await toggleStructural(def);
+    });
+  }
+
+  // ─── Alias-Speichern (on blur) ───────────────────────────────
+  async function onAliasBlur() {
+    const next = aliasDraft().trim() || null;
+    const cur = current();
+    if ((cur?.alias ?? null) === next) return;
+    if (busy()) return;
+    setBusy('alias');
+    try {
+      await ensureCell({ alias: next });
+      p.onChanged();
+    } catch (err) {
+      showToast(translateDbError(err), 'error');
+      setAliasDraft(cur?.alias ?? '');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // ─── Navigation ──────────────────────────────────────────────
+  function onOpen() {
+    const nid = targetNodeId();
+    if (!nid) {
+      p.onClose();
+      return;
+    }
+    navigate(`/w/${p.workspaceId}/n/${nid}`);
+    p.onClose();
+  }
+
+  // ─── Zelle komplett leeren ───────────────────────────────────
+  const hasAnyContent = createMemo(() => {
+    const c = current();
+    if (!c) return false;
+    return (
+      (c.features?.length ?? 0) > 0 ||
+      !!c.alias ||
+      !!c.child_matrix_id ||
+      !!c.board_id
+    );
+  });
+
+  async function onClear() {
+    const c = current();
+    if (!c) {
+      p.onClose();
+      return;
+    }
+    if (
+      hasAnyContent() &&
+      !window.confirm('Zelle leeren? Sub-Strukturen werden mit geloescht.')
+    ) {
+      return;
+    }
+    if (busy()) return;
+    setBusy('clear');
+    try {
+      // Sub-Nodes zuerst (Cascade via FK loescht cell-row-FKs; aber cells
+      // kommt zum Schluss, damit die Row explizit weg ist).
+      if (c.child_matrix_id) await deleteNode(c.child_matrix_id);
+      if (c.board_id) await deleteNode(c.board_id);
+      await delCellRow(c.id);
+      setCurrent(undefined);
+      p.onChanged();
+      p.onClose();
+    } catch (err) {
+      showToast(translateDbError(err), 'error');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // ─── ESC / Global Hotkeys 1-9 ────────────────────────────────
+  onMount(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Nicht greifen, wenn User im Alias-Input / Textarea tippt.
+      const t = e.target as HTMLElement | null;
+      const inEditable =
+        !!t &&
+        (t.tagName === 'INPUT' ||
+          t.tagName === 'TEXTAREA' ||
+          t.isContentEditable);
+
+      if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
+        p.onClose();
+        return;
+      }
+
+      if (inEditable) return;
+
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (canOpen()) onOpen();
+        else p.onClose();
+        return;
+      }
+
+      const def = findFeatureByHotkey(e.key);
+      if (def) {
+        e.preventDefault();
+        void onToggle(def);
+      }
+    };
+    document.addEventListener('keydown', onKey, true);
+    onCleanup(() => document.removeEventListener('keydown', onKey, true));
+  });
+
+  // Breadcrumb-Label oben
+  const breadcrumb = () =>
+    `${p.row.label || '(Zeile)'} × ${p.col.label || '(Spalte)'}`;
+
+  return (
+    <div
+      class="overlay-scrim"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) p.onClose();
+      }}
+    >
+      <div class="overlay-card cell-overlay" role="dialog" aria-modal="true">
+        <header class="overlay-head">
+          <div class="overlay-head-text">
+            <h2>Zelle bearbeiten</h2>
+            <span class="overlay-sub">{breadcrumb()}</span>
+          </div>
+          <button
+            type="button"
+            class="overlay-close"
+            onClick={p.onClose}
+            aria-label="Schliessen"
+          >
+            ✕
+          </button>
+        </header>
+
+        <div class="overlay-body">
+          <label class="cell-alias-label">
+            Alias (optional)
+            <input
+              type="text"
+              value={aliasDraft()}
+              placeholder="z.B. ^heute"
+              onInput={(e) => setAliasDraft(e.currentTarget.value)}
+              onBlur={onAliasBlur}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  (e.currentTarget as HTMLInputElement).blur();
+                }
+              }}
+            />
+          </label>
+
+          <div class="cell-feat-row" role="group" aria-label="Zellen-Features">
+            <For each={CELL_FEATURES}>
+              {(def) => (
+                <button
+                  type="button"
+                  class="cell-feat-btn"
+                  data-feat={def.key}
+                  classList={{
+                    active: hasActive(def.key),
+                    busy: busy() === def.key,
+                  }}
+                  onClick={() => onToggle(def)}
+                  disabled={busy() !== null}
+                  title={`${def.label} (Taste ${def.hotkey})`}
+                >
+                  <span class="cell-feat-hotkey">{def.hotkey}</span>
+                  <span class="cell-feat-ico">{def.icon}</span>
+                  <span class="cell-feat-label">{def.label}</span>
+                </button>
+              )}
+            </For>
+          </div>
+
+          <Show when={canOpen()}>
+            <button
+              type="button"
+              class="cell-open-btn"
+              onClick={onOpen}
+              title="Enter"
+            >
+              ↗ Oeffnen (Enter)
+            </button>
+          </Show>
+
+          <div class="cell-overlay-footer">
+            <Show when={hasAnyContent()}>
+              <button
+                type="button"
+                class="btn-danger"
+                onClick={onClear}
+                disabled={busy() !== null}
+              >
+                Zelle leeren
+              </button>
+            </Show>
+            <button type="button" class="btn-secondary" onClick={p.onClose}>
+              Schliessen
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default CellOverlay;

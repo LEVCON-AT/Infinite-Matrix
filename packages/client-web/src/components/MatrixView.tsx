@@ -5,6 +5,7 @@ import { useEditMode } from '../lib/edit-mode';
 import { addCol, addRow, delCol, delRow, renameCol, renameRow } from '../lib/mutations';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
+import CellOverlay from './CellOverlay';
 
 const FEATURE_ORDER: CellFeature[] = ['matrix', 'board', 'info', 'checklists'];
 
@@ -29,11 +30,14 @@ type Props = {
   onChanged?: () => void;
 };
 
+type OverlayTarget = { row: RowRow; col: ColRow; cell: CellRow | undefined };
+
 const MatrixView: Component<Props> = (p) => {
   const navigate = useNavigate();
   const editMode = useEditMode();
 
   const [busy, setBusy] = createSignal(false);
+  const [overlayTarget, setOverlayTarget] = createSignal<OverlayTarget | null>(null);
 
   const cellMap = createMemo(() => {
     const m = new Map<string, CellRow>();
@@ -82,24 +86,44 @@ const MatrixView: Component<Props> = (p) => {
 
   async function onDelRow(row: RowRow) {
     const used = (p.content?.cells ?? []).some((c) => c.row_id === row.id);
-    const prompt = used
-      ? `Zeile "${row.label || '(leer)'}" loeschen? Enthaelt Zellen mit Inhalt.`
-      : `Zeile "${row.label || '(leer)'}" loeschen?`;
-    if (!window.confirm(prompt)) return;
+    if (used) {
+      if (!window.confirm(`Zeile "${row.label || '(leer)'}" loeschen? Enthaelt Zellen mit Inhalt.`)) {
+        return;
+      }
+    }
     await wrap(() => delRow(row.id), 'Zeile geloescht.');
   }
 
   async function onDelCol(col: ColRow) {
     const used = (p.content?.cells ?? []).some((c) => c.col_id === col.id);
-    const prompt = used
-      ? `Spalte "${col.label || '(leer)'}" loeschen? Enthaelt Zellen mit Inhalt.`
-      : `Spalte "${col.label || '(leer)'}" loeschen?`;
-    if (!window.confirm(prompt)) return;
+    if (used) {
+      if (!window.confirm(`Spalte "${col.label || '(leer)'}" loeschen? Enthaelt Zellen mit Inhalt.`)) {
+        return;
+      }
+    }
     await wrap(() => delCol(col.id), 'Spalte geloescht.');
+  }
+
+  function onCellEdit(row: RowRow, col: ColRow, cell: CellRow | undefined) {
+    setOverlayTarget({ row, col, cell });
   }
 
   return (
     <div class="matrix-wrap">
+      <Show when={overlayTarget()}>
+        {(t) => (
+          <CellOverlay
+            workspaceId={p.workspaceId}
+            matrixId={p.matrixId}
+            row={t().row}
+            col={t().col}
+            cell={t().cell}
+            onClose={() => setOverlayTarget(null)}
+            onChanged={() => p.onChanged?.()}
+          />
+        )}
+      </Show>
+
       <Show
         when={(p.content?.rows.length ?? 0) > 0 && (p.content?.cols.length ?? 0) > 0}
         fallback={
@@ -236,22 +260,29 @@ const MatrixView: Component<Props> = (p) => {
                           );
                         const targetNode = () =>
                           cell()?.child_matrix_id ?? cell()?.board_id ?? null;
-                        const isClickable = () => targetNode() != null && !editMode();
+                        const isReadClickable = () => targetNode() != null && !editMode();
+                        const isEditClickable = () => editMode();
+                        const isClickable = () => isReadClickable() || isEditClickable();
                         return (
                           <div
                             class="mx-cell"
                             classList={{
                               'mx-cell-empty': !cell(),
                               'mx-cell-clickable': isClickable(),
+                              'mx-cell-editable': isEditClickable(),
                             }}
                             role={isClickable() ? 'button' : undefined}
                             tabIndex={isClickable() ? 0 : -1}
-                            onClick={() => !editMode() && onCellClick(cell())}
+                            onClick={() => {
+                              if (editMode()) onCellEdit(row, col, cell());
+                              else if (isReadClickable()) onCellClick(cell());
+                            }}
                             onKeyDown={(e) => {
                               if (!isClickable()) return;
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
-                                onCellClick(cell());
+                                if (editMode()) onCellEdit(row, col, cell());
+                                else onCellClick(cell());
                               }
                             }}
                           >
