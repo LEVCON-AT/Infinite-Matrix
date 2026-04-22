@@ -149,7 +149,9 @@ const AliasQuicknav: Component<Props> = (p) => {
             {error()}
           </p>
         </Show>
-        <p class="alias-quicknav-hint">Enter = springen. Esc = schliessen.</p>
+        <p class="alias-quicknav-hint">
+          ^ oder Ctrl+K oeffnet. Enter = springen. Esc = schliessen.
+        </p>
       </div>
     </div>
   );

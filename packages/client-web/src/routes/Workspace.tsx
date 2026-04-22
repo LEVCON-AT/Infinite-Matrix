@@ -168,14 +168,48 @@ const Workspace: Component = () => {
     onCleanup(() => document.removeEventListener('keydown', onKey));
   });
 
-  // Quicknav: Ctrl+K / Cmd+K oeffnet das Alias-Modal. Greift nicht,
-  // wenn der User gerade in einem Input/Textarea tippt — dann schluckt
-  // das OS-Handler (Safari Address-Bar) bzw. ein anderes Element.
+  // Quicknav: Ctrl+K / Cmd+K ODER direktes ^ oeffnen das Alias-Modal.
+  //
+  // ^-Erkennung cross-layout:
+  //   - US-Tastatur: Shift+6 liefert e.key = '^'
+  //   - Deutsche Tastatur: e.key = '^' direkt (kein Shift)
+  //   - Mit aktiver Dead-Key-Semantik (Firefox/Chrome auf Linux/Win DE):
+  //     e.key = 'Dead' + e.code = 'Backquote' — der Tote-Akzent, der
+  //     sonst das naechste Zeichen modifizieren wuerde
+  //
+  // Wenn der User in einem Input/Textarea tippt, lassen wir ^ als
+  // normales Zeichen durch — sonst kann er kein Zirkumflex im Text
+  // mehr setzen. Gleiche Regel fuer Cmd+K (OS-Konvention: in Inputs
+  // ignorieren).
   onMount(() => {
+    const isTextInput = (t: EventTarget | null): boolean => {
+      const el = t as HTMLElement | null;
+      if (!el) return false;
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return true;
+      if (el.isContentEditable) return true;
+      return false;
+    };
+
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
-      if (e.key !== 'k' && e.key !== 'K') return;
       if (!params.workspaceId) return;
+      if (showQuicknav()) return;
+
+      // Cmd/Ctrl+K
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+        if (e.key === 'k' || e.key === 'K') {
+          if (isTextInput(e.target)) return;
+          e.preventDefault();
+          setShowQuicknav(true);
+          return;
+        }
+      }
+
+      // ^ direkt (ohne Modifier ausser evtl. Shift fuer US-Tastatur)
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const isCaret =
+        e.key === '^' || (e.key === 'Dead' && e.code === 'Backquote');
+      if (!isCaret) return;
+      if (isTextInput(e.target)) return;
       e.preventDefault();
       setShowQuicknav(true);
     };
