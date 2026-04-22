@@ -281,54 +281,55 @@ const CellOverlay: Component<Props> = (p) => {
     }
   }
 
-  // ─── ESC / Global Hotkeys 1-9 + Autofocus ────────────────────
+  // Alias-Input sofort fokussieren.
   onMount(() => {
-    // Alias-Input sofort fokussieren — User kann ohne Klick tippen.
     aliasInput?.focus();
-
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      const inEditable =
-        !!t &&
-        (t.tagName === 'INPUT' ||
-          t.tagName === 'TEXTAREA' ||
-          t.isContentEditable);
-
-      if (e.key === 'Escape') {
-        e.stopImmediatePropagation();
-        p.onClose();
-        return;
-      }
-
-      // Enter: im Input committet der lokale onKeyDown (blur -> save),
-      // deshalb hier nur ausserhalb Inputs greifen.
-      if (e.key === 'Enter') {
-        if (inEditable) return;
-        e.preventDefault();
-        onOpen();
-        return;
-      }
-
-      // Hotkeys 1-9: IMMER greifen, auch im Alias-Input. preventDefault
-      // verhindert, dass die Ziffer ins Textfeld wandert. Ohne das
-      // waere "Alias tippen dann 1 druecken" nicht moeglich.
-      const def = findFeatureByHotkey(e.key);
-      if (def) {
-        e.preventDefault();
-        void onToggle(def);
-      }
-    };
-    document.addEventListener('keydown', onKey, true);
-    onCleanup(() => {
-      document.removeEventListener('keydown', onKey, true);
-      // Fokus zurueck auf die DOM-Zelle, damit User im Read/Edit-Mode
-      // weiter navigieren kann (Enter -> Sub, Pfeil, 1/2-Hotkey).
-      const el = document.querySelector(
-        `.mx-cell[data-row-id="${p.row.id}"][data-col-id="${p.col.id}"]`,
-      ) as HTMLElement | null;
-      el?.focus({ preventScroll: true });
-    });
   });
+
+  // Fokus zurueck auf die DOM-Zelle bei Unmount — damit Enter/Pfeil im
+  // Read/Edit-Mode sofort weiter funktioniert.
+  onCleanup(() => {
+    const el = document.querySelector(
+      `.mx-cell[data-row-id="${p.row.id}"][data-col-id="${p.col.id}"]`,
+    ) as HTMLElement | null;
+    el?.focus({ preventScroll: true });
+  });
+
+  // Lokaler Tastatur-Handler am Scrim. Bubble-Phase: Events vom Alias-
+  // Input oder einem Feature-Button steigen hoch. stopPropagation haelt
+  // sie vom Workspace-ESC-Handler (Parent-Navigation) ab.
+  function onScrimKeyDown(e: KeyboardEvent) {
+    const t = e.target as HTMLElement | null;
+    const inEditable =
+      !!t &&
+      (t.tagName === 'INPUT' ||
+        t.tagName === 'TEXTAREA' ||
+        t.isContentEditable);
+
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      e.preventDefault();
+      p.onClose();
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      if (inEditable) return; // Input-lokaler Handler macht blur -> save
+      e.stopPropagation();
+      e.preventDefault();
+      onOpen();
+      return;
+    }
+
+    // Hotkeys 1-9: greifen auch im Alias-Input. preventDefault verhindert,
+    // dass die Ziffer in den Text wandert.
+    const def = findFeatureByHotkey(e.key);
+    if (def) {
+      e.stopPropagation();
+      e.preventDefault();
+      void onToggle(def);
+    }
+  }
 
   // Breadcrumb-Label oben
   const breadcrumb = () =>
@@ -340,6 +341,7 @@ const CellOverlay: Component<Props> = (p) => {
       onClick={(e) => {
         if (e.target === e.currentTarget) p.onClose();
       }}
+      onKeyDown={onScrimKeyDown}
     >
       <div class="overlay-card cell-overlay" role="dialog" aria-modal="true">
         <header class="overlay-head">
