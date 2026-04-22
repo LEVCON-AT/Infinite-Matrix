@@ -109,6 +109,23 @@ jobs:
           ssh -v -o BatchMode=yes -o ConnectTimeout=10 -i ~/.ssh/id_ed25519 \
             "$USER@$HOST" "echo 'SSH_OK whoami=$(whoami) hostname=$(hostname)'" 2>&1 | tail -30 || echo "SSH-Test fehlgeschlagen"
 
+      - name: Apply DB migrations
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+          # Repo-Mirror /opt/matrix-repo auf main bringen und Migrations
+          # idempotent anwenden. Der Script ueberlebt leere migrations/.
+          # Seeds bleiben manuell (bewusst nicht automatisiert).
+          ssh -i ~/.ssh/id_ed25519 "$USER@$HOST" bash -s <<'REMOTE'
+            set -euo pipefail
+            sudo git -C /opt/matrix-repo fetch --quiet origin main
+            sudo git -C /opt/matrix-repo merge --ff-only origin/main
+            sudo env SUPABASE_DIR=/opt/matrix-repo/infra/supabase \
+              bash /opt/matrix-repo/infra/scripts/supabase-migrate.sh
+          REMOTE
+
       - name: Deploy bridge
         env:
           HOST: ${{ secrets.DEPLOY_HOST }}
