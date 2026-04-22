@@ -74,14 +74,19 @@ const CellOverlay: Component<Props> = (p) => {
     return (current()?.features ?? []).includes(key);
   }
 
-  function targetNodeId(): string | null {
+  // Anzahl navigierbarer Strukturen (Matrix + Board) an der Zelle.
+  // 0 = nichts zu oeffnen, 1 = eindeutig (Enter + "Oeffnen"-Button),
+  // 2 = ambig — User entscheidet per Chip-Klick, Dialog schliesst ohne Nav.
+  const navTargetCount = createMemo(() => {
     const c = current();
-    if (!c) return null;
-    return c.child_matrix_id ?? c.board_id ?? null;
-  }
+    if (!c) return 0;
+    return (c.child_matrix_id ? 1 : 0) + (c.board_id ? 1 : 0);
+  });
 
-  function canOpen(): boolean {
-    return targetNodeId() !== null;
+  function soleTargetNodeId(): string | null {
+    if (navTargetCount() !== 1) return null;
+    const c = current()!;
+    return c.child_matrix_id ?? c.board_id ?? null;
   }
 
   async function wrap<T>(key: string, fn: () => Promise<T>) {
@@ -198,8 +203,10 @@ const CellOverlay: Component<Props> = (p) => {
   }
 
   // ─── Navigation ──────────────────────────────────────────────
+  // Bei genau einem Ziel navigieren. Bei 0 oder 2 nur schliessen —
+  // User entscheidet dann per Chip-Klick in der Zelle selbst.
   function onOpen() {
-    const nid = targetNodeId();
+    const nid = soleTargetNodeId();
     if (!nid) {
       p.onClose();
       return;
@@ -298,8 +305,7 @@ const CellOverlay: Component<Props> = (p) => {
 
       if (e.key === 'Enter') {
         e.preventDefault();
-        if (canOpen()) onOpen();
-        else p.onClose();
+        onOpen();
         return;
       }
 
@@ -383,7 +389,7 @@ const CellOverlay: Component<Props> = (p) => {
             </For>
           </div>
 
-          <Show when={canOpen()}>
+          <Show when={navTargetCount() === 1}>
             <button
               type="button"
               class="cell-open-btn"
@@ -392,6 +398,12 @@ const CellOverlay: Component<Props> = (p) => {
             >
               ↗ Oeffnen (Enter)
             </button>
+          </Show>
+          <Show when={navTargetCount() === 2}>
+            <p class="hint cell-ambig-hint">
+              Matrix und Board vorhanden — per Chip-Klick in der Zelle
+              waehlen.
+            </p>
           </Show>
 
           <div class="cell-overlay-footer">
