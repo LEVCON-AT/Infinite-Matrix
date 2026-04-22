@@ -7,7 +7,17 @@
 // Wird 0e.1 inkrementell fuer alle Tabellen erweitert.
 
 import { supabase } from './supabase';
-import type { CellRow, ColRow, KbCardRow, KbColRow, NodeRow, RowRow } from './types';
+import type {
+  CellRow,
+  ChecklistCloseMode,
+  ChecklistItemRow,
+  ChecklistRow,
+  ColRow,
+  KbCardRow,
+  KbColRow,
+  NodeRow,
+  RowRow,
+} from './types';
 
 // ─── Helpers ───────────────────────────────────────────────────
 async function nextPosition(
@@ -398,5 +408,157 @@ export async function moveCard(args: {
 
 export async function delCard(cardId: string): Promise<void> {
   const { error } = await supabase.from('kb_cards').delete().eq('id', cardId);
+  if (error) throw error;
+}
+
+// ─── Checklisten (standalone am Board) ─────────────────────────
+// Zell-attached Checklisten kommen separat (andere Parent-Spalte:
+// cell_id statt board_id). Hier nur Board-scoped.
+export async function addChecklist(args: {
+  workspaceId: string;
+  boardId: string;
+  label?: string;
+}): Promise<ChecklistRow> {
+  const pos = await nextBoardPosition('checklists', args.boardId, args.workspaceId);
+  const { data, error } = await supabase
+    .from('checklists')
+    .insert({
+      workspace_id: args.workspaceId,
+      board_id: args.boardId,
+      label: args.label ?? '',
+      position: pos,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as ChecklistRow;
+}
+
+type ChecklistPatch = Partial<
+  Pick<ChecklistRow, 'label' | 'alias' | 'close_mode'>
+>;
+
+async function updateChecklist(
+  clId: string,
+  patch: ChecklistPatch,
+): Promise<ChecklistRow> {
+  const { data, error } = await supabase
+    .from('checklists')
+    .update(patch)
+    .eq('id', clId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as ChecklistRow;
+}
+
+export function renameChecklist(
+  clId: string,
+  label: string,
+): Promise<ChecklistRow> {
+  return updateChecklist(clId, { label });
+}
+
+export function setChecklistAlias(
+  clId: string,
+  alias: string | null,
+): Promise<ChecklistRow> {
+  return updateChecklist(clId, { alias });
+}
+
+export function setChecklistCloseMode(
+  clId: string,
+  mode: ChecklistCloseMode,
+): Promise<ChecklistRow> {
+  return updateChecklist(clId, { close_mode: mode });
+}
+
+export async function delChecklist(clId: string): Promise<void> {
+  const { error } = await supabase.from('checklists').delete().eq('id', clId);
+  if (error) throw error;
+}
+
+// ─── Checklist-Items ───────────────────────────────────────────
+async function nextItemPosition(
+  checklistId: string,
+  workspaceId: string,
+): Promise<number> {
+  const { data, error } = await supabase
+    .from('checklist_items')
+    .select('position')
+    .eq('checklist_id', checklistId)
+    .eq('workspace_id', workspaceId)
+    .order('position', { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  const top = data && data.length > 0 ? (data[0] as { position: number }).position : -1;
+  return top + 1;
+}
+
+export async function addChecklistItem(args: {
+  workspaceId: string;
+  checklistId: string;
+  text?: string;
+  level?: 0 | 1 | 2;
+}): Promise<ChecklistItemRow> {
+  const pos = await nextItemPosition(args.checklistId, args.workspaceId);
+  const { data, error } = await supabase
+    .from('checklist_items')
+    .insert({
+      workspace_id: args.workspaceId,
+      checklist_id: args.checklistId,
+      text: args.text ?? '',
+      level: args.level ?? 0,
+      position: pos,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as ChecklistItemRow;
+}
+
+type ItemPatch = Partial<Pick<ChecklistItemRow, 'text' | 'done' | 'level' | 'position'>>;
+
+async function updateItem(itemId: string, patch: ItemPatch): Promise<ChecklistItemRow> {
+  const { data, error } = await supabase
+    .from('checklist_items')
+    .update(patch)
+    .eq('id', itemId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as ChecklistItemRow;
+}
+
+export function renameChecklistItem(
+  itemId: string,
+  text: string,
+): Promise<ChecklistItemRow> {
+  return updateItem(itemId, { text });
+}
+
+export function toggleChecklistItemDone(
+  itemId: string,
+  done: boolean,
+): Promise<ChecklistItemRow> {
+  return updateItem(itemId, { done });
+}
+
+export function setChecklistItemLevel(
+  itemId: string,
+  level: 0 | 1 | 2,
+): Promise<ChecklistItemRow> {
+  return updateItem(itemId, { level });
+}
+
+export function setChecklistItemPosition(
+  itemId: string,
+  position: number,
+): Promise<ChecklistItemRow> {
+  return updateItem(itemId, { position });
+}
+
+export async function delChecklistItem(itemId: string): Promise<void> {
+  const { error } = await supabase.from('checklist_items').delete().eq('id', itemId);
   if (error) throw error;
 }
