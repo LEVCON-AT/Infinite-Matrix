@@ -4780,3 +4780,61 @@ button[type='submit']:hover:not(:disabled) {
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
+
+/* ── Transform-to-Card-Popup ──────────────────────────────────── */
+.cl2c-card {
+  max-width: 480px;
+  width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+}
+
+.cl2c-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.cl2c-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text3);
+  line-height: 1.4;
+}
+
+.cl2c-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cl2c-field-label {
+  font-size: 12px;
+  color: var(--text2);
+}
+
+.cl2c-input,
+.cl2c-select {
+  padding: var(--space-xs) var(--space-sm);
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.cl2c-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 0.5px solid var(--border);
+}
+
+.cl-to-card-btn,
+.cl-snapshot-btn {
+  font-size: 12px;
+}

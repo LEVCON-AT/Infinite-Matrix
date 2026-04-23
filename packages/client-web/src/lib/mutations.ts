@@ -410,6 +410,45 @@ export async function addCard(args: {
   return data as KbCardRow;
 }
 
+// Transform-to-Card: legt eine neue Karte auf dem Ziel-Board/Col an,
+// deren `checklist_ref` auf eine existierende Standalone-Checkliste
+// zeigt. Die Checkliste bleibt unangetastet — sie ist jetzt zusaetzlich
+// ueber die Karte auffindbar. Mehrfach-Transform ist erlaubt (mehrere
+// Karten auf dieselbe Checkliste sind DB-technisch ok).
+//
+// Wichtig: der DB-CHECK (Migration 002) verbietet, dass eine Karte
+// sowohl `checklist_ref` als auch ein Inline-`checklist` traegt. Beim
+// Transform setzen wir nur `checklist_ref`, das Inline-Feld bleibt
+// implizit NULL.
+export async function createCardFromChecklist(args: {
+  workspaceId: string;
+  checklistId: string;
+  name: string;
+  targetBoardId: string;
+  targetColId: string;
+}): Promise<KbCardRow> {
+  const pos = await nextBoardPosition(
+    'kb_cards',
+    args.targetBoardId,
+    args.workspaceId,
+    { col_id: args.targetColId },
+  );
+  const { data, error } = await supabase
+    .from('kb_cards')
+    .insert({
+      workspace_id: args.workspaceId,
+      board_id: args.targetBoardId,
+      col_id: args.targetColId,
+      name: args.name,
+      position: pos,
+      checklist_ref: args.checklistId,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as KbCardRow;
+}
+
 type CardPatch = Partial<
   Pick<
     KbCardRow,

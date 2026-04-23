@@ -30,6 +30,7 @@ import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 import AliasText from './AliasText';
 import ChecklistPastePopup from './ChecklistPastePopup';
 import type { ParsedPasteItem } from '../lib/checklist-paste-parse';
+import ChecklistToCardPopup from './ChecklistToCardPopup';
 
 type Props = {
   checklist: ChecklistRow;
@@ -47,6 +48,8 @@ const ChecklistPanel: Component<Props> = (p) => {
   // History-Sektion faltbar. Per-Snapshot-Expand wird ueber native
   // <details>-Elemente geloest — kein zusaetzlicher Set im Signal.
   const [historyOpen, setHistoryOpen] = createSignal(false);
+  // Transform-to-Card-Popup (Checkliste → neue Karte mit checklist_ref).
+  const [showToCard, setShowToCard] = createSignal(false);
   let aliasInputRef: HTMLInputElement | undefined;
 
   async function wrap<T>(fn: () => Promise<T>, successMsg?: string) {
@@ -368,6 +371,17 @@ const ChecklistPanel: Component<Props> = (p) => {
             + Punkt
           </button>
         </Show>
+        <Show when={editMode()}>
+          <button
+            type="button"
+            class="btn-subtle cl-to-card-btn"
+            onClick={() => setShowToCard(true)}
+            disabled={busy()}
+            title="Diese Checkliste als Karte auf einem Board anlegen (Referenz)"
+          >
+            → Karte
+          </button>
+        </Show>
         <Show when={p.items.length > 0}>
           <button
             type="button"
@@ -460,6 +474,16 @@ const ChecklistPanel: Component<Props> = (p) => {
             </ul>
           </Show>
         </section>
+      </Show>
+
+      <Show when={showToCard()}>
+        <ChecklistToCardPopup
+          workspaceId={p.workspaceId}
+          checklistId={p.checklist.id}
+          checklistLabel={p.checklist.label}
+          onClose={() => setShowToCard(false)}
+          onCreated={() => p.onChanged()}
+        />
       </Show>
 
       <Show when={pasteText() !== null}>
