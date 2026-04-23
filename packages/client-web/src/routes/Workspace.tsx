@@ -27,6 +27,7 @@ import { useSidebarMode } from '../lib/sidebar-mode';
 import { useAggregateView } from '../lib/aggregate-view';
 import { toggleTheme, useTheme } from '../lib/theme';
 import { subscribeWorkspace } from '../lib/realtime';
+import { clearAliasIndex, fetchAliasIndex, scheduleAliasRefresh } from '../lib/alias-index';
 import { useTreeExpand } from '../lib/tree-expand';
 import { downloadWorkspaceExport, exportWorkspace } from '../lib/export';
 import { showToast } from '../lib/toasts';
@@ -534,8 +535,15 @@ const Workspace: Component = () => {
   createEffect(() => {
     const wid = params.workspaceId;
     if (!wid) return;
+    // Alias-Index initial laden. Wird bei jedem Event einer der 6 Alias-
+    // Tabellen via `scheduleAliasRefresh` debounced neu gezogen.
+    void fetchAliasIndex(wid);
+    onCleanup(() => clearAliasIndex(wid));
     subscribeWorkspace(wid, {
-      nodes: () => void refetchNodes(),
+      nodes: () => {
+        void refetchNodes();
+        scheduleAliasRefresh(wid);
+      },
       cells: () => {
         void refetchCells();
         // Eine Cell-Mutation kann Feature-Pills in der aktuellen
@@ -544,6 +552,7 @@ const Workspace: Component = () => {
         // braucht sie frische Daten.
         void refetchMatrix();
         void refetchCellMatrix();
+        scheduleAliasRefresh(wid);
       },
       rows: () => {
         void refetchRows();
@@ -559,19 +568,25 @@ const Workspace: Component = () => {
       kb_cards: () => {
         void refetchBoard();
         setRtCards((v) => v + 1);
+        scheduleAliasRefresh(wid);
       },
       checklists: () => {
         void refetchBoard();
         setRtCellChecklists((v) => v + 1);
+        scheduleAliasRefresh(wid);
       },
       checklist_items: () => {
         void refetchBoard();
         setRtCellChecklists((v) => v + 1);
       },
-      links: () => void refetchBoard(),
+      links: () => {
+        void refetchBoard();
+        scheduleAliasRefresh(wid);
+      },
       docs: () => {
         setRtDocs((v) => v + 1);
         void refetchCellsWithDocs();
+        scheduleAliasRefresh(wid);
       },
     });
   });
