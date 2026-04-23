@@ -734,6 +734,32 @@ export async function addChecklistItem(args: {
   return data as ChecklistItemRow;
 }
 
+// Bulk-Insert mehrerer Items am Ende der Checkliste. Wird vom Paste-
+// Popup aufgerufen. Einzelne .insert()-Calls in einer Schleife waeren
+// 10-50 Roundtrips bei grossen Pastes; deshalb Batch mit einem einzigen
+// Request (positions werden lokal berechnet, startend bei nextPos).
+export async function bulkAddChecklistItems(args: {
+  workspaceId: string;
+  checklistId: string;
+  items: Array<{ text: string; level: 0 | 1 | 2 }>;
+}): Promise<ChecklistItemRow[]> {
+  if (args.items.length === 0) return [];
+  const startPos = await nextItemPosition(args.checklistId, args.workspaceId);
+  const payload = args.items.map((it, i) => ({
+    workspace_id: args.workspaceId,
+    checklist_id: args.checklistId,
+    text: it.text,
+    level: it.level,
+    position: startPos + i,
+  }));
+  const { data, error } = await supabase
+    .from('checklist_items')
+    .insert(payload)
+    .select();
+  if (error) throw error;
+  return (data ?? []) as ChecklistItemRow[];
+}
+
 type ItemPatch = Partial<Pick<ChecklistItemRow, 'text' | 'done' | 'level' | 'position'>>;
 
 async function updateItem(itemId: string, patch: ItemPatch): Promise<ChecklistItemRow> {
