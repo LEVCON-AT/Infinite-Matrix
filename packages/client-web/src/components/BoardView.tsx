@@ -121,16 +121,6 @@ const BoardView: Component<Props> = (p) => {
   const archivedCount = createMemo(
     () => (p.content?.kbCards ?? []).filter((c) => c.archived).length,
   );
-  const totalCardsShown = createMemo(() =>
-    Array.from(cardsByCol().values()).reduce((n, l) => n + l.length, 0),
-  );
-  const totalCardsAll = createMemo(
-    () =>
-      (showArchived()
-        ? p.content?.kbCards ?? []
-        : (p.content?.kbCards ?? []).filter((c) => !c.archived)
-      ).length,
-  );
 
   const cardsByCol = createMemo(() => {
     const map = new Map<string, KbCardRow[]>();
@@ -141,6 +131,19 @@ const BoardView: Component<Props> = (p) => {
     }
     return map;
   });
+
+  // Treffer-Counter fuer den Filter: ueber cardsByCol zaehlen, damit
+  // die Zahl genau dem entspricht, was gerendert wird.
+  const totalCardsShown = createMemo(() =>
+    Array.from(cardsByCol().values()).reduce((n, l) => n + l.length, 0),
+  );
+  const totalCardsAll = createMemo(
+    () =>
+      (showArchived()
+        ? p.content?.kbCards ?? []
+        : (p.content?.kbCards ?? []).filter((c) => !c.archived)
+      ).length,
+  );
 
   const selectedCard = createMemo(() => {
     const id = selectedCardId();

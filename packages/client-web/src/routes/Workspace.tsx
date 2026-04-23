@@ -33,6 +33,7 @@ import CellChecklistsPage from '../components/CellChecklistsPage';
 import CellInfoPage from '../components/CellInfoPage';
 import AliasQuicknav from '../components/AliasQuicknav';
 import ImportDialog from '../components/ImportDialog';
+import KeyboardHelp from '../components/KeyboardHelp';
 
 const Workspace: Component = () => {
   const user = useUser();
@@ -59,6 +60,7 @@ const Workspace: Component = () => {
   const [workspaces] = createResource(() => fetchMyWorkspaces());
   const [showImport, setShowImport] = createSignal(false);
   const [showQuicknav, setShowQuicknav] = createSignal(false);
+  const [showHelp, setShowHelp] = createSignal(false);
   const [exporting, setExporting] = createSignal(false);
 
   async function onExport() {
@@ -249,6 +251,21 @@ const Workspace: Component = () => {
         return;
       }
 
+      // ? oeffnet/schliesst die Shortcut-Hilfe. Auf DE-Layout ist
+      // ? = Shift+ß, auf US Shift+/. e.key ist '?' in beiden Faellen.
+      // In Inputs ignorieren — sonst kann man kein ? eintippen.
+      if (
+        e.key === '?' &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey
+      ) {
+        if (isTextInput(e.target)) return;
+        e.preventDefault();
+        setShowHelp((v) => !v);
+        return;
+      }
+
       // ^ direkt (ohne Modifier ausser evtl. Shift fuer US-Tastatur)
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const isCaret =
@@ -372,6 +389,10 @@ const Workspace: Component = () => {
         />
       </Show>
 
+      <Show when={showHelp()}>
+        <KeyboardHelp onClose={() => setShowHelp(false)} />
+      </Show>
+
       <main class="ws-main">
         <Show
           when={currentWs()}
@@ -379,6 +400,15 @@ const Workspace: Component = () => {
         >
           <header class="ws-main-header">
             <h1>{currentWs()?.name}</h1>
+            <button
+              type="button"
+              class="theme-toggle-btn"
+              onClick={() => setShowHelp(true)}
+              title="Tastatur-Shortcuts (?)"
+              aria-label="Tastatur-Shortcuts"
+            >
+              ?
+            </button>
             <button
               type="button"
               class="theme-toggle-btn"

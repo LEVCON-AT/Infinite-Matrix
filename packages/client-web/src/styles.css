@@ -2296,6 +2296,64 @@ button[type='submit']:hover:not(:disabled) {
   margin-top: var(--space-md);
 }
 
+/* Keyboard-Help */
+.kb-help-card {
+  max-width: 640px;
+}
+
+.kb-help-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.kb-help-section h4 {
+  margin: 0 0 var(--space-sm);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text3);
+}
+
+.kb-help-list {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) 1fr;
+  gap: 6px var(--space-md);
+  margin: 0;
+}
+
+.kb-help-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.kb-help-keys kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  background: var(--bg2);
+  border: 0.5px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: var(--rs);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--text);
+}
+
+.kb-help-sep {
+  color: var(--text3);
+  font-size: 11px;
+}
+
+.kb-help-desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+  align-self: center;
+}
+
 /* Tag/Who-Editor: zwei gleichbreite Spalten auf Desktop, eine auf
    schmalen Screens. Jedes Feld hat Input + Chip-Preview darunter. */
 .overlay-tag-grid {
