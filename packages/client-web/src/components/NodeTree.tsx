@@ -155,6 +155,9 @@ const TreeItem: Component<{
             active:
               p.entry.kind === 'node' && p.entry.id === p.currentNodeId,
           }}
+          data-tree-entry-id={p.entry.id}
+          data-tree-has-children={hasChildren() ? 'yes' : 'no'}
+          data-tree-expanded={expanded() ? 'yes' : 'no'}
           onKeyDown={(e) => {
             if (e.key === '+' || e.key === 'F10' || e.key === 'ContextMenu') {
               e.preventDefault();
@@ -311,6 +314,91 @@ const NodeTree: Component<Props> = (props) => {
     });
   }
 
+  // Keyboard-Nav im Tree. ArrowUp/ArrowDown zwischen sichtbaren Tree-
+  // Links; ArrowLeft/ArrowRight expand/collapse; Home/End zum ersten/
+  // letzten Link. Enter/Space bleibt dem A-Tag ueberlassen (Browser-
+  // Default = navigate). "+" / F10 / ContextMenu-Key fuer das Menu ist
+  // per-item Handler.
+  function handleTreeKeyDown(e: KeyboardEvent) {
+    const target = e.target as HTMLElement | null;
+    const link = target?.closest<HTMLElement>('.tree-link');
+    if (!link) return;
+
+    // Alle sichtbaren tree-links in DOM-Reihenfolge sammeln.
+    const container = link.closest('.tree-root');
+    if (!container) return;
+    const links = Array.from(
+      container.querySelectorAll<HTMLElement>('.tree-link'),
+    );
+    const idx = links.indexOf(link);
+    if (idx < 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      links[Math.min(links.length - 1, idx + 1)]?.focus();
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      links[Math.max(0, idx - 1)]?.focus();
+      return;
+    }
+    if (e.key === 'Home') {
+      e.preventDefault();
+      links[0]?.focus();
+      return;
+    }
+    if (e.key === 'End') {
+      e.preventDefault();
+      links[links.length - 1]?.focus();
+      return;
+    }
+    if (e.key === 'ArrowRight') {
+      const entryId = link.dataset.treeEntryId;
+      const hasKids = link.dataset.treeHasChildren === 'yes';
+      const isOpen = link.dataset.treeExpanded === 'yes';
+      if (hasKids && !isOpen && entryId) {
+        e.preventDefault();
+        expand.toggle(entryId);
+        return;
+      }
+      // Schon offen: Springe zum ersten Kind (naechster Link in DOM-
+      // Reihenfolge, sofern vorhanden).
+      if (hasKids && isOpen) {
+        e.preventDefault();
+        links[Math.min(links.length - 1, idx + 1)]?.focus();
+      }
+      return;
+    }
+    if (e.key === 'ArrowLeft') {
+      const entryId = link.dataset.treeEntryId;
+      const hasKids = link.dataset.treeHasChildren === 'yes';
+      const isOpen = link.dataset.treeExpanded === 'yes';
+      if (hasKids && isOpen && entryId) {
+        e.preventDefault();
+        expand.toggle(entryId);
+        return;
+      }
+      // Bereits geschlossen / Leaf: Fokus auf den Parent-Link. Den
+      // finden wir ueber .closest('li').parentElement ... aber einfacher:
+      // der naeheste vorherige Link mit niedrigerer Einrueckung.
+      const linkDepth = parseInt(
+        link.closest<HTMLElement>('.tree-row')?.style.paddingLeft || '0',
+        10,
+      );
+      for (let j = idx - 1; j >= 0; j--) {
+        const r = links[j].closest<HTMLElement>('.tree-row');
+        if (!r) continue;
+        const rd = parseInt(r.style.paddingLeft || '0', 10);
+        if (rd < linkDepth) {
+          e.preventDefault();
+          links[j].focus();
+          return;
+        }
+      }
+    }
+  }
+
   return (
     <div class="node-tree">
       <div class="node-tree-head">
@@ -341,7 +429,7 @@ const NodeTree: Component<Props> = (props) => {
           </div>
         }
       >
-        <ul class="tree-root">
+        <ul class="tree-root" onKeyDown={handleTreeKeyDown}>
           <For each={filtered()}>
             {(entry) => (
               <TreeItem

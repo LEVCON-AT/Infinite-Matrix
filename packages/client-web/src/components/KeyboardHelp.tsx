@@ -34,6 +34,17 @@ const SECTIONS: ShortcutSection[] = [
     ],
   },
   {
+    title: 'Sidebar-Tree',
+    entries: [
+      { keys: ['↑', '↓'], desc: 'Zwischen Tree-Eintraegen navigieren' },
+      { keys: ['→'], desc: 'Aufklappen (oder zum ersten Kind)' },
+      { keys: ['←'], desc: 'Einklappen (oder zum Parent springen)' },
+      { keys: ['Home', 'End'], desc: 'Erster / letzter Eintrag' },
+      { keys: ['Enter'], desc: 'Eintrag oeffnen' },
+      { keys: ['+', 'F10'], desc: 'Kontext-Menu (Umbenennen, Loeschen, ...)' },
+    ],
+  },
+  {
     title: 'Matrix',
     entries: [
       { keys: ['↑', '↓', '←', '→'], desc: 'Zwischen Zellen navigieren' },
