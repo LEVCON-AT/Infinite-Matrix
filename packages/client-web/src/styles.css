@@ -485,6 +485,53 @@ button[type='submit']:hover:not(:disabled) {
   color: var(--ambertxt);
 }
 
+/* Presence-Avatar-Stack im Main-Header. Avatars ueberlappen leicht. */
+.presence-stack {
+  display: flex;
+  align-items: center;
+  padding-right: var(--space-xs);
+}
+
+.presence-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-left: -8px;
+  background: var(--avatar-color, var(--blue));
+  color: #fff;
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  transition: transform var(--tr-std);
+}
+
+.presence-avatar:first-child {
+  margin-left: 0;
+}
+
+.presence-avatar:hover {
+  transform: translateY(-1px);
+  z-index: 1;
+}
+
+/* Eigener Avatar: zweite Border-Linie zur Unterscheidung. */
+.presence-avatar-self {
+  box-shadow: 0 0 0 1.5px var(--bg), 0 0 0 3px var(--avatar-color, var(--blue));
+}
+
+.presence-avatar-overflow {
+  background: var(--bg2);
+  color: var(--text2);
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: -0.5px;
+}
+
 /* Edit-Mode-Toggle (Pill) */
 .edit-mode-btn {
   padding: 4px 12px;

@@ -35,6 +35,7 @@ import CellInfoPage from '../components/CellInfoPage';
 import AliasQuicknav from '../components/AliasQuicknav';
 import ImportDialog from '../components/ImportDialog';
 import KeyboardHelp from '../components/KeyboardHelp';
+import PresenceStack from '../components/PresenceStack';
 
 const Workspace: Component = () => {
   const user = useUser();
@@ -490,6 +491,13 @@ const Workspace: Component = () => {
                 </span>
               </Show>
             </nav>
+            <Show when={params.workspaceId && user()}>
+              <PresenceStack
+                workspaceId={params.workspaceId as string}
+                selfUserId={user()!.id}
+                selfEmail={user()!.email ?? '(anon)'}
+              />
+            </Show>
             <button
               type="button"
               class="theme-toggle-btn"
