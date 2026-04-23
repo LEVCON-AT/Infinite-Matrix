@@ -734,6 +734,70 @@ export async function addChecklistItem(args: {
   return data as ChecklistItemRow;
 }
 
+// Close-Snapshot fuer History: liest die aktuelle history, prepended
+// einen neuen Snapshot mit closedAt=now + kopierten Items, schreibt
+// zurueck. Nicht concurrency-safe — zwei parallele Closes verlieren
+// einen Snapshot. Fuer Single-User-Fall akzeptabel.
+//
+// Parameter items: der aktuelle Item-Stand, wie ihn das ChecklistPanel
+// kennt. Wir speichern nur {text, done, level} — position ist fuer
+// Snapshots irrelevant (die Reihenfolge folgt dem uebergebenen Array).
+export async function saveChecklistSnapshot(args: {
+  workspaceId: string;
+  checklistId: string;
+  items: Array<{ text: string; done: boolean; level: 0 | 1 | 2 }>;
+}): Promise<void> {
+  // Current history lesen.
+  const { data: cur, error: readErr } = await supabase
+    .from('checklists')
+    .select('history')
+    .eq('id', args.checklistId)
+    .eq('workspace_id', args.workspaceId)
+    .single();
+  if (readErr) throw readErr;
+  const history = Array.isArray((cur as { history: unknown[] } | null)?.history)
+    ? ((cur as { history: unknown[] }).history as Array<Record<string, unknown>>)
+    : [];
+
+  const snapshot = {
+    closedAt: new Date().toISOString(),
+    items: args.items.map((it) => ({ text: it.text, done: it.done, level: it.level })),
+  };
+  const next = [snapshot, ...history];
+
+  const { error: upErr } = await supabase
+    .from('checklists')
+    .update({ history: next })
+    .eq('id', args.checklistId);
+  if (upErr) throw upErr;
+}
+
+// Einzelnen Snapshot aus der History entfernen (identifiziert per
+// closedAt-Timestamp — bei uns eindeutig genug, da ISO-Timestamp mit
+// Millisekunden).
+export async function delChecklistSnapshot(args: {
+  workspaceId: string;
+  checklistId: string;
+  closedAt: string;
+}): Promise<void> {
+  const { data: cur, error: readErr } = await supabase
+    .from('checklists')
+    .select('history')
+    .eq('id', args.checklistId)
+    .eq('workspace_id', args.workspaceId)
+    .single();
+  if (readErr) throw readErr;
+  const history = Array.isArray((cur as { history: unknown[] } | null)?.history)
+    ? ((cur as { history: unknown[] }).history as Array<Record<string, unknown>>)
+    : [];
+  const next = history.filter((s) => s.closedAt !== args.closedAt);
+  const { error: upErr } = await supabase
+    .from('checklists')
+    .update({ history: next })
+    .eq('id', args.checklistId);
+  if (upErr) throw upErr;
+}
+
 // Bulk-Insert mehrerer Items am Ende der Checkliste. Wird vom Paste-
 // Popup aufgerufen. Einzelne .insert()-Calls in einer Schleife waeren
 // 10-50 Roundtrips bei grossen Pastes; deshalb Batch mit einem einzigen

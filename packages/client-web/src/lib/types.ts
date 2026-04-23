@@ -165,6 +165,20 @@ export type ChecklistCloseMode = 'manual' | 'auto-prompt' | 'auto-silent';
 
 // XOR-Invariante (DB-enforced): genau eines von board_id | cell_id ist gesetzt.
 // Client-Code, der eine neue Checkliste anlegt, setzt entsprechend nur einen Parent.
+// Snapshot-Eintrag fuer checklist.history. Wird beim Abschliessen
+// einer Checkliste erzeugt — enthaelt eine vollstaendige Kopie des
+// Item-Zustands zum Zeitpunkt des Closens.
+export type ChecklistSnapshotItem = {
+  text: string;
+  done: boolean;
+  level: 0 | 1 | 2;
+};
+
+export type ChecklistSnapshot = {
+  closedAt: string; // ISO-Timestamp
+  items: ChecklistSnapshotItem[];
+};
+
 export type ChecklistRow = {
   id: string;
   workspace_id: string;
@@ -175,7 +189,9 @@ export type ChecklistRow = {
   recur: Record<string, unknown> | null;
   close_mode: ChecklistCloseMode;
   action: Record<string, unknown> | null;
-  history: unknown[];
+  // History lebt als jsonb-Array im Row; pro Eintrag ein Snapshot im
+  // Shape ChecklistSnapshot. Neueste Eintraege stehen vorne.
+  history: ChecklistSnapshot[];
   alias: string | null;
   created_at: string;
   updated_at: string;

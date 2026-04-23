@@ -4636,3 +4636,147 @@ button[type='submit']:hover:not(:disabled) {
   padding-top: var(--space-sm);
   border-top: 0.5px solid var(--border);
 }
+
+/* ── Checkliste: Actions-Zeile (Add, Snapshot) ───────────────────── */
+.cl-actions {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  padding: var(--space-xs) 13px;
+  flex-wrap: wrap;
+}
+
+.cl-snapshot-btn {
+  font-size: 12px;
+  margin-left: auto;
+}
+
+/* ── Checkliste: Historie-Sektion ────────────────────────────────── */
+.cl-history {
+  border-top: 0.5px solid var(--border);
+  padding: 0;
+}
+
+.cl-history-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  width: 100%;
+  padding: 6px 13px;
+  background: transparent;
+  border: none;
+  color: var(--text2);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cl-history-toggle:hover {
+  background: var(--bg2);
+}
+
+.cl-history-chev {
+  display: inline-block;
+  transition: transform var(--tr-std);
+  color: var(--text3);
+}
+
+.cl-history-chev.expanded {
+  transform: rotate(90deg);
+}
+
+.cl-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 var(--space-xs);
+  background: var(--bg2);
+}
+
+.cl-history-entry {
+  border-top: 0.5px solid var(--border);
+}
+
+.cl-history-details {
+  /* native <details>-Element */
+}
+
+.cl-history-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 5px 13px;
+  cursor: pointer;
+  font-size: 12px;
+  list-style: none;
+}
+
+.cl-history-summary::-webkit-details-marker {
+  display: none;
+}
+
+.cl-history-summary::marker {
+  content: '';
+}
+
+.cl-history-summary:hover {
+  background: var(--bg);
+}
+
+.cl-history-time {
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+
+.cl-history-count {
+  color: var(--text3);
+  font-size: 11px;
+  margin-left: auto;
+}
+
+.cl-history-del {
+  background: transparent;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.cl-history-del:hover {
+  color: var(--red);
+}
+
+.cl-history-items {
+  list-style: none;
+  margin: 0;
+  padding: 0 13px var(--space-xs);
+  background: var(--bg);
+}
+
+.cl-history-item {
+  display: flex;
+  gap: var(--space-xs);
+  padding: 2px 0;
+  padding-left: calc(var(--space-md) * var(--cl-level, 0));
+  font-size: 11px;
+}
+
+.cl-history-item.done .cl-history-text {
+  text-decoration: line-through;
+  color: var(--text3);
+}
+
+.cl-history-check {
+  color: var(--text3);
+  flex-shrink: 0;
+  font-family: ui-monospace, monospace;
+}
+
+.cl-history-text {
+  color: var(--text2);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}

@@ -12,10 +12,12 @@ import {
   bulkAddChecklistItems,
   delChecklist,
   delChecklistItem,
+  delChecklistSnapshot,
   renameChecklist,
   renameChecklistItem,
   restoreChecklistItem,
   restoreChecklistWithItems,
+  saveChecklistSnapshot,
   setChecklistAlias,
   setChecklistItemLevel,
   toggleChecklistItemDone,
@@ -42,6 +44,9 @@ const ChecklistPanel: Component<Props> = (p) => {
   // Paste-Popup-State: enthaelt den rohen Zwischenablage-Text, wenn beim
   // Paste-Event ein multi-line-Text erkannt wurde. null = Popup zu.
   const [pasteText, setPasteText] = createSignal<string | null>(null);
+  // History-Sektion faltbar. Per-Snapshot-Expand wird ueber native
+  // <details>-Elemente geloest — kein zusaetzlicher Set im Signal.
+  const [historyOpen, setHistoryOpen] = createSignal(false);
   let aliasInputRef: HTMLInputElement | undefined;
 
   async function wrap<T>(fn: () => Promise<T>, successMsg?: string) {
@@ -162,7 +167,54 @@ const ChecklistPanel: Component<Props> = (p) => {
     await wrap(() => setChecklistItemLevel(item.id, next));
   }
 
+  // Snapshot des aktuellen Item-Stands in der History ablegen. Items
+  // selbst bleiben unveraendert — volle Close-Semantik (loeschen bei
+  // non-recurring, reset bei recurring) kommt mit den Close-Events.
+  async function onSnapshot() {
+    const snap = p.items.map((it) => ({
+      text: it.text,
+      done: it.done,
+      level: it.level,
+    }));
+    await wrap(
+      () =>
+        saveChecklistSnapshot({
+          workspaceId: p.workspaceId,
+          checklistId: p.checklist.id,
+          items: snap,
+        }),
+      'Snapshot in Historie abgelegt.',
+    );
+  }
+
+  async function onDelSnapshot(closedAt: string) {
+    if (busy()) return;
+    await wrap(() =>
+      delChecklistSnapshot({
+        workspaceId: p.workspaceId,
+        checklistId: p.checklist.id,
+        closedAt,
+      }),
+    );
+  }
+
   const done = () => p.items.filter((i) => i.done).length;
+  const historyList = () => p.checklist.history ?? [];
+
+  function formatClosedAt(iso: string): string {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return iso;
+    }
+  }
 
   return (
     <li class="cl-item" attr:data-edit={editMode() ? 'true' : 'false'}>
@@ -305,15 +357,109 @@ const ChecklistPanel: Component<Props> = (p) => {
         </For>
       </ul>
 
-      <Show when={editMode()}>
-        <button
-          type="button"
-          class="cl-add-item-btn"
-          onClick={onAddItem}
-          disabled={busy()}
+      <div class="cl-actions">
+        <Show when={editMode()}>
+          <button
+            type="button"
+            class="cl-add-item-btn"
+            onClick={onAddItem}
+            disabled={busy()}
+          >
+            + Punkt
+          </button>
+        </Show>
+        <Show when={p.items.length > 0}>
+          <button
+            type="button"
+            class="btn-subtle cl-snapshot-btn"
+            onClick={onSnapshot}
+            disabled={busy()}
+            title="Aktuellen Stand in Historie speichern"
+          >
+            ↺ Abschliessen
+          </button>
+        </Show>
+      </div>
+
+      <Show when={historyList().length > 0}>
+        <section
+          class="cl-history"
+          classList={{ 'cl-history-open': historyOpen() }}
         >
-          + Punkt
-        </button>
+          <button
+            type="button"
+            class="cl-history-toggle"
+            onClick={() => setHistoryOpen((v) => !v)}
+            aria-expanded={historyOpen()}
+          >
+            <span
+              class="cl-history-chev"
+              classList={{ expanded: historyOpen() }}
+            >
+              ▸
+            </span>
+            Historie ({historyList().length})
+          </button>
+          <Show when={historyOpen()}>
+            <ul class="cl-history-list">
+              <For each={historyList()}>
+                {(snap) => {
+                  const total = snap.items.length;
+                  const doneN = snap.items.filter((i) => i.done).length;
+                  return (
+                    <li class="cl-history-entry">
+                      <details class="cl-history-details">
+                        <summary class="cl-history-summary">
+                          <span class="cl-history-time">
+                            {formatClosedAt(snap.closedAt)}
+                          </span>
+                          <span class="cl-history-count">
+                            {doneN}/{total}
+                          </span>
+                          <Show when={editMode()}>
+                            <button
+                              type="button"
+                              class="cl-history-del"
+                              title="Snapshot loeschen"
+                              aria-label="Snapshot loeschen"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                void onDelSnapshot(snap.closedAt);
+                              }}
+                              disabled={busy()}
+                            >
+                              ✕
+                            </button>
+                          </Show>
+                        </summary>
+                        <ul class="cl-history-items">
+                          <For each={snap.items}>
+                            {(si) => (
+                              <li
+                                class="cl-history-item"
+                                classList={{ done: si.done }}
+                                style={{ '--cl-level': si.level }}
+                              >
+                                <span
+                                  class="cl-history-check"
+                                  aria-hidden="true"
+                                >
+                                  {si.done ? '☑' : '☐'}
+                                </span>
+                                <span class="cl-history-text">{si.text}</span>
+                              </li>
+                            )}
+                          </For>
+                        </ul>
+                      </details>
+                    </li>
+                  );
+                }}
+              </For>
+            </ul>
+          </Show>
+        </section>
       </Show>
 
       <Show when={pasteText() !== null}>
