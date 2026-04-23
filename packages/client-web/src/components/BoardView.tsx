@@ -97,18 +97,39 @@ const BoardView: Component<Props> = (p) => {
   });
 
   const [showArchived, setShowArchived] = createSignal(false);
+  const [filter, setFilter] = createSignal('');
+  let filterInputRef: HTMLInputElement | undefined;
 
   const visibleCols = createMemo<KbColRow[]>(() => p.content?.kbCols ?? []);
   // Archiv-Filter: per Default ausgeblendet. Toggle-Button im Board-Head
   // setzt showArchived — dann kommen die archivierten Karten mit
   // kb-card-archived-Klasse sichtbar rein.
-  const activeCards = createMemo<KbCardRow[]>(() =>
-    showArchived()
+  const activeCards = createMemo<KbCardRow[]>(() => {
+    const all = showArchived()
       ? p.content?.kbCards ?? []
-      : (p.content?.kbCards ?? []).filter((c) => !c.archived),
-  );
+      : (p.content?.kbCards ?? []).filter((c) => !c.archived);
+    const q = filter().trim().toLowerCase();
+    if (!q) return all;
+    return all.filter((c) => {
+      if (c.name.toLowerCase().includes(q)) return true;
+      if (c.alias && c.alias.toLowerCase().includes(q)) return true;
+      if ((c.tags ?? []).some((t) => t.toLowerCase().includes(q))) return true;
+      if ((c.who ?? []).some((w) => w.toLowerCase().includes(q))) return true;
+      return false;
+    });
+  });
   const archivedCount = createMemo(
     () => (p.content?.kbCards ?? []).filter((c) => c.archived).length,
+  );
+  const totalCardsShown = createMemo(() =>
+    Array.from(cardsByCol().values()).reduce((n, l) => n + l.length, 0),
+  );
+  const totalCardsAll = createMemo(
+    () =>
+      (showArchived()
+        ? p.content?.kbCards ?? []
+        : (p.content?.kbCards ?? []).filter((c) => !c.archived)
+      ).length,
   );
 
   const cardsByCol = createMemo(() => {
@@ -313,25 +334,60 @@ const BoardView: Component<Props> = (p) => {
     <Show when={p.content} fallback={<p class="hint">Lade Board…</p>}>
       {(_) => (
         <div class="board">
-          {/* Board-Header: Archiv-Toggle (nur relevant, wenn ueberhaupt
-              archivierte Karten existieren — sonst verwirrend). */}
-          <Show when={archivedCount() > 0}>
+          {/* Board-Header: Filter-Suche + Archiv-Toggle. Immer sichtbar,
+              sobald das Board Karten hat — Suche sparen sich leere
+              Boards. */}
+          <Show when={(p.content!.kbCards ?? []).length > 0}>
             <div class="board-header-bar">
-              <button
-                type="button"
-                class="btn-subtle board-archive-toggle"
-                classList={{ active: showArchived() }}
-                onClick={() => setShowArchived((v) => !v)}
-                aria-pressed={showArchived()}
-                title={
-                  showArchived()
-                    ? 'Archivierte Karten ausblenden'
-                    : 'Archivierte Karten anzeigen'
-                }
-              >
-                {showArchived() ? 'Archiv: an' : 'Archiv: aus'}{' '}
-                <span class="hint">({archivedCount()})</span>
-              </button>
+              <input
+                ref={filterInputRef}
+                type="text"
+                class="board-filter-input"
+                placeholder="Suche (Name, Alias, #Tag, @Person)…"
+                value={filter()}
+                onInput={(e) => setFilter(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape' && filter()) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setFilter('');
+                  }
+                }}
+              />
+              <Show when={filter()}>
+                <span class="board-filter-count hint">
+                  {totalCardsShown()}/{totalCardsAll()}
+                </span>
+                <button
+                  type="button"
+                  class="board-filter-clear"
+                  onClick={() => {
+                    setFilter('');
+                    filterInputRef?.focus();
+                  }}
+                  title="Filter loeschen"
+                  aria-label="Filter loeschen"
+                >
+                  ✕
+                </button>
+              </Show>
+              <Show when={archivedCount() > 0}>
+                <button
+                  type="button"
+                  class="btn-subtle board-archive-toggle"
+                  classList={{ active: showArchived() }}
+                  onClick={() => setShowArchived((v) => !v)}
+                  aria-pressed={showArchived()}
+                  title={
+                    showArchived()
+                      ? 'Archivierte Karten ausblenden'
+                      : 'Archivierte Karten anzeigen'
+                  }
+                >
+                  {showArchived() ? 'Archiv: an' : 'Archiv: aus'}{' '}
+                  <span class="hint">({archivedCount()})</span>
+                </button>
+              </Show>
             </div>
           </Show>
 

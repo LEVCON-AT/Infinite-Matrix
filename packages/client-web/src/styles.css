@@ -1348,8 +1348,55 @@ button[type='submit']:hover:not(:disabled) {
 
 .board-header-bar {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-sm);
   padding: 0 var(--space-md) var(--space-sm);
+}
+
+.board-filter-input {
+  flex: 1;
+  max-width: 360px;
+  padding: 4px 10px;
+  font-size: 13px;
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  color: var(--text);
+  transition: var(--tr-std);
+}
+
+.board-filter-input:focus-visible {
+  border-color: var(--blue);
+  background: var(--bg2);
+  outline: none;
+}
+
+.board-filter-count {
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+}
+
+.board-filter-clear {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 0.5px solid transparent;
+  border-radius: var(--rs);
+  color: var(--text3);
+  font-size: 11px;
+  cursor: pointer;
+  transition: var(--tr-std);
+}
+
+.board-filter-clear:hover {
+  color: var(--red);
+  border-color: var(--red);
+  background: var(--redbg);
+}
+
+.board-archive-toggle {
+  margin-left: auto;
 }
 
 .board-archive-toggle.active {
