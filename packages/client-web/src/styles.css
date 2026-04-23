@@ -4538,3 +4538,101 @@ button[type='submit']:hover:not(:disabled) {
   text-decoration: line-through;
   color: var(--text3);
 }
+
+/* ── Checklist-Paste-Popup ─────────────────────────────────────────
+   Modal mit Textarea + Live-Vorschau. Wird aus ChecklistPanel
+   getriggert, wenn mehrzeiliger Text in einen Item-Input gepasted wird.
+*/
+.cl-paste-card {
+  max-width: 560px;
+  width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+}
+
+.cl-paste-breadcrumb {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text3);
+}
+
+.cl-paste-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.cl-paste-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text2);
+}
+
+.cl-paste-ta {
+  width: 100%;
+  min-height: 120px;
+  padding: var(--space-sm);
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.cl-paste-prev-label {
+  font-size: 12px;
+  color: var(--text2);
+  margin-top: var(--space-xs);
+}
+
+.cl-paste-prev {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--bg2);
+  padding: var(--space-xs) 0;
+}
+
+.cl-paste-empty {
+  padding: var(--space-sm);
+  color: var(--text3);
+  font-size: 12px;
+  font-style: italic;
+  text-align: center;
+}
+
+.cl-paste-item {
+  display: flex;
+  gap: var(--space-xs);
+  padding: 2px var(--space-sm);
+  padding-left: calc(var(--space-sm) + var(--space-md) * var(--cl-level, 0));
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.cl-paste-bullet {
+  color: var(--text3);
+  flex-shrink: 0;
+}
+
+.cl-paste-text {
+  color: var(--text);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.cl-paste-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 0.5px solid var(--border);
+}

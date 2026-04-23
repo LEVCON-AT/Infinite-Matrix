@@ -9,6 +9,7 @@ import type { ChecklistItemRow, ChecklistRow } from '../lib/types';
 import { useEditMode } from '../lib/edit-mode';
 import {
   addChecklistItem,
+  bulkAddChecklistItems,
   delChecklist,
   delChecklistItem,
   renameChecklist,
@@ -25,6 +26,8 @@ import { flashError } from '../lib/flash';
 import { validateAlias } from '../lib/alias';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 import AliasText from './AliasText';
+import ChecklistPastePopup from './ChecklistPastePopup';
+import type { ParsedPasteItem } from '../lib/checklist-paste-parse';
 
 type Props = {
   checklist: ChecklistRow;
@@ -36,6 +39,9 @@ type Props = {
 const ChecklistPanel: Component<Props> = (p) => {
   const editMode = useEditMode();
   const [busy, setBusy] = createSignal(false);
+  // Paste-Popup-State: enthaelt den rohen Zwischenablage-Text, wenn beim
+  // Paste-Event ein multi-line-Text erkannt wurde. null = Popup zu.
+  const [pasteText, setPasteText] = createSignal<string | null>(null);
   let aliasInputRef: HTMLInputElement | undefined;
 
   async function wrap<T>(fn: () => Promise<T>, successMsg?: string) {
@@ -259,6 +265,15 @@ const ChecklistPanel: Component<Props> = (p) => {
                   placeholder="(Punkt)"
                   tabIndex={0}
                   ref={(el) => bindAliasAutocomplete(el, p.workspaceId)}
+                  onPaste={(e) => {
+                    // Multi-line-Paste → Popup mit Parser-Vorschau.
+                    // Single-line bleibt normaler Paste (kein preventDefault).
+                    const txt = e.clipboardData?.getData('text/plain') ?? '';
+                    if (/\r?\n/.test(txt)) {
+                      e.preventDefault();
+                      setPasteText(txt);
+                    }
+                  }}
                   onBlur={(e) => onRenameItem(it, e.currentTarget.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
@@ -299,6 +314,26 @@ const ChecklistPanel: Component<Props> = (p) => {
         >
           + Punkt
         </button>
+      </Show>
+
+      <Show when={pasteText() !== null}>
+        <ChecklistPastePopup
+          initialText={pasteText() as string}
+          checklistLabel={p.checklist.label}
+          onClose={() => setPasteText(null)}
+          onCommit={async (parsed: ParsedPasteItem[]) => {
+            setPasteText(null);
+            await wrap(
+              () =>
+                bulkAddChecklistItems({
+                  workspaceId: p.workspaceId,
+                  checklistId: p.checklist.id,
+                  items: parsed.map((it) => ({ text: it.text, level: it.level })),
+                }),
+              `${parsed.length} ${parsed.length === 1 ? 'Punkt' : 'Punkte'} eingefuegt`,
+            );
+          }}
+        />
       </Show>
     </li>
   );
