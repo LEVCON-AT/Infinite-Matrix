@@ -59,20 +59,41 @@ function hrefOf(workspaceId: string, entry: TreeEntry): string {
   });
 }
 
-// Filtert den Tree so, dass alle Entries drin bleiben, deren Label oder
-// Alias das Query matcht — plus deren Ancestors (damit der Pfad sichtbar
-// bleibt). Subtrees unterhalb eines Match werden vollstaendig mitgeliefert.
-function filterTree(tree: TreeEntry[], q: string): TreeEntry[] {
-  if (!q) return tree;
+// Chip-Filter-Kinds: Teilmenge der TreeEntry-Auspraegungen, nach denen
+// der User die Sidebar crunchen kann. Ports das Chip-Filter-Konzept aus
+// dem HTML-Vorbild (dort: matrices / cards / checklists / infos).
+type FilterChip = 'matrix' | 'board' | 'cell';
+
+// Filtert den Tree nach Text + aktiven Chip-Filter. Ein Entry
+// qualifiziert, wenn BEIDES zutrifft (Text matcht UND Entry-Kind ist
+// im aktiven Set). Ancestors bleiben sichtbar, damit der Pfad sichtbar
+// ist; bei einem Self-Match zeigen wir den ganzen Subtree mit.
+function filterTree(
+  tree: TreeEntry[],
+  q: string,
+  chips: Set<FilterChip>,
+): TreeEntry[] {
+  if (!q && chips.size === 0) return tree;
   const query = q.toLowerCase();
+
+  function entryKindKey(e: TreeEntry): FilterChip {
+    if (e.kind === 'cell') return 'cell';
+    return e.node.type === 'matrix' ? 'matrix' : 'board';
+  }
+
   const walk = (items: TreeEntry[]): TreeEntry[] => {
     const out: TreeEntry[] = [];
     for (const it of items) {
       const label = labelOf(it).toLowerCase();
       const alias = (aliasOf(it) || '').toLowerCase();
-      const selfMatch = label.includes(query) || alias.includes(query);
+      const textMatch = !query || label.includes(query) || alias.includes(query);
+      const kindMatch = chips.size === 0 || chips.has(entryKindKey(it));
+      const selfMatch = textMatch && kindMatch;
+
       const childMatches = walk(it.children);
       if (selfMatch) {
+        // Self-Match: ganzer Subtree ungefiltert anzeigen, der User
+        // will den Kontext unter dem Treffer sehen.
         out.push(it);
       } else if (childMatches.length > 0) {
         out.push({ ...it, children: childMatches } as TreeEntry);
@@ -122,7 +143,10 @@ const TreeItem: Component<{
         class="tree-row"
         data-entry-kind={p.entry.kind}
         data-node-type={p.entry.kind === 'node' ? p.entry.node.type : undefined}
-        style={{ 'padding-left': `${p.depth * 12 + 4}px` }}
+        style={{
+          'padding-left': `${p.depth * 12 + 4}px`,
+          '--tree-depth': p.depth,
+        }}
         onContextMenu={(e) => {
           e.preventDefault();
           if (rowRef) p.openMenu(p.entry, rowRef, e.clientX, e.clientY);
@@ -213,8 +237,17 @@ const NodeTree: Component<Props> = (props) => {
   const expand = useTreeExpand(props.workspaceId);
   const navigate = useNavigate();
   const [query, setQuery] = createSignal('');
+  const [chips, setChips] = createSignal<Set<FilterChip>>(new Set());
   const [ctxMenu, setCtxMenu] = createSignal<CtxMenuState | null>(null);
   let inputRef: HTMLInputElement | undefined;
+
+  function toggleChip(chip: FilterChip) {
+    const cur = chips();
+    const next = new Set(cur);
+    if (next.has(chip)) next.delete(chip);
+    else next.add(chip);
+    setChips(next);
+  }
 
   // Einmalig seeden, sobald der Tree Daten hat. Bei neuen Workspaces
   // heisst das: Root-Ebene offen, Rest zu.
@@ -224,7 +257,9 @@ const NodeTree: Component<Props> = (props) => {
     expand.seedIfFresh(roots.map((r) => r.id));
   });
 
-  const filtered = createMemo(() => filterTree(props.tree, query().trim()));
+  const filtered = createMemo(() =>
+    filterTree(props.tree, query().trim(), chips()),
+  );
 
   function openMenu(entry: TreeEntry, rowEl: HTMLElement, x: number, y: number) {
     const items: CtxMenuState['items'] = [];
@@ -418,6 +453,38 @@ const NodeTree: Component<Props> = (props) => {
             }
           }}
         />
+      </div>
+      <div class="node-tree-chips" role="toolbar" aria-label="Typ-Filter">
+        <button
+          type="button"
+          class="tree-chip"
+          classList={{ active: chips().has('matrix') }}
+          data-chip="matrix"
+          onClick={() => toggleChip('matrix')}
+          title="Nur Matrizen zeigen"
+        >
+          ▦ Matrix
+        </button>
+        <button
+          type="button"
+          class="tree-chip"
+          classList={{ active: chips().has('board') }}
+          data-chip="board"
+          onClick={() => toggleChip('board')}
+          title="Nur Boards zeigen"
+        >
+          ▤ Board
+        </button>
+        <button
+          type="button"
+          class="tree-chip"
+          classList={{ active: chips().has('cell') }}
+          data-chip="cell"
+          onClick={() => toggleChip('cell')}
+          title="Nur Zellen zeigen"
+        >
+          · Zellen
+        </button>
       </div>
       <Show
         when={filtered().length > 0}

@@ -1817,6 +1817,83 @@ button[type='submit']:hover:not(:disabled) {
   border-radius: 50%;
   flex-shrink: 0;
   margin-right: 2px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Vertikale Tree-Lines zwischen Parent + Children. CSS-pur via
+   ::before-Pseudo auf .tree-row, per depth-Variable positioniert.
+   Der Dot (z-index:1) liegt drueber, sodass die Linie optisch durch
+   den Dot laeuft — wie beim SVG-Pattern im HTML-Vorbild, aber ohne
+   Measuring-Logik. */
+.tree-row {
+  position: relative;
+}
+
+.tree-row[style*='--tree-depth']::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--tree-depth, 0) * 12px + 10px);
+  width: 1px;
+  background: var(--border2);
+  pointer-events: none;
+}
+
+/* Root-Ebene: keine Linie ueber der Matrix (sonst zieht sich ein
+   Strich durch Matrizen die gar keinen Parent haben). */
+.tree-row[style*='--tree-depth: 0']::before,
+.tree-root > li:first-child > .tree-row::before {
+  display: none;
+}
+
+/* Typ-Filter-Chips unter dem Filter-Input. Kleine toggle-buttons,
+   kombinierbar. Rails-Mode blendet sie mit aus (gehoert zu .node-
+   tree-head-unsichtbar-Set). */
+.node-tree-chips {
+  display: flex;
+  gap: var(--space-xs);
+  padding: 4px var(--space-xs) var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.tree-chip {
+  background: transparent;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  color: var(--text2);
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background var(--tr-std), color var(--tr-std), border-color var(--tr-std);
+}
+
+.tree-chip:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.tree-chip.active {
+  background: var(--bluebg);
+  color: var(--bluetxt);
+  border-color: var(--blue);
+}
+
+.tree-chip[data-chip='board'].active {
+  background: var(--tealbg);
+  color: var(--tealtxt);
+  border-color: var(--teal);
+}
+
+.tree-chip[data-chip='cell'].active {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+  border-color: var(--amber);
+}
+
+.ws-sidebar[data-sb-mode='rails'] .node-tree-chips {
+  display: none;
 }
 
 /* Zellen-Eintraege etwas dezenter als Nodes — niedrigerer Kontrast,
