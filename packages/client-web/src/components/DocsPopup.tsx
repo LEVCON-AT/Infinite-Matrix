@@ -70,6 +70,18 @@ function todayDE(): string {
   return `${dd}.${mm}.${yyyy}`;
 }
 
+// Kompaktes Alias-Default "YYMMDD" — 6 Zeichen, passt in den 8-
+// Zeichen-Alias-Limit. Bei Mehrfach-Docs am selben Tag muss der User
+// selbst einen Suffix ergaenzen (z.B. "260423a") — Collision-Toast
+// weist beim Blur darauf hin.
+function todayAliasCompact(): string {
+  const d = new Date();
+  const yy = String(d.getFullYear()).slice(2);
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yy}${mm}${dd}`;
+}
+
 function defaultTitle(sourceAlias: string | null): string {
   if (sourceAlias) return `^${sourceAlias} · ${todayDE()}`;
   return todayDE();
@@ -136,7 +148,7 @@ const DocsPopup: Component<Props> = (p) => {
       docId: null,
       title: defaultTitle(sourceAlias),
       content: '',
-      alias: '',
+      alias: todayAliasCompact(),
       sourceAlias,
       attachedCellId,
       dirty: false,
@@ -297,20 +309,28 @@ const DocsPopup: Component<Props> = (p) => {
     const t = activeTab();
     if (!t) return;
     const cleaned = val.trim().toLowerCase();
-    if (cleaned === t.alias) return;
+    if (cleaned === t.alias && t.docId) return; // persisted, unchanged
+    // Leerer Alias: direkt persist (null) — Default wird gedroppt.
+    if (!cleaned) {
+      if (t.docId) await persistField('alias', '');
+      else patchActive({ alias: '' });
+      return;
+    }
     // Cross-Table-Validation. Bei Pending-Doc: id-Ausschluss leer
     // (noch kein DB-Row), findAliasConflict erkennt dann alle
     // anderen Treffer als Konflikt. Bei Persisted: eigene id excluden.
     const v = await validateAlias(
-      cleaned || null,
+      cleaned,
       p.workspaceId,
       { type: 'doc', id: t.docId ?? '00000000-0000-0000-0000-000000000000' },
     );
     if (!v.ok) {
       showToast(v.msg, 'error');
-      // Draft zurueck auf alten Wert setzen, damit das Input korrekt
-      // rendert.
-      patchActive({ alias: t.alias });
+      // Alias-Input leeren, damit der User nicht im Collision-Loop
+      // landet (Default-YYMMDD ueberall gleich → ohne Reset wuerde
+      // der User beim 2. Doc am selben Tag immer wieder denselben
+      // Collision-Toast bekommen). User kann manuell Suffix anhaengen.
+      patchActive({ alias: '' });
       aliasRef?.focus?.();
       return;
     }
