@@ -304,6 +304,20 @@ export async function deleteNode(nodeId: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function renameNode(
+  nodeId: string,
+  label: string,
+): Promise<NodeRow> {
+  const { data, error } = await supabase
+    .from('nodes')
+    .update({ label })
+    .eq('id', nodeId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as NodeRow;
+}
+
 // ─── Kanban-Spalten ────────────────────────────────────────────
 export async function addKbCol(args: {
   workspaceId: string;

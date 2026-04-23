@@ -1,7 +1,18 @@
-import { For, Show, createEffect, createMemo, createSignal, type Component } from 'solid-js';
+import {
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  type Component,
+} from 'solid-js';
 import { A } from '@solidjs/router';
 import type { TreeNode } from '../lib/types';
 import { useTreeExpand } from '../lib/tree-expand';
+import { deleteNode, renameNode } from '../lib/mutations';
+import { showToast } from '../lib/toasts';
+import { translateDbError } from '../lib/errors';
+import ContextMenu, { type CtxMenuState } from './ContextMenu';
 
 type Props = {
   workspaceId: string;
@@ -62,6 +73,7 @@ const NodeTreeItem: Component<{
   depth: number;
   expand: ReturnType<typeof useTreeExpand>;
   query: string;
+  openMenu: (item: TreeNode, rowEl: HTMLElement, x: number, y: number) => void;
 }> = (p) => {
   const hasChildren = () => p.item.children.length > 0;
   // Bei aktivem Filter ignorieren wir den persistierten Expand-State:
@@ -69,11 +81,19 @@ const NodeTreeItem: Component<{
   const expanded = () =>
     p.query ? true : p.expand.isExpanded(p.item.node.id);
 
+  let rowRef: HTMLDivElement | undefined;
+
   return (
     <li>
       <div
+        ref={rowRef}
         class="tree-row"
+        data-node-type={p.item.node.type}
         style={{ 'padding-left': `${p.depth * 12 + 4}px` }}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          if (rowRef) p.openMenu(p.item, rowRef, e.clientX, e.clientY);
+        }}
       >
         {/* Chevron-Slot immer im DOM (fixe Breite), damit Rows ohne
             Kinder buendig mit denen mit Kindern ausgerichtet sind. */}
@@ -101,6 +121,18 @@ const NodeTreeItem: Component<{
           href={`/w/${p.workspaceId}/n/${p.item.node.id}`}
           class="tree-link"
           classList={{ active: p.item.node.id === p.currentNodeId }}
+          onKeyDown={(e) => {
+            // "+" oder F10 oder ContextMenu-Key oeffnet das Kontext-
+            // Menu an der Position des Link-Elements. Gibt Keyboard-
+            // Usern Parity zum Rechtsklick.
+            if (e.key === '+' || e.key === 'F10' || e.key === 'ContextMenu') {
+              e.preventDefault();
+              if (rowRef) {
+                const r = rowRef.getBoundingClientRect();
+                p.openMenu(p.item, rowRef, r.right - 16, r.bottom);
+              }
+            }
+          }}
         >
           <span class="tree-ico" aria-hidden="true">
             {typeIcon[p.item.node.type]}
@@ -132,6 +164,7 @@ const NodeTreeItem: Component<{
                 depth={p.depth + 1}
                 expand={p.expand}
                 query={p.query}
+                openMenu={p.openMenu}
               />
             )}
           </For>
@@ -144,6 +177,7 @@ const NodeTreeItem: Component<{
 const NodeTree: Component<Props> = (props) => {
   const expand = useTreeExpand(props.workspaceId);
   const [query, setQuery] = createSignal('');
+  const [ctxMenu, setCtxMenu] = createSignal<CtxMenuState | null>(null);
   let inputRef: HTMLInputElement | undefined;
 
   // Einmalig seeden, sobald der Tree Daten hat. Bei neuen Workspaces
@@ -157,6 +191,62 @@ const NodeTree: Component<Props> = (props) => {
   });
 
   const filtered = createMemo(() => filterTree(props.tree, query().trim()));
+
+  function openMenu(item: TreeNode, rowEl: HTMLElement, x: number, y: number) {
+    setCtxMenu({
+      x,
+      y,
+      sourceEl: rowEl,
+      headerBadge: item.node.type === 'matrix' ? '▦' : '▤',
+      headerLabel: item.node.label || '(ohne Label)',
+      items: [
+        {
+          label: 'Umbenennen',
+          icon: '✎',
+          onClick: () => {
+            const next = window.prompt(
+              `Neuer Name fuer "${item.node.label}":`,
+              item.node.label,
+            );
+            if (next === null) return;
+            const trimmed = next.trim();
+            if (!trimmed || trimmed === item.node.label) return;
+            void (async () => {
+              try {
+                await renameNode(item.node.id, trimmed);
+                showToast(`Umbenannt in "${trimmed}".`, 'success');
+              } catch (err) {
+                showToast(translateDbError(err), 'error');
+              }
+            })();
+          },
+        },
+        { label: '', onClick: () => {}, divider: true },
+        {
+          label: 'Loeschen',
+          icon: '✕',
+          danger: true,
+          onClick: () => {
+            if (
+              !window.confirm(
+                `"${item.node.label}" loeschen? Alle darunter liegenden Nodes, Zellen und Karten verschwinden mit.`,
+              )
+            ) {
+              return;
+            }
+            void (async () => {
+              try {
+                await deleteNode(item.node.id);
+                showToast(`"${item.node.label}" geloescht.`, 'success');
+              } catch (err) {
+                showToast(translateDbError(err), 'error');
+              }
+            })();
+          },
+        },
+      ],
+    });
+  }
 
   return (
     <div class="node-tree">
@@ -198,11 +288,13 @@ const NodeTree: Component<Props> = (props) => {
                 depth={0}
                 expand={expand}
                 query={query().trim()}
+                openMenu={openMenu}
               />
             )}
           </For>
         </ul>
       </Show>
+      <ContextMenu state={ctxMenu()} onClose={() => setCtxMenu(null)} />
     </div>
   );
 };
