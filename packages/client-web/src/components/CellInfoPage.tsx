@@ -33,6 +33,7 @@ import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import CellDocsSection from './CellDocsSection';
 import { openDocsPopup } from '../lib/docs-ui';
+import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 
 type Props = {
   workspaceId: string;
@@ -265,6 +266,7 @@ const CellInfoPage: Component<Props> = (p) => {
                   readOnly={!editMode()}
                   tabIndex={editMode() ? 0 : -1}
                   rows={3}
+                  ref={(el) => bindAliasAutocomplete(el, p.workspaceId)}
                   onBlur={(e) => {
                     if (!editMode()) return;
                     onSetValue(f, e.currentTarget.value);

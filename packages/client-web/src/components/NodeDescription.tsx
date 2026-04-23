@@ -13,6 +13,7 @@ import { setNodeDescription } from '../lib/mutations';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import MarkdownLightView from './MarkdownLightView';
+import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 
 type Props = {
   node: NodeRow;
@@ -77,7 +78,10 @@ const NodeDescription: Component<Props> = (p) => {
           }
         >
           <textarea
-            ref={textareaRef}
+            ref={(el) => {
+              textareaRef = el;
+              bindAliasAutocomplete(el, p.node.workspace_id);
+            }}
             class="node-desc-input"
             placeholder="Beschreibung (Markdown: **bold**, *italic*, `code`, http-Links)…"
             value={draft()}

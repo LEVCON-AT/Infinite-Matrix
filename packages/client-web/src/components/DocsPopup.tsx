@@ -45,6 +45,7 @@ import { resolveAlias } from '../lib/alias-resolve';
 import { dispatchAliasResult } from '../lib/alias-dispatch';
 import { supabase } from '../lib/supabase';
 import MarkdownLightView from './MarkdownLightView';
+import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 import { getPersistedTabIds, persistTabIds } from '../lib/docs-tab-restore';
 import {
   getDrafts,
@@ -940,7 +941,10 @@ const DocsPopup: Component<Props> = (p) => {
                   }
                 >
                   <textarea
-                    ref={contentRef}
+                    ref={(el) => {
+                      contentRef = el;
+                      bindAliasAutocomplete(el, p.workspaceId);
+                    }}
                     class="docs-popup-content"
                     value={t().content}
                     placeholder="Markdown: **bold**, *italic*, `code`, http-Links. Leerzeile = Absatz."

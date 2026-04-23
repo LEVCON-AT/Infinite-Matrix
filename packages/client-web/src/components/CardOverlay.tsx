@@ -48,6 +48,7 @@ import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
 import { validateAlias } from '../lib/alias';
 import { openDocsPopup } from '../lib/docs-ui';
+import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 
 type Props = {
   card: KbCardRow;
@@ -657,6 +658,7 @@ const CardOverlay: Component<Props> = (p) => {
               value={p.card.note}
               placeholder="(keine Notiz)"
               rows="4"
+              ref={(el) => bindAliasAutocomplete(el, p.card.workspace_id)}
               onBlur={(e) => onNote(e.currentTarget.value)}
             />
           </section>
