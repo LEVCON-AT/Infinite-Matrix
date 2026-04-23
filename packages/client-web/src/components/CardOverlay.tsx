@@ -24,6 +24,7 @@ import {
   renameCardInlineItem,
   renameChecklistItem,
   setCardAlias,
+  setCardArchived,
   setCardDeadline,
   setCardNote,
   setCardPriority,
@@ -266,6 +267,14 @@ const CardOverlay: Component<Props> = (p) => {
       ? ` ab ${new Date(r.startDate).toLocaleDateString('de-DE')}`
       : '';
     return `${phrase}${start}`;
+  }
+
+  async function onToggleArchive() {
+    const next = !p.card.archived;
+    await wrap(
+      () => setCardArchived(p.card.id, next),
+      next ? 'Karte archiviert.' : 'Karte wieder aktiv.',
+    );
   }
 
   async function onDelete() {
@@ -664,6 +673,19 @@ const CardOverlay: Component<Props> = (p) => {
           </Show>
 
           <footer class="overlay-edit-footer">
+            <button
+              type="button"
+              class="btn-subtle"
+              onClick={onToggleArchive}
+              disabled={busy()}
+              title={
+                p.card.archived
+                  ? 'Karte wieder sichtbar machen'
+                  : 'Karte archivieren (versteckt auf dem Board)'
+              }
+            >
+              {p.card.archived ? 'Aus Archiv holen' : 'Archivieren'}
+            </button>
             <button
               type="button"
               class="btn-danger"

@@ -436,6 +436,13 @@ export function setCardRecur(
   return updateCard(cardId, { recur });
 }
 
+export function setCardArchived(
+  cardId: string,
+  archived: boolean,
+): Promise<KbCardRow> {
+  return updateCard(cardId, { archived });
+}
+
 // Move: innerhalb derselben Spalte oder cross-column. Bei cross-column
 // bekommt die Karte Position ans Ende der Ziel-Spalte (kein Reorder
 // innerhalb — kommt in 0e.1.h).

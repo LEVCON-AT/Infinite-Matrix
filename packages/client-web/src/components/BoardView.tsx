@@ -87,9 +87,19 @@ const BoardView: Component<Props> = (p) => {
     setSearchParams({ card: undefined }, { replace: true });
   });
 
+  const [showArchived, setShowArchived] = createSignal(false);
+
   const visibleCols = createMemo<KbColRow[]>(() => p.content?.kbCols ?? []);
+  // Archiv-Filter: per Default ausgeblendet. Toggle-Button im Board-Head
+  // setzt showArchived — dann kommen die archivierten Karten mit
+  // kb-card-archived-Klasse sichtbar rein.
   const activeCards = createMemo<KbCardRow[]>(() =>
-    (p.content?.kbCards ?? []).filter((c) => !c.archived),
+    showArchived()
+      ? p.content?.kbCards ?? []
+      : (p.content?.kbCards ?? []).filter((c) => !c.archived),
+  );
+  const archivedCount = createMemo(
+    () => (p.content?.kbCards ?? []).filter((c) => c.archived).length,
   );
 
   const cardsByCol = createMemo(() => {
@@ -221,6 +231,28 @@ const BoardView: Component<Props> = (p) => {
     <Show when={p.content} fallback={<p class="hint">Lade Board…</p>}>
       {(_) => (
         <div class="board">
+          {/* Board-Header: Archiv-Toggle (nur relevant, wenn ueberhaupt
+              archivierte Karten existieren — sonst verwirrend). */}
+          <Show when={archivedCount() > 0}>
+            <div class="board-header-bar">
+              <button
+                type="button"
+                class="btn-subtle board-archive-toggle"
+                classList={{ active: showArchived() }}
+                onClick={() => setShowArchived((v) => !v)}
+                aria-pressed={showArchived()}
+                title={
+                  showArchived()
+                    ? 'Archivierte Karten ausblenden'
+                    : 'Archivierte Karten anzeigen'
+                }
+              >
+                {showArchived() ? 'Archiv: an' : 'Archiv: aus'}{' '}
+                <span class="hint">({archivedCount()})</span>
+              </button>
+            </div>
+          </Show>
+
           {/* Links-Leiste */}
           <Show when={(p.content!.links ?? []).length > 0}>
             <div class="board-links">
@@ -372,7 +404,10 @@ const BoardView: Component<Props> = (p) => {
                               return (
                                 <li
                                   class="kb-card"
-                                  classList={{ 'kb-card-done': card.done }}
+                                  classList={{
+                                    'kb-card-done': card.done,
+                                    'kb-card-archived': card.archived,
+                                  }}
                                   role="button"
                                   tabIndex={0}
                                   onClick={() => setSelectedCardId(card.id)}
