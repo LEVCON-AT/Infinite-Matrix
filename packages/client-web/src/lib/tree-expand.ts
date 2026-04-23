@@ -84,11 +84,23 @@ export function useTreeExpand(workspaceId: string) {
     setExpandAll(!state().all);
   }
 
-  function isExpanded(nodeId: string, depth: number): boolean {
+  function isExpanded(nodeId: string): boolean {
     const s = state();
     if (s.all) return true;
-    if (depth === 0) return true; // Root-Ebene immer offen
     return s.expanded.has(nodeId);
+  }
+
+  // Einmalig beim ersten Besuch eines Workspaces: Root-IDs als
+  // Default-Expansion setzen, damit der User nicht erst alles
+  // aufklappen muss. Kriterium: kein localStorage-Eintrag vorhanden
+  // (nicht "Set leer" — das koennte eine bewusste Kollabierung sein).
+  function seedIfFresh(rootIds: string[]): void {
+    if (localStorage.getItem(storageKey(workspaceId)) !== null) return;
+    if (rootIds.length === 0) return;
+    const cur = state();
+    const next = new Set(cur.expanded);
+    for (const id of rootIds) next.add(id);
+    setState({ expanded: next, all: cur.all });
   }
 
   return {
@@ -97,5 +109,6 @@ export function useTreeExpand(workspaceId: string) {
     toggle,
     setExpandAll,
     toggleExpandAll,
+    seedIfFresh,
   };
 }

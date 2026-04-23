@@ -1,4 +1,4 @@
-import { For, Show, type Component } from 'solid-js';
+import { For, Show, createEffect, type Component } from 'solid-js';
 import { A } from '@solidjs/router';
 import type { TreeNode } from '../lib/types';
 import { useTreeExpand } from '../lib/tree-expand';
@@ -22,7 +22,7 @@ const NodeTreeItem: Component<{
   expand: ReturnType<typeof useTreeExpand>;
 }> = (p) => {
   const hasChildren = () => p.item.children.length > 0;
-  const expanded = () => p.expand.isExpanded(p.item.node.id, p.depth);
+  const expanded = () => p.expand.isExpanded(p.item.node.id);
 
   return (
     <li>
@@ -87,6 +87,17 @@ const NodeTreeItem: Component<{
 
 const NodeTree: Component<Props> = (props) => {
   const expand = useTreeExpand(props.workspaceId);
+
+  // Einmalig seeden, sobald der Tree Daten hat. Bei neuen Workspaces
+  // heisst das: Root-Ebene offen, Rest zu — der bekannte Default.
+  // Bei existierenden Workspaces (localStorage-Eintrag schon da)
+  // greift das no-op.
+  createEffect(() => {
+    const roots = props.tree;
+    if (roots.length === 0) return;
+    expand.seedIfFresh(roots.map((r) => r.node.id));
+  });
+
   return (
     <div class="node-tree">
       <div class="node-tree-label">Matrix &amp; Boards</div>
