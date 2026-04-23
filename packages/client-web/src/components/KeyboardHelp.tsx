@@ -29,6 +29,7 @@ const SECTIONS: ShortcutSection[] = [
       { keys: ['Shift+P'], desc: 'Command-Palette (n/copy/del/ren/nd/k)' },
       { keys: ['Shift+N'], desc: 'Sidebar-Modus zyklen (full → rails → aus)' },
       { keys: ['s'], desc: 'Fokus Sidebar ↔ Canvas swappen' },
+      { keys: ['Shift+W'], desc: 'Aufgabenuebersicht ↔ Intervallmatrix toggeln (im Matrix-Kontext)' },
       { keys: ['Shift+E'], desc: 'Edit-Mode togglen' },
       { keys: ['Shift+A'], desc: 'Sidebar: alles aufklappen (sticky)' },
       { keys: ['Esc'], desc: 'Overlay schliessen / eine Ebene hoch' },

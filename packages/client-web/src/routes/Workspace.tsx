@@ -24,6 +24,7 @@ import {
 } from '../lib/queries';
 import { toggleEditMode, useEditMode } from '../lib/edit-mode';
 import { useSidebarMode } from '../lib/sidebar-mode';
+import { useAggregateView } from '../lib/aggregate-view';
 import { toggleTheme, useTheme } from '../lib/theme';
 import { subscribeWorkspace } from '../lib/realtime';
 import { useTreeExpand } from '../lib/tree-expand';
@@ -458,6 +459,24 @@ const Workspace: Component = () => {
         if (isTextInput(e.target)) return;
         e.preventDefault();
         sidebar.cycle();
+        return;
+      }
+
+      // Shift+W: Aggregat-Sektion unter der Matrix umschalten zwischen
+      // Aufgabenuebersicht und Intervallmatrix. Nur wenn aktuell eine
+      // Matrix im Fokus ist.
+      if (
+        e.shiftKey &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        (e.key === 'W' || e.key === 'w')
+      ) {
+        if (isTextInput(e.target)) return;
+        const n = currentNode();
+        if (!n || n.type !== 'matrix') return;
+        e.preventDefault();
+        useAggregateView(n.id).toggle();
         return;
       }
 

@@ -13,7 +13,6 @@ import {
   Show,
   createMemo,
   createResource,
-  createSignal,
   type Component,
 } from 'solid-js';
 import type { CellRow, ColRow, NodeRow, RowRow } from '../lib/types';
@@ -22,12 +21,11 @@ import {
   collectBoardIdsInMatrixTree,
   isFreqCardActive,
 } from '../lib/aggregate';
+import { useAggregateView } from '../lib/aggregate-view';
 import { loadDailyCols } from '../lib/daily-cols';
 import { fetchCardsForBoards } from '../lib/queries';
 import FrequencyMatrix from './FrequencyMatrix';
 import TaskOverview from './TaskOverview';
-
-type View = 'overview' | 'freq';
 
 type Props = {
   workspaceId: string;
@@ -43,29 +41,9 @@ type Props = {
   realtimeVersion: number;
 };
 
-function storageKey(matrixId: string): string {
-  return `matrix-agg-view-${matrixId}`;
-}
-
-function loadView(matrixId: string): View {
-  try {
-    const raw = localStorage.getItem(storageKey(matrixId));
-    return raw === 'freq' ? 'freq' : 'overview';
-  } catch {
-    return 'overview';
-  }
-}
-
-function saveView(matrixId: string, v: View): void {
-  try {
-    localStorage.setItem(storageKey(matrixId), v);
-  } catch {
-    /* ignore */
-  }
-}
-
 const MatrixAggregateSection: Component<Props> = (p) => {
-  const [view, setView] = createSignal<View>(loadView(p.matrixId));
+  const aggView = createMemo(() => useAggregateView(p.matrixId));
+  const view = () => aggView().view();
 
   // Board-IDs im Subtree — rein client-seitig aus nodes+cells.
   const boardIds = createMemo(() =>
@@ -114,9 +92,8 @@ const MatrixAggregateSection: Component<Props> = (p) => {
     return m;
   });
 
-  function setViewPersisted(v: View) {
-    setView(v);
-    saveView(p.matrixId, v);
+  function setViewPersisted(v: 'overview' | 'freq') {
+    aggView().setView(v);
   }
 
   return (

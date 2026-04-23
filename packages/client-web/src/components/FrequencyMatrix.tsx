@@ -7,12 +7,12 @@
 // dynamisch nur-aktiven Spalten (Kategorien ohne Karten werden
 // ausgelassen — identisch zum HTML-Vorbild).
 
-import { For, Show, createSignal, type Component } from 'solid-js';
+import { For, Show, createSignal, onCleanup, onMount, type Component } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import type { AggregateCell, FreqCategoryKey } from '../lib/aggregate';
 import { FREQ_CATEGORIES } from '../lib/aggregate';
 import { cellTarget } from '../lib/alias-dispatch';
-import type { CellRow } from '../lib/types';
+import type { CellRow, KbCardRow } from '../lib/types';
 
 type Props = {
   workspaceId: string;
@@ -21,11 +21,45 @@ type Props = {
   cellById: Map<string, CellRow>;
 };
 
+type FlyoutState = {
+  title: string;
+  cards: KbCardRow[];
+};
+
 const FrequencyMatrix: Component<Props> = (p) => {
   const navigate = useNavigate();
   // Expand-State per dataId, Sitzung-lokal. Persistenz weggelassen —
   // im HTML ist _freqExpanded auch nur in-memory.
   const [expanded, setExpanded] = createSignal<Set<string>>(new Set());
+  // Flyout beim Klick auf eine Zahl-Cell.
+  const [flyout, setFlyout] = createSignal<FlyoutState | null>(null);
+
+  // ESC schliesst Flyout (Capture, damit andere Handler nicht greifen).
+  onMount(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || !flyout()) return;
+      e.stopImmediatePropagation();
+      setFlyout(null);
+    };
+    document.addEventListener('keydown', onKey, true);
+    onCleanup(() => document.removeEventListener('keydown', onKey, true));
+  });
+
+  function openFlyout(agg: AggregateCell, key: FreqCategoryKey) {
+    const cat = FREQ_CATEGORIES.find((c) => c.key === key);
+    if (!cat) return;
+    const matching = agg.cards.filter((c) => cat.test(c));
+    if (matching.length === 0) return;
+    setFlyout({
+      title: `${agg.label} · ${cat.label}`,
+      cards: matching,
+    });
+  }
+
+  function openCardFromFlyout(card: KbCardRow) {
+    navigate(`/w/${p.workspaceId}/n/${card.board_id}?card=${card.id}`);
+    setFlyout(null);
+  }
 
   function toggle(dataId: string) {
     const cur = expanded();
@@ -140,7 +174,20 @@ const FrequencyMatrix: Component<Props> = (p) => {
                         return (
                           <td
                             class="freq-cell"
-                            classList={{ 'freq-cell-empty': n === 0 }}
+                            classList={{
+                              'freq-cell-empty': n === 0,
+                              'freq-cell-clickable': n > 0,
+                            }}
+                            role={n > 0 ? 'button' : undefined}
+                            tabIndex={n > 0 ? 0 : -1}
+                            onClick={() => n > 0 && openFlyout(agg, cat.key)}
+                            onKeyDown={(e) => {
+                              if (n > 0 && (e.key === 'Enter' || e.key === ' ')) {
+                                e.preventDefault();
+                                openFlyout(agg, cat.key);
+                              }
+                            }}
+                            title={n > 0 ? 'Karten anzeigen' : undefined}
                           >
                             {n > 0 ? n : ''}
                           </td>
@@ -154,6 +201,53 @@ const FrequencyMatrix: Component<Props> = (p) => {
           </tbody>
         </table>
       </div>
+
+      <Show when={flyout()}>
+        {(f) => (
+          <div
+            class="overlay-scrim freq-flyout-scrim"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setFlyout(null);
+            }}
+          >
+            <div class="overlay-card freq-flyout-card" role="dialog">
+              <header class="overlay-head">
+                <h3>{f().title}</h3>
+                <button
+                  type="button"
+                  class="overlay-close"
+                  onClick={() => setFlyout(null)}
+                  aria-label="Schliessen"
+                >
+                  ✕
+                </button>
+              </header>
+              <ul class="freq-flyout-list">
+                <For each={f().cards}>
+                  {(card) => (
+                    <li>
+                      <button
+                        type="button"
+                        class="freq-flyout-item"
+                        onClick={() => openCardFromFlyout(card)}
+                      >
+                        <span class="freq-flyout-name">
+                          {card.name || '(ohne Name)'}
+                        </span>
+                        <Show when={card.deadline}>
+                          <span class="freq-flyout-meta">
+                            {card.deadline}
+                          </span>
+                        </Show>
+                      </button>
+                    </li>
+                  )}
+                </For>
+              </ul>
+            </div>
+          </div>
+        )}
+      </Show>
     </Show>
   );
 };
