@@ -11,16 +11,24 @@ import type {
   BoardContent,
   KbCardRow,
   KbColRow,
+  LinkRow,
+  LinkType,
 } from '../lib/types';
 import { useEditMode } from '../lib/edit-mode';
 import {
+  addBoardLink,
   addCard,
   addChecklist,
   addKbCol,
+  delBoardLink,
   delCard,
   delKbCol,
+  InvalidUrlError,
   moveCard,
   renameKbCol,
+  setBoardLinkLabel,
+  setBoardLinkType,
+  setBoardLinkUrl,
   setCardPosition,
   setKbColColor,
   setKbColPosition,
@@ -227,6 +235,74 @@ const BoardView: Component<Props> = (p) => {
     );
   }
 
+  // Board-Links: Add via Prompt (URL dann Label). Invalid-URL liefert
+  // eine freundliche Fehler-Toast, Sanitization greift im
+  // Mutations-Layer.
+  async function onAddLink() {
+    const rawUrl = window.prompt(
+      'URL oder E-Mail-Adresse:',
+      'https://',
+    );
+    if (!rawUrl) return;
+    const raw = rawUrl.trim();
+    if (!raw) return;
+    // Simple Heuristik: enthaelt @ ohne :// → wohl eine Mail.
+    const looksLikeMail = raw.includes('@') && !/^[a-z]+:\/\//i.test(raw);
+    const type: LinkType = looksLikeMail ? 'mail' : 'url';
+    const label = window.prompt('Anzeigetext (optional):', '') ?? '';
+    try {
+      await addBoardLink({
+        workspaceId: p.workspaceId,
+        boardId: p.boardId,
+        type,
+        label,
+        url: raw,
+      });
+      p.onChanged?.();
+    } catch (err) {
+      if (err instanceof InvalidUrlError) {
+        showToast('URL ist ungueltig.', 'error');
+      } else {
+        showToast(translateDbError(err), 'error');
+      }
+    }
+  }
+
+  async function onDelLink(link: LinkRow) {
+    if (
+      !window.confirm(
+        `Link "${link.label || link.url}" loeschen?`,
+      )
+    ) {
+      return;
+    }
+    await wrap(() => delBoardLink(link.id), 'Link geloescht.');
+  }
+
+  async function onRenameLink(link: LinkRow, label: string) {
+    if (label.trim() === link.label) return;
+    await wrap(() => setBoardLinkLabel(link.id, label));
+  }
+
+  async function onLinkUrl(link: LinkRow, url: string) {
+    if (url.trim() === link.url) return;
+    try {
+      await setBoardLinkUrl(link.id, url);
+      p.onChanged?.();
+    } catch (err) {
+      if (err instanceof InvalidUrlError) {
+        showToast('URL ist ungueltig.', 'error');
+      } else {
+        showToast(translateDbError(err), 'error');
+      }
+    }
+  }
+
+  async function onLinkType(link: LinkRow, type: LinkType) {
+    if (type === link.type) return;
+    await wrap(() => setBoardLinkType(link.id, type));
+  }
+
   return (
     <Show when={p.content} fallback={<p class="hint">Lade Board…</p>}>
       {(_) => (
@@ -253,29 +329,112 @@ const BoardView: Component<Props> = (p) => {
             </div>
           </Show>
 
-          {/* Links-Leiste */}
-          <Show when={(p.content!.links ?? []).length > 0}>
+          {/* Links-Leiste. Im View-Mode Chips als <a>, im Edit-Mode
+              Inline-Edit: Typ, Label, URL + Delete. */}
+          <Show when={(p.content!.links ?? []).length > 0 || editMode()}>
             <div class="board-links">
-              <For each={p.content!.links}>
+              <For each={p.content!.links ?? []}>
                 {(link) => (
-                  <a
-                    class="board-link-chip"
-                    data-link-type={link.type}
-                    href={link.type === 'mail' ? `mailto:${link.url}` : link.url}
-                    target={link.type === 'url' ? '_blank' : undefined}
-                    rel={link.type === 'url' ? 'noopener noreferrer' : undefined}
-                    title={link.url}
+                  <Show
+                    when={editMode()}
+                    fallback={
+                      <a
+                        class="board-link-chip"
+                        data-link-type={link.type}
+                        href={
+                          link.type === 'mail' ? `mailto:${link.url}` : link.url
+                        }
+                        target={link.type === 'url' ? '_blank' : undefined}
+                        rel={
+                          link.type === 'url' ? 'noopener noreferrer' : undefined
+                        }
+                        title={link.url}
+                      >
+                        <span class="link-ico">
+                          {link.type === 'mail' ? '✉' : '↗'}
+                        </span>
+                        <span>{link.label || link.url}</span>
+                        <Show when={link.alias}>
+                          <span class="link-alias">^{link.alias}</span>
+                        </Show>
+                      </a>
+                    }
                   >
-                    <span class="link-ico">
-                      {link.type === 'mail' ? '✉' : '↗'}
-                    </span>
-                    <span>{link.label || link.url}</span>
-                    <Show when={link.alias}>
-                      <span class="link-alias">^{link.alias}</span>
-                    </Show>
-                  </a>
+                    <div
+                      class="board-link-edit"
+                      data-link-type={link.type}
+                    >
+                      <select
+                        class="board-link-type"
+                        value={link.type}
+                        title="Link-Typ"
+                        onChange={(e) =>
+                          onLinkType(
+                            link,
+                            (e.currentTarget as HTMLSelectElement)
+                              .value as LinkType,
+                          )
+                        }
+                      >
+                        <option value="url">URL</option>
+                        <option value="mail">Mail</option>
+                      </select>
+                      <input
+                        class="board-link-label"
+                        type="text"
+                        value={link.label}
+                        placeholder="Label"
+                        onBlur={(e) =>
+                          onRenameLink(link, e.currentTarget.value)
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            (e.currentTarget as HTMLInputElement).blur();
+                          }
+                        }}
+                      />
+                      <input
+                        class="board-link-url"
+                        type="text"
+                        value={link.url}
+                        placeholder={
+                          link.type === 'mail'
+                            ? 'name@example.com'
+                            : 'https://...'
+                        }
+                        onBlur={(e) => onLinkUrl(link, e.currentTarget.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            (e.currentTarget as HTMLInputElement).blur();
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        class="mx-del-btn"
+                        title="Link loeschen"
+                        aria-label="Link loeschen"
+                        onClick={() => onDelLink(link)}
+                        disabled={busy()}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </Show>
                 )}
               </For>
+              <Show when={editMode()}>
+                <button
+                  type="button"
+                  class="btn-subtle board-link-add-btn"
+                  onClick={onAddLink}
+                  disabled={busy()}
+                >
+                  + Link
+                </button>
+              </Show>
             </div>
           </Show>
 

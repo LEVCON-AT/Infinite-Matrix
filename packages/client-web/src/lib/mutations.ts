@@ -19,6 +19,8 @@ import type {
   InlineChecklistItem,
   KbCardRow,
   KbColRow,
+  LinkRow,
+  LinkType,
   NodeRow,
   RowRow,
 } from './types';
@@ -983,4 +985,90 @@ export async function delCardInlineItem(
     items: items.map(ensureItemId).filter((it) => it.id !== itemId),
     result: undefined,
   }));
+}
+
+// ─── Board-Links (links-Tabelle, board_id=X) ───────────────────
+// Eigene Tabelle (nicht JSONB): Sortierung per position, Alias moeglich.
+// URLs gehen durch sanitizeUrl — 'javascript:' etc. werden abgelehnt.
+// type: 'url' (normale Hyperlinks) oder 'mail' (url = reine E-Mail-
+// Adresse, href wird im UI zu mailto:<addr> gebaut).
+export async function addBoardLink(args: {
+  workspaceId: string;
+  boardId: string;
+  type: LinkType;
+  label?: string;
+  url: string;
+}): Promise<LinkRow> {
+  const safeUrl = sanitizeUrl(args.url);
+  if (!safeUrl) throw new InvalidUrlError();
+  const position = await nextBoardPosition(
+    'links',
+    args.boardId,
+    args.workspaceId,
+  );
+  const { data, error } = await supabase
+    .from('links')
+    .insert({
+      workspace_id: args.workspaceId,
+      board_id: args.boardId,
+      type: args.type,
+      label: (args.label ?? '').trim() || safeUrl,
+      url: safeUrl,
+      position,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as LinkRow;
+}
+
+export async function setBoardLinkLabel(
+  linkId: string,
+  label: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('links')
+    .update({ label: label.trim() })
+    .eq('id', linkId);
+  if (error) throw error;
+}
+
+export async function setBoardLinkUrl(
+  linkId: string,
+  url: string,
+): Promise<void> {
+  const safe = sanitizeUrl(url);
+  if (!safe) throw new InvalidUrlError();
+  const { error } = await supabase
+    .from('links')
+    .update({ url: safe })
+    .eq('id', linkId);
+  if (error) throw error;
+}
+
+export async function setBoardLinkType(
+  linkId: string,
+  type: LinkType,
+): Promise<void> {
+  const { error } = await supabase
+    .from('links')
+    .update({ type })
+    .eq('id', linkId);
+  if (error) throw error;
+}
+
+export async function setBoardLinkPosition(
+  linkId: string,
+  position: number,
+): Promise<void> {
+  const { error } = await supabase
+    .from('links')
+    .update({ position })
+    .eq('id', linkId);
+  if (error) throw error;
+}
+
+export async function delBoardLink(linkId: string): Promise<void> {
+  const { error } = await supabase.from('links').delete().eq('id', linkId);
+  if (error) throw error;
 }

@@ -1137,6 +1137,68 @@ button[type='submit']:hover:not(:disabled) {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+/* Edit-Row fuer einen Link. Flex-Row mit Type-Select + zwei Inputs +
+   Del. Bricht auf schmalen Screens um. */
+.board-link-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 3px 6px;
+  background: var(--bg);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+}
+
+.board-link-type {
+  font-size: 11px;
+  padding: 2px 4px;
+  background: var(--bg2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+}
+
+.board-link-label,
+.board-link-url {
+  font-size: 11px;
+  padding: 2px 6px;
+  background: transparent;
+  border: 0.5px solid transparent;
+  border-radius: var(--rs);
+  color: var(--text);
+  min-width: 80px;
+  transition: var(--tr-std);
+}
+
+.board-link-url {
+  min-width: 140px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.board-link-label:hover,
+.board-link-url:hover {
+  border-color: var(--border);
+}
+
+.board-link-label:focus-visible,
+.board-link-url:focus-visible {
+  background: var(--bg2);
+  border-color: var(--blue);
+  outline: none;
+}
+
+/* Wrapper erlaubt der Inline-del-Btn volle Sichtbarkeit auch ohne
+   .mx-editable-Parent — genau wie beim kb-card-edit-bar. */
+.board-link-edit .mx-del-btn:not(:disabled) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.board-link-add-btn {
+  font-size: 11px;
+  padding: 3px 9px;
+}
+
 .board-cols {
   display: flex;
   gap: var(--space-md);
