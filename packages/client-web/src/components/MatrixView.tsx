@@ -12,7 +12,16 @@ import { useNavigate, useSearchParams } from '@solidjs/router';
 import type { CellFeature, CellRow, ColRow, MatrixContent, RowRow } from '../lib/types';
 import { useEditMode } from '../lib/edit-mode';
 import { findFeatureByHotkey } from '../lib/features';
-import { addCol, addRow, delCol, delRow, renameCol, renameRow } from '../lib/mutations';
+import {
+  addCol,
+  addRow,
+  delCol,
+  delRow,
+  renameCol,
+  renameRow,
+  setColPosition,
+  setRowPosition,
+} from '../lib/mutations';
 import { rememberFocus, useLastFocus } from '../lib/navigation-focus';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
@@ -172,6 +181,37 @@ const MatrixView: Component<Props> = (p) => {
       }
     }
     await wrap(() => delCol(col.id), 'Spalte geloescht.');
+  }
+
+  // Reorder: Swap mit dem direkten Nachbarn (positionsbezogen). Zwei
+  // Updates hintereinander — es gibt keine UNIQUE(matrix_id, position)-
+  // Constraint, also ist die temporaere Kollision der Zwischenschritte
+  // unkritisch. Nach Erfolg refetcht onChanged() und der Re-Render
+  // greift die neuen Positionen.
+  async function onMoveRow(row: RowRow, direction: 'up' | 'down') {
+    const list = p.content?.rows ?? [];
+    const idx = list.findIndex((r: RowRow) => r.id === row.id);
+    if (idx < 0) return;
+    const neighbourIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (neighbourIdx < 0 || neighbourIdx >= list.length) return;
+    const neighbour = list[neighbourIdx];
+    await wrap(async () => {
+      await setRowPosition(row.id, neighbour.position);
+      await setRowPosition(neighbour.id, row.position);
+    });
+  }
+
+  async function onMoveCol(col: ColRow, direction: 'left' | 'right') {
+    const list = p.content?.cols ?? [];
+    const idx = list.findIndex((c: ColRow) => c.id === col.id);
+    if (idx < 0) return;
+    const neighbourIdx = direction === 'left' ? idx - 1 : idx + 1;
+    if (neighbourIdx < 0 || neighbourIdx >= list.length) return;
+    const neighbour = list[neighbourIdx];
+    await wrap(async () => {
+      await setColPosition(col.id, neighbour.position);
+      await setColPosition(neighbour.id, col.position);
+    });
   }
 
   function onCellEdit(row: RowRow, col: ColRow, cell: CellRow | undefined) {
@@ -391,7 +431,7 @@ const MatrixView: Component<Props> = (p) => {
               <div class="mx-corner" />
 
               <For each={cols()}>
-                {(col) => (
+                {(col, colIdx) => (
                   <div class="mx-col-head" classList={{ 'mx-editable': editMode() }}>
                     {/* IMMER Input: readOnly togglet statt span-swap — so
                         bleibt die Kopfzeile beim Edit-Toggle formstabil. */}
@@ -414,6 +454,28 @@ const MatrixView: Component<Props> = (p) => {
                         }
                       }}
                     />
+                    <button
+                      type="button"
+                      class="mx-move-btn"
+                      title="Spalte nach links"
+                      aria-label="Spalte nach links"
+                      tabIndex={editMode() ? 0 : -1}
+                      onClick={() => onMoveCol(col, 'left')}
+                      disabled={busy() || !editMode() || colIdx() === 0}
+                    >
+                      ‹
+                    </button>
+                    <button
+                      type="button"
+                      class="mx-move-btn"
+                      title="Spalte nach rechts"
+                      aria-label="Spalte nach rechts"
+                      tabIndex={editMode() ? 0 : -1}
+                      onClick={() => onMoveCol(col, 'right')}
+                      disabled={busy() || !editMode() || colIdx() === cols().length - 1}
+                    >
+                      ›
+                    </button>
                     <button
                       type="button"
                       class="mx-del-btn"
@@ -446,7 +508,7 @@ const MatrixView: Component<Props> = (p) => {
 
               {/* Zeilen */}
               <For each={rows()}>
-                {(row) => (
+                {(row, rowIdx) => (
                   <>
                     <div class="mx-row-head" classList={{ 'mx-editable': editMode() }}>
                       <input
@@ -468,6 +530,28 @@ const MatrixView: Component<Props> = (p) => {
                           }
                         }}
                       />
+                      <button
+                        type="button"
+                        class="mx-move-btn"
+                        title="Zeile nach oben"
+                        aria-label="Zeile nach oben"
+                        tabIndex={editMode() ? 0 : -1}
+                        onClick={() => onMoveRow(row, 'up')}
+                        disabled={busy() || !editMode() || rowIdx() === 0}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        class="mx-move-btn"
+                        title="Zeile nach unten"
+                        aria-label="Zeile nach unten"
+                        tabIndex={editMode() ? 0 : -1}
+                        onClick={() => onMoveRow(row, 'down')}
+                        disabled={busy() || !editMode() || rowIdx() === rows().length - 1}
+                      >
+                        ↓
+                      </button>
                       <button
                         type="button"
                         class="mx-del-btn"

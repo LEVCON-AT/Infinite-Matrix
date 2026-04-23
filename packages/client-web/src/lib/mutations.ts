@@ -94,6 +94,17 @@ export async function renameRow(rowId: string, label: string): Promise<RowRow> {
   return data as RowRow;
 }
 
+export async function setRowPosition(
+  rowId: string,
+  position: number,
+): Promise<void> {
+  const { error } = await supabase
+    .from('rows')
+    .update({ position })
+    .eq('id', rowId);
+  if (error) throw error;
+}
+
 export async function delRow(rowId: string): Promise<void> {
   const { error } = await supabase.from('rows').delete().eq('id', rowId);
   if (error) throw error;
@@ -129,6 +140,17 @@ export async function renameCol(colId: string, label: string): Promise<ColRow> {
     .single();
   if (error) throw error;
   return data as ColRow;
+}
+
+export async function setColPosition(
+  colId: string,
+  position: number,
+): Promise<void> {
+  const { error } = await supabase
+    .from('cols')
+    .update({ position })
+    .eq('id', colId);
+  if (error) throw error;
 }
 
 export async function delCol(colId: string): Promise<void> {
