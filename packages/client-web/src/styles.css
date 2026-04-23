@@ -386,11 +386,26 @@ button[type='submit']:hover:not(:disabled) {
 }
 
 /* ── Workspace-Shell: Sidebar + Main ──────────────────────────── */
+/* Sidebar-Modi (Shift+N zyklet): full | rails | collapsed.
+   - full: default Breite --sidebar-w (280px)
+   - rails: schmal (52px), nur Icons/Chevrons
+   - collapsed: weg (0px), Edge-Toggle am Rand sichtbar
+   Grid-Columns passt sich an, damit Main-Content die freie Flaeche
+   bekommt. Transition auf width + grid-template-columns fuehlen sich
+   zaeh an — deshalb nur der Sidebar selbst animiert, das Grid springt. */
 .ws-shell {
   display: grid;
   grid-template-columns: var(--sidebar-w) 1fr;
   min-height: 100vh;
   background: var(--bg);
+}
+
+.ws-shell[data-sb-mode='rails'] {
+  grid-template-columns: 52px 1fr;
+}
+
+.ws-shell[data-sb-mode='collapsed'] {
+  grid-template-columns: 0 1fr;
 }
 
 .ws-sidebar {
@@ -401,6 +416,101 @@ button[type='submit']:hover:not(:disabled) {
   gap: var(--space-md);
   padding: var(--space-md) var(--space-sm);
   overflow: hidden;
+  transition: padding var(--tr-std);
+}
+
+.ws-sidebar[data-sb-mode='rails'] {
+  padding: var(--space-md) var(--space-xs);
+  gap: var(--space-sm);
+}
+
+.ws-sidebar[data-sb-mode='collapsed'] {
+  padding: 0;
+  border-right: none;
+  overflow: hidden;
+}
+
+/* Rails-Modus: Elemente die nur im full-Modus Sinn ergeben, verstecken.
+   Tree-Icons/Chevrons bleiben — der Rest (Filter-Input, Labels,
+   Aliase, Action-Buttons, User-Block) wird auf 0 geschrumpft. */
+.ws-sidebar[data-sb-mode='rails'] .ws-actions,
+.ws-sidebar[data-sb-mode='rails'] .ws-user-block,
+.ws-sidebar[data-sb-mode='rails'] .node-tree-head,
+.ws-sidebar[data-sb-mode='rails'] .ws-switcher,
+.ws-sidebar[data-sb-mode='rails'] .tree-label,
+.ws-sidebar[data-sb-mode='rails'] .tree-alias {
+  display: none;
+}
+
+/* Collapsed-Modus: Alles verstecken. Die ws-shell-Column ist eh 0.
+   Belt-and-braces, falls Inhalt doch irgendwie overflow produziert. */
+.ws-sidebar[data-sb-mode='collapsed'] > * {
+  display: none;
+}
+
+/* Sidebar-Head: WorkspaceSwitcher + Mode-Toggle-Button. Flex-Row. */
+.ws-sidebar-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.ws-sidebar-head .ws-switcher {
+  flex: 1;
+  min-width: 0;
+}
+
+.ws-sidebar-mode-btn {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: background var(--tr-std), color var(--tr-std);
+}
+
+.ws-sidebar-mode-btn:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Im Rails-Modus: Mode-Btn stackt unter den WorkspaceSwitcher-Platzhalter
+   (letzter ist ohnehin verborgen). Button zentriert. */
+.ws-sidebar[data-sb-mode='rails'] .ws-sidebar-head {
+  justify-content: center;
+}
+
+/* Edge-Toggle bei collapsed. Fixed links am Rand, klein, auffaellig. */
+.ws-sidebar-edge-toggle {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 44px;
+  padding: 0;
+  border: 0.5px solid var(--border);
+  border-left: none;
+  border-radius: 0 var(--rs) var(--rs) 0;
+  background: var(--bg2);
+  color: var(--text2);
+  cursor: pointer;
+  z-index: 40;
+  font-size: 14px;
+  line-height: 1;
+  box-shadow: var(--shadow-sm);
+  transition: background var(--tr-std), color var(--tr-std);
+}
+
+.ws-sidebar-edge-toggle:hover {
+  background: var(--bg);
+  color: var(--text);
 }
 
 .ws-main {

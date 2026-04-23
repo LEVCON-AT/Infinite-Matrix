@@ -21,6 +21,7 @@ import {
   fetchNodesForWorkspace,
 } from '../lib/queries';
 import { toggleEditMode, useEditMode } from '../lib/edit-mode';
+import { useSidebarMode } from '../lib/sidebar-mode';
 import { toggleTheme, useTheme } from '../lib/theme';
 import { subscribeWorkspace } from '../lib/realtime';
 import { useTreeExpand } from '../lib/tree-expand';
@@ -55,6 +56,12 @@ const Workspace: Component = () => {
   const location = useLocation();
   const editMode = useEditMode();
   const theme = useTheme();
+
+  // Sidebar-Modus pro Workspace. Bei fehlendem workspaceId wird die
+  // Registry mit einem leeren String angelegt — die Funktionen sind
+  // idempotent und toleriert. Reales Toggle passiert nur wenn die
+  // Workspace-Shell tatsaechlich gerendert wird.
+  const sidebar = useSidebarMode(params.workspaceId ?? '');
 
   // Zell-Page-Section: der letzte URL-Segment hinter /c/:cellId/ entscheidet,
   // welches Feature-Panel gerendert wird.
@@ -374,6 +381,20 @@ const Workspace: Component = () => {
         return;
       }
 
+      // Shift+N: Sidebar-Modus zyklen (full → rails → collapsed → full).
+      if (
+        e.shiftKey &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        (e.key === 'N' || e.key === 'n')
+      ) {
+        if (isTextInput(e.target)) return;
+        e.preventDefault();
+        sidebar.cycle();
+        return;
+      }
+
       // ? oeffnet/schliesst die Shortcut-Hilfe. Auf DE-Layout ist
       // ? = Shift+ß, auf US Shift+/. e.key ist '?' in beiden Faellen.
       // In Inputs ignorieren — sonst kann man kein ? eintippen.
@@ -459,12 +480,29 @@ const Workspace: Component = () => {
   }
 
   return (
-    <div class="ws-shell">
-      <aside class="ws-sidebar">
-        <WorkspaceSwitcher
-          workspaces={workspaces()}
-          currentWorkspaceId={params.workspaceId}
-        />
+    <div class="ws-shell" data-sb-mode={sidebar.mode()}>
+      <aside class="ws-sidebar" data-sb-mode={sidebar.mode()}>
+        <div class="ws-sidebar-head">
+          <WorkspaceSwitcher
+            workspaces={workspaces()}
+            currentWorkspaceId={params.workspaceId}
+          />
+          <button
+            type="button"
+            class="ws-sidebar-mode-btn"
+            onClick={() => sidebar.cycle()}
+            title={
+              sidebar.mode() === 'full'
+                ? 'Sidebar einklappen (Shift+N)'
+                : sidebar.mode() === 'rails'
+                ? 'Sidebar ausblenden (Shift+N)'
+                : 'Sidebar aufklappen (Shift+N)'
+            }
+            aria-label="Sidebar-Modus"
+          >
+            {sidebar.mode() === 'full' ? '‹' : sidebar.mode() === 'rails' ? '‹‹' : '›'}
+          </button>
+        </div>
         <Show when={params.workspaceId}>
           <NodeTree
             workspaceId={params.workspaceId as string}
@@ -500,6 +538,18 @@ const Workspace: Component = () => {
           </button>
         </div>
       </aside>
+
+      <Show when={sidebar.mode() === 'collapsed'}>
+        <button
+          type="button"
+          class="ws-sidebar-edge-toggle"
+          onClick={() => sidebar.open()}
+          title="Sidebar aufklappen (Shift+N)"
+          aria-label="Sidebar aufklappen"
+        >
+          ›
+        </button>
+      </Show>
 
       <Show when={showImport() && params.workspaceId}>
         <ImportDialog

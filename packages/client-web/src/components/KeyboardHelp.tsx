@@ -27,6 +27,7 @@ const SECTIONS: ShortcutSection[] = [
       { keys: ['/'], desc: 'Suche in Matrizen, Boards, Karten, Checklisten' },
       { keys: ['Shift+D'], desc: 'Dokumentations-Popup oeffnen' },
       { keys: ['Shift+P'], desc: 'Command-Palette (neue Karte, Clone, ...)' },
+      { keys: ['Shift+N'], desc: 'Sidebar-Modus zyklen (full → rails → aus)' },
       { keys: ['Shift+E'], desc: 'Edit-Mode togglen' },
       { keys: ['Shift+A'], desc: 'Sidebar: alles aufklappen (sticky)' },
       { keys: ['Esc'], desc: 'Overlay schliessen / eine Ebene hoch' },
