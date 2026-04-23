@@ -156,6 +156,7 @@ export type KbCardRow = {
   source_label: string | null;
   checklist_ref: string | null;
   checklist: InlineChecklistItem[] | null;
+  color: string | null;
   created_at: string;
   updated_at: string;
 };

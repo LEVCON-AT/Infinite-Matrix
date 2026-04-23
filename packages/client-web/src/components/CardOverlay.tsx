@@ -25,6 +25,7 @@ import {
   renameChecklistItem,
   setCardAlias,
   setCardArchived,
+  setCardColor,
   setCardDeadline,
   setCardNote,
   setCardPriority,
@@ -154,6 +155,12 @@ const CardOverlay: Component<Props> = (p) => {
     if (next !== null && !Number.isFinite(next)) return;
     if (next === (p.card.priority ?? null)) return;
     await wrap(() => setCardPriority(p.card.id, next));
+  }
+
+  async function onColor(val: string | null) {
+    const next = val && val !== '' ? val : null;
+    if ((next ?? null) === (p.card.color ?? null)) return;
+    await wrap(() => setCardColor(p.card.id, next));
   }
 
   // Comma/Whitespace-separierte Eingabe → normalisiertes Array.
@@ -491,6 +498,29 @@ const CardOverlay: Component<Props> = (p) => {
                   }
                 }}
               />
+            </label>
+
+            <label class="overlay-field overlay-field-color">
+              <span class="overlay-field-label">Farbe</span>
+              <div class="overlay-color-row">
+                <input
+                  type="color"
+                  class="overlay-color-input"
+                  value={p.card.color ?? '#888888'}
+                  title="Karten-Farbe"
+                  onChange={(e) => onColor(e.currentTarget.value)}
+                />
+                <button
+                  type="button"
+                  class="overlay-color-clear"
+                  title="Farbe entfernen"
+                  aria-label="Farbe entfernen"
+                  onClick={() => onColor(null)}
+                  disabled={!p.card.color}
+                >
+                  ○
+                </button>
+              </div>
             </label>
 
             <label class="overlay-field overlay-field-done">

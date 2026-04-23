@@ -2295,6 +2295,10 @@ button[type='submit']:hover:not(:disabled) {
 .kb-card[data-prio='2'] { border-left-color: var(--prio-medium); }
 .kb-card[data-prio='1'] { border-left-color: var(--teal); }
 
+.kb-card[data-has-color='yes'] {
+  border-top: 3px solid var(--kb-card-color, var(--border2));
+}
+
 .kb-card-done {
   opacity: 0.65;
 }
@@ -3325,6 +3329,46 @@ button[type='submit']:hover:not(:disabled) {
   align-items: center;
   gap: var(--space-sm);
   margin-top: var(--space-md);
+}
+
+.overlay-color-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.overlay-color-input {
+  width: 32px;
+  height: 28px;
+  padding: 0;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--r);
+  background: transparent;
+  cursor: pointer;
+}
+
+.overlay-color-clear {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: opacity var(--tr-std);
+}
+
+.overlay-color-clear:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.overlay-color-clear:disabled {
+  opacity: 0.35;
+  pointer-events: none;
 }
 
 /* Keyboard-Help */

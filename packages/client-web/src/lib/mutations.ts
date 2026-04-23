@@ -408,6 +408,7 @@ type CardPatch = Partial<
     | 'tags'
     | 'who'
     | 'archived'
+    | 'color'
   >
 > & {
   recur?: CardRecur | null;
@@ -477,6 +478,13 @@ export function setCardArchived(
   archived: boolean,
 ): Promise<KbCardRow> {
   return updateCard(cardId, { archived });
+}
+
+export function setCardColor(
+  cardId: string,
+  color: string | null,
+): Promise<KbCardRow> {
+  return updateCard(cardId, { color });
 }
 
 // Move: innerhalb derselben Spalte oder cross-column. Bei cross-column

@@ -977,6 +977,12 @@ const BoardView: Component<Props> = (p) => {
                                     'kb-card-drop-before': dropBefore(),
                                     'kb-card-drop-after': dropAfter(),
                                   }}
+                                  style={
+                                    card.color
+                                      ? { '--kb-card-color': card.color }
+                                      : undefined
+                                  }
+                                  data-has-color={card.color ? 'yes' : 'no'}
                                   role="button"
                                   tabIndex={0}
                                   draggable={true}
