@@ -101,6 +101,37 @@ function deadlineState(
   return 'future';
 }
 
+// Comparator-Factory fuer Card-Sort. In allen Modi sortieren wir
+// done-Karten ans Ende (erledigt = weniger relevant). Null-Werte
+// (kein Deadline, keine Prio) landen ebenfalls hinten.
+function sortComparator(
+  mode: 'deadline' | 'priority' | 'name',
+): (a: KbCardRow, b: KbCardRow) => number {
+  return (a, b) => {
+    if (a.done !== b.done) return a.done ? 1 : -1;
+    if (mode === 'deadline') {
+      const aHas = !!a.deadline;
+      const bHas = !!b.deadline;
+      if (aHas !== bHas) return aHas ? -1 : 1;
+      if (aHas && a.deadline !== b.deadline) {
+        return a.deadline! < b.deadline! ? -1 : 1;
+      }
+    } else if (mode === 'priority') {
+      const ap = a.priority;
+      const bp = b.priority;
+      const aHas = ap != null;
+      const bHas = bp != null;
+      if (aHas !== bHas) return aHas ? -1 : 1;
+      if (aHas && ap !== bp) return (ap as number) - (bp as number);
+    } else if (mode === 'name') {
+      const cmp = a.name.localeCompare(b.name);
+      if (cmp !== 0) return cmp;
+    }
+    // Tiebreaker: bestehende Position, stabil.
+    return a.position - b.position;
+  };
+}
+
 const BoardView: Component<Props> = (p) => {
   const editMode = useEditMode();
   const boardUi = useBoardUi(p.boardId);
@@ -216,6 +247,13 @@ const BoardView: Component<Props> = (p) => {
       const arr = map.get(c.col_id);
       if (arr) arr.push(c);
       else map.set(c.col_id, [c]);
+    }
+    // Sort pro Spalte. Position-Order kommt schon sortiert aus der
+    // Query — nichts zu tun im 'manual'-Modus.
+    const mode = boardUi.sort();
+    if (mode !== 'manual') {
+      const cmp = sortComparator(mode);
+      for (const list of map.values()) list.sort(cmp);
     }
     return map;
   });
@@ -486,6 +524,25 @@ const BoardView: Component<Props> = (p) => {
                   ✕
                 </button>
               </Show>
+              <select
+                class="board-sort-select"
+                value={boardUi.sort()}
+                title="Sortierung"
+                onChange={(e) =>
+                  boardUi.setSort(
+                    (e.currentTarget as HTMLSelectElement).value as
+                      | 'manual'
+                      | 'deadline'
+                      | 'priority'
+                      | 'name',
+                  )
+                }
+              >
+                <option value="manual">Manuell</option>
+                <option value="deadline">Deadline</option>
+                <option value="priority">Prioritaet</option>
+                <option value="name">Name</option>
+              </select>
               <Show when={archivedCount() > 0}>
                 <button
                   type="button"
@@ -863,20 +920,36 @@ const BoardView: Component<Props> = (p) => {
                                     <button
                                       type="button"
                                       class="mx-move-btn"
-                                      title="Karte nach oben"
+                                      title={
+                                        boardUi.sort() !== 'manual'
+                                          ? 'Sortierung aktiv — Reihenfolge automatisch'
+                                          : 'Karte nach oben'
+                                      }
                                       aria-label="Karte nach oben"
                                       onClick={() => onMoveCardWithin(card, 'up')}
-                                      disabled={busy() || cardIdx() === 0}
+                                      disabled={
+                                        busy() ||
+                                        cardIdx() === 0 ||
+                                        boardUi.sort() !== 'manual'
+                                      }
                                     >
                                       ↑
                                     </button>
                                     <button
                                       type="button"
                                       class="mx-move-btn"
-                                      title="Karte nach unten"
+                                      title={
+                                        boardUi.sort() !== 'manual'
+                                          ? 'Sortierung aktiv — Reihenfolge automatisch'
+                                          : 'Karte nach unten'
+                                      }
                                       aria-label="Karte nach unten"
                                       onClick={() => onMoveCardWithin(card, 'down')}
-                                      disabled={busy() || cardIdx() === list().length - 1}
+                                      disabled={
+                                        busy() ||
+                                        cardIdx() === list().length - 1 ||
+                                        boardUi.sort() !== 'manual'
+                                      }
                                     >
                                       ↓
                                     </button>
