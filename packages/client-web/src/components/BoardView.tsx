@@ -15,6 +15,7 @@ import type {
   LinkType,
 } from '../lib/types';
 import { useEditMode } from '../lib/edit-mode';
+import { useBoardUi } from '../lib/board-ui-state';
 import {
   addBoardLink,
   addCard,
@@ -79,6 +80,7 @@ function fmtDate(iso: string | null): string | null {
 
 const BoardView: Component<Props> = (p) => {
   const editMode = useEditMode();
+  const boardUi = useBoardUi(p.boardId);
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedCardId, setSelectedCardId] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
@@ -558,13 +560,32 @@ const BoardView: Component<Props> = (p) => {
               <For each={visibleCols()}>
                 {(col, colIdx) => {
                   const list = () => cardsByCol().get(col.id) ?? [];
+                  const collapsed = () => boardUi.isCollapsed(col.id);
                   return (
                     <div
                       class="kb-col"
+                      classList={{ 'kb-col-collapsed': collapsed() }}
                       style={col.color ? { '--kb-col-color': col.color } : undefined}
                       data-has-color={col.color ? 'yes' : 'no'}
                     >
-                      <header class="kb-col-head" classList={{ 'mx-editable': editMode() }}>
+                      <header
+                        class="kb-col-head"
+                        classList={{ 'mx-editable': editMode() }}
+                      >
+                        <button
+                          type="button"
+                          class="kb-col-collapse-btn"
+                          title={
+                            collapsed() ? 'Spalte aufklappen' : 'Spalte kollabieren'
+                          }
+                          aria-label={
+                            collapsed() ? 'Spalte aufklappen' : 'Spalte kollabieren'
+                          }
+                          aria-expanded={!collapsed()}
+                          onClick={() => boardUi.toggleCol(col.id)}
+                        >
+                          {collapsed() ? '▸' : '▾'}
+                        </button>
                         <input
                           class="mx-head-input"
                           type="text"
@@ -641,8 +662,12 @@ const BoardView: Component<Props> = (p) => {
                       </header>
 
                       <Show
-                        when={list().length > 0}
-                        fallback={<p class="kb-col-empty hint">leer</p>}
+                        when={!collapsed() && list().length > 0}
+                        fallback={
+                          <Show when={!collapsed()}>
+                            <p class="kb-col-empty hint">leer</p>
+                          </Show>
+                        }
                       >
                         <ul class="kb-cards">
                           <For each={list()}>
@@ -793,15 +818,17 @@ const BoardView: Component<Props> = (p) => {
                       </Show>
 
                       {/* "+ Karte" immer verfuegbar — Karten sind keine Struktur. */}
-                      <button
-                        type="button"
-                        class="kb-card-add-btn"
-                        onClick={() => onAddCard(col)}
-                        disabled={busy()}
-                        title="Karte hinzufuegen"
-                      >
-                        + Karte
-                      </button>
+                      <Show when={!collapsed()}>
+                        <button
+                          type="button"
+                          class="kb-card-add-btn"
+                          onClick={() => onAddCard(col)}
+                          disabled={busy()}
+                          title="Karte hinzufuegen"
+                        >
+                          + Karte
+                        </button>
+                      </Show>
                     </div>
                   );
                 }}

@@ -1321,6 +1321,38 @@ button[type='submit']:hover:not(:disabled) {
   border: 0.5px solid var(--border);
   border-radius: var(--rl);
   padding: var(--space-sm);
+  transition: min-width var(--tr-std), max-width var(--tr-std), flex var(--tr-std);
+}
+
+/* Kollabierte Spalte: schmal, nur Header sichtbar. min/max/flex
+   animieren (CSS-Transition), Cards/Empty-Hint/Add-Btn sind via
+   <Show> rausgenommen — keine Anzeige-Logik im CSS. */
+.kb-col-collapsed {
+  min-width: 64px;
+  max-width: 88px;
+  flex: 0 0 auto;
+}
+
+.kb-col-collapsed .mx-head-input {
+  font-size: 11px;
+}
+
+.kb-col-collapse-btn {
+  width: 18px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--text3);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color var(--tr-std);
+}
+
+.kb-col-collapse-btn:hover {
+  color: var(--text);
 }
 
 .kb-col[data-has-color='yes'] {
