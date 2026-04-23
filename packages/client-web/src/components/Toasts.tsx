@@ -1,4 +1,4 @@
-import { For, type Component } from 'solid-js';
+import { For, Show, type Component } from 'solid-js';
 import { dismissToast, useToasts } from '../lib/toasts';
 
 const Toasts: Component = () => {
@@ -9,6 +9,18 @@ const Toasts: Component = () => {
         {(t) => (
           <div class="toast" data-kind={t.kind}>
             <span class="toast-msg">{t.msg}</span>
+            <Show when={t.action}>
+              <button
+                type="button"
+                class="toast-action"
+                onClick={() => {
+                  t.action!.onClick();
+                  dismissToast(t.id);
+                }}
+              >
+                {t.action!.label}
+              </button>
+            </Show>
             <button
               type="button"
               class="toast-close"

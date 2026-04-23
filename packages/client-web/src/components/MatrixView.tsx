@@ -19,11 +19,13 @@ import {
   delRow,
   renameCol,
   renameRow,
+  restoreColWithCells,
+  restoreRowWithCells,
   setColPosition,
   setRowPosition,
 } from '../lib/mutations';
+import { showToast, showUndoToast } from '../lib/toasts';
 import { rememberFocus, useLastFocus } from '../lib/navigation-focus';
-import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import CellOverlay from './CellOverlay';
 
@@ -164,23 +166,49 @@ const MatrixView: Component<Props> = (p) => {
   }
 
   async function onDelRow(row: RowRow) {
-    const used = (p.content?.cells ?? []).some((c) => c.row_id === row.id);
-    if (used) {
+    const rowCells = (p.content?.cells ?? []).filter((c) => c.row_id === row.id);
+    if (rowCells.length > 0) {
       if (!window.confirm(`Zeile "${row.label || '(leer)'}" loeschen? Enthaelt Zellen mit Inhalt.`)) {
         return;
       }
     }
-    await wrap(() => delRow(row.id), 'Zeile geloescht.');
+    const rowSnap: RowRow = { ...row };
+    const cellSnaps: CellRow[] = rowCells.map((c) => ({ ...c }));
+    await wrap(() => delRow(row.id));
+    showUndoToast(`Zeile "${rowSnap.label || '(leer)'}" geloescht.`, () => {
+      void (async () => {
+        try {
+          await restoreRowWithCells(rowSnap, cellSnaps);
+          showToast('Zeile wiederhergestellt.', 'success');
+          p.onChanged?.();
+        } catch (err) {
+          showToast(translateDbError(err), 'error');
+        }
+      })();
+    });
   }
 
   async function onDelCol(col: ColRow) {
-    const used = (p.content?.cells ?? []).some((c) => c.col_id === col.id);
-    if (used) {
+    const colCells = (p.content?.cells ?? []).filter((c) => c.col_id === col.id);
+    if (colCells.length > 0) {
       if (!window.confirm(`Spalte "${col.label || '(leer)'}" loeschen? Enthaelt Zellen mit Inhalt.`)) {
         return;
       }
     }
-    await wrap(() => delCol(col.id), 'Spalte geloescht.');
+    const colSnap: ColRow = { ...col };
+    const cellSnaps: CellRow[] = colCells.map((c) => ({ ...c }));
+    await wrap(() => delCol(col.id));
+    showUndoToast(`Spalte "${colSnap.label || '(leer)'}" geloescht.`, () => {
+      void (async () => {
+        try {
+          await restoreColWithCells(colSnap, cellSnaps);
+          showToast('Spalte wiederhergestellt.', 'success');
+          p.onChanged?.();
+        } catch (err) {
+          showToast(translateDbError(err), 'error');
+        }
+      })();
+    });
   }
 
   // Reorder: Swap mit dem direkten Nachbarn (positionsbezogen). Zwei

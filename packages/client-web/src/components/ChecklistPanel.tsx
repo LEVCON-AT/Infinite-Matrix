@@ -13,11 +13,13 @@ import {
   delChecklistItem,
   renameChecklist,
   renameChecklistItem,
+  restoreChecklistItem,
+  restoreChecklistWithItems,
   setChecklistAlias,
   setChecklistItemLevel,
   toggleChecklistItemDone,
 } from '../lib/mutations';
-import { showToast } from '../lib/toasts';
+import { showToast, showUndoToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
 import { validateAlias } from '../lib/alias';
@@ -93,7 +95,23 @@ const ChecklistPanel: Component<Props> = (p) => {
         return;
       }
     }
-    await wrap(() => delChecklist(p.checklist.id), 'Checkliste geloescht.');
+    const clSnap = { ...p.checklist };
+    const itemSnaps = p.items.map((i) => ({ ...i }));
+    await wrap(() => delChecklist(p.checklist.id));
+    showUndoToast(
+      `Checkliste "${clSnap.label || '(Liste)'}" geloescht.`,
+      () => {
+        void (async () => {
+          try {
+            await restoreChecklistWithItems(clSnap, itemSnaps);
+            showToast('Checkliste wiederhergestellt.', 'success');
+            p.onChanged();
+          } catch (err) {
+            showToast(translateDbError(err), 'error');
+          }
+        })();
+      },
+    );
   }
 
   async function onAddItem() {
@@ -116,7 +134,18 @@ const ChecklistPanel: Component<Props> = (p) => {
   }
 
   async function onDelItem(item: ChecklistItemRow) {
+    const snap = { ...item };
     await wrap(() => delChecklistItem(item.id));
+    showUndoToast(`Punkt geloescht.`, () => {
+      void (async () => {
+        try {
+          await restoreChecklistItem(snap);
+          p.onChanged();
+        } catch (err) {
+          showToast(translateDbError(err), 'error');
+        }
+      })();
+    });
   }
 
   async function onLevelItem(item: ChecklistItemRow, dir: 1 | -1) {

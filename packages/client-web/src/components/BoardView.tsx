@@ -26,6 +26,8 @@ import {
   InvalidUrlError,
   moveCard,
   renameKbCol,
+  restoreBoardLink,
+  restoreCard,
   setBoardLinkLabel,
   setBoardLinkType,
   setBoardLinkUrl,
@@ -34,7 +36,7 @@ import {
   setKbColPosition,
   toggleCardDone,
 } from '../lib/mutations';
-import { showToast } from '../lib/toasts';
+import { showToast, showUndoToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import CardOverlay from './CardOverlay';
 import ChecklistPanel from './ChecklistPanel';
@@ -222,7 +224,19 @@ const BoardView: Component<Props> = (p) => {
     if (!window.confirm(`Karte "${card.name || '(ohne Titel)'}" loeschen?`)) {
       return;
     }
-    await wrap(() => delCard(card.id), 'Karte geloescht.');
+    const snap: KbCardRow = { ...card };
+    await wrap(() => delCard(card.id));
+    showUndoToast(`Karte "${snap.name || '(ohne Titel)'}" geloescht.`, () => {
+      void (async () => {
+        try {
+          await restoreCard(snap);
+          showToast('Karte wiederhergestellt.', 'success');
+          p.onChanged?.();
+        } catch (err) {
+          showToast(translateDbError(err), 'error');
+        }
+      })();
+    });
   }
 
   async function onMoveCard(card: KbCardRow, toColId: string) {
@@ -301,7 +315,19 @@ const BoardView: Component<Props> = (p) => {
     ) {
       return;
     }
-    await wrap(() => delBoardLink(link.id), 'Link geloescht.');
+    const snap: LinkRow = { ...link };
+    await wrap(() => delBoardLink(link.id));
+    showUndoToast(`Link "${snap.label || snap.url}" geloescht.`, () => {
+      void (async () => {
+        try {
+          await restoreBoardLink(snap);
+          showToast('Link wiederhergestellt.', 'success');
+          p.onChanged?.();
+        } catch (err) {
+          showToast(translateDbError(err), 'error');
+        }
+      })();
+    });
   }
 
   async function onRenameLink(link: LinkRow, label: string) {

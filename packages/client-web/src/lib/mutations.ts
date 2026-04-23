@@ -1072,3 +1072,73 @@ export async function delBoardLink(linkId: string): Promise<void> {
   const { error } = await supabase.from('links').delete().eq('id', linkId);
   if (error) throw error;
 }
+
+// ─── Undo-Restore-Helfer ───────────────────────────────────────
+// Re-INSERT mit explicit id. RLS erlaubt das, solange der User im
+// selben Workspace ist. Wir schreiben die komplette Snapshot-Row
+// zurueck — timestamps (created_at/updated_at) neu, alles andere
+// unveraendert. "id" bleibt stabil, damit Alias-Index / Cross-Refs
+// (child_matrix_id, board_id, parent_cell_id) wieder passen.
+
+type AnyRow = Record<string, unknown>;
+
+// Generisches re-INSERT. Entfernt timestamp-Felder damit der Server
+// sie neu vergibt (Undo-Zeitpunkt soll neuer Stand sein, nicht der
+// alte). Alle anderen Felder inkl. id landen zurueck.
+async function restoreRow(
+  table: 'kb_cards' | 'links' | 'rows' | 'cols' | 'cells' | 'checklists' | 'checklist_items',
+  row: AnyRow,
+): Promise<void> {
+  const clean = { ...row };
+  delete clean.created_at;
+  delete clean.updated_at;
+  const { error } = await supabase.from(table).insert(clean);
+  if (error) throw error;
+}
+
+export async function restoreCard(snapshot: KbCardRow): Promise<void> {
+  await restoreRow('kb_cards', snapshot as unknown as AnyRow);
+}
+
+export async function restoreBoardLink(snapshot: LinkRow): Promise<void> {
+  await restoreRow('links', snapshot as unknown as AnyRow);
+}
+
+// Row + ihre Cells restore: zuerst die Row (FK-Parent), dann die
+// Cells (FK-Child). Reihenfolge matters — andere Reihenfolge wirft
+// FK-Violation.
+export async function restoreRowWithCells(
+  rowSnap: RowRow,
+  cellSnaps: CellRow[],
+): Promise<void> {
+  await restoreRow('rows', rowSnap as unknown as AnyRow);
+  for (const cell of cellSnaps) {
+    await restoreRow('cells', cell as unknown as AnyRow);
+  }
+}
+
+export async function restoreColWithCells(
+  colSnap: ColRow,
+  cellSnaps: CellRow[],
+): Promise<void> {
+  await restoreRow('cols', colSnap as unknown as AnyRow);
+  for (const cell of cellSnaps) {
+    await restoreRow('cells', cell as unknown as AnyRow);
+  }
+}
+
+export async function restoreChecklistWithItems(
+  clSnap: ChecklistRow,
+  itemSnaps: ChecklistItemRow[],
+): Promise<void> {
+  await restoreRow('checklists', clSnap as unknown as AnyRow);
+  for (const item of itemSnaps) {
+    await restoreRow('checklist_items', item as unknown as AnyRow);
+  }
+}
+
+export async function restoreChecklistItem(
+  snap: ChecklistItemRow,
+): Promise<void> {
+  await restoreRow('checklist_items', snap as unknown as AnyRow);
+}
