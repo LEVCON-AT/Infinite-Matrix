@@ -930,6 +930,36 @@ button[type='submit']:hover:not(:disabled) {
   font-style: italic;
 }
 
+/* Markdown-Light-Inline-Elemente. Scoped auf Node-Description,
+   kein Leak nach draussen (falls mal anderswo Markdown-Text rendert). */
+.node-desc-view .md-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  padding: 1px 4px;
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  border-radius: 3px;
+}
+
+.node-desc-view .md-link {
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.node-desc-view .md-link:hover {
+  color: var(--bluetxt);
+}
+
+.node-desc-view strong {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.node-desc-view em {
+  font-style: italic;
+}
+
 .node-view-head {
   display: flex;
   align-items: baseline;
