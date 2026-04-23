@@ -1327,7 +1327,7 @@ button[type='submit']:hover:not(:disabled) {
   opacity: 0.65;
 }
 
-.kb-card-done .kb-card-name {
+.kb-card-done .kb-card-title-text {
   text-decoration: line-through;
   color: var(--text3);
 }
@@ -1339,7 +1339,7 @@ button[type='submit']:hover:not(:disabled) {
   border-style: dashed;
 }
 
-.kb-card-archived .kb-card-name::after {
+.kb-card-archived .kb-card-title-text::after {
   content: ' · archiviert';
   color: var(--text3);
   font-size: 10px;
@@ -1362,13 +1362,32 @@ button[type='submit']:hover:not(:disabled) {
   font-weight: 500;
   color: var(--text);
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-xs);
 }
 
 .kb-done-mark {
   color: var(--teal);
   font-size: 11px;
+}
+
+/* Done-Checkbox direkt am Board-Karten-Titel. Klein, teal, klickbar
+   ohne die Karte zu oeffnen (stopPropagation auf onClick). */
+.kb-card-done-checkbox {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--teal);
+  cursor: pointer;
+}
+
+.kb-card-title-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .kb-card-alias {

@@ -32,6 +32,7 @@ import {
   setCardPosition,
   setKbColColor,
   setKbColPosition,
+  toggleCardDone,
 } from '../lib/mutations';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
@@ -301,6 +302,11 @@ const BoardView: Component<Props> = (p) => {
   async function onLinkType(link: LinkRow, type: LinkType) {
     if (type === link.type) return;
     await wrap(() => setBoardLinkType(link.id, type));
+  }
+
+  async function onToggleCardDone(card: KbCardRow, done: boolean) {
+    if (done === card.done) return;
+    await wrap(() => toggleCardDone(card.id, done));
   }
 
   return (
@@ -578,12 +584,20 @@ const BoardView: Component<Props> = (p) => {
                                   }}
                                 >
                                   <div class="kb-card-name">
-                                    <Show when={card.done}>
-                                      <span class="kb-done-mark" aria-hidden>
-                                        ✓
-                                      </span>
-                                    </Show>
-                                    {card.name || '(ohne Titel)'}
+                                    <input
+                                      type="checkbox"
+                                      class="kb-card-done-checkbox"
+                                      checked={card.done}
+                                      aria-label="Erledigt"
+                                      title={card.done ? 'Wieder offen' : 'Als erledigt markieren'}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onChange={(e) => {
+                                        onToggleCardDone(card, e.currentTarget.checked);
+                                      }}
+                                    />
+                                    <span class="kb-card-title-text">
+                                      {card.name || '(ohne Titel)'}
+                                    </span>
                                     <Show when={card.alias}>
                                       <span class="kb-card-alias">
                                         ^{card.alias}
