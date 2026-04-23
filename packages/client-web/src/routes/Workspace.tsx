@@ -39,6 +39,7 @@ import BoardView from '../components/BoardView';
 import CellChecklistsPage from '../components/CellChecklistsPage';
 import CellDocsPage from '../components/CellDocsPage';
 import CellInfoPage from '../components/CellInfoPage';
+import AliasAutocomplete from '../components/AliasAutocomplete';
 import AliasQuicknav from '../components/AliasQuicknav';
 import CommandPalette from '../components/CommandPalette';
 import DocsPopup from '../components/DocsPopup';
@@ -685,6 +686,10 @@ const Workspace: Component = () => {
           onImported={onImported}
         />
       </Show>
+
+      {/* Singleton-Dropdown fuer Alias-Autocomplete. Sichtbarkeit steuert
+          lib/use-alias-autocomplete; Inputs binden sich per ref an den Hook. */}
+      <AliasAutocomplete />
 
       <Show when={showQuicknav() && params.workspaceId}>
         <AliasQuicknav

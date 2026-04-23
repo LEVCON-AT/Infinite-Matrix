@@ -4432,3 +4432,63 @@ button[type='submit']:hover:not(:disabled) {
 .di-recur-badge {
   color: var(--text3);
 }
+
+/* ── Alias-Autocomplete Popup ───────────────────────────────────────
+   Singleton-Dropdown, position:fixed via JS. Bei Typen von `^token`
+   in einem Input/Textarea zeigt sich die Liste passender Aliases.
+*/
+.alias-ac-popup {
+  min-width: 180px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--bg2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-xs) 0;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+}
+
+.alias-ac-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: var(--space-sm);
+  padding: 4px var(--space-sm);
+  cursor: pointer;
+  user-select: none;
+}
+
+.alias-ac-item.active,
+.alias-ac-item:hover {
+  background: var(--bluebg);
+  color: var(--bluetxt);
+}
+
+.alias-ac-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 600;
+  color: var(--amber);
+}
+
+.alias-ac-item.active .alias-ac-name,
+.alias-ac-item:hover .alias-ac-name {
+  color: var(--amber);
+}
+
+.alias-ac-label {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alias-ac-kind {
+  font-size: 10px;
+  color: var(--text3);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}

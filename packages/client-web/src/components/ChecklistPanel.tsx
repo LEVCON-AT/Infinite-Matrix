@@ -23,6 +23,7 @@ import { showToast, showUndoToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
 import { validateAlias } from '../lib/alias';
+import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 
 type Props = {
   checklist: ChecklistRow;
@@ -244,6 +245,14 @@ const ChecklistPanel: Component<Props> = (p) => {
                 placeholder="(Punkt)"
                 readOnly={!editMode()}
                 tabIndex={editMode() ? 0 : -1}
+                ref={(el) => {
+                  // Alias-Autocomplete: `^token` zeigt Dropdown aus dem
+                  // Workspace-Alias-Index. Cleanup haengt am Element-Remove
+                  // (Solid ruft den ref nicht erneut, aber der Listener ist
+                  // am Element; wenn das Element abgebaut wird, laeuft der
+                  // GC der Listener mit).
+                  bindAliasAutocomplete(el, p.workspaceId);
+                }}
                 onBlur={(e) => {
                   if (!editMode()) return;
                   onRenameItem(it, e.currentTarget.value);
