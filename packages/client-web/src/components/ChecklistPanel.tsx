@@ -298,12 +298,19 @@ const ChecklistPanel: Component<Props> = (p) => {
       if (mode === 'auto-silent') {
         void performClose(false);
       } else if (mode === 'auto-prompt') {
-        // Reuse der showUndoToast-Mechanik fuer Action-Button: hier
-        // missbrauchen wir das als generischen Action-Toast.
-        showUndoToast(
-          `"${p.checklist.label || '(Liste)'}" ist vollstaendig. Abschliessen?`,
-          () => {
-            void performClose(true);
+        // Generischer Action-Toast mit passendem Button-Label
+        // ("Abschliessen" statt generischem "Rueckgaengig").
+        showToast(
+          `"${p.checklist.label || '(Liste)'}" ist vollstaendig.`,
+          'info',
+          {
+            ms: 10000,
+            action: {
+              label: 'Abschliessen',
+              onClick: () => {
+                void performClose(true);
+              },
+            },
           },
         );
       }
