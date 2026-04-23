@@ -32,6 +32,7 @@ import { sanitizeUrl } from '../lib/url';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import CellDocsSection from './CellDocsSection';
+import { openDocsPopup } from '../lib/docs-ui';
 
 type Props = {
   workspaceId: string;
@@ -173,6 +174,19 @@ const CellInfoPage: Component<Props> = (p) => {
             <span class="node-alias">^{p.cell.alias}</span>
           </Show>
         </div>
+        <button
+          type="button"
+          class="btn-subtle cell-page-doc-btn"
+          onClick={() =>
+            openDocsPopup({
+              sourceAlias: p.cell.alias ?? null,
+              attachedCellId: p.cell.id,
+            })
+          }
+          title="Neue Doku fuer diese Zelle"
+        >
+          + In Doku erfassen
+        </button>
       </header>
 
       <Show

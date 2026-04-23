@@ -641,6 +641,18 @@ const Workspace: Component = () => {
                   <span class="node-type-badge" data-type={currentNode()?.type}>
                     {currentNode()?.type}
                   </span>
+                  <button
+                    type="button"
+                    class="btn-subtle node-view-head-doc-btn"
+                    onClick={() =>
+                      openDocsPopup({
+                        sourceAlias: currentNode()?.alias ?? null,
+                      })
+                    }
+                    title="Neue Doku mit dieser Matrix/diesem Board als Quelle"
+                  >
+                    + In Doku erfassen
+                  </button>
                 </div>
 
                 <NodeDescription

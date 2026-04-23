@@ -688,7 +688,11 @@ const DocsPopup: Component<Props> = (p) => {
                     class="docs-popup-attach-input"
                     type="text"
                     value={attachDraft()}
-                    placeholder="^zellalias (leer = loesen)"
+                    placeholder={
+                      t().attachedCellId && !t().attachedCellAlias
+                        ? '(Zelle ohne Alias angehaengt — leer loest)'
+                        : '^zellalias (leer = loesen)'
+                    }
                     autocomplete="off"
                     spellcheck={false}
                     onInput={(e) => setAttachDraft(e.currentTarget.value)}
@@ -700,9 +704,25 @@ const DocsPopup: Component<Props> = (p) => {
                       }
                     }}
                   />
-                  <Show when={t().attachedCellId}>
-                    <span class="docs-popup-attach-status hint">
-                      angehaengt
+                  <Show when={t().attachedCellId && t().attachedCellAlias}>
+                    <button
+                      type="button"
+                      class="docs-popup-attach-chip"
+                      title="Zur angehaengten Zelle springen"
+                      onClick={() => {
+                        navigate(`/w/${p.workspaceId}/c/${t().attachedCellId}/info`);
+                        p.onClose();
+                      }}
+                    >
+                      ^{t().attachedCellAlias}
+                    </button>
+                  </Show>
+                  <Show when={t().attachedCellId && !t().attachedCellAlias}>
+                    <span
+                      class="docs-popup-attach-chip docs-popup-attach-chip-noalias"
+                      title="Zelle hat keinen Alias — loesen via leer lassen und Enter"
+                    >
+                      (Zelle)
                     </span>
                   </Show>
                 </div>

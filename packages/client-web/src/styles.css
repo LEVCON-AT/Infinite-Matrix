@@ -1028,6 +1028,37 @@ button[type='submit']:hover:not(:disabled) {
   font-size: 11px;
 }
 
+.docs-popup-attach-chip {
+  flex: 0 0 auto;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--rs);
+  background: var(--bluebg);
+  border: 0.5px solid var(--blue);
+  color: var(--blue);
+  cursor: pointer;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  transition: background-color var(--tr-std);
+}
+
+.docs-popup-attach-chip:hover {
+  background: var(--blue);
+  color: var(--bg);
+}
+
+.docs-popup-attach-chip-noalias {
+  background: var(--surface, var(--bg));
+  border-color: var(--border);
+  color: var(--text3);
+  cursor: default;
+  font-family: inherit;
+}
+
+.docs-popup-attach-chip-noalias:hover {
+  background: var(--surface, var(--bg));
+  color: var(--text3);
+}
+
 .docs-popup-del {
   flex: 0 0 auto;
   margin-left: auto;
@@ -1541,6 +1572,11 @@ button[type='submit']:hover:not(:disabled) {
   margin: 0;
   font-size: var(--fs-title);
   font-weight: 600;
+}
+
+.node-view-head-doc-btn {
+  margin-left: auto;
+  flex: 0 0 auto;
 }
 
 .node-alias {
@@ -2717,6 +2753,11 @@ button[type='submit']:hover:not(:disabled) {
   margin: 0;
   font-size: var(--fs-title);
   color: var(--text);
+}
+
+.cell-page-doc-btn {
+  margin-left: auto;
+  flex: 0 0 auto;
 }
 
 .cell-page-sub {
