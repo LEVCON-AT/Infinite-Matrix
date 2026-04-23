@@ -4067,3 +4067,163 @@ button[type='submit']:hover:not(:disabled) {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Matrix-Aggregat-Sektion (Intervallmatrix / Aufgabenuebersicht) ── */
+/* Sektion unter einer Matrix, die Karten aus dem Subtree aggregiert.
+   Tab-Bar oben, Content darunter. Portiert aus dem HTML-Vorbild
+   renderTaskOverview + renderFrequencyMatrix. */
+.matrix-aggregate {
+  margin-top: var(--space-lg);
+  border-top: 0.5px solid var(--border2);
+  padding-top: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.matrix-aggregate-head {
+  display: flex;
+  align-items: center;
+}
+
+.matrix-aggregate-tabs {
+  display: flex;
+  gap: 2px;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  padding: 2px;
+  background: var(--bg2);
+}
+
+.matrix-aggregate-tab {
+  padding: 4px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+  font-size: 12px;
+  border-radius: var(--rs);
+  transition: background var(--tr-std), color var(--tr-std);
+}
+
+.matrix-aggregate-tab:hover {
+  color: var(--text);
+}
+
+.matrix-aggregate-tab.active {
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.freq-empty {
+  color: var(--text3);
+  font-size: 12px;
+  padding: var(--space-md);
+  text-align: center;
+}
+
+.freq-scroll-wrap {
+  overflow-x: auto;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  background: var(--bg);
+}
+
+.freq-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.freq-hd {
+  text-align: center;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg2);
+  color: var(--text2);
+  font-weight: 500;
+  font-size: 11px;
+  border-bottom: 0.5px solid var(--border2);
+  border-left: 0.5px solid var(--border2);
+  white-space: nowrap;
+}
+
+.freq-hd-corner {
+  text-align: left;
+  border-left: none;
+}
+
+.freq-row-hd {
+  text-align: left;
+  padding: 6px var(--space-sm);
+  background: transparent;
+  color: var(--text);
+  font-weight: 400;
+  border-bottom: 0.5px solid var(--border2);
+  cursor: pointer;
+  min-width: 180px;
+  transition: background var(--tr-std);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.freq-row-hd:hover,
+.freq-row-hd:focus-visible {
+  background: var(--bg2);
+}
+
+.freq-chevron {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: transform var(--tr-std);
+  transform-origin: center;
+}
+
+.freq-chevron.expanded {
+  transform: rotate(90deg);
+  color: var(--text);
+}
+
+.freq-chevron-spacer {
+  display: inline-block;
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.freq-row-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.freq-cell {
+  text-align: center;
+  padding: 6px var(--space-sm);
+  border-left: 0.5px solid var(--border2);
+  border-bottom: 0.5px solid var(--border2);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.freq-cell-empty {
+  color: var(--text3);
+  font-weight: 400;
+}
+
+.alias-tag {
+  color: var(--text3);
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  flex-shrink: 0;
+}

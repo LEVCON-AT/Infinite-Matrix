@@ -9,7 +9,7 @@ import {
   type Component,
 } from 'solid-js';
 import { useNavigate, useSearchParams } from '@solidjs/router';
-import type { CellFeature, CellRow, ColRow, MatrixContent, RowRow } from '../lib/types';
+import type { CellFeature, CellRow, ColRow, MatrixContent, NodeRow, RowRow } from '../lib/types';
 import { useEditMode } from '../lib/edit-mode';
 import { findFeatureByHotkey } from '../lib/features';
 import {
@@ -29,6 +29,7 @@ import { rememberFocus, useLastFocus } from '../lib/navigation-focus';
 import { translateDbError } from '../lib/errors';
 import { openDocsPopup } from '../lib/docs-ui';
 import CellOverlay from './CellOverlay';
+import MatrixAggregateSection from './MatrixAggregateSection';
 
 const FEATURE_ORDER: CellFeature[] = ['matrix', 'board', 'info', 'checklists'];
 
@@ -53,6 +54,16 @@ type Props = {
   // Set der cell_ids mit angehaengten Docs — fuer die derived
   // Doku-Pill. Workspace-weit; Matrix filtert clientseitig.
   cellsWithDocs: Set<string>;
+  // Workspace-weite Daten fuer die Aggregat-Sektion unter der
+  // Matrix (Intervallmatrix / Aufgabenuebersicht). Koennen
+  // undefined sein, wenn die Resources noch laden — die Sektion
+  // rendert dann einfach nichts.
+  wsNodes: NodeRow[];
+  wsCells: CellRow[];
+  wsRows: RowRow[];
+  wsCols: ColRow[];
+  // Realtime-Version fuer Cards-Fetch in der Aggregat-Sektion.
+  cardsRealtimeVersion: number;
   onChanged?: () => void;
 };
 
@@ -748,6 +759,19 @@ const MatrixView: Component<Props> = (p) => {
           );
         }}
       </Show>
+
+      {/* Aggregat-Sektion unter der Matrix: Intervallmatrix +
+          (ab FREQ-2) Aufgabenuebersicht. Nur sichtbar wenn aktive
+          Karten im Subtree existieren. */}
+      <MatrixAggregateSection
+        workspaceId={p.workspaceId}
+        matrixId={p.matrixId}
+        nodes={p.wsNodes}
+        cells={p.wsCells}
+        rows={p.wsRows}
+        cols={p.wsCols}
+        realtimeVersion={p.cardsRealtimeVersion}
+      />
     </div>
   );
 };

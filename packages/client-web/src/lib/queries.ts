@@ -84,6 +84,23 @@ export async function fetchColsForWorkspace(workspaceId: string): Promise<ColRow
   return (data ?? []) as ColRow[];
 }
 
+// Laedt alle Karten der angegebenen Boards in einem Query. Genutzt
+// von der Aggregat-Sektion (Intervallmatrix / Aufgabenuebersicht),
+// um alle Karten im Subtree einer Matrix zu holen.
+export async function fetchCardsForBoards(
+  boardIds: string[],
+  workspaceId: string,
+): Promise<KbCardRow[]> {
+  if (boardIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from('kb_cards')
+    .select('*')
+    .in('board_id', boardIds)
+    .eq('workspace_id', workspaceId);
+  if (error) throw error;
+  return (data ?? []) as KbCardRow[];
+}
+
 // ─── Matrix-Inhalt (rows + cols + cells) ─────────────────────────
 // Laedt alle drei Tabellen parallel, gefiltert auf die Matrix. RLS
 // blockiert Fremd-Workspaces automatisch; workspace_id ist zusaetzlich

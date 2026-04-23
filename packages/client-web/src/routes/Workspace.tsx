@@ -303,6 +303,12 @@ const Workspace: Component = () => {
   // Board-View aber schon ueber refetchBoard abgedeckt ist.
   const [rtCellChecklists, setRtCellChecklists] = createSignal(0);
   const [rtDocs, setRtDocs] = createSignal(0);
+  // Bump bei kb_cards-Realtime, damit die Aggregat-Sektion unter
+  // Matrix-Ansichten (Intervallmatrix / Aufgabenuebersicht) neu
+  // lauft. refetchBoard allein reicht nicht — die Aggregat-Section
+  // fetcht ueber board_id IN (subtree), unabhaengig vom aktuellen
+  // Board-Context.
+  const [rtCards, setRtCards] = createSignal(0);
 
   const cellRow = createMemo(() => {
     const c = currentCell();
@@ -531,7 +537,10 @@ const Workspace: Component = () => {
         void refetchCellMatrix();
       },
       kb_cols: () => void refetchBoard(),
-      kb_cards: () => void refetchBoard(),
+      kb_cards: () => {
+        void refetchBoard();
+        setRtCards((v) => v + 1);
+      },
       checklists: () => {
         void refetchBoard();
         setRtCellChecklists((v) => v + 1);
@@ -848,6 +857,11 @@ const Workspace: Component = () => {
                     matrixId={currentNode()!.id}
                     content={matrixContent()}
                     cellsWithDocs={cellsWithDocs() ?? new Set<string>()}
+                    wsNodes={nodes() ?? []}
+                    wsCells={cells() ?? []}
+                    wsRows={rows() ?? []}
+                    wsCols={colsData() ?? []}
+                    cardsRealtimeVersion={rtCards()}
                     onChanged={() => {
                       // Nach strukturellen Aenderungen koennen neue/entfernte Sub-Nodes
                       // im Tree sichtbar werden, und cells.child_matrix_id/board_id
