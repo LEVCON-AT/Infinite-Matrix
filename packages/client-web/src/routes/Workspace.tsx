@@ -35,6 +35,7 @@ import CellInfoPage from '../components/CellInfoPage';
 import AliasQuicknav from '../components/AliasQuicknav';
 import ImportDialog from '../components/ImportDialog';
 import KeyboardHelp from '../components/KeyboardHelp';
+import NodeDescription from '../components/NodeDescription';
 import PresenceStack from '../components/PresenceStack';
 
 const Workspace: Component = () => {
@@ -570,6 +571,11 @@ const Workspace: Component = () => {
                     {currentNode()?.type}
                   </span>
                 </div>
+
+                <NodeDescription
+                  node={currentNode()!}
+                  onChanged={() => void refetchNodes()}
+                />
 
                 <Show when={currentNode()?.type === 'matrix'}>
                   <MatrixView

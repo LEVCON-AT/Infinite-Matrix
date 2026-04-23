@@ -265,6 +265,39 @@ export async function createChildBoard(args: {
 }
 
 // Cascade via FK ON DELETE CASCADE: alle Kinder (rows/cols/cells/...) gehen mit.
+// Read-modify-write auf nodes.data, parallel zu mutateCellData.
+// Gleiche Semantik: paralleler Writer mit anderen Keys in node.data
+// ueberschreibt nichts Fremdes, weil wir das Gesamt-Object mergen.
+async function mutateNodeData<T>(
+  nodeId: string,
+  mutator: (data: Record<string, unknown>) => { data: Record<string, unknown>; result: T },
+): Promise<T> {
+  const { data: cur, error: readErr } = await supabase
+    .from('nodes')
+    .select('data')
+    .eq('id', nodeId)
+    .single();
+  if (readErr) throw readErr;
+  const nodeData = (cur?.data ?? {}) as Record<string, unknown>;
+  const { data: nextData, result } = mutator(nodeData);
+  const { error: writeErr } = await supabase
+    .from('nodes')
+    .update({ data: nextData })
+    .eq('id', nodeId);
+  if (writeErr) throw writeErr;
+  return result;
+}
+
+export async function setNodeDescription(
+  nodeId: string,
+  description: string,
+): Promise<void> {
+  await mutateNodeData(nodeId, (data) => ({
+    data: { ...data, description: description ?? '' },
+    result: undefined,
+  }));
+}
+
 export async function deleteNode(nodeId: string): Promise<void> {
   const { error } = await supabase.from('nodes').delete().eq('id', nodeId);
   if (error) throw error;

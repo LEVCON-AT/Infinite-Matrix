@@ -882,6 +882,54 @@ button[type='submit']:hover:not(:disabled) {
   gap: var(--space-md);
 }
 
+/* Node-Description: links-Akzent-Border, leicht gedimmt, nur
+   sichtbar wenn Content oder Edit-Mode. Textarea nutzt field-sizing
+   fuer Auto-Grow (Chrome/Edge ab 123, Firefox ab 129 — in aelteren
+   Browsern bleibt der Default-Height, was harmlos ist). */
+.node-desc {
+  border-left: 2px solid var(--border);
+  padding: 4px 10px;
+  color: var(--text2);
+  background: var(--bg2);
+  border-radius: 0 var(--rs) var(--rs) 0;
+}
+
+.node-desc-edit {
+  border-left-color: var(--blue);
+}
+
+.node-desc-view p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  min-height: 1em;
+}
+
+.node-desc-input {
+  width: 100%;
+  min-height: 2.4em;
+  padding: 0;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  resize: none;
+  /* Auto-Grow; Fallback: Default-Height haelt den Input nutzbar. */
+  field-sizing: content;
+}
+
+.node-desc-input:focus-visible {
+  outline: none;
+}
+
+.node-desc-input::placeholder {
+  color: var(--text3);
+  font-style: italic;
+}
+
 .node-view-head {
   display: flex;
   align-items: baseline;
