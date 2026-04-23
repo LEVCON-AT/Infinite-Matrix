@@ -4,11 +4,16 @@
 // Aenderungen an Items sind struktur-aehnlich, nicht blosse Zustands-
 // Flips.
 
-import { For, Show, createSignal, type Component } from 'solid-js';
-import type { ChecklistItemRow, ChecklistRow } from '../lib/types';
+import { For, Show, createEffect, createSignal, type Component } from 'solid-js';
+import type {
+  ChecklistCloseMode,
+  ChecklistItemRow,
+  ChecklistRow,
+} from '../lib/types';
 import { useEditMode } from '../lib/edit-mode';
 import {
   addChecklistItem,
+  applyChecklistClose,
   bulkAddChecklistItems,
   delChecklist,
   delChecklistItem,
@@ -19,6 +24,7 @@ import {
   restoreChecklistWithItems,
   saveChecklistSnapshot,
   setChecklistAlias,
+  setChecklistCloseMode,
   setChecklistItemLevel,
   toggleChecklistItemDone,
 } from '../lib/mutations';
@@ -170,24 +176,59 @@ const ChecklistPanel: Component<Props> = (p) => {
     await wrap(() => setChecklistItemLevel(item.id, next));
   }
 
-  // Snapshot des aktuellen Item-Stands in der History ablegen. Items
-  // selbst bleiben unveraendert — volle Close-Semantik (loeschen bei
-  // non-recurring, reset bei recurring) kommt mit den Close-Events.
-  async function onSnapshot() {
-    const snap = p.items.map((it) => ({
-      text: it.text,
-      done: it.done,
-      level: it.level,
-    }));
-    await wrap(
-      () =>
-        saveChecklistSnapshot({
-          workspaceId: p.workspaceId,
-          checklistId: p.checklist.id,
-          items: snap,
-        }),
-      'Snapshot in Historie abgelegt.',
-    );
+  // Voller Close-Flow: Snapshot der Items ablegen, danach Items gemaess
+  // recur-Status behandeln — non-recurring: delete all, recurring:
+  // done=false reset. Bei non-recurring mit >0 Items vorher eine
+  // Rueckfrage, weil Delete destruktiv ist.
+  function isRecurring(): boolean {
+    const r = p.checklist.recur;
+    return !!(r && typeof r === 'object' && Object.keys(r).length > 0);
+  }
+
+  async function performClose(confirmIfDestructive: boolean): Promise<boolean> {
+    if (busy()) return false;
+    const recur = isRecurring();
+    if (!recur && p.items.length > 0 && confirmIfDestructive) {
+      const ok = window.confirm(
+        `Checkliste "${p.checklist.label || '(Liste)'}" abschliessen? ` +
+          `Alle ${p.items.length} Punkte werden entfernt — ein Snapshot ` +
+          `bleibt in der Historie.`,
+      );
+      if (!ok) return false;
+    }
+    setBusy(true);
+    try {
+      const snap = p.items.map((it) => ({
+        text: it.text,
+        done: it.done,
+        level: it.level,
+      }));
+      await saveChecklistSnapshot({
+        workspaceId: p.workspaceId,
+        checklistId: p.checklist.id,
+        items: snap,
+      });
+      await applyChecklistClose({
+        workspaceId: p.workspaceId,
+        checklistId: p.checklist.id,
+        recurring: recur,
+      });
+      showToast(
+        recur ? 'Abgeschlossen — Punkte zurueckgesetzt.' : 'Abgeschlossen.',
+        'success',
+      );
+      p.onChanged();
+      return true;
+    } catch (err) {
+      showToast(translateDbError(err), 'error');
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function onSnapshot() {
+    void performClose(true);
   }
 
   async function onDelSnapshot(closedAt: string) {
@@ -200,6 +241,39 @@ const ChecklistPanel: Component<Props> = (p) => {
       }),
     );
   }
+
+  async function onCloseModeChange(mode: ChecklistCloseMode) {
+    if (mode === p.checklist.close_mode) return;
+    await wrap(() => setChecklistCloseMode(p.checklist.id, mode));
+  }
+
+  // Auto-Close-Detection: feuert bei Zustandsuebergang von "nicht alle done"
+  // zu "alle done". Verhalten je nach close_mode:
+  //   - 'manual'       — nichts automatisch; User klickt Button.
+  //   - 'auto-prompt'  — Toast mit Action-Button "Jetzt abschliessen".
+  //   - 'auto-silent'  — direkt performClose (ohne Confirm).
+  let prevAllDone = false;
+  createEffect(() => {
+    const all = p.items.length > 0 && p.items.every((i) => i.done);
+    if (all && !prevAllDone) {
+      prevAllDone = true;
+      const mode = p.checklist.close_mode;
+      if (mode === 'auto-silent') {
+        void performClose(false);
+      } else if (mode === 'auto-prompt') {
+        // Reuse der showUndoToast-Mechanik fuer Action-Button: hier
+        // missbrauchen wir das als generischen Action-Toast.
+        showUndoToast(
+          `"${p.checklist.label || '(Liste)'}" ist vollstaendig. Abschliessen?`,
+          () => {
+            void performClose(true);
+          },
+        );
+      }
+    } else if (!all) {
+      prevAllDone = false;
+    }
+  });
 
   const done = () => p.items.filter((i) => i.done).length;
   const historyList = () => p.checklist.history ?? [];
@@ -261,6 +335,21 @@ const ChecklistPanel: Component<Props> = (p) => {
             }
           }}
         />
+        <Show when={editMode()}>
+          <select
+            class="cl-close-mode"
+            value={p.checklist.close_mode}
+            onChange={(e) =>
+              void onCloseModeChange(e.currentTarget.value as ChecklistCloseMode)
+            }
+            disabled={busy()}
+            title="Wann soll diese Checkliste abgeschlossen werden?"
+          >
+            <option value="manual">manuell</option>
+            <option value="auto-prompt">fragen bei Vollstaendig</option>
+            <option value="auto-silent">auto. bei Vollstaendig</option>
+          </select>
+        </Show>
         <button
           type="button"
           class="mx-del-btn"

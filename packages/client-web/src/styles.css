@@ -4838,3 +4838,19 @@ button[type='submit']:hover:not(:disabled) {
 .cl-snapshot-btn {
   font-size: 12px;
 }
+
+/* closeMode-Select im Checkliste-Header (Edit-Mode). Klein + unauffaellig. */
+.cl-close-mode {
+  padding: 2px 6px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--bg);
+  color: var(--text2);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.cl-close-mode:hover {
+  border-color: var(--focus-color);
+}

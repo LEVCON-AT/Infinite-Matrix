@@ -811,6 +811,32 @@ export async function saveChecklistSnapshot(args: {
   if (upErr) throw upErr;
 }
 
+// Close-Action auf der Checkliste anwenden, abhaengig vom recur-Feld:
+//   - non-recurring: alle Items loeschen (ein DELETE);
+//   - recurring:     alle Items auf done=false zuruecksetzen.
+// Wird nach dem saveChecklistSnapshot aus dem ChecklistPanel gerufen.
+export async function applyChecklistClose(args: {
+  workspaceId: string;
+  checklistId: string;
+  recurring: boolean;
+}): Promise<void> {
+  if (args.recurring) {
+    const { error } = await supabase
+      .from('checklist_items')
+      .update({ done: false })
+      .eq('checklist_id', args.checklistId)
+      .eq('workspace_id', args.workspaceId);
+    if (error) throw error;
+    return;
+  }
+  const { error } = await supabase
+    .from('checklist_items')
+    .delete()
+    .eq('checklist_id', args.checklistId)
+    .eq('workspace_id', args.workspaceId);
+  if (error) throw error;
+}
+
 // Einzelnen Snapshot aus der History entfernen (identifiziert per
 // closedAt-Timestamp — bei uns eindeutig genug, da ISO-Timestamp mit
 // Millisekunden).
