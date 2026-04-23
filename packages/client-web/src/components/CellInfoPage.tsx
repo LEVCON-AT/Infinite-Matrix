@@ -34,6 +34,7 @@ import { translateDbError } from '../lib/errors';
 import CellDocsSection from './CellDocsSection';
 import { openDocsPopup } from '../lib/docs-ui';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
+import AliasText from './AliasText';
 
 type Props = {
   workspaceId: string;
@@ -259,19 +260,29 @@ const CellInfoPage: Component<Props> = (p) => {
                     ✕
                   </button>
                 </div>
-                <textarea
-                  class="info-val"
-                  value={f.value}
-                  placeholder={editMode() ? '(Wert eingeben)' : '(leer)'}
-                  readOnly={!editMode()}
-                  tabIndex={editMode() ? 0 : -1}
-                  rows={3}
-                  ref={(el) => bindAliasAutocomplete(el, p.workspaceId)}
-                  onBlur={(e) => {
-                    if (!editMode()) return;
-                    onSetValue(f, e.currentTarget.value);
-                  }}
-                />
+                <Show
+                  when={editMode()}
+                  fallback={
+                    <div
+                      class="info-val info-val-view"
+                      classList={{ 'info-val-empty': !f.value }}
+                    >
+                      <Show when={f.value} fallback="(leer)">
+                        <AliasText text={f.value} workspaceId={p.workspaceId} />
+                      </Show>
+                    </div>
+                  }
+                >
+                  <textarea
+                    class="info-val"
+                    value={f.value}
+                    placeholder="(Wert eingeben)"
+                    tabIndex={0}
+                    rows={3}
+                    ref={(el) => bindAliasAutocomplete(el, p.workspaceId)}
+                    onBlur={(e) => onSetValue(f, e.currentTarget.value)}
+                  />
+                </Show>
               </div>
             )}
           </For>

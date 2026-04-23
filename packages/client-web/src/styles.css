@@ -4892,3 +4892,50 @@ button[type='submit']:hover:not(:disabled) {
   color: var(--text3);
   line-height: 1.4;
 }
+
+/* ── Info-Feld-Value View-Mode (Chips statt read-only textarea) ── */
+.info-val-view {
+  padding: var(--space-xs) var(--space-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+  min-height: 1.4em;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.info-val-view.info-val-empty {
+  color: var(--text3);
+  font-style: italic;
+}
+
+/* ── Card-Note View-Mode ──────────────────────────────────────── */
+.overlay-note-view {
+  padding: var(--space-sm);
+  border: 0.5px solid transparent;
+  border-radius: var(--rs);
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+  min-height: 4em;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  cursor: text;
+  transition: background var(--tr-std), border-color var(--tr-std);
+}
+
+.overlay-note-view:hover,
+.overlay-note-view:focus-visible {
+  border-color: var(--border);
+  background: var(--bg2);
+  outline: none;
+}
+
+.overlay-note-view.overlay-note-empty {
+  color: var(--text3);
+  font-style: italic;
+}

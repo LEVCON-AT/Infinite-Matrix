@@ -49,6 +49,7 @@ import { flashError } from '../lib/flash';
 import { validateAlias } from '../lib/alias';
 import { openDocsPopup } from '../lib/docs-ui';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
+import AliasText from './AliasText';
 
 type Props = {
   card: KbCardRow;
@@ -69,6 +70,8 @@ type OverlayItem = {
 // globalen Edit-Mode. Der Edit-Mode gated nur strukturelle Board-Ops
 // (Spalten-CRUD, Card Add/Delete/Move in der BoardView).
 const CardOverlay: Component<Props> = (p) => {
+  // Note-View/Edit-Toggle: Default View mit Alias-Chips, Klick → Textarea.
+  const [noteEditing, setNoteEditing] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   let aliasInputRef: HTMLInputElement | undefined;
 
@@ -653,14 +656,58 @@ const CardOverlay: Component<Props> = (p) => {
 
           <section class="overlay-section">
             <h4>Notiz</h4>
-            <textarea
-              class="overlay-textarea"
-              value={p.card.note}
-              placeholder="(keine Notiz)"
-              rows="4"
-              ref={(el) => bindAliasAutocomplete(el, p.card.workspace_id)}
-              onBlur={(e) => onNote(e.currentTarget.value)}
-            />
+            {/* View/Edit-Toggle: View rendert AliasText mit Chip-
+                Interaktion; Klick/Enter wechselt zur Textarea.
+                Blur schreibt zurueck und wechselt zur View-Ansicht.
+                Leere Notiz zeigt Placeholder-Div mit "Klick zum Bearbeiten". */}
+            <Show
+              when={noteEditing()}
+              fallback={
+                <div
+                  class="overlay-note-view"
+                  classList={{ 'overlay-note-empty': !p.card.note }}
+                  role="button"
+                  tabIndex={0}
+                  title="Klicken zum Bearbeiten"
+                  onClick={() => setNoteEditing(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setNoteEditing(true);
+                    }
+                  }}
+                >
+                  <Show when={p.card.note} fallback="(keine Notiz)">
+                    <AliasText text={p.card.note} workspaceId={p.card.workspace_id} />
+                  </Show>
+                </div>
+              }
+            >
+              <textarea
+                class="overlay-textarea"
+                value={p.card.note}
+                placeholder="(keine Notiz)"
+                rows="4"
+                autofocus
+                ref={(el) => {
+                  bindAliasAutocomplete(el, p.card.workspace_id);
+                  // Beim ersten Render nach Mode-Wechsel Fokus ans Ende.
+                  queueMicrotask(() => {
+                    try {
+                      const len = el.value.length;
+                      el.focus();
+                      el.setSelectionRange(len, len);
+                    } catch {
+                      /* ignore */
+                    }
+                  });
+                }}
+                onBlur={(e) => {
+                  onNote(e.currentTarget.value);
+                  setNoteEditing(false);
+                }}
+              />
+            </Show>
           </section>
 
           <section class="overlay-section">
