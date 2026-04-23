@@ -9,8 +9,9 @@ import {
 import { A, useNavigate } from '@solidjs/router';
 import type { TreeEntry } from '../lib/types';
 import { useTreeExpand } from '../lib/tree-expand';
-import { deleteNode, renameNode } from '../lib/mutations';
+import { deleteNode, moveCardToBoard, renameNode } from '../lib/mutations';
 import { cellTarget } from '../lib/alias-dispatch';
+import { supabase } from '../lib/supabase';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import ContextMenu, { type CtxMenuState } from './ContextMenu';
@@ -126,6 +127,10 @@ const TreeItem: Component<{
   expand: ReturnType<typeof useTreeExpand>;
   query: string;
   openMenu: (entry: TreeEntry, rowEl: HTMLElement, x: number, y: number) => void;
+  dragOverBoardId: () => string | null;
+  onCardDragOver: (boardId: string, e: DragEvent) => void;
+  onCardDragLeave: (boardId: string) => void;
+  onCardDrop: (boardId: string, e: DragEvent) => void;
 }> = (p) => {
   const hasChildren = () => p.entry.children.length > 0;
   // Bei aktivem Filter ignorieren wir den persistierten Expand-State:
@@ -135,12 +140,17 @@ const TreeItem: Component<{
   let rowRef: HTMLDivElement | undefined;
 
   const dotStyle = { background: dotColorFor(p.entry) };
+  const isBoard = () =>
+    p.entry.kind === 'node' && p.entry.node.type === 'board';
 
   return (
     <li>
       <div
         ref={rowRef}
         class="tree-row"
+        classList={{
+          'tree-row-drop': isBoard() && p.dragOverBoardId() === p.entry.id,
+        }}
         data-entry-kind={p.entry.kind}
         data-node-type={p.entry.kind === 'node' ? p.entry.node.type : undefined}
         style={{
@@ -150,6 +160,15 @@ const TreeItem: Component<{
         onContextMenu={(e) => {
           e.preventDefault();
           if (rowRef) p.openMenu(p.entry, rowRef, e.clientX, e.clientY);
+        }}
+        onDragOver={(e) => {
+          if (isBoard()) p.onCardDragOver(p.entry.id, e);
+        }}
+        onDragLeave={() => {
+          if (isBoard()) p.onCardDragLeave(p.entry.id);
+        }}
+        onDrop={(e) => {
+          if (isBoard()) p.onCardDrop(p.entry.id, e);
         }}
       >
         <Show
@@ -224,6 +243,10 @@ const TreeItem: Component<{
                 expand={p.expand}
                 query={p.query}
                 openMenu={p.openMenu}
+                dragOverBoardId={p.dragOverBoardId}
+                onCardDragOver={p.onCardDragOver}
+                onCardDragLeave={p.onCardDragLeave}
+                onCardDrop={p.onCardDrop}
               />
             )}
           </For>
@@ -239,7 +262,74 @@ const NodeTree: Component<Props> = (props) => {
   const [query, setQuery] = createSignal('');
   const [chips, setChips] = createSignal<Set<FilterChip>>(new Set());
   const [ctxMenu, setCtxMenu] = createSignal<CtxMenuState | null>(null);
+  const [dragOverBoardId, setDragOverBoardId] = createSignal<string | null>(null);
   let inputRef: HTMLInputElement | undefined;
+
+  // Card-Drop auf Board-Eintraege in der Sidebar (cross-board move).
+  // BoardView setzt den Card-ID auf text/matrix-card-id; wir holen ihn
+  // im Drop-Handler, laden die Ziel-Board-Cols, und verschieben die
+  // Karte an die erste Spalte ans Ende.
+  function onCardDragOver(boardId: string, e: DragEvent) {
+    if (!e.dataTransfer) return;
+    const types = Array.from(e.dataTransfer.types);
+    if (!types.includes('text/matrix-card-id') && !types.includes('text/plain')) {
+      return;
+    }
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverBoardId() !== boardId) setDragOverBoardId(boardId);
+  }
+  function onCardDragLeave(boardId: string) {
+    if (dragOverBoardId() === boardId) setDragOverBoardId(null);
+  }
+  async function onCardDrop(boardId: string, e: DragEvent) {
+    e.preventDefault();
+    setDragOverBoardId(null);
+    if (!e.dataTransfer) return;
+    const cardId =
+      e.dataTransfer.getData('text/matrix-card-id') ||
+      e.dataTransfer.getData('text/plain');
+    if (!cardId) return;
+
+    try {
+      // Ziel-Spalten + hoechste Position in deren ersten Spalte laden.
+      const [colsRes] = await Promise.all([
+        supabase
+          .from('kb_cols')
+          .select('id, position')
+          .eq('board_id', boardId)
+          .eq('workspace_id', props.workspaceId)
+          .order('position', { ascending: true })
+          .limit(1),
+      ]);
+      if (colsRes.error) throw colsRes.error;
+      const firstCol = (colsRes.data ?? [])[0] as
+        | { id: string; position: number }
+        | undefined;
+      if (!firstCol) {
+        showToast('Ziel-Board hat keine Spalte.', 'error');
+        return;
+      }
+
+      const posRes = await supabase
+        .from('kb_cards')
+        .select('position')
+        .eq('col_id', firstCol.id)
+        .eq('workspace_id', props.workspaceId)
+        .order('position', { ascending: false })
+        .limit(1);
+      if (posRes.error) throw posRes.error;
+      const topPos =
+        posRes.data && posRes.data.length > 0
+          ? (posRes.data[0] as { position: number }).position
+          : -1;
+
+      await moveCardToBoard(cardId, boardId, firstCol.id, topPos + 1);
+      showToast('Karte verschoben.', 'success');
+    } catch (err) {
+      showToast(translateDbError(err), 'error');
+    }
+  }
 
   function toggleChip(chip: FilterChip) {
     const cur = chips();
@@ -486,6 +576,7 @@ const NodeTree: Component<Props> = (props) => {
           · Zellen
         </button>
       </div>
+      <div class="node-tree-scroll">
       <Show
         when={filtered().length > 0}
         fallback={
@@ -507,11 +598,16 @@ const NodeTree: Component<Props> = (props) => {
                 expand={expand}
                 query={query().trim()}
                 openMenu={openMenu}
+                dragOverBoardId={dragOverBoardId}
+                onCardDragOver={onCardDragOver}
+                onCardDragLeave={onCardDragLeave}
+                onCardDrop={onCardDrop}
               />
             )}
           </For>
         </ul>
       </Show>
+      </div>
       <ContextMenu state={ctxMenu()} onClose={() => setCtxMenu(null)} />
     </div>
   );

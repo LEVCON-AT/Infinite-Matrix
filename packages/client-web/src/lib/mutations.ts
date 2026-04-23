@@ -567,6 +567,23 @@ export async function setCardColAndPosition(
   if (error) throw error;
 }
 
+// Cross-Board-Move: board_id + col_id + position in einem Update.
+// Separat von setCardColAndPosition, weil der FK-Scope sich aendert
+// und die Aufrufer typischerweise zuerst die Ziel-Spalte auflosen
+// muessen (erste/aktive Spalte des Ziel-Boards).
+export async function moveCardToBoard(
+  cardId: string,
+  toBoardId: string,
+  toColId: string,
+  position: number,
+): Promise<void> {
+  const { error } = await supabase
+    .from('kb_cards')
+    .update({ board_id: toBoardId, col_id: toColId, position })
+    .eq('id', cardId);
+  if (error) throw error;
+}
+
 export async function delCard(cardId: string): Promise<void> {
   const { error } = await supabase.from('kb_cards').delete().eq('id', cardId);
   if (error) throw error;

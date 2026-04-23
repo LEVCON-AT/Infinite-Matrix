@@ -1896,6 +1896,48 @@ button[type='submit']:hover:not(:disabled) {
   display: none;
 }
 
+/* Scroll-Fade-Wrapper: der Tree scrollt intern, mit Top+Bottom-Fade
+   via mask-image. Portiert die sbUpdateScrollFade-Logik aus dem
+   HTML-Vorbild — hier in reinem CSS, ohne JS-Messung. Der Fade
+   zeigt sich auch bei wenig Inhalt leicht am Rand; 16px ist knapp
+   genug, dass das nicht stoert. */
+.node-tree-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 16px,
+    #000 calc(100% - 16px),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 16px,
+    #000 calc(100% - 16px),
+    transparent 100%
+  );
+}
+
+/* node-tree muss den restlichen Sidebar-Platz einnehmen, damit der
+   Scroll-Container funktioniert. */
+.node-tree {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+/* Drop-Target-Highlight: Board-Eintrag in der Sidebar wenn eine
+   Karte darueber gezogen wird (cross-board-move). */
+.tree-row.tree-row-drop {
+  background: var(--tealbg);
+  outline: 1px dashed var(--teal);
+  outline-offset: -1px;
+}
+
 /* Zellen-Eintraege etwas dezenter als Nodes — niedrigerer Kontrast,
    kleinerer Icon. Der User scannt primaer nach Matrix/Board. */
 .tree-row[data-entry-kind='cell'] .tree-link {
