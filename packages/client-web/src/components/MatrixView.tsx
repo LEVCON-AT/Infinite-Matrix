@@ -708,7 +708,7 @@ const MatrixView: Component<Props> = (p) => {
                                       const c = cell();
                                       if (!c) return;
                                       navigate(
-                                        `/w/${p.workspaceId}/c/${c.id}/info`,
+                                        `/w/${p.workspaceId}/c/${c.id}/docs`,
                                       );
                                     }}
                                   >

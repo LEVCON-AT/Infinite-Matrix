@@ -32,6 +32,7 @@ import NodeTree from '../components/NodeTree';
 import MatrixView from '../components/MatrixView';
 import BoardView from '../components/BoardView';
 import CellChecklistsPage from '../components/CellChecklistsPage';
+import CellDocsPage from '../components/CellDocsPage';
 import CellInfoPage from '../components/CellInfoPage';
 import AliasQuicknav from '../components/AliasQuicknav';
 import DocsPopup from '../components/DocsPopup';
@@ -55,12 +56,13 @@ const Workspace: Component = () => {
   const theme = useTheme();
 
   // Zell-Page-Section: der letzte URL-Segment hinter /c/:cellId/ entscheidet,
-  // welches Feature-Panel gerendert wird. "checklists" | "info" | sonst leer.
-  const cellSection = createMemo<'checklists' | 'info' | null>(() => {
+  // welches Feature-Panel gerendert wird.
+  const cellSection = createMemo<'checklists' | 'info' | 'docs' | null>(() => {
     const p = location.pathname;
     if (!params.cellId) return null;
     if (p.endsWith('/checklists')) return 'checklists';
     if (p.endsWith('/info')) return 'info';
+    if (p.endsWith('/docs')) return 'docs';
     return null;
   });
 
@@ -638,6 +640,15 @@ const Workspace: Component = () => {
                     onChanged={() => {
                       void refetchCells();
                     }}
+                  />
+                </Show>
+                <Show when={cellSection() === 'docs'}>
+                  <CellDocsPage
+                    workspaceId={currentCell()!.workspace_id}
+                    cell={currentCell()!}
+                    row={cellRow()}
+                    col={cellCol()}
+                    realtimeDocsVersion={rtDocs()}
                   />
                 </Show>
               </section>
