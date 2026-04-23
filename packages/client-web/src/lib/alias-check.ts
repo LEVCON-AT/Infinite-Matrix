@@ -11,9 +11,9 @@
 
 import { supabase } from './supabase';
 
-export type AliasTable = 'cells' | 'nodes' | 'kb_cards' | 'checklists' | 'links';
+export type AliasTable = 'cells' | 'nodes' | 'kb_cards' | 'checklists' | 'links' | 'docs';
 
-const TABLES: AliasTable[] = ['cells', 'nodes', 'kb_cards', 'checklists', 'links'];
+const TABLES: AliasTable[] = ['cells', 'nodes', 'kb_cards', 'checklists', 'links', 'docs'];
 
 export const ALIAS_TABLE_LABEL: Record<AliasTable, string> = {
   cells: 'Zelle',
@@ -21,6 +21,7 @@ export const ALIAS_TABLE_LABEL: Record<AliasTable, string> = {
   kb_cards: 'Karte',
   checklists: 'Checkliste',
   links: 'Link',
+  docs: 'Doku',
 };
 
 // Liefert die Tabelle, in der der Alias schon vergeben ist — oder null.

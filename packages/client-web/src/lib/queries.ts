@@ -6,6 +6,7 @@ import type {
   ChecklistItemRow,
   ChecklistRow,
   ColRow,
+  DocRow,
   KbCardRow,
   KbColRow,
   LinkRow,
@@ -269,4 +270,37 @@ export function buildTree(nodes: NodeRow[], cells: CellRow[]): TreeNode[] {
   }
 
   return roots;
+}
+
+// ─── Dokumentation ─────────────────────────────────────────────
+// Laedt die n zuletzt geaenderten Docs (Recent-Liste im Popup).
+// Sort nach updated_at DESC, Limit einstellbar (default 20 — genug
+// fuer die sichtbare Recent-Sektion ohne Scroll).
+export async function fetchDocsRecent(
+  workspaceId: string,
+  limit = 20,
+): Promise<DocRow[]> {
+  const { data, error } = await supabase
+    .from('docs')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .order('updated_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []) as DocRow[];
+}
+
+// Einzel-Doc fetch — fuer Tab-Restore via ^alias.
+export async function fetchDocById(
+  docId: string,
+  workspaceId: string,
+): Promise<DocRow | null> {
+  const { data, error } = await supabase
+    .from('docs')
+    .select('*')
+    .eq('id', docId)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as DocRow | null) ?? null;
 }

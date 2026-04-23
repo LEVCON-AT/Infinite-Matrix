@@ -22,6 +22,7 @@ import { sanitizeUrl } from '../lib/url';
 import { flashError } from '../lib/flash';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
+import { openDocsPopup } from '../lib/docs-ui';
 
 type Props = {
   workspaceId: string;
@@ -119,6 +120,12 @@ const AliasQuicknav: Component<Props> = (p) => {
         window.open(safe, '_blank', 'noopener,noreferrer');
         return;
       }
+      case 'doc':
+        // Docs leben nicht unter einer URL-Route — Popup via Shared-
+        // Signal oeffnen. Workspace.tsx beobachtet das Request-Signal
+        // und mountet das DocsPopup mit diesem Doc als aktivem Tab.
+        openDocsPopup({ initialDocId: result.docId });
+        return;
     }
   }
 

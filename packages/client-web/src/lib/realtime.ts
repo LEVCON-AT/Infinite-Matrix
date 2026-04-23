@@ -27,7 +27,8 @@ export type RealtimeTable =
   | 'kb_cards'
   | 'checklists'
   | 'checklist_items'
-  | 'links';
+  | 'links'
+  | 'docs';
 
 export type RealtimeBumps = Partial<Record<RealtimeTable, () => void>>;
 
@@ -41,6 +42,7 @@ const TABLES: RealtimeTable[] = [
   'checklists',
   'checklist_items',
   'links',
+  'docs',
 ];
 
 // Subscribe in einem reaktiven Scope (onMount / createEffect). Der

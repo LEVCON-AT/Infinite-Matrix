@@ -226,3 +226,20 @@ export type TreeNode = {
   node: NodeRow;
   children: TreeNode[];
 };
+
+// ─── Dokumentation ─────────────────────────────────────────────
+// Freischwebende Markdown-Light-Notiz pro Workspace. Optional mit
+// eigenem Alias (→ Quicknav-Ziel), Source-Alias (Ursprung der Doku,
+// z.B. Karte aus der heraus dokumentiert wurde) und attached_cell_id
+// (Phase 2: Anzeige in Cell-Info/Checklisten-Bereich).
+export type DocRow = {
+  id: string;
+  workspace_id: string;
+  alias: string | null;
+  title: string;
+  content: string;
+  source_alias: string | null;
+  attached_cell_id: string | null;
+  created_at: string;
+  updated_at: string;
+};

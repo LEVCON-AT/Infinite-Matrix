@@ -17,7 +17,7 @@ export const ALIAS_MAX_LEN = 8;
 export const ALIAS_RE = /^[a-z0-9]+$/;
 export const RESERVED_ALIASES = ['n', 'fa', 'fi', 'fh', 'fc', 'home', 'w', 's'];
 
-export type AliasOwnerType = 'node' | 'cell' | 'card' | 'checklist' | 'link';
+export type AliasOwnerType = 'node' | 'cell' | 'card' | 'checklist' | 'link' | 'doc';
 
 export type AliasOwner = {
   type: AliasOwnerType;
@@ -34,6 +34,7 @@ const OWNER_TO_TABLE: Record<AliasOwnerType, AliasTable> = {
   card: 'kb_cards',
   checklist: 'checklists',
   link: 'links',
+  doc: 'docs',
 };
 
 // Nur-Format-Check. Gibt canonical zurueck (lowercase/trim) oder msg.

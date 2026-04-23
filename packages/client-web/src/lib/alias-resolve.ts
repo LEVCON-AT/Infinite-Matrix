@@ -28,7 +28,8 @@ export type AliasResolveResult =
   | { kind: 'card'; cardId: string; boardId: string; name: string }
   | { kind: 'checklist-board'; checklistId: string; boardId: string; label: string }
   | { kind: 'checklist-cell'; checklistId: string; cellId: string; matrixId: string; label: string }
-  | { kind: 'link'; url: string; label: string };
+  | { kind: 'link'; url: string; label: string }
+  | { kind: 'doc'; docId: string; title: string };
 
 export type AliasResolveOutcome =
   | { ok: true; result: AliasResolveResult; canonical: string }
@@ -49,7 +50,7 @@ export async function resolveAlias(
   if (!fmt.canonical) return { ok: false, msg: 'Alias ist leer.' };
   const a = fmt.canonical;
 
-  const [nodes, cells, cards, checklists, links] = await Promise.all([
+  const [nodes, cells, cards, checklists, links, docs] = await Promise.all([
     supabase
       .from('nodes')
       .select('id, type, label')
@@ -77,6 +78,12 @@ export async function resolveAlias(
     supabase
       .from('links')
       .select('id, url, label')
+      .eq('workspace_id', workspaceId)
+      .ilike('alias', a)
+      .limit(1),
+    supabase
+      .from('docs')
+      .select('id, title')
       .eq('workspace_id', workspaceId)
       .ilike('alias', a)
       .limit(1),
@@ -178,6 +185,15 @@ export async function resolveAlias(
       ok: true,
       canonical: a,
       result: { kind: 'link', url: l.url, label: l.label },
+    };
+  }
+
+  if (docs.data && docs.data.length > 0) {
+    const d = docs.data[0] as { id: string; title: string };
+    return {
+      ok: true,
+      canonical: a,
+      result: { kind: 'doc', docId: d.id, title: d.title },
     };
   }
 

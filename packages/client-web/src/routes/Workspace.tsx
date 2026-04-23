@@ -33,11 +33,13 @@ import BoardView from '../components/BoardView';
 import CellChecklistsPage from '../components/CellChecklistsPage';
 import CellInfoPage from '../components/CellInfoPage';
 import AliasQuicknav from '../components/AliasQuicknav';
+import DocsPopup from '../components/DocsPopup';
 import GlobalSearch from '../components/GlobalSearch';
 import ImportDialog from '../components/ImportDialog';
 import KeyboardHelp from '../components/KeyboardHelp';
 import NodeDescription from '../components/NodeDescription';
 import PresenceStack from '../components/PresenceStack';
+import { clearDocsRequest, openDocsPopup, useDocsRequest } from '../lib/docs-ui';
 
 const Workspace: Component = () => {
   const user = useUser();
@@ -65,7 +67,22 @@ const Workspace: Component = () => {
   const [showImport, setShowImport] = createSignal(false);
   const [showQuicknav, setShowQuicknav] = createSignal(false);
   const [showSearch, setShowSearch] = createSignal(false);
+  const [showDocs, setShowDocs] = createSignal(false);
   const [showHelp, setShowHelp] = createSignal(false);
+  const docsRequest = useDocsRequest();
+
+  // Docs-Popup wird ueber die shared Request-Signal gesteuert. Jede
+  // openDocsPopup()-Call pushed einen neuen Request; der Effect hier
+  // setzt daraufhin showDocs(true). Close-Side (onClose) setzt
+  // showDocs(false) und clearDocsRequest(). Der Effect reagiert auf
+  // `tick`, damit aufeinanderfolgende Requests auf denselben DocId
+  // ebenfalls das Popup oeffnen (z.B. wenn es gerade geschlossen wurde).
+  createEffect(() => {
+    const req = docsRequest();
+    if (!req) return;
+    void req.tick; // dependency registrieren
+    if (!showDocs()) setShowDocs(true);
+  });
   const [exporting, setExporting] = createSignal(false);
 
   async function onExport() {
@@ -205,6 +222,7 @@ const Workspace: Component = () => {
   // weil die Cell-Checklisten-Seite beide interessiert, die
   // Board-View aber schon ueber refetchBoard abgedeckt ist.
   const [rtCellChecklists, setRtCellChecklists] = createSignal(0);
+  const [rtDocs, setRtDocs] = createSignal(0);
 
   const cellRow = createMemo(() => {
     const c = currentCell();
@@ -315,6 +333,20 @@ const Workspace: Component = () => {
         return;
       }
 
+      // Shift+D: Dokumentations-Popup oeffnen.
+      if (
+        e.shiftKey &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        (e.key === 'D' || e.key === 'd')
+      ) {
+        if (isTextInput(e.target)) return;
+        e.preventDefault();
+        openDocsPopup();
+        return;
+      }
+
       // ? oeffnet/schliesst die Shortcut-Hilfe. Auf DE-Layout ist
       // ? = Shift+ß, auf US Shift+/. e.key ist '?' in beiden Faellen.
       // In Inputs ignorieren — sonst kann man kein ? eintippen.
@@ -382,6 +414,7 @@ const Workspace: Component = () => {
         setRtCellChecklists((v) => v + 1);
       },
       links: () => void refetchBoard(),
+      docs: () => setRtDocs((v) => v + 1),
     });
   });
 
@@ -457,6 +490,18 @@ const Workspace: Component = () => {
         <GlobalSearch
           workspaceId={params.workspaceId as string}
           onClose={() => setShowSearch(false)}
+        />
+      </Show>
+
+      <Show when={showDocs() && params.workspaceId}>
+        <DocsPopup
+          workspaceId={params.workspaceId as string}
+          request={docsRequest()}
+          realtimeVersion={rtDocs()}
+          onClose={() => {
+            setShowDocs(false);
+            clearDocsRequest();
+          }}
         />
       </Show>
 

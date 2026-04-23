@@ -26,6 +26,7 @@ import { clip, searchWorkspace, type SearchResult } from '../lib/search';
 import { rememberFocus } from '../lib/navigation-focus';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
+import { openDocsPopup } from '../lib/docs-ui';
 
 type Props = {
   workspaceId: string;
@@ -34,22 +35,24 @@ type Props = {
 
 type Group = {
   label: string;
-  kind: 'node' | 'card' | 'checklist' | 'cell';
+  kind: 'node' | 'card' | 'checklist' | 'cell' | 'doc';
   items: SearchResult[];
 };
 
-// Gruppiert Results in die 4 Sektionen. Innerhalb jeder Sektion
+// Gruppiert Results in die 5 Sektionen. Innerhalb jeder Sektion
 // alphabetisch nach Title sortiert — stabil, ohne Rank-Magie.
 function groupResults(rs: SearchResult[]): Group[] {
   const nodes: SearchResult[] = [];
   const cards: SearchResult[] = [];
   const checklists: SearchResult[] = [];
   const cells: SearchResult[] = [];
+  const docs: SearchResult[] = [];
   for (const r of rs) {
     if (r.kind === 'node') nodes.push(r);
     else if (r.kind === 'card') cards.push(r);
     else if (r.kind === 'checklist-board' || r.kind === 'checklist-cell') checklists.push(r);
     else if (r.kind === 'cell') cells.push(r);
+    else if (r.kind === 'doc') docs.push(r);
   }
   const sort = (xs: SearchResult[]) =>
     xs.slice().sort((a, b) => a.title.localeCompare(b.title, 'de'));
@@ -57,6 +60,7 @@ function groupResults(rs: SearchResult[]): Group[] {
     { label: 'Matrizen & Boards', kind: 'node', items: sort(nodes) },
     { label: 'Karten', kind: 'card', items: sort(cards) },
     { label: 'Checklisten', kind: 'checklist', items: sort(checklists) },
+    { label: 'Dokumentation', kind: 'doc', items: sort(docs) },
     { label: 'Zellen', kind: 'cell', items: sort(cells) },
   ];
   return groups.filter((g) => g.items.length > 0);
@@ -163,6 +167,9 @@ const GlobalSearch: Component<Props> = (p) => {
       case 'checklist-cell':
         navigate(`/w/${p.workspaceId}/c/${r.cellId}/checklists`);
         return;
+      case 'doc':
+        openDocsPopup({ initialDocId: r.docId });
+        return;
     }
   }
 
@@ -199,10 +206,11 @@ const GlobalSearch: Component<Props> = (p) => {
     }
   }
 
-  // Snippet: fuer Card-Notizen eine gekuerzte Excerpt-Zeile, sonst
-  // nichts. Sucht nicht das Treffer-Fenster — nur Anfangs-Excerpt.
+  // Snippet: fuer Card-Notizen und Doc-Content eine gekuerzte Excerpt-
+  // Zeile. Keine Treffer-Fenster-Suche — nur Anfangs-Excerpt.
   function subtitleFor(r: SearchResult): string | null {
     if (r.kind === 'card' && r.note) return clip(r.note, 100);
+    if (r.kind === 'doc' && r.content) return clip(r.content, 100);
     return null;
   }
 
@@ -212,6 +220,7 @@ const GlobalSearch: Component<Props> = (p) => {
     if (r.kind === 'card') return 'Karte';
     if (r.kind === 'checklist-board') return 'Checkliste (Board)';
     if (r.kind === 'checklist-cell') return 'Checkliste (Zelle)';
+    if (r.kind === 'doc') return 'Doku';
     return 'Zelle';
   }
 
@@ -219,6 +228,7 @@ const GlobalSearch: Component<Props> = (p) => {
     if (r.kind === 'node') return r.nodeType;
     if (r.kind === 'card') return 'card';
     if (r.kind === 'checklist-board' || r.kind === 'checklist-cell') return 'checklist';
+    if (r.kind === 'doc') return 'doc';
     return 'cell';
   }
 

@@ -14,6 +14,7 @@ import type {
   ChecklistItemRow,
   ChecklistRow,
   ColRow,
+  DocRow,
   InfoField,
   InfoLink,
   InlineChecklistItem,
@@ -1135,7 +1136,15 @@ type AnyRow = Record<string, unknown>;
 // sie neu vergibt (Undo-Zeitpunkt soll neuer Stand sein, nicht der
 // alte). Alle anderen Felder inkl. id landen zurueck.
 async function restoreRow(
-  table: 'kb_cards' | 'links' | 'rows' | 'cols' | 'cells' | 'checklists' | 'checklist_items',
+  table:
+    | 'kb_cards'
+    | 'links'
+    | 'rows'
+    | 'cols'
+    | 'cells'
+    | 'checklists'
+    | 'checklist_items'
+    | 'docs',
   row: AnyRow,
 ): Promise<void> {
   const clean = { ...row };
@@ -1190,4 +1199,79 @@ export async function restoreChecklistItem(
   snap: ChecklistItemRow,
 ): Promise<void> {
   await restoreRow('checklist_items', snap as unknown as AnyRow);
+}
+
+// ─── Docs ────────────────────────────────────────────────────────
+// Freischwebende Markdown-Light-Notizen. Create ist explizit — weder
+// JSONB-Read-Modify-Write noch Position-Dance; Docs haben weder
+// position noch Parent-Zwang.
+export async function createDoc(args: {
+  workspaceId: string;
+  title?: string;
+  content?: string;
+  alias?: string | null;
+  source_alias?: string | null;
+  attached_cell_id?: string | null;
+}): Promise<DocRow> {
+  const { data, error } = await supabase
+    .from('docs')
+    .insert({
+      workspace_id: args.workspaceId,
+      title: args.title ?? '',
+      content: args.content ?? '',
+      alias: args.alias ?? null,
+      source_alias: args.source_alias ?? null,
+      attached_cell_id: args.attached_cell_id ?? null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as DocRow;
+}
+
+async function updateDoc(
+  docId: string,
+  patch: Partial<
+    Pick<DocRow, 'title' | 'content' | 'alias' | 'source_alias' | 'attached_cell_id'>
+  >,
+): Promise<DocRow> {
+  const { data, error } = await supabase
+    .from('docs')
+    .update(patch)
+    .eq('id', docId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as DocRow;
+}
+
+export function setDocTitle(docId: string, title: string): Promise<DocRow> {
+  return updateDoc(docId, { title });
+}
+
+export function setDocContent(docId: string, content: string): Promise<DocRow> {
+  return updateDoc(docId, { content });
+}
+
+export function setDocAlias(
+  docId: string,
+  alias: string | null,
+): Promise<DocRow> {
+  return updateDoc(docId, { alias });
+}
+
+export function setDocAttachedCell(
+  docId: string,
+  cellId: string | null,
+): Promise<DocRow> {
+  return updateDoc(docId, { attached_cell_id: cellId });
+}
+
+export async function delDoc(docId: string): Promise<void> {
+  const { error } = await supabase.from('docs').delete().eq('id', docId);
+  if (error) throw error;
+}
+
+export async function restoreDoc(snap: DocRow): Promise<void> {
+  await restoreRow('docs', snap as unknown as AnyRow);
 }

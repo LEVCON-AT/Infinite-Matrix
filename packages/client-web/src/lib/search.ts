@@ -57,6 +57,13 @@ export type SearchResult =
       matrixId: string;
       title: string;
       alias: string | null;
+    }
+  | {
+      kind: 'doc';
+      docId: string;
+      title: string;
+      alias: string | null;
+      content: string;
     };
 
 // Escaped den User-Input fuer ilike: % und _ sind Wildcards in SQL,
@@ -92,7 +99,7 @@ export async function searchWorkspace(
   const pat = `%${escapeLike(q)}%`;
   const qpat = quoteForOr(pat);
 
-  const [nodesRes, cellsRes, cardsRes, checklistsRes] = await Promise.all([
+  const [nodesRes, cellsRes, cardsRes, checklistsRes, docsRes] = await Promise.all([
     supabase
       .from('nodes')
       .select('id, type, label, alias')
@@ -116,6 +123,12 @@ export async function searchWorkspace(
       .select('id, board_id, cell_id, label, alias')
       .eq('workspace_id', workspaceId)
       .or(`label.ilike.${qpat},alias.ilike.${qpat}`)
+      .limit(perTypeLimit),
+    supabase
+      .from('docs')
+      .select('id, title, alias, content')
+      .eq('workspace_id', workspaceId)
+      .or(`title.ilike.${qpat},alias.ilike.${qpat},content.ilike.${qpat}`)
       .limit(perTypeLimit),
   ]);
 
@@ -181,6 +194,23 @@ export async function searchWorkspace(
         alias: c.alias,
         note: typeof c.note === 'string' ? c.note : '',
         tags: Array.isArray(c.tags) ? c.tags : [],
+      });
+    }
+  }
+
+  if (docsRes.data) {
+    for (const d of docsRes.data as Array<{
+      id: string;
+      title: string;
+      alias: string | null;
+      content: string | null;
+    }>) {
+      results.push({
+        kind: 'doc',
+        docId: d.id,
+        title: d.title || '(ohne Titel)',
+        alias: d.alias,
+        content: typeof d.content === 'string' ? d.content : '',
       });
     }
   }
