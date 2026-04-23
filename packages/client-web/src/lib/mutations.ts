@@ -487,6 +487,20 @@ export function setCardColor(
   return updateCard(cardId, { color });
 }
 
+export async function setCardDoneOccurrences(
+  cardId: string,
+  occurrences: string[],
+): Promise<KbCardRow> {
+  const { data, error } = await supabase
+    .from('kb_cards')
+    .update({ done_occurrences: occurrences })
+    .eq('id', cardId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as KbCardRow;
+}
+
 // Move: innerhalb derselben Spalte oder cross-column. Bei cross-column
 // bekommt die Karte Position ans Ende der Ziel-Spalte (kein Reorder
 // innerhalb — kommt in 0e.1.h).

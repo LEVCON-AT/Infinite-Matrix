@@ -34,10 +34,17 @@ import {
   setBoardLinkUrl,
   setCardColAndPosition,
   setCardPosition,
+  setCardDoneOccurrences,
   setKbColColor,
   setKbColPosition,
   toggleCardDone,
 } from '../lib/mutations';
+import {
+  isCardDone,
+  isRecurCard,
+  todayIso,
+  toggleOccurrence,
+} from '../lib/recur';
 import { showToast, showUndoToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import CardOverlay from './CardOverlay';
@@ -109,7 +116,9 @@ function sortComparator(
   mode: 'deadline' | 'priority' | 'name',
 ): (a: KbCardRow, b: KbCardRow) => number {
   return (a, b) => {
-    if (a.done !== b.done) return a.done ? 1 : -1;
+    const aDone = isCardDone(a);
+    const bDone = isCardDone(b);
+    if (aDone !== bDone) return aDone ? 1 : -1;
     if (mode === 'deadline') {
       const aHas = !!a.deadline;
       const bHas = !!b.deadline;
@@ -614,8 +623,14 @@ const BoardView: Component<Props> = (p) => {
   }
 
   async function onToggleCardDone(card: KbCardRow, done: boolean) {
-    if (done === card.done) return;
-    await wrap(() => toggleCardDone(card.id, done));
+    const current = isCardDone(card);
+    if (done === current) return;
+    if (isRecurCard(card)) {
+      const next = toggleOccurrence(card.done_occurrences, todayIso(), done);
+      await wrap(() => setCardDoneOccurrences(card.id, next));
+    } else {
+      await wrap(() => toggleCardDone(card.id, done));
+    }
   }
 
   return (
@@ -970,7 +985,7 @@ const BoardView: Component<Props> = (p) => {
                                 <li
                                   class="kb-card"
                                   classList={{
-                                    'kb-card-done': card.done,
+                                    'kb-card-done': isCardDone(card),
                                     'kb-card-archived': card.archived,
                                     'kb-card-dragging':
                                       draggingCardId() === card.id,
@@ -1002,9 +1017,9 @@ const BoardView: Component<Props> = (p) => {
                                     <input
                                       type="checkbox"
                                       class="kb-card-done-checkbox"
-                                      checked={card.done}
+                                      checked={isCardDone(card)}
                                       aria-label="Erledigt"
-                                      title={card.done ? 'Wieder offen' : 'Als erledigt markieren'}
+                                      title={isCardDone(card) ? 'Wieder offen' : 'Als erledigt markieren'}
                                       onClick={(e) => e.stopPropagation()}
                                       onChange={(e) => {
                                         onToggleCardDone(card, e.currentTarget.checked);
@@ -1041,7 +1056,7 @@ const BoardView: Component<Props> = (p) => {
                                         <span
                                           class="kb-deadline"
                                           data-deadline-state={
-                                            deadlineState(card.deadline, card.done) ?? 'none'
+                                            deadlineState(card.deadline, isCardDone(card)) ?? 'none'
                                           }
                                         >
                                           ⏱ {deadline}

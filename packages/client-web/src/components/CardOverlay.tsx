@@ -27,6 +27,7 @@ import {
   setCardArchived,
   setCardColor,
   setCardDeadline,
+  setCardDoneOccurrences,
   setCardNote,
   setCardPriority,
   setCardRecur,
@@ -36,6 +37,12 @@ import {
   toggleCardInlineItem,
   toggleChecklistItemDone,
 } from '../lib/mutations';
+import {
+  isCardDone,
+  isRecurCard,
+  todayIso,
+  toggleOccurrence,
+} from '../lib/recur';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
@@ -140,8 +147,14 @@ const CardOverlay: Component<Props> = (p) => {
   }
 
   async function onToggleDone(done: boolean) {
-    if (done === p.card.done) return;
-    await wrap(() => toggleCardDone(p.card.id, done));
+    const current = isCardDone(p.card);
+    if (done === current) return;
+    if (isRecurCard(p.card)) {
+      const next = toggleOccurrence(p.card.done_occurrences, todayIso(), done);
+      await wrap(() => setCardDoneOccurrences(p.card.id, next));
+    } else {
+      await wrap(() => toggleCardDone(p.card.id, done));
+    }
   }
 
   async function onDeadline(val: string) {
@@ -414,7 +427,7 @@ const CardOverlay: Component<Props> = (p) => {
       <div class="overlay-card" role="dialog" aria-modal="true">
         <header class="overlay-head">
           <div class="overlay-title">
-            <Show when={p.card.done}>
+            <Show when={isCardDone(p.card)}>
               <span class="kb-done-mark" aria-hidden>
                 ✓
               </span>
@@ -471,7 +484,7 @@ const CardOverlay: Component<Props> = (p) => {
                 value={p.card.deadline ?? ''}
                 onChange={(e) => onDeadline(e.currentTarget.value)}
               />
-              <Show when={!p.card.done && deadlineWarning()}>
+              <Show when={!isCardDone(p.card) && deadlineWarning()}>
                 <span
                   class="overlay-deadline-warning"
                   data-deadline-state={deadlineWarning()!.state}
@@ -526,10 +539,12 @@ const CardOverlay: Component<Props> = (p) => {
             <label class="overlay-field overlay-field-done">
               <input
                 type="checkbox"
-                checked={p.card.done}
+                checked={isCardDone(p.card)}
                 onChange={(e) => onToggleDone(e.currentTarget.checked)}
               />
-              <span>Erledigt</span>
+              <span>
+                {isRecurCard(p.card) ? 'Heute erledigt' : 'Erledigt'}
+              </span>
             </label>
           </section>
 
