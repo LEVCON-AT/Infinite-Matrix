@@ -21,6 +21,7 @@ import {
 import { toggleEditMode, useEditMode } from '../lib/edit-mode';
 import { toggleTheme, useTheme } from '../lib/theme';
 import { subscribeWorkspace } from '../lib/realtime';
+import { useTreeExpand } from '../lib/tree-expand';
 import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
 import NodeTree from '../components/NodeTree';
 import MatrixView from '../components/MatrixView';
@@ -212,6 +213,21 @@ const Workspace: Component = () => {
           setShowQuicknav(true);
           return;
         }
+      }
+
+      // Shift+A: Expand-All-Tree togglen (sticky pro Workspace).
+      // In Text-Inputs ignorieren — sonst kann man kein A eintippen.
+      if (
+        e.shiftKey &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        (e.key === 'A' || e.key === 'a')
+      ) {
+        if (isTextInput(e.target)) return;
+        e.preventDefault();
+        useTreeExpand(params.workspaceId).toggleExpandAll();
+        return;
       }
 
       // ^ direkt (ohne Modifier ausser evtl. Shift fuer US-Tastatur)
