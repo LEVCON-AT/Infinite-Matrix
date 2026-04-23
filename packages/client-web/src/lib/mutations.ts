@@ -877,6 +877,35 @@ export async function delChecklistSnapshot(args: {
   if (upErr) throw upErr;
 }
 
+// Undo-Pendant zu delChecklistSnapshot: einzelnen Snapshot wieder in
+// die History einreihen. Neu-Prepend statt Chronologie-erhalten — das
+// reicht fuer den Undo-Fall und vermeidet einen zusaetzlichen Sort-
+// Durchlauf. Falls derselbe closedAt schon drin ist (race), wird der
+// neue ignoriert.
+export async function restoreChecklistSnapshot(args: {
+  workspaceId: string;
+  checklistId: string;
+  snapshot: { closedAt: string; items: unknown[] };
+}): Promise<void> {
+  const { data: cur, error: readErr } = await supabase
+    .from('checklists')
+    .select('history')
+    .eq('id', args.checklistId)
+    .eq('workspace_id', args.workspaceId)
+    .single();
+  if (readErr) throw readErr;
+  const history = Array.isArray((cur as { history: unknown[] } | null)?.history)
+    ? ((cur as { history: unknown[] }).history as Array<Record<string, unknown>>)
+    : [];
+  if (history.some((s) => s.closedAt === args.snapshot.closedAt)) return;
+  const next = [args.snapshot as unknown as Record<string, unknown>, ...history];
+  const { error: upErr } = await supabase
+    .from('checklists')
+    .update({ history: next })
+    .eq('id', args.checklistId);
+  if (upErr) throw upErr;
+}
+
 // Bulk-Insert mehrerer Items am Ende der Checkliste. Wird vom Paste-
 // Popup aufgerufen. Einzelne .insert()-Calls in einer Schleife waeren
 // 10-50 Roundtrips bei grossen Pastes; deshalb Batch mit einem einzigen

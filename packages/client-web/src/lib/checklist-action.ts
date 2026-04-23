@@ -86,6 +86,10 @@ export async function executeChecklistAction(
         showToast('Close-Webhook: URL ungueltig.', 'error');
         return;
       }
+      // Timeout via AbortController: ein haengender Fetch darf den UI-
+      // Thread nicht binden. 5 s ist grosszuegig fuer typische Webhooks.
+      const ctrl = new AbortController();
+      const timer = window.setTimeout(() => ctrl.abort(), 5000);
       try {
         await fetch(url, {
           method: 'POST',
@@ -96,12 +100,15 @@ export async function executeChecklistAction(
             message: action.message ?? '',
             at: new Date().toISOString(),
           }),
+          signal: ctrl.signal,
         });
       } catch {
-        // Best-effort — Webhook-Fehler (CORS, Netz, 500) sollen den
-        // Close-Flow nicht brechen. Der Nutzer sieht, dass die
+        // Best-effort — Webhook-Fehler (CORS, Netz, 500, Timeout) sollen
+        // den Close-Flow nicht brechen. Der Nutzer sieht, dass die
         // Checkliste trotzdem abgeschlossen ist.
         showToast('Close-Webhook konnte nicht erreicht werden.', 'error');
+      } finally {
+        window.clearTimeout(timer);
       }
       return;
     }

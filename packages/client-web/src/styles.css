@@ -4057,6 +4057,17 @@ button[type='submit']:hover:not(:disabled) {
   .btn-subtle {
     min-height: 36px;
   }
+  /* Checklisten-spezifische Icon-Buttons (History-Del, Close-Action,
+     Item-Del). WCAG-Tap-Target im Mobile-Viewport. */
+  .cl-action-btn,
+  .cl-history-del,
+  .cl-it-del {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .cl-close-mode {
+    min-height: 36px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

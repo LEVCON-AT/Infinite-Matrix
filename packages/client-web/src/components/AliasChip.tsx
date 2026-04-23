@@ -90,13 +90,19 @@ const AliasChip: Component<Props> = (p) => {
         openMenu(e.clientX, e.clientY, e.currentTarget);
       }}
       onKeyDown={(e) => {
+        // stopPropagation: der Chip kann in einem outer <div role="button">
+        // mit eigenem Enter/Space-Handler stecken (z.B. CardOverlay-Note-
+        // View). Ohne Stop wuerde Enter erst navigate + dann Edit-Toggle
+        // triggern — Race-Condition mit Focus-Loss.
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
+          e.stopPropagation();
           void activate();
           return;
         }
         if (e.key === '+' || e.key === 'F10') {
           e.preventDefault();
+          e.stopPropagation();
           const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
           openMenu(r.left, r.bottom + 2, e.currentTarget as HTMLElement);
         }

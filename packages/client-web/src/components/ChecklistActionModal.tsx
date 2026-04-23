@@ -103,12 +103,21 @@ const ChecklistActionModal: Component<Props> = (p) => {
     }
   }
 
+  // Ctrl/Cmd+Enter committet — konsistent zu ChecklistPastePopup.
+  function onFormKey(e: KeyboardEvent) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      void save();
+    }
+  }
+
   return (
     <div
       class="overlay-scrim"
       onClick={(e) => {
         if (e.target === e.currentTarget) p.onClose();
       }}
+      onKeyDown={onFormKey}
     >
       <div class="overlay-card cl-action-card" role="dialog" aria-modal="true">
         <header class="overlay-head">
@@ -228,7 +237,7 @@ const ChecklistActionModal: Component<Props> = (p) => {
             onClick={save}
             disabled={busy()}
           >
-            Speichern
+            Speichern (Strg+Enter)
           </button>
         </footer>
       </div>

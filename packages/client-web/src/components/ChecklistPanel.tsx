@@ -21,6 +21,7 @@ import {
   renameChecklist,
   renameChecklistItem,
   restoreChecklistItem,
+  restoreChecklistSnapshot,
   restoreChecklistWithItems,
   saveChecklistSnapshot,
   setChecklistAlias,
@@ -247,6 +248,12 @@ const ChecklistPanel: Component<Props> = (p) => {
 
   async function onDelSnapshot(closedAt: string) {
     if (busy()) return;
+    // Pre-Snapshot des betroffenen Eintrags fuer Undo. Der aktuelle
+    // history-Array liegt im props-Objekt vor — der Eintrag wird per
+    // closedAt gefunden und vollstaendig gemerkt.
+    const snap = (p.checklist.history ?? []).find(
+      (s) => s.closedAt === closedAt,
+    );
     await wrap(() =>
       delChecklistSnapshot({
         workspaceId: p.workspaceId,
@@ -254,6 +261,22 @@ const ChecklistPanel: Component<Props> = (p) => {
         closedAt,
       }),
     );
+    if (!snap) return;
+    showUndoToast('Snapshot geloescht.', () => {
+      void (async () => {
+        try {
+          await restoreChecklistSnapshot({
+            workspaceId: p.workspaceId,
+            checklistId: p.checklist.id,
+            snapshot: { closedAt: snap.closedAt, items: snap.items },
+          });
+          showToast('Snapshot wiederhergestellt.', 'success');
+          p.onChanged();
+        } catch (err) {
+          showToast(translateDbError(err), 'error');
+        }
+      })();
+    });
   }
 
   async function onCloseModeChange(mode: ChecklistCloseMode) {
@@ -358,6 +381,7 @@ const ChecklistPanel: Component<Props> = (p) => {
             }
             disabled={busy()}
             title="Wann soll diese Checkliste abgeschlossen werden?"
+            aria-label="Close-Modus der Checkliste"
           >
             <option value="manual">manuell</option>
             <option value="auto-prompt">fragen bei Vollstaendig</option>
@@ -369,6 +393,7 @@ const ChecklistPanel: Component<Props> = (p) => {
             onClick={() => setShowActionModal(true)}
             disabled={busy()}
             title="Close-Aktion konfigurieren (Toast / Jump / Webhook / Mail)"
+            aria-label="Close-Aktion konfigurieren"
           >
             ⚡
           </button>
