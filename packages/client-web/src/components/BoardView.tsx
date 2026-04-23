@@ -78,6 +78,29 @@ function fmtDate(iso: string | null): string | null {
   return `${d}.${m}.${y}`;
 }
 
+// Deadline-State relativ zu heute:
+//   overdue  = strikt vor heute
+//   today    = heute
+//   soon     = innerhalb der naechsten 3 Tage (heute exklusiv)
+//   future   = spaeter
+// Donecards bekommen keinen State — "erledigt" ueberschreibt
+// das Dringlichkeitssignal.
+function deadlineState(
+  iso: string | null,
+  done: boolean,
+): 'overdue' | 'today' | 'soon' | 'future' | null {
+  if (!iso || done) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(iso);
+  d.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((d.getTime() - today.getTime()) / 86_400_000);
+  if (diffDays < 0) return 'overdue';
+  if (diffDays === 0) return 'today';
+  if (diffDays <= 3) return 'soon';
+  return 'future';
+}
+
 const BoardView: Component<Props> = (p) => {
   const editMode = useEditMode();
   const boardUi = useBoardUi(p.boardId);
@@ -805,7 +828,12 @@ const BoardView: Component<Props> = (p) => {
                                         {(w) => <span class="kb-who">@{w}</span>}
                                       </For>
                                       <Show when={deadline}>
-                                        <span class="kb-deadline">
+                                        <span
+                                          class="kb-deadline"
+                                          data-deadline-state={
+                                            deadlineState(card.deadline, card.done) ?? 'none'
+                                          }
+                                        >
                                           ⏱ {deadline}
                                         </span>
                                       </Show>

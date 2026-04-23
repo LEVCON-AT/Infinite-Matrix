@@ -1658,11 +1658,48 @@ button[type='submit']:hover:not(:disabled) {
 .kb-deadline {
   padding: 1px 6px;
   border-radius: 999px;
-  background: var(--amberbg);
-  color: var(--ambertxt);
+  background: var(--bg2);
+  color: var(--text2);
   display: inline-flex;
   align-items: center;
   gap: 2px;
+}
+
+/* Faerbung nach Dringlichkeit — ueberfaellig rot, heute/bald amber,
+   erledigt (done ueberschreibt state=null) neutral. */
+.kb-deadline[data-deadline-state='overdue'] {
+  background: var(--redbg);
+  color: var(--redtxt);
+  font-weight: 600;
+}
+
+.kb-deadline[data-deadline-state='today'],
+.kb-deadline[data-deadline-state='soon'] {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+}
+
+/* Overlay-Warnung neben dem Date-Input: kleiner Chip, Farbe wie
+   Badge. Inline-Level, damit er im Flow des overlay-field bleibt. */
+.overlay-deadline-warning {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  align-self: flex-start;
+}
+
+.overlay-deadline-warning[data-deadline-state='overdue'] {
+  background: var(--redbg);
+  color: var(--redtxt);
+}
+
+.overlay-deadline-warning[data-deadline-state='today'],
+.overlay-deadline-warning[data-deadline-state='soon'] {
+  background: var(--amberbg);
+  color: var(--ambertxt);
 }
 
 .kb-prio {

@@ -196,6 +196,22 @@ const CardOverlay: Component<Props> = (p) => {
     await wrap(() => setCardWho(p.card.id, next));
   }
 
+  // Deadline-Warnung: dasselbe Regelwerk wie auf den Board-Karten.
+  // Rendert einen kleinen farbigen Hinweis neben dem Date-Input.
+  function deadlineWarning(): { state: 'overdue' | 'today' | 'soon'; label: string } | null {
+    const iso = p.card.deadline;
+    if (!iso) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const d = new Date(iso);
+    d.setHours(0, 0, 0, 0);
+    const days = Math.round((d.getTime() - today.getTime()) / 86_400_000);
+    if (days < 0) return { state: 'overdue', label: `ueberfaellig (${-days}d)` };
+    if (days === 0) return { state: 'today', label: 'heute faellig' };
+    if (days <= 3) return { state: 'soon', label: `in ${days}d` };
+    return null;
+  }
+
   // Recur: Dropdown + Intervall + Startdatum. Zusammen ein Objekt,
   // weil die DB-Spalte ein JSONB ist und Teilupdates sonst per
   // mutateCardRecur gehen muessten. Fuer V1 reicht setCardRecur(obj).
@@ -447,6 +463,14 @@ const CardOverlay: Component<Props> = (p) => {
                 value={p.card.deadline ?? ''}
                 onChange={(e) => onDeadline(e.currentTarget.value)}
               />
+              <Show when={!p.card.done && deadlineWarning()}>
+                <span
+                  class="overlay-deadline-warning"
+                  data-deadline-state={deadlineWarning()!.state}
+                >
+                  {deadlineWarning()!.label}
+                </span>
+              </Show>
             </label>
 
             <label class="overlay-field">
