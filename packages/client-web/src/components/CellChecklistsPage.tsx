@@ -6,6 +6,7 @@
 import {
   For,
   Show,
+  createEffect,
   createResource,
   createSignal,
   type Component,
@@ -23,6 +24,11 @@ type Props = {
   cell: CellRow;
   row: RowRow | undefined;
   col: ColRow | undefined;
+  // Monotoner Zaehler, der bei jeder Realtime-Mutation auf
+  // checklists oder checklist_items hochlaeuft. Wir beobachten ihn
+  // in einem createEffect und refetchen; der Zahlenwert selbst wird
+  // nie gelesen.
+  realtimeVersion: number;
 };
 
 const CellChecklistsPage: Component<Props> = (p) => {
@@ -33,6 +39,22 @@ const CellChecklistsPage: Component<Props> = (p) => {
     () => ({ cellId: p.cell.id, workspaceId: p.workspaceId }),
     (key) => fetchCellChecklists(key.cellId, key.workspaceId),
   );
+
+  // Realtime: bei jedem Bump refetchen. Der erste Lauf (Version=0)
+  // ueberspringen — die createResource-Initial-Loading deckt das ab,
+  // ein zweiter Refetch waere Verschwendung.
+  let rtSeen: number | null = null;
+  createEffect(() => {
+    const v = p.realtimeVersion;
+    if (rtSeen === null) {
+      rtSeen = v;
+      return;
+    }
+    if (v !== rtSeen) {
+      rtSeen = v;
+      void refetch();
+    }
+  });
 
   async function onAddChecklist() {
     if (busy()) return;

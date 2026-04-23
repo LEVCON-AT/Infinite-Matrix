@@ -20,6 +20,7 @@ import {
 } from '../lib/queries';
 import { toggleEditMode, useEditMode } from '../lib/edit-mode';
 import { toggleTheme, useTheme } from '../lib/theme';
+import { subscribeWorkspace } from '../lib/realtime';
 import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
 import NodeTree from '../components/NodeTree';
 import MatrixView from '../components/MatrixView';
@@ -116,7 +117,7 @@ const Workspace: Component = () => {
   // Rows + Cols der Parent-Matrix der aktuellen Zelle — fuer den
   // Breadcrumb (Row × Col) auf der Zell-Page. Greift nur bei /c/:cellId-
   // Routen; sonst null.
-  const [cellMatrixContent] = createResource(
+  const [cellMatrixContent, { refetch: refetchCellMatrix }] = createResource(
     () => {
       const c = currentCell();
       if (!c) return null;
@@ -124,6 +125,15 @@ const Workspace: Component = () => {
     },
     async (key) => (key ? fetchMatrixContent(key.matrixId, key.workspaceId) : undefined),
   );
+
+  // Realtime-Version-Zaehler fuer Tabellen, deren Daten in Kind-
+  // Komponenten gefetcht werden. Die Kinder beobachten die Signale
+  // und refetchen selbst. Ein Zaehler pro Tabelle reicht — wir
+  // brauchen keine Detail-Payload, die Komponente weiss selbst was
+  // sie zu laden hat. Getrennt fuer checklists + checklist_items,
+  // weil die Cell-Checklisten-Seite beide interessiert, die
+  // Board-View aber schon ueber refetchBoard abgedeckt ist.
+  const [rtCellChecklists, setRtCellChecklists] = createSignal(0);
 
   const cellRow = createMemo(() => {
     const c = currentCell();
@@ -215,6 +225,48 @@ const Workspace: Component = () => {
     };
     document.addEventListener('keydown', onKey);
     onCleanup(() => document.removeEventListener('keydown', onKey));
+  });
+
+  // Realtime: pro Workspace einen Channel, der alle 9 Tabellen auf
+  // der Postgres-Publication `supabase_realtime` broadcastet. Events
+  // mappen wir 1:1 auf refetch-Calls. Der Channel wird beim
+  // Workspace-Wechsel neu aufgebaut (createEffect haengt an
+  // params.workspaceId), die Cleanup-Logik stammt aus
+  // subscribeWorkspace (registriert onCleanup selbst).
+  createEffect(() => {
+    const wid = params.workspaceId;
+    if (!wid) return;
+    subscribeWorkspace(wid, {
+      nodes: () => void refetchNodes(),
+      cells: () => {
+        void refetchCells();
+        // Eine Cell-Mutation kann Feature-Pills in der aktuellen
+        // Matrix/Board-Ansicht veraendern (z.B. child_matrix_id
+        // gesetzt). Falls die betroffene Matrix gerade offen ist,
+        // braucht sie frische Daten.
+        void refetchMatrix();
+        void refetchCellMatrix();
+      },
+      rows: () => {
+        void refetchMatrix();
+        void refetchCellMatrix();
+      },
+      cols: () => {
+        void refetchMatrix();
+        void refetchCellMatrix();
+      },
+      kb_cols: () => void refetchBoard(),
+      kb_cards: () => void refetchBoard(),
+      checklists: () => {
+        void refetchBoard();
+        setRtCellChecklists((v) => v + 1);
+      },
+      checklist_items: () => {
+        void refetchBoard();
+        setRtCellChecklists((v) => v + 1);
+      },
+      links: () => void refetchBoard(),
+    });
   });
 
   async function onImported(rootNodeId: string) {
@@ -318,6 +370,7 @@ const Workspace: Component = () => {
                     cell={currentCell()!}
                     row={cellRow()}
                     col={cellCol()}
+                    realtimeVersion={rtCellChecklists()}
                   />
                 </Show>
                 <Show when={cellSection() === 'info'}>
