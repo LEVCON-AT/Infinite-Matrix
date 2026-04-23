@@ -44,6 +44,7 @@ import { clearDocsRequest, type OpenDocsRequest } from '../lib/docs-ui';
 import { resolveAlias } from '../lib/alias-resolve';
 import { dispatchAliasResult } from '../lib/alias-dispatch';
 import { supabase } from '../lib/supabase';
+import { getPersistedTabIds, persistTabIds } from '../lib/docs-tab-restore';
 
 type Props = {
   workspaceId: string;
@@ -218,32 +219,68 @@ const DocsPopup: Component<Props> = (p) => {
     }
   }
 
-  // Bei Popup-Mount: entweder initialDocId laden oder leeren Pending-Tab
-  // anlegen. Die Request-Props stammen aus Workspace via Shared-Signal.
+  // Bei Popup-Mount: persisted Tabs (aus localStorage) laden, dann
+  // ggf. initialDocId als aktiven Tab aktivieren oder anhaengen. Wenn
+  // nichts persisted ist und kein initialDoc: leerer Pending-Tab.
   onMount(async () => {
     prevFocus = document.activeElement as HTMLElement | null;
     const req = p.request;
-    if (req?.initialDocId) {
+    const persisted = getPersistedTabIds(p.workspaceId);
+
+    const loaded: Tab[] = [];
+    for (const id of persisted) {
       try {
-        const row = await fetchDocById(req.initialDocId, p.workspaceId);
-        if (row) {
-          setTabs([tabFromRow(row)]);
-          setActiveIdx(0);
-        } else {
-          showToast('Doku nicht gefunden.', 'error');
-          setTabs([newPendingTab(req.sourceAlias ?? null, req.attachedCellId ?? null)]);
-        }
-      } catch (err) {
-        showToast(translateDbError(err), 'error');
-        setTabs([newPendingTab(req.sourceAlias ?? null, req.attachedCellId ?? null)]);
+        const row = await fetchDocById(id, p.workspaceId);
+        if (row) loaded.push(tabFromRow(row));
+      } catch {
+        // Stale-Eintrag oder Permission-Error — still skippen,
+        // naechster persist raeumt auf.
       }
-    } else {
-      setTabs([newPendingTab(req?.sourceAlias ?? null, req?.attachedCellId ?? null)]);
     }
+
+    let activeIdxAfter = 0;
+    if (req?.initialDocId) {
+      const existingIdx = loaded.findIndex((t) => t.docId === req.initialDocId);
+      if (existingIdx >= 0) {
+        activeIdxAfter = existingIdx;
+      } else {
+        try {
+          const row = await fetchDocById(req.initialDocId, p.workspaceId);
+          if (row) {
+            loaded.push(tabFromRow(row));
+            activeIdxAfter = loaded.length - 1;
+          } else {
+            showToast('Doku nicht gefunden.', 'error');
+          }
+        } catch (err) {
+          showToast(translateDbError(err), 'error');
+        }
+      }
+    }
+
+    if (loaded.length === 0) {
+      loaded.push(
+        newPendingTab(req?.sourceAlias ?? null, req?.attachedCellId ?? null),
+      );
+    }
+
+    setTabs(loaded);
+    setActiveIdx(activeIdxAfter);
     resolveAllAttachedAliases();
     // Title-Fokus: Feld ist pre-filled mit heutigem Datum — User kann
     // sofort mit Tab weiter zu content oder das Datum ueberschreiben.
     setTimeout(() => titleRef?.select?.(), 0);
+  });
+
+  // Bei jeder Tab-Aenderung die docIds persistieren. Pending-Tabs
+  // (docId=null) werden nicht gespeichert — sie existieren nicht in
+  // der DB und koennen nicht restored werden.
+  createEffect(() => {
+    const current = tabs();
+    const ids = current
+      .map((t) => t.docId)
+      .filter((id): id is string => id !== null);
+    persistTabIds(p.workspaceId, ids);
   });
 
   onCleanup(() => {
