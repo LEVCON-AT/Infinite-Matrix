@@ -31,12 +31,14 @@ import {
 import { sanitizeUrl } from '../lib/url';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
+import CellDocsSection from './CellDocsSection';
 
 type Props = {
   workspaceId: string;
   cell: CellRow;
   row: RowRow | undefined;
   col: ColRow | undefined;
+  realtimeDocsVersion: number;
   onChanged: () => void;
 };
 
@@ -383,6 +385,12 @@ const CellInfoPage: Component<Props> = (p) => {
           </button>
         </Show>
       </section>
+
+      <CellDocsSection
+        cell={p.cell}
+        workspaceId={p.workspaceId}
+        realtimeVersion={p.realtimeDocsVersion}
+      />
     </div>
   );
 };

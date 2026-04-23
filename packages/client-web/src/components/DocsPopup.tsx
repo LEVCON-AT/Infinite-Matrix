@@ -25,6 +25,7 @@ import {
   onMount,
   type Component,
 } from 'solid-js';
+import { useNavigate } from '@solidjs/router';
 import type { DocRow } from '../lib/types';
 import { fetchDocById, fetchDocsRecent } from '../lib/queries';
 import {
@@ -32,6 +33,7 @@ import {
   delDoc,
   restoreDoc,
   setDocAlias,
+  setDocAttachedCell,
   setDocContent,
   setDocTitle,
 } from '../lib/mutations';
@@ -39,6 +41,9 @@ import { validateAlias } from '../lib/alias';
 import { showToast, showUndoToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import { clearDocsRequest, type OpenDocsRequest } from '../lib/docs-ui';
+import { resolveAlias } from '../lib/alias-resolve';
+import { dispatchAliasResult } from '../lib/alias-dispatch';
+import { supabase } from '../lib/supabase';
 
 type Props = {
   workspaceId: string;
@@ -56,6 +61,10 @@ type Tab = {
   alias: string;
   sourceAlias: string | null;
   attachedCellId: string | null;
+  // Display-Alias der angehaengten Zelle — Snapshot, aufgeloest beim
+  // Tab-Load oder nach Attach-Blur. Leer wenn nicht attached oder die
+  // Zelle hat keinen Alias (dann sieht der User "(Zelle)" als Hinweis).
+  attachedCellAlias: string | null;
   // Dirty-Flag: gibt es ungesaettigte Aenderungen? Bei Close-Popup
   // koennte man darueber warnen — aktuell aber: blur speichert schon,
   // also sollte dirty immer false sein, wenn der User das Popup zumacht.
@@ -95,17 +104,44 @@ function tabFromRow(row: DocRow): Tab {
     alias: row.alias ?? '',
     sourceAlias: row.source_alias,
     attachedCellId: row.attached_cell_id,
+    attachedCellAlias: null, // wird asynchron nachgezogen
     dirty: false,
   };
 }
 
+// Lookup der Zell-Alias fuer Display. Silent fail (bei Permission/FK-
+// Fehler wird attachedCellAlias=null belassen).
+async function lookupCellAlias(
+  cellId: string,
+  workspaceId: string,
+): Promise<string | null> {
+  try {
+    const { data } = await supabase
+      .from('cells')
+      .select('alias')
+      .eq('id', cellId)
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+    return (data as { alias: string | null } | null)?.alias ?? null;
+  } catch {
+    return null;
+  }
+}
+
 const DocsPopup: Component<Props> = (p) => {
+  const navigate = useNavigate();
   const [tabs, setTabs] = createSignal<Tab[]>([]);
   const [activeIdx, setActiveIdx] = createSignal(0);
   const [busy, setBusy] = createSignal(false);
+  // Separater Draft fuer die Zellen-Anhaenge-Eingabe, damit der
+  // Input-Inhalt unabhaengig vom cached attachedCellAlias editierbar
+  // bleibt. Bei Tab-Wechsel wird der Draft auf den neuen Tab.alias
+  // zurueckgesetzt.
+  const [attachDraft, setAttachDraft] = createSignal('');
   let titleRef: HTMLInputElement | undefined;
   let contentRef: HTMLTextAreaElement | undefined;
   let aliasRef: HTMLInputElement | undefined;
+  let attachRef: HTMLInputElement | undefined;
 
   // Focus-Restore (wie andere Modals).
   let prevFocus: HTMLElement | null = null;
@@ -151,8 +187,35 @@ const DocsPopup: Component<Props> = (p) => {
       alias: todayAliasCompact(),
       sourceAlias,
       attachedCellId,
+      attachedCellAlias: null,
       dirty: false,
     };
+  }
+
+  // Async-Resolver fuer attachedCellAlias eines Tabs. Wird nach
+  // tabFromRow() oder nach Attach-Blur gerufen. Gated auf attachedCellId-
+  // Stabilitaet: wenn der User in der Zwischenzeit die Zelle getauscht
+  // hat, wird kein Wert geschrieben.
+  async function resolveAttachedAlias(idx: number, cellId: string) {
+    const aliasStr = await lookupCellAlias(cellId, p.workspaceId);
+    setTabs((prev) => {
+      const next = prev.slice();
+      const cur = next[idx];
+      if (!cur) return prev;
+      if (cur.attachedCellId !== cellId) return prev;
+      next[idx] = { ...cur, attachedCellAlias: aliasStr };
+      return next;
+    });
+  }
+
+  function resolveAllAttachedAliases() {
+    const cur = tabs();
+    for (let i = 0; i < cur.length; i++) {
+      const t = cur[i];
+      if (t.attachedCellId && t.attachedCellAlias === null) {
+        void resolveAttachedAlias(i, t.attachedCellId);
+      }
+    }
   }
 
   // Bei Popup-Mount: entweder initialDocId laden oder leeren Pending-Tab
@@ -177,6 +240,7 @@ const DocsPopup: Component<Props> = (p) => {
     } else {
       setTabs([newPendingTab(req?.sourceAlias ?? null, req?.attachedCellId ?? null)]);
     }
+    resolveAllAttachedAliases();
     // Title-Fokus: Feld ist pre-filled mit heutigem Datum — User kann
     // sofort mit Tab weiter zu content oder das Datum ueberschreiben.
     setTimeout(() => titleRef?.select?.(), 0);
@@ -201,11 +265,23 @@ const DocsPopup: Component<Props> = (p) => {
           const row = await fetchDocById(req.initialDocId as string, p.workspaceId);
           if (!row) return;
           openTab(tabFromRow(row));
+          resolveAllAttachedAliases();
         } catch {
           /* silent — ein evtl. Fehler ist schon beim initial-load gemeldet */
         }
       })();
     }
+  });
+
+  // Bei Tab-Wechsel: attachDraft auf den Display-Alias des neuen Tabs
+  // setzen. Aber nur wenn der User nicht gerade im Attach-Input tippt —
+  // sonst rissen wir den laufenden Text weg.
+  createEffect(() => {
+    const idx = activeIdx();
+    const t = tabs()[idx];
+    if (!t) return;
+    if (document.activeElement === attachRef) return;
+    setAttachDraft(t.attachedCellAlias ?? '');
   });
 
   // ESC schliesst (Capture-Phase, sonst greift der globale Back-Handler).
@@ -399,6 +475,88 @@ const DocsPopup: Component<Props> = (p) => {
 
   async function openRecent(row: DocRow) {
     openTab(tabFromRow(row));
+    // Nach dem setTabs-Batch den lookup fuer den neuen Tab triggern.
+    resolveAllAttachedAliases();
+  }
+
+  // Source-Chip-Klick: Popup schliessen, zum Quell-Alias navigieren.
+  // Snapshot — Ziel kann gelöscht oder umbenannt sein; Toast bei Fehler.
+  async function onSourceClick() {
+    const t = activeTab();
+    const alias = t?.sourceAlias;
+    if (!alias) return;
+    try {
+      const res = await resolveAlias(alias, p.workspaceId);
+      if (!res.ok) {
+        showToast(`Quelle ^${alias} nicht gefunden.`, 'error');
+        return;
+      }
+      dispatchAliasResult(res.result, {
+        workspaceId: p.workspaceId,
+        navigate,
+        onError: (msg) => showToast(msg, 'error'),
+      });
+      p.onClose();
+    } catch (err) {
+      showToast(translateDbError(err), 'error');
+    }
+  }
+
+  // Attach/Detach: User tippt einen Zellen-Alias (oder leer fuer Loesen).
+  // Resolver muss kind='cell' liefern, sonst freundlich abbrechen.
+  async function onAttachBlur(val: string) {
+    const idx = activeIdx();
+    const t = tabs()[idx];
+    if (!t) return;
+    const cleaned = val.trim().replace(/^\^+/, '').toLowerCase();
+    const currentAlias = (t.attachedCellAlias ?? '').toLowerCase();
+    if (cleaned === currentAlias) return; // nichts geaendert
+    if (!cleaned) {
+      // Detach
+      if (t.docId && t.attachedCellId) {
+        try {
+          await setDocAttachedCell(t.docId, null);
+        } catch (err) {
+          showToast(translateDbError(err), 'error');
+          setAttachDraft(t.attachedCellAlias ?? '');
+          return;
+        }
+      }
+      patchActive({ attachedCellId: null, attachedCellAlias: null });
+      setAttachDraft('');
+      return;
+    }
+    // Resolve
+    let res;
+    try {
+      res = await resolveAlias(cleaned, p.workspaceId);
+    } catch (err) {
+      showToast(translateDbError(err), 'error');
+      setAttachDraft(t.attachedCellAlias ?? '');
+      return;
+    }
+    if (!res.ok) {
+      showToast(res.msg, 'error');
+      setAttachDraft(t.attachedCellAlias ?? '');
+      return;
+    }
+    if (res.result.kind !== 'cell') {
+      showToast('Nur Zellen koennen als Anhang dienen.', 'error');
+      setAttachDraft(t.attachedCellAlias ?? '');
+      return;
+    }
+    const cellId = res.result.cellId;
+    if (t.docId) {
+      try {
+        await setDocAttachedCell(t.docId, cellId);
+      } catch (err) {
+        showToast(translateDbError(err), 'error');
+        setAttachDraft(t.attachedCellAlias ?? '');
+        return;
+      }
+    }
+    patchActive({ attachedCellId: cellId, attachedCellAlias: cleaned });
+    setAttachDraft(cleaned);
   }
 
   return (
@@ -503,12 +661,14 @@ const DocsPopup: Component<Props> = (p) => {
                     }}
                   />
                   <Show when={t().sourceAlias}>
-                    <span
+                    <button
+                      type="button"
                       class="docs-popup-source-chip"
-                      title="Quelle dieser Doku"
+                      title={`Zum Quell-Alias ^${t().sourceAlias} springen`}
+                      onClick={onSourceClick}
                     >
                       via ^{t().sourceAlias}
-                    </span>
+                    </button>
                   </Show>
                   <button
                     type="button"
@@ -520,6 +680,31 @@ const DocsPopup: Component<Props> = (p) => {
                   >
                     ✕
                   </button>
+                </div>
+                <div class="docs-popup-attach-row">
+                  <span class="docs-popup-attach-label">An Zelle:</span>
+                  <input
+                    ref={attachRef}
+                    class="docs-popup-attach-input"
+                    type="text"
+                    value={attachDraft()}
+                    placeholder="^zellalias (leer = loesen)"
+                    autocomplete="off"
+                    spellcheck={false}
+                    onInput={(e) => setAttachDraft(e.currentTarget.value)}
+                    onBlur={(e) => onAttachBlur(e.currentTarget.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        (e.currentTarget as HTMLInputElement).blur();
+                      }
+                    }}
+                  />
+                  <Show when={t().attachedCellId}>
+                    <span class="docs-popup-attach-status hint">
+                      angehaengt
+                    </span>
+                  </Show>
                 </div>
                 <textarea
                   ref={contentRef}

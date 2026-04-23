@@ -613,6 +613,7 @@ const Workspace: Component = () => {
                     row={cellRow()}
                     col={cellCol()}
                     realtimeVersion={rtCellChecklists()}
+                    realtimeDocsVersion={rtDocs()}
                   />
                 </Show>
                 <Show when={cellSection() === 'info'}>
@@ -621,6 +622,7 @@ const Workspace: Component = () => {
                     cell={currentCell()!}
                     row={cellRow()}
                     col={cellCol()}
+                    realtimeDocsVersion={rtDocs()}
                     onChanged={() => {
                       void refetchCells();
                     }}

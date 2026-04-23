@@ -980,12 +980,52 @@ button[type='submit']:hover:not(:disabled) {
 .docs-popup-source-chip {
   flex: 0 0 auto;
   font-size: 11px;
-  color: var(--text3);
   padding: 2px 8px;
   border-radius: var(--rs);
   background: var(--bluebg);
   border: 0.5px solid var(--blue);
   color: var(--blue);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background-color var(--tr-std);
+}
+
+.docs-popup-source-chip:hover {
+  background: var(--blue);
+  color: var(--bg);
+}
+
+.docs-popup-attach-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.docs-popup-attach-label {
+  font-size: 11px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.docs-popup-attach-input {
+  flex: 1 1 auto;
+  border: 0.5px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: var(--rs);
+  outline: none;
+}
+
+.docs-popup-attach-input:focus {
+  border-color: var(--blue);
+}
+
+.docs-popup-attach-status {
+  font-size: 11px;
 }
 
 .docs-popup-del {
@@ -1093,6 +1133,79 @@ button[type='submit']:hover:not(:disabled) {
     border-top: 0.5px solid var(--border);
     max-height: 30vh;
   }
+}
+
+/* ── Cell-Docs-Sektion ────────────────────────────────────────── */
+.cell-docs-section {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: 0.5px solid var(--border);
+}
+
+.cell-docs-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.cell-docs-title {
+  margin: 0;
+  font-size: var(--fs-subtitle);
+  font-weight: 600;
+  color: var(--text2);
+}
+
+.cell-docs-add {
+  margin-left: auto;
+}
+
+.cell-docs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.cell-docs-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  padding: 6px 10px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  cursor: pointer;
+  background: var(--bg);
+  transition: background-color var(--tr-std), border-color var(--tr-std);
+}
+
+.cell-docs-item:hover {
+  background: var(--bluebg);
+  border-color: var(--blue);
+}
+
+.cell-docs-date {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.cell-docs-item-title {
+  flex: 1 1 auto;
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell-docs-alias {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--blue);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 /* Sidebar-Tree */

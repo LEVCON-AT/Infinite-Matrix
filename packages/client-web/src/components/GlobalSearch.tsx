@@ -27,6 +27,7 @@ import { rememberFocus } from '../lib/navigation-focus';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import { openDocsPopup } from '../lib/docs-ui';
+import { cellTarget } from '../lib/alias-dispatch';
 
 type Props = {
   workspaceId: string;
@@ -75,13 +76,10 @@ function flatten(groups: Group[]): SearchResult[] {
   return out;
 }
 
-function cellTarget(wsId: string, c: Extract<SearchResult, { kind: 'cell' }>): string {
-  if (c.childMatrixId) return `/w/${wsId}/n/${c.childMatrixId}`;
-  if (c.boardId) return `/w/${wsId}/n/${c.boardId}`;
-  if (c.features.includes('checklists')) return `/w/${wsId}/c/${c.cellId}/checklists`;
-  if (c.features.includes('info')) return `/w/${wsId}/c/${c.cellId}/info`;
-  return `/w/${wsId}/n/${c.matrixId}?cell=${c.cellId}`;
-}
+// cellTarget aus lib/alias-dispatch wiederverwenden. Die SearchResult-
+// Shape ist strukturell identisch zu AliasResolveResult's cell-variant
+// (childMatrixId, boardId, features, matrixId, cellId); der shared
+// Helper ist derselbe.
 
 const GlobalSearch: Component<Props> = (p) => {
   const navigate = useNavigate();

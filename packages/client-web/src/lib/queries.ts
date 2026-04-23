@@ -304,3 +304,21 @@ export async function fetchDocById(
   if (error) throw error;
   return (data as DocRow | null) ?? null;
 }
+
+// Alle Dokus, die an eine bestimmte Zelle angehaengt sind. Fuer die
+// Cell-Info/Checklists-Pages — zeigt dem User "welche Dokus liegen
+// hier". Sort nach updated_at DESC (zuletzt geaenderte zuerst, wie
+// im Alt-Client-Vorbild).
+export async function fetchDocsForCell(
+  cellId: string,
+  workspaceId: string,
+): Promise<DocRow[]> {
+  const { data, error } = await supabase
+    .from('docs')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .eq('attached_cell_id', cellId)
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as DocRow[];
+}

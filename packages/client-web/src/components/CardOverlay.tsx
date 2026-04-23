@@ -39,6 +39,7 @@ import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
 import { validateAlias } from '../lib/alias';
+import { openDocsPopup } from '../lib/docs-ui';
 
 type Props = {
   card: KbCardRow;
@@ -697,6 +698,19 @@ const CardOverlay: Component<Props> = (p) => {
           </Show>
 
           <footer class="overlay-edit-footer">
+            <button
+              type="button"
+              class="btn-subtle"
+              onClick={() => {
+                openDocsPopup({
+                  sourceAlias: p.card.alias ?? null,
+                });
+                p.onClose();
+              }}
+              title="Neue Doku mit dieser Karte als Quelle anlegen"
+            >
+              In Doku erfassen
+            </button>
             <button
               type="button"
               class="btn-subtle"

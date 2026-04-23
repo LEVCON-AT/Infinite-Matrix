@@ -16,13 +16,11 @@
 
 import { createSignal, onCleanup, onMount, Show, type Component } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
-import { resolveAlias, type AliasResolveResult } from '../lib/alias-resolve';
-import { rememberFocus } from '../lib/navigation-focus';
-import { sanitizeUrl } from '../lib/url';
+import { resolveAlias } from '../lib/alias-resolve';
+import { dispatchAliasResult } from '../lib/alias-dispatch';
 import { flashError } from '../lib/flash';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
-import { openDocsPopup } from '../lib/docs-ui';
 
 type Props = {
   workspaceId: string;
@@ -64,70 +62,9 @@ const AliasQuicknav: Component<Props> = (p) => {
     onCleanup(() => document.removeEventListener('keydown', onKey, true));
   });
 
-  // Cell-Quicknav: Priorisiert das eindeutige Ziel. Wenn die Zelle genau
-  // ein primaeres Feature (Sub-Matrix/Sub-Board/Checklisten/Info) hat,
-  // springen wir direkt dorthin. Sonst navigieren wir zur Parent-Matrix
-  // und oeffnen das CellOverlay per ?cell=<id> — der User sieht sofort
-  // die Zell-Konfiguration.
-  function cellTarget(
-    wsId: string,
-    c: Extract<AliasResolveResult, { kind: 'cell' }>,
-  ): string {
-    if (c.childMatrixId) {
-      return `/w/${wsId}/n/${c.childMatrixId}`;
-    }
-    if (c.boardId) {
-      return `/w/${wsId}/n/${c.boardId}`;
-    }
-    if (c.features.includes('checklists')) {
-      return `/w/${wsId}/c/${c.cellId}/checklists`;
-    }
-    if (c.features.includes('info')) {
-      return `/w/${wsId}/c/${c.cellId}/info`;
-    }
-    // Zelle ohne Feature (oder mehrdeutig) — Overlay auf Parent-Matrix.
-    return `/w/${wsId}/n/${c.matrixId}?cell=${c.cellId}`;
-  }
-
-  function dispatch(result: AliasResolveResult) {
-    switch (result.kind) {
-      case 'node':
-        navigate(`/w/${p.workspaceId}/n/${result.nodeId}`);
-        return;
-      case 'cell':
-        // Focus der Zelle in der Parent-Matrix merken — falls der User
-        // spaeter per ESC zurueck zur Matrix kommt, ist die Zelle im
-        // Focus.
-        rememberFocus(result.matrixId, result.rowId, result.colId);
-        navigate(cellTarget(p.workspaceId, result));
-        return;
-      case 'card':
-        // BoardView liest ?card=<id> und oeffnet das CardOverlay.
-        navigate(`/w/${p.workspaceId}/n/${result.boardId}?card=${result.cardId}`);
-        return;
-      case 'checklist-board':
-        navigate(`/w/${p.workspaceId}/n/${result.boardId}`);
-        return;
-      case 'checklist-cell':
-        navigate(`/w/${p.workspaceId}/c/${result.cellId}/checklists`);
-        return;
-      case 'link': {
-        const safe = sanitizeUrl(result.url);
-        if (!safe) {
-          showToast('Link-URL ist ungueltig.', 'error');
-          return;
-        }
-        window.open(safe, '_blank', 'noopener,noreferrer');
-        return;
-      }
-      case 'doc':
-        // Docs leben nicht unter einer URL-Route — Popup via Shared-
-        // Signal oeffnen. Workspace.tsx beobachtet das Request-Signal
-        // und mountet das DocsPopup mit diesem Doc als aktivem Tab.
-        openDocsPopup({ initialDocId: result.docId });
-        return;
-    }
-  }
+  // Dispatch liegt in lib/alias-dispatch.ts — shared mit DocsPopup-
+  // Source-Chip und allen anderen Aufloese-Pfaden, damit Cell-Ziel-
+  // Priorisierung etc. nur einmal existiert.
 
   function fail(msg: string) {
     setError(msg);
@@ -161,7 +98,11 @@ const AliasQuicknav: Component<Props> = (p) => {
     // wenigstens bedienbar und der User sieht einen Fehler.
     setBusy(false);
     try {
-      dispatch(outcomeSnapshot.result);
+      dispatchAliasResult(outcomeSnapshot.result, {
+        workspaceId: p.workspaceId,
+        navigate,
+        onError: (msg) => showToast(msg, 'error'),
+      });
       p.onClose();
     } catch (err) {
       console.error('[quicknav] dispatch failed', err);

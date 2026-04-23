@@ -18,6 +18,7 @@ import { fetchCellChecklists } from '../lib/queries';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import ChecklistPanel from './ChecklistPanel';
+import CellDocsSection from './CellDocsSection';
 
 type Props = {
   workspaceId: string;
@@ -29,6 +30,7 @@ type Props = {
   // in einem createEffect und refetchen; der Zahlenwert selbst wird
   // nie gelesen.
   realtimeVersion: number;
+  realtimeDocsVersion: number;
 };
 
 const CellChecklistsPage: Component<Props> = (p) => {
@@ -142,6 +144,12 @@ const CellChecklistsPage: Component<Props> = (p) => {
           </button>
         </Show>
       </Show>
+
+      <CellDocsSection
+        cell={p.cell}
+        workspaceId={p.workspaceId}
+        realtimeVersion={p.realtimeDocsVersion}
+      />
     </div>
   );
 };
