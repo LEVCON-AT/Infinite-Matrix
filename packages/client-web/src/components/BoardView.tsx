@@ -22,6 +22,7 @@ import {
   moveCard,
   renameKbCol,
   setKbColColor,
+  setKbColPosition,
 } from '../lib/mutations';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
@@ -136,6 +137,19 @@ const BoardView: Component<Props> = (p) => {
     await wrap(() => setKbColColor(col.id, color));
   }
 
+  async function onMoveCol(col: KbColRow, direction: 'left' | 'right') {
+    const list = visibleCols();
+    const idx = list.findIndex((c) => c.id === col.id);
+    if (idx < 0) return;
+    const neighbourIdx = direction === 'left' ? idx - 1 : idx + 1;
+    if (neighbourIdx < 0 || neighbourIdx >= list.length) return;
+    const neighbour = list[neighbourIdx];
+    await wrap(async () => {
+      await setKbColPosition(col.id, neighbour.position);
+      await setKbColPosition(neighbour.id, col.position);
+    });
+  }
+
   async function onDelCol(col: KbColRow) {
     const count = (cardsByCol().get(col.id) ?? []).length;
     if (count > 0) {
@@ -242,7 +256,7 @@ const BoardView: Component<Props> = (p) => {
           >
             <div class="board-cols">
               <For each={visibleCols()}>
-                {(col) => {
+                {(col, colIdx) => {
                   const list = () => cardsByCol().get(col.id) ?? [];
                   return (
                     <div
@@ -289,6 +303,28 @@ const BoardView: Component<Props> = (p) => {
                           disabled={!editMode() || !col.color}
                         >
                           ○
+                        </button>
+                        <button
+                          type="button"
+                          class="mx-move-btn"
+                          title="Spalte nach links"
+                          aria-label="Spalte nach links"
+                          tabIndex={editMode() ? 0 : -1}
+                          onClick={() => onMoveCol(col, 'left')}
+                          disabled={busy() || !editMode() || colIdx() === 0}
+                        >
+                          ‹
+                        </button>
+                        <button
+                          type="button"
+                          class="mx-move-btn"
+                          title="Spalte nach rechts"
+                          aria-label="Spalte nach rechts"
+                          tabIndex={editMode() ? 0 : -1}
+                          onClick={() => onMoveCol(col, 'right')}
+                          disabled={busy() || !editMode() || colIdx() === visibleCols().length - 1}
+                        >
+                          ›
                         </button>
                         <button
                           type="button"

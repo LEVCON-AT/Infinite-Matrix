@@ -316,6 +316,17 @@ export async function setKbColColor(
   return data as KbColRow;
 }
 
+export async function setKbColPosition(
+  colId: string,
+  position: number,
+): Promise<void> {
+  const { error } = await supabase
+    .from('kb_cols')
+    .update({ position })
+    .eq('id', colId);
+  if (error) throw error;
+}
+
 export async function delKbCol(colId: string): Promise<void> {
   const { error } = await supabase.from('kb_cols').delete().eq('id', colId);
   if (error) throw error;
