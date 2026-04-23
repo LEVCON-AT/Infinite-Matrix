@@ -1,4 +1,5 @@
 import {
+  For,
   Show,
   createEffect,
   createMemo,
@@ -114,6 +115,50 @@ const Workspace: Component = () => {
   const currentCell = createMemo(() => {
     if (!params.cellId) return undefined;
     return (cells() ?? []).find((c) => c.id === params.cellId);
+  });
+
+  // Breadcrumb vom aktuellen Node aufwaerts. Geht von Node zu Parent-
+  // Cell (via node.parent_cell_id) und von dort zur Parent-Matrix
+  // (cell.matrix_id = Node-ID der Matrix, in der die Cell lebt).
+  // Stoppt wenn parent_cell_id NULL ist (Root) oder die Parent-Cell
+  // nicht gefunden wird (Orphan — buildTree macht das zu einem Root).
+  //
+  // Bei Cell-Routen (/c/:cellId) ist der Start die Parent-Matrix der
+  // Zelle. Die Zelle selbst wird nicht eigens als Crumb gerendert;
+  // das aktuelle Section-Label steht ohnehin auf der Cell-Page.
+  const breadcrumb = createMemo<
+    Array<{ id: string; label: string; type: 'matrix' | 'board' }>
+  >(() => {
+    const nodesList = nodes() ?? [];
+    const cellsList = cells() ?? [];
+    const byNodeId = new Map(nodesList.map((n) => [n.id, n]));
+    const byCellId = new Map(cellsList.map((c) => [c.id, c]));
+
+    let startNodeId: string | undefined;
+    const c = currentCell();
+    if (c) {
+      startNodeId = c.matrix_id;
+    } else {
+      startNodeId = currentNode()?.id;
+    }
+    if (!startNodeId) return [];
+
+    const chain: Array<{ id: string; label: string; type: 'matrix' | 'board' }> = [];
+    let cursor = byNodeId.get(startNodeId);
+    const seen = new Set<string>();
+    while (cursor && !seen.has(cursor.id)) {
+      seen.add(cursor.id);
+      chain.unshift({
+        id: cursor.id,
+        label: cursor.label || '(ohne Label)',
+        type: cursor.type,
+      });
+      if (!cursor.parent_cell_id) break;
+      const pc = byCellId.get(cursor.parent_cell_id);
+      if (!pc) break;
+      cursor = byNodeId.get(pc.matrix_id);
+    }
+    return chain;
   });
 
   // Matrix-Content fuer die aktuelle Node (nur wenn Typ=matrix).
@@ -399,7 +444,52 @@ const Workspace: Component = () => {
           fallback={<p class="hint">Workspace waehlen.</p>}
         >
           <header class="ws-main-header">
-            <h1>{currentWs()?.name}</h1>
+            <nav class="ws-breadcrumb" aria-label="Breadcrumb">
+              <span class="ws-breadcrumb-ws">{currentWs()?.name}</span>
+              <For each={breadcrumb()}>
+                {(crumb, i) => {
+                  const isLast = () => i() === breadcrumb().length - 1;
+                  return (
+                    <>
+                      <span class="ws-breadcrumb-sep" aria-hidden>
+                        /
+                      </span>
+                      <Show
+                        when={!isLast()}
+                        fallback={
+                          <span
+                            class="ws-breadcrumb-current"
+                            data-type={crumb.type}
+                          >
+                            {crumb.label}
+                          </span>
+                        }
+                      >
+                        <a
+                          class="ws-breadcrumb-link"
+                          data-type={crumb.type}
+                          href={`/w/${params.workspaceId}/n/${crumb.id}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            navigate(`/w/${params.workspaceId}/n/${crumb.id}`);
+                          }}
+                        >
+                          {crumb.label}
+                        </a>
+                      </Show>
+                    </>
+                  );
+                }}
+              </For>
+              <Show when={currentCell()}>
+                <span class="ws-breadcrumb-sep" aria-hidden>
+                  /
+                </span>
+                <span class="ws-breadcrumb-current" data-type="cell">
+                  {cellRow()?.label || '(Zeile)'} × {cellCol()?.label || '(Spalte)'}
+                </span>
+              </Show>
+            </nav>
             <button
               type="button"
               class="theme-toggle-btn"

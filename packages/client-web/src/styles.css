@@ -423,6 +423,68 @@ button[type='submit']:hover:not(:disabled) {
   font-weight: 600;
 }
 
+/* Breadcrumb ersetzt den nackten Workspace-Namen im Main-Header.
+   Workspace selbst leicht gedimmt, Kette im normalen Text, letztes
+   Segment (current) farbig nach node-type (blue=matrix, teal=board). */
+.ws-breadcrumb {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--space-xs);
+  font-size: var(--fs-title);
+  min-width: 0;
+}
+
+.ws-breadcrumb-ws {
+  color: var(--text3);
+  font-weight: 500;
+}
+
+.ws-breadcrumb-sep {
+  color: var(--text3);
+  font-weight: 300;
+}
+
+.ws-breadcrumb-link {
+  color: var(--text2);
+  text-decoration: none;
+  padding: 2px 4px;
+  border-radius: var(--rs);
+  transition: var(--tr-std);
+}
+
+.ws-breadcrumb-link:hover {
+  background: var(--bg2);
+  color: var(--text);
+}
+
+.ws-breadcrumb-current {
+  color: var(--text);
+  font-weight: 600;
+  padding: 2px 4px;
+}
+
+.ws-breadcrumb-current[data-type='matrix'] {
+  color: var(--bluetxt);
+}
+
+.ws-breadcrumb-current[data-type='board'] {
+  color: var(--tealtxt);
+}
+
+.ws-breadcrumb-link[data-type='matrix'] {
+  color: var(--blue);
+}
+
+.ws-breadcrumb-link[data-type='board'] {
+  color: var(--teal);
+}
+
+.ws-breadcrumb-current[data-type='cell'] {
+  color: var(--ambertxt);
+}
+
 /* Edit-Mode-Toggle (Pill) */
 .edit-mode-btn {
   padding: 4px 12px;
