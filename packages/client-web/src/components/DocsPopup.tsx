@@ -45,6 +45,13 @@ import { resolveAlias } from '../lib/alias-resolve';
 import { dispatchAliasResult } from '../lib/alias-dispatch';
 import { supabase } from '../lib/supabase';
 import { getPersistedTabIds, persistTabIds } from '../lib/docs-tab-restore';
+import {
+  getDrafts,
+  newClientId,
+  persistDrafts,
+  removeDraft,
+  type Draft,
+} from '../lib/docs-drafts';
 
 type Props = {
   workspaceId: string;
@@ -57,6 +64,10 @@ type Tab = {
   // null solange pending (kein DB-Row). Wird beim ersten erfolgreichen
   // createDoc gesetzt.
   docId: string | null;
+  // Stabiler Identifier fuer Draft-Round-Trip: erlaubt, einen Pending-
+  // Tab nach Crash/Close wiederzufinden, ohne dass wir ihn mit einem
+  // anderen Draft verwechseln.
+  clientId: string;
   title: string;
   content: string;
   alias: string;
@@ -100,12 +111,27 @@ function defaultTitle(sourceAlias: string | null): string {
 function tabFromRow(row: DocRow): Tab {
   return {
     docId: row.id,
+    clientId: newClientId(),
     title: row.title,
     content: row.content,
     alias: row.alias ?? '',
     sourceAlias: row.source_alias,
     attachedCellId: row.attached_cell_id,
     attachedCellAlias: null, // wird asynchron nachgezogen
+    dirty: false,
+  };
+}
+
+function tabFromDraft(d: Draft): Tab {
+  return {
+    docId: null,
+    clientId: d.clientId,
+    title: d.title,
+    content: d.content,
+    alias: d.alias,
+    sourceAlias: d.sourceAlias,
+    attachedCellId: d.attachedCellId,
+    attachedCellAlias: null,
     dirty: false,
   };
 }
@@ -183,6 +209,7 @@ const DocsPopup: Component<Props> = (p) => {
   function newPendingTab(sourceAlias: string | null = null, attachedCellId: string | null = null): Tab {
     return {
       docId: null,
+      clientId: newClientId(),
       title: defaultTitle(sourceAlias),
       content: '',
       alias: todayAliasCompact(),
@@ -191,6 +218,19 @@ const DocsPopup: Component<Props> = (p) => {
       attachedCellAlias: null,
       dirty: false,
     };
+  }
+
+  // Tab ist "empty" wenn alles auf Default steht — wird nicht als
+  // Draft persistiert (sonst wuerde jeder blanke Shift+D einen
+  // Draft erzeugen).
+  function isTabEmpty(t: Tab): boolean {
+    return (
+      t.docId === null &&
+      t.title === defaultTitle(t.sourceAlias) &&
+      t.content === '' &&
+      t.alias === todayAliasCompact() &&
+      !t.attachedCellId
+    );
   }
 
   // Async-Resolver fuer attachedCellAlias eines Tabs. Wird nach
@@ -219,13 +259,15 @@ const DocsPopup: Component<Props> = (p) => {
     }
   }
 
-  // Bei Popup-Mount: persisted Tabs (aus localStorage) laden, dann
-  // ggf. initialDocId als aktiven Tab aktivieren oder anhaengen. Wenn
-  // nichts persisted ist und kein initialDoc: leerer Pending-Tab.
+  // Bei Popup-Mount: persisted Tabs (aus localStorage) laden, offene
+  // Drafts als Pending-Tabs anhaengen, dann ggf. initialDocId als
+  // aktiven Tab aktivieren oder anhaengen. Wenn nichts geladen wird:
+  // leerer Pending-Tab.
   onMount(async () => {
     prevFocus = document.activeElement as HTMLElement | null;
     const req = p.request;
     const persisted = getPersistedTabIds(p.workspaceId);
+    const drafts = getDrafts(p.workspaceId);
 
     const loaded: Tab[] = [];
     for (const id of persisted) {
@@ -236,6 +278,13 @@ const DocsPopup: Component<Props> = (p) => {
         // Stale-Eintrag oder Permission-Error — still skippen,
         // naechster persist raeumt auf.
       }
+    }
+
+    // Drafts hinten anhaengen. Reihenfolge aus dem Draft-Array bleibt
+    // erhalten; das ist die Reihenfolge, in der der User sie zuletzt
+    // bearbeitet hatte (Save schreibt die Liste komplett).
+    for (const d of drafts) {
+      loaded.push(tabFromDraft(d));
     }
 
     let activeIdxAfter = 0;
@@ -272,16 +321,84 @@ const DocsPopup: Component<Props> = (p) => {
     setTimeout(() => titleRef?.select?.(), 0);
   });
 
-  // Bei jeder Tab-Aenderung die docIds persistieren. Pending-Tabs
-  // (docId=null) werden nicht gespeichert — sie existieren nicht in
-  // der DB und koennen nicht restored werden.
+  // Separates Signal fuer die Draft-Liste — damit die Sidebar
+  // reaktiv auf Draft-Updates zeigen kann (inkl. Drafts, die nicht
+  // mehr als Tab offen sind). Wird beim Mount initial geladen und
+  // vom Persist-Effect nach jedem tabs()-Update neu geschrieben.
+  const [draftsList, setDraftsList] = createSignal<Draft[]>([]);
+
+  // Bei jeder Tab-Aenderung persistieren:
+  //   - docIds  -> matrix.docs.tabs.<wsId>   (Tab-Restore)
+  //   - Drafts  -> matrix.docs.drafts.<wsId> (Crash-Safe-Entwuerfe)
+  //
+  // Drafts-Merge (wichtig!): der Effect ueberschreibt NICHT einfach
+  // die Draft-Liste mit den aktuellen Tab-Drafts. Sonst wuerde ein
+  // Close-Tab (×) den Draft loeschen — der User soll Drafts aber
+  // bewusst via Sidebar-Loesch-Button wegwerfen, nicht nebenbei.
+  // Stattdessen: aktuelle Tab-Drafts ueberschreiben die bestehenden
+  // Eintraege gleicher clientId; neue kommen dazu; fehlende bleiben.
   createEffect(() => {
     const current = tabs();
     const ids = current
       .map((t) => t.docId)
       .filter((id): id is string => id !== null);
     persistTabIds(p.workspaceId, ids);
+
+    const now = Date.now();
+    const tabDrafts = new Map<string, Draft>();
+    for (const t of current) {
+      if (t.docId !== null) continue;
+      if (isTabEmpty(t)) continue;
+      tabDrafts.set(t.clientId, {
+        clientId: t.clientId,
+        title: t.title,
+        content: t.content,
+        alias: t.alias,
+        sourceAlias: t.sourceAlias,
+        attachedCellId: t.attachedCellId,
+        updatedAt: now,
+      });
+    }
+
+    const existing = getDrafts(p.workspaceId);
+    const merged: Draft[] = [];
+    const seen = new Set<string>();
+    for (const d of existing) {
+      const updated = tabDrafts.get(d.clientId);
+      merged.push(updated ?? d);
+      seen.add(d.clientId);
+    }
+    for (const [cid, d] of tabDrafts) {
+      if (!seen.has(cid)) merged.push(d);
+    }
+    persistDrafts(p.workspaceId, merged);
+    setDraftsList(merged);
   });
+
+  function onDeleteDraft(clientId: string) {
+    removeDraft(p.workspaceId, clientId);
+    setDraftsList(getDrafts(p.workspaceId));
+    // Falls der Draft als Tab offen ist: auch den Tab schliessen.
+    setTabs((prev) => prev.filter((t) => !(t.docId === null && t.clientId === clientId)));
+    // activeIdx nach Entfernen ggf. nachziehen
+    const len = tabs().length;
+    if (len === 0) p.onClose();
+    else if (activeIdx() >= len) setActiveIdx(len - 1);
+  }
+
+  function onOpenDraft(d: Draft) {
+    const current = tabs();
+    const existingIdx = current.findIndex(
+      (t) => t.docId === null && t.clientId === d.clientId,
+    );
+    if (existingIdx >= 0) {
+      setActiveIdx(existingIdx);
+      return;
+    }
+    const next = [...current, tabFromDraft(d)];
+    setTabs(next);
+    setActiveIdx(next.length - 1);
+  }
 
   onCleanup(() => {
     clearDocsRequest();
@@ -370,6 +487,11 @@ const DocsPopup: Component<Props> = (p) => {
           source_alias: t.sourceAlias,
           attached_cell_id: t.attachedCellId,
         });
+        // Draft ist jetzt materialisiert — localStorage-Eintrag kann
+        // weg. Ohne diese Zeile wuerde der Draft in der Sidebar
+        // weiter auftauchen, obwohl er als Doc in der DB lebt.
+        removeDraft(p.workspaceId, t.clientId);
+        setDraftsList(getDrafts(p.workspaceId));
         patchActive({
           docId: created.id,
           title: created.title,
@@ -774,6 +896,57 @@ const DocsPopup: Component<Props> = (p) => {
               </div>
 
               <aside class="docs-popup-sidebar">
+                <Show when={draftsList().length > 0}>
+                  <h4 class="docs-popup-sidebar-title">
+                    Entwuerfe ({draftsList().length})
+                  </h4>
+                  <ul class="docs-popup-recent-list">
+                    <For each={draftsList()}>
+                      {(d) => {
+                        const isOpenTab = () =>
+                          tabs().some(
+                            (tb) =>
+                              tb.docId === null && tb.clientId === d.clientId,
+                          );
+                        return (
+                          <li
+                            class="docs-popup-recent-item docs-popup-draft-item"
+                            classList={{
+                              'docs-popup-recent-active': isOpenTab(),
+                            }}
+                            onClick={() => onOpenDraft(d)}
+                          >
+                            <div class="docs-popup-recent-title">
+                              {d.title || '(ohne Titel)'}
+                              <Show when={d.alias}>
+                                <span class="docs-popup-recent-alias">
+                                  ^{d.alias}
+                                </span>
+                              </Show>
+                            </div>
+                            <Show when={d.content}>
+                              <div class="docs-popup-recent-preview">
+                                {d.content.slice(0, 80)}
+                              </div>
+                            </Show>
+                            <button
+                              type="button"
+                              class="docs-popup-draft-del"
+                              title="Entwurf verwerfen"
+                              aria-label="Entwurf verwerfen"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDeleteDraft(d.clientId);
+                              }}
+                            >
+                              ×
+                            </button>
+                          </li>
+                        );
+                      }}
+                    </For>
+                  </ul>
+                </Show>
                 <h4 class="docs-popup-sidebar-title">Zuletzt</h4>
                 <Show
                   when={(recent() ?? []).length > 0}

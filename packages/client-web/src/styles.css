@@ -1153,6 +1153,39 @@ button[type='submit']:hover:not(:disabled) {
   white-space: nowrap;
 }
 
+/* Draft-Eintraege heben sich optisch von persistierten Docs ab —
+   gestrichelter Rand + anderer Hintergrund-Ton, damit der User
+   sieht "diese Doku wurde noch nicht gespeichert". */
+.docs-popup-draft-item {
+  position: relative;
+  border: 0.5px dashed var(--border);
+  background: var(--bg);
+}
+
+.docs-popup-draft-item.docs-popup-recent-active {
+  border-style: dashed;
+}
+
+.docs-popup-draft-del {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  font-size: 14px;
+  opacity: 0.6;
+  transition: opacity var(--tr-std), color var(--tr-std);
+}
+
+.docs-popup-draft-del:hover {
+  opacity: 1;
+  color: var(--red, var(--text));
+}
+
 /* Mobile: Sidebar unter das Editor-Panel klappen */
 @media (max-width: 780px) {
   .docs-popup-body {
