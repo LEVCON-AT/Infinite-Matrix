@@ -12,13 +12,15 @@ import {
 import { useLocation, useNavigate, useParams } from '@solidjs/router';
 import { signOut, useUser } from '../lib/auth';
 import {
-  buildTree,
+  buildSidebarTree,
   fetchBoardContent,
   fetchCellIdsWithDocs,
   fetchCellsForWorkspace,
+  fetchColsForWorkspace,
   fetchMatrixContent,
   fetchMyWorkspaces,
   fetchNodesForWorkspace,
+  fetchRowsForWorkspace,
 } from '../lib/queries';
 import { toggleEditMode, useEditMode } from '../lib/edit-mode';
 import { useSidebarMode } from '../lib/sidebar-mode';
@@ -137,6 +139,16 @@ const Workspace: Component = () => {
     async (wid) => (wid ? fetchCellsForWorkspace(wid) : []),
   );
 
+  const [rows, { refetch: refetchRows }] = createResource(
+    () => params.workspaceId,
+    async (wid) => (wid ? fetchRowsForWorkspace(wid) : []),
+  );
+
+  const [colsData, { refetch: refetchCols }] = createResource(
+    () => params.workspaceId,
+    async (wid) => (wid ? fetchColsForWorkspace(wid) : []),
+  );
+
   // Set der cells, an denen Dokus haengen — fuer die derived Doku-
   // Pill in der Matrix-Ansicht. Reagiert auf rtDocs-Bumps ueber den
   // createEffect unten.
@@ -145,7 +157,9 @@ const Workspace: Component = () => {
     async (wid) => (wid ? fetchCellIdsWithDocs(wid) : new Set<string>()),
   );
 
-  const tree = createMemo(() => buildTree(nodes() ?? [], cells() ?? []));
+  const tree = createMemo(() =>
+    buildSidebarTree(nodes() ?? [], cells() ?? [], rows() ?? [], colsData() ?? []),
+  );
 
   const currentNode = createMemo(() => {
     if (!params.nodeId) return undefined;
@@ -444,10 +458,12 @@ const Workspace: Component = () => {
         void refetchCellMatrix();
       },
       rows: () => {
+        void refetchRows();
         void refetchMatrix();
         void refetchCellMatrix();
       },
       cols: () => {
+        void refetchCols();
         void refetchMatrix();
         void refetchCellMatrix();
       },
@@ -472,7 +488,12 @@ const Workspace: Component = () => {
   async function onImported(rootNodeId: string) {
     // Tree neu laden, damit der Import im Sidebar sichtbar wird,
     // dann zur neuen Root-Node navigieren.
-    await Promise.all([refetchNodes(), refetchCells()]);
+    await Promise.all([
+      refetchNodes(),
+      refetchCells(),
+      refetchRows(),
+      refetchCols(),
+    ]);
     setShowImport(false);
     if (params.workspaceId) {
       navigate(`/w/${params.workspaceId}/n/${rootNodeId}`);

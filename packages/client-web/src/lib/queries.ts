@@ -13,6 +13,7 @@ import type {
   MatrixContent,
   NodeRow,
   RowRow,
+  TreeEntry,
   TreeNode,
   WorkspaceWithRole,
 } from './types';
@@ -63,6 +64,24 @@ export async function fetchCellsForWorkspace(workspaceId: string): Promise<CellR
 
   if (error) throw error;
   return (data ?? []) as CellRow[];
+}
+
+export async function fetchRowsForWorkspace(workspaceId: string): Promise<RowRow[]> {
+  const { data, error } = await supabase
+    .from('rows')
+    .select('*')
+    .eq('workspace_id', workspaceId);
+  if (error) throw error;
+  return (data ?? []) as RowRow[];
+}
+
+export async function fetchColsForWorkspace(workspaceId: string): Promise<ColRow[]> {
+  const { data, error } = await supabase
+    .from('cols')
+    .select('*')
+    .eq('workspace_id', workspaceId);
+  if (error) throw error;
+  return (data ?? []) as ColRow[];
 }
 
 // ─── Matrix-Inhalt (rows + cols + cells) ─────────────────────────
@@ -248,12 +267,17 @@ export async function isNodeEmpty(
 // Sub-Feature lebt). Diese Zelle selbst gehoert zu einer anderen Matrix
 // (= der Parent-Node). Fuer den Sidebar-Tree brauchen wir also die Kette:
 //   child-node.parent_cell_id -> cell.matrix_id -> parent-node.id
+//
+// Legacy-Variante, liefert nur Matrix/Board-Nodes flach-rekursiv. Bleibt
+// fuer Alt-Aufrufer (Breadcrumb-Walking, Export) gewuenscht.
 export function buildTree(nodes: NodeRow[], cells: CellRow[]): TreeNode[] {
   const cellToMatrix = new Map<string, string>();
   for (const c of cells) cellToMatrix.set(c.id, c.matrix_id);
 
   const nodeById = new Map<string, TreeNode>();
-  for (const n of nodes) nodeById.set(n.id, { node: n, children: [] });
+  for (const n of nodes) {
+    nodeById.set(n.id, { kind: 'node', id: n.id, node: n, children: [] });
+  }
 
   const roots: TreeNode[] = [];
 
@@ -265,10 +289,95 @@ export function buildTree(nodes: NodeRow[], cells: CellRow[]): TreeNode[] {
     }
     const parentMatrixId = cellToMatrix.get(parentCellId);
     const parent = parentMatrixId ? nodeById.get(parentMatrixId) : undefined;
-    if (parent) parent.children.push(tn);
+    if (parent) (parent.children as TreeNode[]).push(tn);
     else roots.push(tn); // verwaiste Node (parent in anderem Workspace / geloescht)
   }
 
+  return roots;
+}
+
+// Erweiterte Variante fuer den Sidebar: Matrix-Nodes zeigen ihre Zellen
+// (mit Features oder mit child-node), und die Sub-Nodes (Board, Matrix)
+// haengen unter der jeweiligen Cell. Leere Zellen werden ausgefiltert —
+// eine Zelle qualifiziert, wenn:
+//   - sie mindestens ein Feature hat,        ODER
+//   - ein Child-Node (Board/Matrix) an ihr haengt (parent_cell_id match).
+// Zell-Label ist "rowLabel / colLabel"; wenn Row/Col fehlen (orphaned),
+// wird die Zelle ausgelassen.
+export function buildSidebarTree(
+  nodes: NodeRow[],
+  cells: CellRow[],
+  rows: RowRow[],
+  cols: ColRow[],
+): TreeEntry[] {
+  const rowById = new Map(rows.map((r) => [r.id, r]));
+  const colById = new Map(cols.map((c) => [c.id, c]));
+  const cellsByMatrix = new Map<string, CellRow[]>();
+  for (const cell of cells) {
+    const arr = cellsByMatrix.get(cell.matrix_id) ?? [];
+    arr.push(cell);
+    cellsByMatrix.set(cell.matrix_id, arr);
+  }
+  const childNodesByCell = new Map<string, NodeRow[]>();
+  for (const n of nodes) {
+    if (!n.parent_cell_id) continue;
+    const arr = childNodesByCell.get(n.parent_cell_id) ?? [];
+    arr.push(n);
+    childNodesByCell.set(n.parent_cell_id, arr);
+  }
+
+  function buildNode(node: NodeRow): TreeEntry {
+    const entry: TreeEntry = {
+      kind: 'node',
+      id: node.id,
+      node,
+      children: [],
+    };
+    if (node.type !== 'matrix') return entry;
+
+    const myCells = cellsByMatrix.get(node.id) ?? [];
+    // Sort cells: zeilenweise, innerhalb Zeile nach Spalten-Position.
+    // Beides ueber position-Feld der Row/Col, Fallback 0.
+    const decorated = myCells
+      .map((c) => {
+        const r = rowById.get(c.row_id);
+        const col = colById.get(c.col_id);
+        return { cell: c, row: r, col };
+      })
+      .filter((d) => d.row && d.col);
+    decorated.sort((a, b) => {
+      const ra = a.row!.position ?? 0;
+      const rb = b.row!.position ?? 0;
+      if (ra !== rb) return ra - rb;
+      const ca = a.col!.position ?? 0;
+      const cb = b.col!.position ?? 0;
+      return ca - cb;
+    });
+
+    for (const { cell, row, col } of decorated) {
+      const kids = childNodesByCell.get(cell.id) ?? [];
+      const hasFeatures = (cell.features?.length ?? 0) > 0;
+      if (!hasFeatures && kids.length === 0) continue;
+
+      const cellEntry: TreeEntry = {
+        kind: 'cell',
+        id: cell.id,
+        cell,
+        rowLabel: row!.label || '(Zeile)',
+        colLabel: col!.label || '(Spalte)',
+        children: kids.map(buildNode),
+      };
+      (entry.children as TreeEntry[]).push(cellEntry);
+    }
+
+    return entry;
+  }
+
+  const roots: TreeEntry[] = [];
+  for (const n of nodes) {
+    if (n.parent_cell_id) continue;
+    roots.push(buildNode(n));
+  }
   return roots;
 }
 

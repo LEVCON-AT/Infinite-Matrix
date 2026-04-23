@@ -223,10 +223,29 @@ export type CellChecklistsContent = {
 
 // Hilfs-Shape fuer den Sidebar-Tree. Nodes werden nach parent_cell_id
 // verschachtelt; die Zelle wiederum kennt ihre Matrix (= parent-Node).
-export type TreeNode = {
-  node: NodeRow;
-  children: TreeNode[];
-};
+// Seit SB.3 ist der Tree ein discriminated union: Matrix/Board-Nodes
+// koennen Zellen-Eintraege als Kinder tragen, und Zellen-Eintraege
+// enthalten die darunterliegenden Child-Nodes (sub-matrix, sub-board).
+// Leere Zellen (keine Features) werden aus Rendering-Kosten ausgefiltert.
+export type TreeEntry =
+  | {
+      kind: 'node';
+      id: string;
+      node: NodeRow;
+      children: TreeEntry[];
+    }
+  | {
+      kind: 'cell';
+      id: string;
+      cell: CellRow;
+      rowLabel: string;
+      colLabel: string;
+      children: TreeEntry[];
+    };
+
+// Backward-compat alias — legacy code spricht TreeNode, entspricht einem
+// Top-Level node-Eintrag. Neu geschriebener Code nutzt TreeEntry.
+export type TreeNode = Extract<TreeEntry, { kind: 'node' }>;
 
 // ─── Dokumentation ─────────────────────────────────────────────
 // Freischwebende Markdown-Light-Notiz pro Workspace. Optional mit

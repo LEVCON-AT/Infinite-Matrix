@@ -1809,6 +1809,29 @@ button[type='submit']:hover:not(:disabled) {
 .tree-ico[data-type='matrix'] { color: var(--blue); }
 .tree-ico[data-type='board'] { color: var(--teal); }
 
+/* Farbiger Dot, direkt vor dem Icon. Entspricht dem .mm-dot-Pattern
+   aus dem HTML-Vorbild: blau=matrix, teal=board, amber=cell. */
+.tree-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+
+/* Zellen-Eintraege etwas dezenter als Nodes — niedrigerer Kontrast,
+   kleinerer Icon. Der User scannt primaer nach Matrix/Board. */
+.tree-row[data-entry-kind='cell'] .tree-link {
+  color: var(--text2);
+  font-size: 12px;
+}
+.tree-row[data-entry-kind='cell'] .tree-ico {
+  color: var(--text3);
+}
+.tree-row[data-entry-kind='cell'] .tree-label {
+  font-weight: 400;
+}
+
 .tree-label {
   flex: 1;
   overflow: hidden;
