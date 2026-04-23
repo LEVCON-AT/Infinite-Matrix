@@ -65,6 +65,52 @@ const Workspace: Component = () => {
   // Workspace-Shell tatsaechlich gerendert wird.
   const sidebar = useSidebarMode(params.workspaceId ?? '');
 
+  // Focus-Tracking fuer den "s"-Swap zwischen Sidebar und Canvas.
+  // Portiert _lastSidebarFocus / _lastCanvasFocus aus dem HTML-Vorbild:
+  // wir merken uns pro Region das zuletzt fokussierte Element und
+  // springen dorthin zurueck, wenn der Nutzer zwischen den Regionen
+  // wechselt. focusin-Listener wird global registriert (capture false),
+  // weil wir nur den letzten Zielzustand brauchen.
+  let lastSidebarFocus: HTMLElement | null = null;
+  let lastCanvasFocus: HTMLElement | null = null;
+  onMount(() => {
+    const onFocusIn = (e: FocusEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t || !t.closest) return;
+      if (t.closest('.ws-sidebar')) lastSidebarFocus = t;
+      else if (t.closest('.ws-main')) lastCanvasFocus = t;
+    };
+    document.addEventListener('focusin', onFocusIn);
+    onCleanup(() => document.removeEventListener('focusin', onFocusIn));
+  });
+
+  function swapFocus() {
+    const ae = document.activeElement as HTMLElement | null;
+    const inSidebar = !!ae?.closest?.('.ws-sidebar');
+    if (inSidebar) {
+      const target =
+        (lastCanvasFocus && document.contains(lastCanvasFocus) && lastCanvasFocus) ||
+        (document.querySelector<HTMLElement>('.ws-main [tabindex="0"]') ??
+          document.querySelector<HTMLElement>('.mx-cell') ??
+          document.querySelector<HTMLElement>('.ws-main button'));
+      target?.focus?.();
+      return;
+    }
+    // Nicht in Sidebar → dorthin. Bei collapsed erst auf full hochschalten,
+    // sonst gibt es kein Ziel.
+    if (sidebar.mode() === 'collapsed') sidebar.setMode('full');
+    // setTimeout(0), damit SolidJS + DOM den Sidebar-Modus-Switch applied
+    // hat bevor wir focusen.
+    setTimeout(() => {
+      const target =
+        (lastSidebarFocus && document.contains(lastSidebarFocus) && lastSidebarFocus) ||
+        (document.querySelector<HTMLElement>('.ws-sidebar .tree-link.active') ??
+          document.querySelector<HTMLElement>('.ws-sidebar .tree-link') ??
+          document.querySelector<HTMLElement>('.ws-sidebar button'));
+      target?.focus?.();
+    }, 0);
+  }
+
   // Zell-Page-Section: der letzte URL-Segment hinter /c/:cellId/ entscheidet,
   // welches Feature-Panel gerendert wird.
   const cellSection = createMemo<'checklists' | 'info' | 'docs' | null>(() => {
@@ -406,6 +452,23 @@ const Workspace: Component = () => {
         if (isTextInput(e.target)) return;
         e.preventDefault();
         sidebar.cycle();
+        return;
+      }
+
+      // "s" (kein Modifier): Fokus zwischen Sidebar und Canvas swappen.
+      // In Text-Inputs ignorieren (sonst kann man kein s tippen). Wenn
+      // Sidebar collapsed ist, erst auf full promoten, damit der Focus-
+      // Restore ein Ziel hat.
+      if (
+        e.key === 's' &&
+        !e.shiftKey &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey
+      ) {
+        if (isTextInput(e.target)) return;
+        e.preventDefault();
+        swapFocus();
         return;
       }
 
