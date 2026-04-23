@@ -44,6 +44,7 @@ import { clearDocsRequest, type OpenDocsRequest } from '../lib/docs-ui';
 import { resolveAlias } from '../lib/alias-resolve';
 import { dispatchAliasResult } from '../lib/alias-dispatch';
 import { supabase } from '../lib/supabase';
+import MarkdownLightView from './MarkdownLightView';
 import { getPersistedTabIds, persistTabIds } from '../lib/docs-tab-restore';
 import {
   getDrafts,
@@ -59,6 +60,8 @@ type Props = {
   realtimeVersion: number;
   onClose: () => void;
 };
+
+type TabMode = 'view' | 'edit';
 
 type Tab = {
   // null solange pending (kein DB-Row). Wird beim ersten erfolgreichen
@@ -77,6 +80,11 @@ type Tab = {
   // Tab-Load oder nach Attach-Blur. Leer wenn nicht attached oder die
   // Zelle hat keinen Alias (dann sieht der User "(Zelle)" als Hinweis).
   attachedCellAlias: string | null;
+  // View/Edit-Umschaltung pro Tab. Default: 'edit' bei leerem Content,
+  // 'view' wenn Content beim Tab-Oeffnen vorhanden. Klick auf den
+  // View-Bereich wechselt zu 'edit'; Toggle-Button im Meta-Row macht
+  // beides manuell.
+  mode: TabMode;
   // Dirty-Flag: gibt es ungesaettigte Aenderungen? Bei Close-Popup
   // koennte man darueber warnen — aktuell aber: blur speichert schon,
   // also sollte dirty immer false sein, wenn der User das Popup zumacht.
@@ -118,6 +126,7 @@ function tabFromRow(row: DocRow): Tab {
     sourceAlias: row.source_alias,
     attachedCellId: row.attached_cell_id,
     attachedCellAlias: null, // wird asynchron nachgezogen
+    mode: row.content.trim().length > 0 ? 'view' : 'edit',
     dirty: false,
   };
 }
@@ -132,6 +141,9 @@ function tabFromDraft(d: Draft): Tab {
     sourceAlias: d.sourceAlias,
     attachedCellId: d.attachedCellId,
     attachedCellAlias: null,
+    // Drafts starten in Edit — der User hatte vor dem Crash getippt,
+    // will also weiterarbeiten, nicht nur lesen.
+    mode: 'edit',
     dirty: false,
   };
 }
@@ -216,6 +228,7 @@ const DocsPopup: Component<Props> = (p) => {
       sourceAlias,
       attachedCellId,
       attachedCellAlias: null,
+      mode: 'edit',
       dirty: false,
     };
   }
@@ -831,6 +844,23 @@ const DocsPopup: Component<Props> = (p) => {
                   </Show>
                   <button
                     type="button"
+                    class="btn-subtle docs-popup-mode-toggle"
+                    onClick={() =>
+                      patchActive({
+                        mode: t().mode === 'view' ? 'edit' : 'view',
+                      })
+                    }
+                    disabled={t().content.trim().length === 0}
+                    title={
+                      t().mode === 'edit'
+                        ? 'Vorschau anzeigen'
+                        : 'Bearbeiten'
+                    }
+                  >
+                    {t().mode === 'edit' ? 'Vorschau' : 'Bearbeiten'}
+                  </button>
+                  <button
+                    type="button"
                     class="mx-del-btn docs-popup-del"
                     title="Doku loeschen"
                     aria-label="Doku loeschen"
@@ -885,14 +915,39 @@ const DocsPopup: Component<Props> = (p) => {
                     </span>
                   </Show>
                 </div>
-                <textarea
-                  ref={contentRef}
-                  class="docs-popup-content"
-                  value={t().content}
-                  placeholder="Markdown: **bold**, *italic*, `code`, http-Links. Leerzeile = Absatz."
-                  onInput={(e) => patchActive({ content: e.currentTarget.value })}
-                  onBlur={(e) => onContentBlur(e.currentTarget.value)}
-                />
+                <Show
+                  when={t().mode === 'edit'}
+                  fallback={
+                    <div
+                      class="docs-popup-content-view"
+                      role="button"
+                      tabIndex={0}
+                      title="Klicken oder Enter zum Bearbeiten"
+                      onClick={() => {
+                        patchActive({ mode: 'edit' });
+                        setTimeout(() => contentRef?.focus(), 0);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          patchActive({ mode: 'edit' });
+                          setTimeout(() => contentRef?.focus(), 0);
+                        }
+                      }}
+                    >
+                      <MarkdownLightView text={t().content} />
+                    </div>
+                  }
+                >
+                  <textarea
+                    ref={contentRef}
+                    class="docs-popup-content"
+                    value={t().content}
+                    placeholder="Markdown: **bold**, *italic*, `code`, http-Links. Leerzeile = Absatz."
+                    onInput={(e) => patchActive({ content: e.currentTarget.value })}
+                    onBlur={(e) => onContentBlur(e.currentTarget.value)}
+                  />
+                </Show>
               </div>
 
               <aside class="docs-popup-sidebar">

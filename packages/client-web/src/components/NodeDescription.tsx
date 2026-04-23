@@ -6,17 +6,13 @@
 // Realtime: nodes.data mutiert -> postgres_changes.nodes feuert ->
 // Workspace refetcht nodes -> currentNode().data.description ist frisch.
 
-import { For, Show, createEffect, createMemo, createSignal, type Component } from 'solid-js';
+import { Show, createEffect, createSignal, type Component } from 'solid-js';
 import type { NodeRow } from '../lib/types';
 import { useEditMode } from '../lib/edit-mode';
 import { setNodeDescription } from '../lib/mutations';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
-import {
-  parseMarkdownLight,
-  type MdInline,
-  type MdParagraph,
-} from '../lib/markdown-lite';
+import MarkdownLightView from './MarkdownLightView';
 
 type Props = {
   node: NodeRow;
@@ -28,60 +24,6 @@ function readDescription(node: NodeRow): string {
   const d = data?.description;
   return typeof d === 'string' ? d : '';
 }
-
-const RenderInline: Component<{ nodes: MdInline[] }> = (p) => {
-  return (
-    <For each={p.nodes}>
-      {(n) => {
-        if (n.type === 'text') return <>{n.value}</>;
-        if (n.type === 'bold')
-          return (
-            <strong>
-              <RenderInline nodes={n.children} />
-            </strong>
-          );
-        if (n.type === 'italic')
-          return (
-            <em>
-              <RenderInline nodes={n.children} />
-            </em>
-          );
-        if (n.type === 'code') return <code class="md-code">{n.value}</code>;
-        if (n.type === 'link')
-          return (
-            <a
-              href={n.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="md-link"
-            >
-              {n.label}
-            </a>
-          );
-        return null;
-      }}
-    </For>
-  );
-};
-
-const RenderParagraphs: Component<{ paragraphs: MdParagraph[] }> = (p) => {
-  return (
-    <For each={p.paragraphs}>
-      {(para) => (
-        <p>
-          <For each={para.lines}>
-            {(line, i) => (
-              <>
-                {i() > 0 && <br />}
-                <RenderInline nodes={line} />
-              </>
-            )}
-          </For>
-        </p>
-      )}
-    </For>
-  );
-};
 
 const NodeDescription: Component<Props> = (p) => {
   const editMode = useEditMode();
@@ -122,7 +64,6 @@ const NodeDescription: Component<Props> = (p) => {
   }
 
   const hasContent = () => draft().trim().length > 0;
-  const rendered = createMemo(() => parseMarkdownLight(draft()));
 
   return (
     <Show when={editMode() || hasContent()}>
@@ -131,7 +72,7 @@ const NodeDescription: Component<Props> = (p) => {
           when={editMode()}
           fallback={
             <div class="node-desc-view">
-              <RenderParagraphs paragraphs={rendered()} />
+              <MarkdownLightView text={draft()} />
             </div>
           }
         >

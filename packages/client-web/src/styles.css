@@ -1083,6 +1083,38 @@ button[type='submit']:hover:not(:disabled) {
   border-color: var(--blue);
 }
 
+.docs-popup-content-view {
+  flex: 1 1 auto;
+  min-height: 240px;
+  border: 0.5px solid transparent;
+  border-radius: var(--rs);
+  padding: var(--space-sm);
+  cursor: text;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  transition: border-color var(--tr-std), background-color var(--tr-std);
+}
+
+.docs-popup-content-view:hover,
+.docs-popup-content-view:focus-visible {
+  border-color: var(--border);
+  background: var(--surface, var(--bg));
+}
+
+.docs-popup-content-view p:first-child {
+  margin-top: 0;
+}
+
+.docs-popup-content-view p:last-child {
+  margin-bottom: 0;
+}
+
+.docs-popup-mode-toggle {
+  flex: 0 0 auto;
+  margin-left: var(--space-sm);
+}
+
 .docs-popup-sidebar {
   flex: 0 0 260px;
   border-left: 0.5px solid var(--border);
