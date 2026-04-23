@@ -4227,3 +4227,142 @@ button[type='submit']:hover:not(:disabled) {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   flex-shrink: 0;
 }
+
+/* ── Aufgabenuebersicht (TaskOverview — daily-cols) ─────────────── */
+.daily-cols {
+  display: flex;
+  gap: var(--space-sm);
+  overflow-x: auto;
+  padding-bottom: var(--space-xs);
+}
+
+.daily-col {
+  flex: 0 0 260px;
+  max-width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  background: var(--bg2);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  padding: var(--space-sm);
+}
+
+.daily-col-hd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding-bottom: var(--space-xs);
+  border-bottom: 0.5px solid var(--border2);
+}
+
+.daily-col-hd .flex-fill {
+  flex: 1;
+  min-width: 0;
+}
+
+.dcolh-name-span {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dcolh-type {
+  font-size: 10px;
+  color: var(--text3);
+}
+
+.dcolh-count {
+  background: var(--bg);
+  color: var(--text2);
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.daily-empty {
+  color: var(--text3);
+  font-size: 11px;
+  text-align: center;
+  padding: var(--space-sm);
+}
+
+.daily-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  padding: var(--space-xs);
+  background: var(--bg);
+  border: 0.5px solid var(--border2);
+  border-left: 3px solid transparent;
+  border-radius: var(--rs);
+  transition: background var(--tr-std), box-shadow var(--tr-std);
+}
+
+.daily-item:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.daily-item[data-prio='3'] { border-left-color: var(--red); }
+.daily-item[data-prio='2'] { border-left-color: var(--amber); }
+.daily-item[data-prio='1'] { border-left-color: var(--teal); }
+.daily-item[data-overdue='true'] { background: var(--redbg); }
+
+.task-check {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0.5px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg);
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 1px;
+  transition: background var(--tr-std), border-color var(--tr-std);
+}
+
+.task-check:hover {
+  background: var(--tealbg);
+  border-color: var(--teal);
+}
+
+.di-name-wrap {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.di-name {
+  font-size: 12px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.di-name[data-overdue='true'] {
+  color: var(--red);
+  font-weight: 500;
+}
+
+.di-from {
+  font-size: 10px;
+  color: var(--text3);
+}
+
+.di-overdue-text {
+  color: var(--red);
+  font-weight: 500;
+}
+
+.di-recur-badge {
+  color: var(--text3);
+}

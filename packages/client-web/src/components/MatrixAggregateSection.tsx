@@ -22,8 +22,10 @@ import {
   collectBoardIdsInMatrixTree,
   isFreqCardActive,
 } from '../lib/aggregate';
+import { loadDailyCols } from '../lib/daily-cols';
 import { fetchCardsForBoards } from '../lib/queries';
 import FrequencyMatrix from './FrequencyMatrix';
+import TaskOverview from './TaskOverview';
 
 type View = 'overview' | 'freq';
 
@@ -151,9 +153,11 @@ const MatrixAggregateSection: Component<Props> = (p) => {
           />
         </Show>
         <Show when={view() === 'overview'}>
-          <div class="freq-empty">
-            Aufgabenuebersicht kommt im naechsten Sprint (FREQ-2).
-          </div>
+          <TaskOverview
+            workspaceId={p.workspaceId}
+            cards={(cards() ?? []).filter(isFreqCardActive)}
+            cols={loadDailyCols(p.workspaceId)}
+          />
         </Show>
       </section>
     </Show>
