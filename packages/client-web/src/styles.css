@@ -1333,6 +1333,23 @@ button[type='submit']:hover:not(:disabled) {
   flex: 0 0 auto;
 }
 
+/* Drop-Target waehrend eine Card ueber der Spalte haengt: dashed
+   blauer Rand + leichter Hintergrund, damit klar ist wohin gedropt
+   werden wuerde. Transition bleibt auf dem Basis-Selektor. */
+.kb-col-drag-over {
+  border-style: dashed;
+  border-color: var(--blue);
+  background: var(--bluebg);
+}
+
+/* Karte die gerade gezogen wird: transparent + leicht rotiert, damit
+   der User sofort sieht "das ist mein Drag-Subjekt". Hover auf
+   andere Karten bleibt unveraendert. */
+.kb-card-dragging {
+  opacity: 0.4;
+  transform: rotate(-1deg);
+}
+
 .kb-col-collapsed .mx-head-input {
   font-size: 11px;
 }

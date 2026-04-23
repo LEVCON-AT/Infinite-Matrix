@@ -81,6 +81,67 @@ function fmtDate(iso: string | null): string | null {
 const BoardView: Component<Props> = (p) => {
   const editMode = useEditMode();
   const boardUi = useBoardUi(p.boardId);
+
+  // Drag-State: welche Card wird gerade gezogen, welcher Col-Container
+  // ist gerade der Hover-Drop-Target. Keine DOM-Klasse anfassen —
+  // reaktive Signale treiben classList.
+  const [draggingCardId, setDraggingCardId] = createSignal<string | null>(null);
+  const [dragOverColId, setDragOverColId] = createSignal<string | null>(null);
+
+  function onCardDragStart(card: KbCardRow, e: DragEvent) {
+    if (!e.dataTransfer) return;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/matrix-card-id', card.id);
+    // Fallback fuer Browser die den custom-type ignorieren.
+    e.dataTransfer.setData('text/plain', card.id);
+    setDraggingCardId(card.id);
+  }
+
+  function onCardDragEnd() {
+    setDraggingCardId(null);
+    setDragOverColId(null);
+  }
+
+  function onColDragOver(colId: string, e: DragEvent) {
+    // Nur wenn eine Card gezogen wird (draggingCardId gesetzt).
+    // Der dataTransfer-Typ-Check ist unzuverlaessig im dragover-Event
+    // (Firefox/Chrome-Diff), deshalb verlassen wir uns auf das Signal.
+    if (!draggingCardId()) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    if (dragOverColId() !== colId) setDragOverColId(colId);
+  }
+
+  function onColDragLeave(colId: string, e: DragEvent) {
+    // Nur wenn wir wirklich den Container verlassen (nicht ein Child
+    // betreten). relatedTarget ist das neu-fokussierte Element;
+    // wenn es ausserhalb des aktuellen Col-Divs liegt, leaven.
+    const related = e.relatedTarget as Node | null;
+    const current = e.currentTarget as HTMLElement;
+    if (related && current.contains(related)) return;
+    if (dragOverColId() === colId) setDragOverColId(null);
+  }
+
+  async function onColDrop(colId: string, e: DragEvent) {
+    const cardId =
+      e.dataTransfer?.getData('text/matrix-card-id') ||
+      e.dataTransfer?.getData('text/plain') ||
+      draggingCardId();
+    setDraggingCardId(null);
+    setDragOverColId(null);
+    if (!cardId) return;
+    e.preventDefault();
+    const card = (p.content?.kbCards ?? []).find((c) => c.id === cardId);
+    if (!card || card.col_id === colId) return;
+    await wrap(() =>
+      moveCard({
+        cardId: card.id,
+        boardId: p.boardId,
+        workspaceId: p.workspaceId,
+        toColId: colId,
+      }),
+    );
+  }
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedCardId, setSelectedCardId] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
@@ -564,9 +625,15 @@ const BoardView: Component<Props> = (p) => {
                   return (
                     <div
                       class="kb-col"
-                      classList={{ 'kb-col-collapsed': collapsed() }}
+                      classList={{
+                        'kb-col-collapsed': collapsed(),
+                        'kb-col-drag-over': dragOverColId() === col.id,
+                      }}
                       style={col.color ? { '--kb-col-color': col.color } : undefined}
                       data-has-color={col.color ? 'yes' : 'no'}
+                      onDragOver={(e) => onColDragOver(col.id, e)}
+                      onDragLeave={(e) => onColDragLeave(col.id, e)}
+                      onDrop={(e) => onColDrop(col.id, e)}
                     >
                       <header
                         class="kb-col-head"
@@ -682,9 +749,14 @@ const BoardView: Component<Props> = (p) => {
                                   classList={{
                                     'kb-card-done': card.done,
                                     'kb-card-archived': card.archived,
+                                    'kb-card-dragging':
+                                      draggingCardId() === card.id,
                                   }}
                                   role="button"
                                   tabIndex={0}
+                                  draggable={true}
+                                  onDragStart={(e) => onCardDragStart(card, e)}
+                                  onDragEnd={onCardDragEnd}
                                   onClick={() => setSelectedCardId(card.id)}
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter' || e.key === ' ') {
