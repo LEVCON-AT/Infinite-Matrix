@@ -9,8 +9,9 @@ import {
   type MdInline,
   type MdParagraph,
 } from '../lib/markdown-lite';
+import AliasChip from './AliasChip';
 
-const RenderInline: Component<{ nodes: MdInline[] }> = (p) => {
+const RenderInline: Component<{ nodes: MdInline[]; workspaceId?: string }> = (p) => {
   return (
     <For each={p.nodes}>
       {(n) => {
@@ -18,13 +19,13 @@ const RenderInline: Component<{ nodes: MdInline[] }> = (p) => {
         if (n.type === 'bold')
           return (
             <strong>
-              <RenderInline nodes={n.children} />
+              <RenderInline nodes={n.children} workspaceId={p.workspaceId} />
             </strong>
           );
         if (n.type === 'italic')
           return (
             <em>
-              <RenderInline nodes={n.children} />
+              <RenderInline nodes={n.children} workspaceId={p.workspaceId} />
             </em>
           );
         if (n.type === 'code') return <code class="md-code">{n.value}</code>;
@@ -39,13 +40,22 @@ const RenderInline: Component<{ nodes: MdInline[] }> = (p) => {
               {n.label}
             </a>
           );
+        if (n.type === 'alias') {
+          // Ohne workspaceId koennen wir weder aufloesen noch menu oeffnen —
+          // fallback auf Plain-Text mit `^`-Prefix.
+          if (!p.workspaceId) return <>^{n.alias}</>;
+          return <AliasChip alias={n.alias} workspaceId={p.workspaceId} />;
+        }
         return null;
       }}
     </For>
   );
 };
 
-const RenderParagraphs: Component<{ paragraphs: MdParagraph[] }> = (p) => {
+const RenderParagraphs: Component<{
+  paragraphs: MdParagraph[];
+  workspaceId?: string;
+}> = (p) => {
   return (
     <For each={p.paragraphs}>
       {(para) => (
@@ -54,7 +64,7 @@ const RenderParagraphs: Component<{ paragraphs: MdParagraph[] }> = (p) => {
             {(line, i) => (
               <>
                 {i() > 0 && <br />}
-                <RenderInline nodes={line} />
+                <RenderInline nodes={line} workspaceId={p.workspaceId} />
               </>
             )}
           </For>
@@ -66,12 +76,21 @@ const RenderParagraphs: Component<{ paragraphs: MdParagraph[] }> = (p) => {
 
 type Props = {
   text: string;
+  // Optional: wenn gesetzt, werden `^alias`-Tokens als interaktive Chips
+  // gerendert (Click = dispatch, Rechtsklick = Context-Menu). Ohne wsId
+  // fallen Aliases auf Plain-Text zurueck.
+  workspaceId?: string;
 };
 
 // Markdown-Light-Rendering als Top-Level-Component. Nimmt den Rohtext,
 // parsed pro Render (leichtgewichtig; Memoization im Caller wenn noetig).
 const MarkdownLightView: Component<Props> = (p) => {
-  return <RenderParagraphs paragraphs={parseMarkdownLight(p.text)} />;
+  return (
+    <RenderParagraphs
+      paragraphs={parseMarkdownLight(p.text)}
+      workspaceId={p.workspaceId}
+    />
+  );
 };
 
 export default MarkdownLightView;

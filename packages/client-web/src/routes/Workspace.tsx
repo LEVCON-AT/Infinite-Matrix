@@ -41,6 +41,8 @@ import CellDocsPage from '../components/CellDocsPage';
 import CellInfoPage from '../components/CellInfoPage';
 import AliasAutocomplete from '../components/AliasAutocomplete';
 import AliasQuicknav from '../components/AliasQuicknav';
+import ContextMenu from '../components/ContextMenu';
+import { aliasChipMenuState, closeAliasChipMenu } from '../lib/alias-chip-menu';
 import CommandPalette from '../components/CommandPalette';
 import DocsPopup from '../components/DocsPopup';
 import GlobalSearch from '../components/GlobalSearch';
@@ -690,6 +692,11 @@ const Workspace: Component = () => {
       {/* Singleton-Dropdown fuer Alias-Autocomplete. Sichtbarkeit steuert
           lib/use-alias-autocomplete; Inputs binden sich per ref an den Hook. */}
       <AliasAutocomplete />
+
+      {/* Singleton-Context-Menu fuer Alias-Chips (Click/+/Rechtsklick).
+          Jeder AliasChip triggert openAliasChipMenu — nur eine Instanz
+          im DOM, egal wie viele Chips gerade gerendert sind. */}
+      <ContextMenu state={aliasChipMenuState()} onClose={closeAliasChipMenu} />
 
       <Show when={showQuicknav() && params.workspaceId}>
         <AliasQuicknav

@@ -73,7 +73,7 @@ const NodeDescription: Component<Props> = (p) => {
           when={editMode()}
           fallback={
             <div class="node-desc-view">
-              <MarkdownLightView text={draft()} />
+              <MarkdownLightView text={draft()} workspaceId={p.node.workspace_id} />
             </div>
           }
         >

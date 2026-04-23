@@ -24,6 +24,7 @@ import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
 import { validateAlias } from '../lib/alias';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
+import AliasText from './AliasText';
 
 type Props = {
   checklist: ChecklistRow;
@@ -235,42 +236,44 @@ const ChecklistPanel: Component<Props> = (p) => {
                 aria-label="Erledigt"
                 onChange={(e) => onToggleItem(it, e.currentTarget.checked)}
               />
-              {/* Text immer Input, readOnly togglet; Del immer im DOM
-                  mit opacity/pointer-events. So bleibt jedes Item beim
-                  Edit-Mode-Toggle form- und groessenstabil. */}
-              <input
-                class="cl-text-input"
-                type="text"
-                value={it.text}
-                placeholder="(Punkt)"
-                readOnly={!editMode()}
-                tabIndex={editMode() ? 0 : -1}
-                ref={(el) => {
-                  // Alias-Autocomplete: `^token` zeigt Dropdown aus dem
-                  // Workspace-Alias-Index. Cleanup haengt am Element-Remove
-                  // (Solid ruft den ref nicht erneut, aber der Listener ist
-                  // am Element; wenn das Element abgebaut wird, laeuft der
-                  // GC der Listener mit).
-                  bindAliasAutocomplete(el, p.workspaceId);
-                }}
-                onBlur={(e) => {
-                  if (!editMode()) return;
-                  onRenameItem(it, e.currentTarget.value);
-                }}
-                onKeyDown={(e) => {
-                  if (!editMode()) return;
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    (e.currentTarget as HTMLInputElement).blur();
-                  } else if (e.altKey && e.key === 'ArrowRight') {
-                    e.preventDefault();
-                    void onLevelItem(it, 1);
-                  } else if (e.altKey && e.key === 'ArrowLeft') {
-                    e.preventDefault();
-                    void onLevelItem(it, -1);
-                  }
-                }}
-              />
+              {/* Edit-Mode: klassischer Input mit Alias-Autocomplete.
+                  View-Mode: Span mit AliasText → `^alias`-Chips sind
+                  klickbar (dispatch) und kontext-menu-faehig. */}
+              <Show
+                when={editMode()}
+                fallback={
+                  <span class="cl-text-view">
+                    <Show
+                      when={it.text}
+                      fallback={<span class="cl-text-placeholder">(Punkt)</span>}
+                    >
+                      <AliasText text={it.text} workspaceId={p.workspaceId} />
+                    </Show>
+                  </span>
+                }
+              >
+                <input
+                  class="cl-text-input"
+                  type="text"
+                  value={it.text}
+                  placeholder="(Punkt)"
+                  tabIndex={0}
+                  ref={(el) => bindAliasAutocomplete(el, p.workspaceId)}
+                  onBlur={(e) => onRenameItem(it, e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      (e.currentTarget as HTMLInputElement).blur();
+                    } else if (e.altKey && e.key === 'ArrowRight') {
+                      e.preventDefault();
+                      void onLevelItem(it, 1);
+                    } else if (e.altKey && e.key === 'ArrowLeft') {
+                      e.preventDefault();
+                      void onLevelItem(it, -1);
+                    }
+                  }}
+                />
+              </Show>
               <button
                 type="button"
                 class="cl-it-del"

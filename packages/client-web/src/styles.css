@@ -4492,3 +4492,49 @@ button[type='submit']:hover:not(:disabled) {
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
+
+/* ── Alias-Chip ────────────────────────────────────────────────────
+   Inline-`^alias`-Marker in gerendertem Text (MarkdownLightView,
+   AliasText). Click = dispatch, Rechtsklick/+ = Context-Menu.
+*/
+.alias-chip {
+  display: inline;
+  color: var(--amber);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 0 1px;
+  transition: background var(--tr-std);
+}
+
+.alias-chip:hover,
+.alias-chip:focus-visible {
+  background: var(--amberbg, rgba(240, 160, 40, 0.15));
+  outline: none;
+  text-decoration: underline;
+}
+
+/* ── Checkliste: View-Mode Item-Text ──────────────────────────────
+   Muss optisch nah am cl-text-input:read-only bleiben, damit der
+   Mode-Toggle nicht springt.
+*/
+.cl-text-view {
+  flex: 1;
+  padding: 2px 6px;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.4;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.cl-text-placeholder {
+  color: var(--text3);
+  font-style: italic;
+}
+
+.cl-it-done .cl-text-view {
+  text-decoration: line-through;
+  color: var(--text3);
+}

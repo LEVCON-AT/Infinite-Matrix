@@ -936,7 +936,7 @@ const DocsPopup: Component<Props> = (p) => {
                         }
                       }}
                     >
-                      <MarkdownLightView text={t().content} />
+                      <MarkdownLightView text={t().content} workspaceId={p.workspaceId} />
                     </div>
                   }
                 >
