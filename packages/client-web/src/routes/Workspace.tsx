@@ -22,6 +22,9 @@ import { toggleEditMode, useEditMode } from '../lib/edit-mode';
 import { toggleTheme, useTheme } from '../lib/theme';
 import { subscribeWorkspace } from '../lib/realtime';
 import { useTreeExpand } from '../lib/tree-expand';
+import { downloadWorkspaceExport, exportWorkspace } from '../lib/export';
+import { showToast } from '../lib/toasts';
+import { translateDbError } from '../lib/errors';
 import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
 import NodeTree from '../components/NodeTree';
 import MatrixView from '../components/MatrixView';
@@ -56,6 +59,22 @@ const Workspace: Component = () => {
   const [workspaces] = createResource(() => fetchMyWorkspaces());
   const [showImport, setShowImport] = createSignal(false);
   const [showQuicknav, setShowQuicknav] = createSignal(false);
+  const [exporting, setExporting] = createSignal(false);
+
+  async function onExport() {
+    if (!params.workspaceId || exporting()) return;
+    setExporting(true);
+    try {
+      const data = await exportWorkspace(params.workspaceId);
+      const name = currentWs()?.name ?? 'workspace';
+      downloadWorkspaceExport(data, name);
+      showToast('Export heruntergeladen.', 'success');
+    } catch (err) {
+      showToast(translateDbError(err), 'error');
+    } finally {
+      setExporting(false);
+    }
+  }
 
   // Default-Workspace auswaehlen, wenn URL keinen fuehrt.
   createEffect(() => {
@@ -317,6 +336,15 @@ const Workspace: Component = () => {
               onClick={() => setShowImport(true)}
             >
               + JSON importieren
+            </button>
+            <button
+              type="button"
+              class="btn-subtle"
+              onClick={onExport}
+              disabled={exporting()}
+              title="Kompletten Workspace als JSON herunterladen"
+            >
+              ⇩ Export
             </button>
           </Show>
         </div>
