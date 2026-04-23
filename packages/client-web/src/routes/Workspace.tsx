@@ -14,6 +14,7 @@ import { signOut, useUser } from '../lib/auth';
 import {
   buildTree,
   fetchBoardContent,
+  fetchCellIdsWithDocs,
   fetchCellsForWorkspace,
   fetchMatrixContent,
   fetchMyWorkspaces,
@@ -123,6 +124,14 @@ const Workspace: Component = () => {
   const [cells, { refetch: refetchCells }] = createResource(
     () => params.workspaceId,
     async (wid) => (wid ? fetchCellsForWorkspace(wid) : []),
+  );
+
+  // Set der cells, an denen Dokus haengen — fuer die derived Doku-
+  // Pill in der Matrix-Ansicht. Reagiert auf rtDocs-Bumps ueber den
+  // createEffect unten.
+  const [cellsWithDocs, { refetch: refetchCellsWithDocs }] = createResource(
+    () => params.workspaceId,
+    async (wid) => (wid ? fetchCellIdsWithDocs(wid) : new Set<string>()),
   );
 
   const tree = createMemo(() => buildTree(nodes() ?? [], cells() ?? []));
@@ -414,7 +423,10 @@ const Workspace: Component = () => {
         setRtCellChecklists((v) => v + 1);
       },
       links: () => void refetchBoard(),
-      docs: () => setRtDocs((v) => v + 1),
+      docs: () => {
+        setRtDocs((v) => v + 1);
+        void refetchCellsWithDocs();
+      },
     });
   });
 
@@ -665,6 +677,7 @@ const Workspace: Component = () => {
                     workspaceId={currentNode()!.workspace_id}
                     matrixId={currentNode()!.id}
                     content={matrixContent()}
+                    cellsWithDocs={cellsWithDocs() ?? new Set<string>()}
                     onChanged={() => {
                       // Nach strukturellen Aenderungen koennen neue/entfernte Sub-Nodes
                       // im Tree sichtbar werden, und cells.child_matrix_id/board_id

@@ -1899,6 +1899,12 @@ button[type='submit']:hover:not(:disabled) {
   color: var(--purpletxt);
 }
 
+.mx-feat-chip[data-feat='doc'] {
+  background: var(--bluebg);
+  color: var(--blue);
+  border: 0.5px solid var(--blue);
+}
+
 .mx-feat-chip-link {
   cursor: pointer;
 }

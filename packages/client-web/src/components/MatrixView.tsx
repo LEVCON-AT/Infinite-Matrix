@@ -49,6 +49,9 @@ type Props = {
   workspaceId: string;
   matrixId: string;
   content: MatrixContent | undefined;
+  // Set der cell_ids mit angehaengten Docs — fuer die derived
+  // Doku-Pill. Workspace-weit; Matrix filtert clientseitig.
+  cellsWithDocs: Set<string>;
   onChanged?: () => void;
 };
 
@@ -643,7 +646,12 @@ const MatrixView: Component<Props> = (p) => {
                             <Show when={cell()?.alias}>
                               <span class="mx-cell-alias">^{cell()!.alias}</span>
                             </Show>
-                            <Show when={features().length > 0}>
+                            <Show
+                              when={
+                                features().length > 0 ||
+                                (cell() && p.cellsWithDocs.has(cell()!.id))
+                              }
+                            >
                               <div class="mx-cell-feats">
                                 <For each={features()}>
                                   {(f) => {
@@ -670,6 +678,27 @@ const MatrixView: Component<Props> = (p) => {
                                     );
                                   }}
                                 </For>
+                                <Show
+                                  when={
+                                    cell() && p.cellsWithDocs.has(cell()!.id)
+                                  }
+                                >
+                                  <span
+                                    class="mx-feat-chip mx-feat-chip-link"
+                                    data-feat="doc"
+                                    title="Dokumentation dieser Zelle oeffnen"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const c = cell();
+                                      if (!c) return;
+                                      navigate(
+                                        `/w/${p.workspaceId}/c/${c.id}/info`,
+                                      );
+                                    }}
+                                  >
+                                    ¶
+                                  </span>
+                                </Show>
                               </div>
                             </Show>
                           </div>

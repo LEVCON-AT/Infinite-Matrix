@@ -322,3 +322,24 @@ export async function fetchDocsForCell(
   if (error) throw error;
   return (data ?? []) as DocRow[];
 }
+
+// Set der cell_ids, an denen mindestens eine Doku haengt. Fuer die
+// derived Doku-Pill in der Matrix-Ansicht. Eine einzelne Query, wir
+// filtern workspace-weit und deduplizieren client-seitig. Erwartete
+// Groesse: wenige hundert Rows selbst bei grossen Workspaces —
+// tragbar ohne Paging.
+export async function fetchCellIdsWithDocs(
+  workspaceId: string,
+): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from('docs')
+    .select('attached_cell_id')
+    .eq('workspace_id', workspaceId)
+    .not('attached_cell_id', 'is', null);
+  if (error) throw error;
+  const set = new Set<string>();
+  for (const row of (data ?? []) as Array<{ attached_cell_id: string | null }>) {
+    if (row.attached_cell_id) set.add(row.attached_cell_id);
+  }
+  return set;
+}
