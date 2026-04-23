@@ -37,6 +37,9 @@ import AliasText from './AliasText';
 import ChecklistPastePopup from './ChecklistPastePopup';
 import type { ParsedPasteItem } from '../lib/checklist-paste-parse';
 import ChecklistToCardPopup from './ChecklistToCardPopup';
+import ChecklistActionModal from './ChecklistActionModal';
+import { executeChecklistAction, parseChecklistAction } from '../lib/checklist-action';
+import { useNavigate } from '@solidjs/router';
 
 type Props = {
   checklist: ChecklistRow;
@@ -56,6 +59,9 @@ const ChecklistPanel: Component<Props> = (p) => {
   const [historyOpen, setHistoryOpen] = createSignal(false);
   // Transform-to-Card-Popup (Checkliste → neue Karte mit checklist_ref).
   const [showToCard, setShowToCard] = createSignal(false);
+  // Close-Action-Konfigurations-Modal.
+  const [showActionModal, setShowActionModal] = createSignal(false);
+  const navigate = useNavigate();
   let aliasInputRef: HTMLInputElement | undefined;
 
   async function wrap<T>(fn: () => Promise<T>, successMsg?: string) {
@@ -218,6 +224,14 @@ const ChecklistPanel: Component<Props> = (p) => {
         'success',
       );
       p.onChanged();
+      // Konfigurierte Close-Action ausfuehren (Toast/Jump/Webhook/Mail).
+      // Fehler in der Action brechen den Close-Erfolg nicht — sie werden
+      // im executeChecklistAction via Toast gemeldet.
+      void executeChecklistAction(parseChecklistAction(p.checklist.action), {
+        workspaceId: p.workspaceId,
+        checklistLabel: p.checklist.label || '(Liste)',
+        navigate,
+      });
       return true;
     } catch (err) {
       showToast(translateDbError(err), 'error');
@@ -349,6 +363,15 @@ const ChecklistPanel: Component<Props> = (p) => {
             <option value="auto-prompt">fragen bei Vollstaendig</option>
             <option value="auto-silent">auto. bei Vollstaendig</option>
           </select>
+          <button
+            type="button"
+            class="cl-action-btn"
+            onClick={() => setShowActionModal(true)}
+            disabled={busy()}
+            title="Close-Aktion konfigurieren (Toast / Jump / Webhook / Mail)"
+          >
+            ⚡
+          </button>
         </Show>
         <button
           type="button"
@@ -572,6 +595,16 @@ const ChecklistPanel: Component<Props> = (p) => {
           checklistLabel={p.checklist.label}
           onClose={() => setShowToCard(false)}
           onCreated={() => p.onChanged()}
+        />
+      </Show>
+
+      <Show when={showActionModal()}>
+        <ChecklistActionModal
+          workspaceId={p.workspaceId}
+          checklistId={p.checklist.id}
+          currentAction={p.checklist.action}
+          onClose={() => setShowActionModal(false)}
+          onSaved={() => p.onChanged()}
         />
       </Show>
 

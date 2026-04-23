@@ -811,6 +811,20 @@ export async function saveChecklistSnapshot(args: {
   if (upErr) throw upErr;
 }
 
+// checklist.action als jsonb setzen (oder NULL bei type='none'). Der
+// Wert ist generisch Record<string, unknown> — die typisierte Form lebt
+// in lib/checklist-action.ts.
+export async function setChecklistAction(
+  checklistId: string,
+  action: Record<string, unknown> | null,
+): Promise<void> {
+  const { error } = await supabase
+    .from('checklists')
+    .update({ action })
+    .eq('id', checklistId);
+  if (error) throw error;
+}
+
 // Close-Action auf der Checkliste anwenden, abhaengig vom recur-Feld:
 //   - non-recurring: alle Items loeschen (ein DELETE);
 //   - recurring:     alle Items auf done=false zuruecksetzen.
