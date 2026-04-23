@@ -111,6 +111,30 @@ export type InlineChecklistItem = {
   level?: 0 | 1 | 2;
 };
 
+// Wiederkehr-Konfiguration (kb_cards.recur jsonb, auch checklists.recur).
+// V1: nur type + every + startDate. V2 kommt weekday-Grid (weekly),
+// monthType (monthly), end-Rules (date/count). Alle Zusatzfelder sind
+// heute schon optional — spaetere Features duerfen sie befuellen, ohne
+// den V1-Typ zu brechen.
+export type CardRecurType =
+  | 'none'
+  | 'daily'
+  | 'weekly'
+  | 'monthly'
+  | 'yearly';
+
+export type CardRecur = {
+  type: CardRecurType;
+  every?: number;
+  startDate?: string;
+  weekday?: boolean[];
+  monthType?: 'day' | 'weekday';
+  day?: number;
+  endType?: 'never' | 'date' | 'count';
+  endDate?: string;
+  endCount?: number;
+};
+
 export type KbCardRow = {
   id: string;
   workspace_id: string;

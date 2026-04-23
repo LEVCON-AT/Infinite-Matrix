@@ -2099,6 +2099,20 @@ button[type='submit']:hover:not(:disabled) {
   gap: var(--space-md);
 }
 
+/* Recur-Editor: Typ + Every + Startdatum nebeneinander. Alle drei
+   bei 1fr, damit das Layout ruhig bleibt wenn Every/Start auftauchen. */
+.overlay-recur-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-md);
+}
+
+@media (max-width: 600px) {
+  .overlay-recur-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 600px) {
   .overlay-tag-grid {
     grid-template-columns: 1fr;

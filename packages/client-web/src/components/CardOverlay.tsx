@@ -9,6 +9,8 @@ import {
 } from 'solid-js';
 import type {
   BoardContent,
+  CardRecur,
+  CardRecurType,
   InlineChecklistItem,
   KbCardRow,
 } from '../lib/types';
@@ -25,6 +27,7 @@ import {
   setCardDeadline,
   setCardNote,
   setCardPriority,
+  setCardRecur,
   setCardTags,
   setCardWho,
   toggleCardDone,
@@ -190,6 +193,79 @@ const CardOverlay: Component<Props> = (p) => {
     const cur = p.card.who ?? [];
     if (arraysEqual(next, cur)) return;
     await wrap(() => setCardWho(p.card.id, next));
+  }
+
+  // Recur: Dropdown + Intervall + Startdatum. Zusammen ein Objekt,
+  // weil die DB-Spalte ein JSONB ist und Teilupdates sonst per
+  // mutateCardRecur gehen muessten. Fuer V1 reicht setCardRecur(obj).
+  function recurVal(): CardRecur {
+    const r = p.card.recur as CardRecur | null | undefined;
+    return {
+      type: (r?.type ?? 'none') as CardRecurType,
+      every: typeof r?.every === 'number' ? r.every : 1,
+      startDate: typeof r?.startDate === 'string' ? r.startDate : '',
+    };
+  }
+
+  async function onRecurType(val: string) {
+    const next: CardRecur | null = val === 'none' ? null : (() => {
+      const cur = recurVal();
+      return {
+        type: val as CardRecurType,
+        every: cur.every ?? 1,
+        startDate:
+          cur.startDate ||
+          new Date().toISOString().slice(0, 10),
+      };
+    })();
+    await wrap(() => setCardRecur(p.card.id, next));
+  }
+
+  async function onRecurEvery(val: string) {
+    const n = Number(val);
+    if (!Number.isFinite(n) || n < 1) return;
+    const cur = recurVal();
+    if (cur.type === 'none') return;
+    if (cur.every === n) return;
+    await wrap(() =>
+      setCardRecur(p.card.id, { ...cur, every: n }),
+    );
+  }
+
+  async function onRecurStart(val: string) {
+    const cur = recurVal();
+    if (cur.type === 'none') return;
+    const next = val || '';
+    if (cur.startDate === next) return;
+    await wrap(() =>
+      setCardRecur(p.card.id, { ...cur, startDate: next }),
+    );
+  }
+
+  function recurLabel(): string {
+    const r = recurVal();
+    if (r.type === 'none') return '';
+    const n = r.every ?? 1;
+    const phrase =
+      n === 1
+        ? {
+            daily: 'taeglich',
+            weekly: 'woechentlich',
+            monthly: 'monatlich',
+            yearly: 'jaehrlich',
+          }[r.type as Exclude<CardRecurType, 'none'>]
+        : `alle ${n} ${
+            {
+              daily: 'Tage',
+              weekly: 'Wochen',
+              monthly: 'Monate',
+              yearly: 'Jahre',
+            }[r.type as Exclude<CardRecurType, 'none'>]
+          }`;
+    const start = r.startDate
+      ? ` ab ${new Date(r.startDate).toLocaleDateString('de-DE')}`
+      : '';
+    return `${phrase}${start}`;
   }
 
   async function onDelete() {
@@ -393,10 +469,10 @@ const CardOverlay: Component<Props> = (p) => {
             </label>
           </section>
 
-          <Show when={p.card.recur}>
+          <Show when={recurVal().type !== 'none'}>
             <div class="overlay-meta">
-              <span class="kb-recur" title="wiederkehrend">
-                ↻
+              <span class="kb-recur" title={recurLabel()}>
+                ↻ {recurLabel()}
               </span>
             </div>
           </Show>
@@ -448,6 +524,51 @@ const CardOverlay: Component<Props> = (p) => {
                 </div>
               </Show>
             </label>
+          </section>
+
+          <section class="overlay-section overlay-recur-grid">
+            <label class="overlay-field">
+              <span class="overlay-field-label">Wiederholung</span>
+              <select
+                class="overlay-input"
+                value={recurVal().type}
+                onChange={(e) => onRecurType(e.currentTarget.value)}
+              >
+                <option value="none">keine</option>
+                <option value="daily">taeglich</option>
+                <option value="weekly">woechentlich</option>
+                <option value="monthly">monatlich</option>
+                <option value="yearly">jaehrlich</option>
+              </select>
+            </label>
+            <Show when={recurVal().type !== 'none'}>
+              <label class="overlay-field">
+                <span class="overlay-field-label">Intervall</span>
+                <input
+                  type="number"
+                  class="overlay-input"
+                  min="1"
+                  max="365"
+                  value={recurVal().every ?? 1}
+                  onBlur={(e) => onRecurEvery(e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      (e.currentTarget as HTMLInputElement).blur();
+                    }
+                  }}
+                />
+              </label>
+              <label class="overlay-field">
+                <span class="overlay-field-label">Start</span>
+                <input
+                  type="date"
+                  class="overlay-input"
+                  value={recurVal().startDate ?? ''}
+                  onChange={(e) => onRecurStart(e.currentTarget.value)}
+                />
+              </label>
+            </Show>
           </section>
 
           <section class="overlay-section">

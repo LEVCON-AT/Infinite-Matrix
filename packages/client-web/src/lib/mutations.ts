@@ -8,6 +8,7 @@
 
 import { supabase } from './supabase';
 import type {
+  CardRecur,
   CellRow,
   ChecklistCloseMode,
   ChecklistItemRow,
@@ -339,7 +340,9 @@ type CardPatch = Partial<
     | 'who'
     | 'archived'
   >
->;
+> & {
+  recur?: CardRecur | null;
+};
 
 async function updateCard(cardId: string, patch: CardPatch): Promise<KbCardRow> {
   const { data, error } = await supabase
@@ -391,6 +394,13 @@ export function setCardTags(cardId: string, tags: string[]): Promise<KbCardRow> 
 
 export function setCardWho(cardId: string, who: string[]): Promise<KbCardRow> {
   return updateCard(cardId, { who });
+}
+
+export function setCardRecur(
+  cardId: string,
+  recur: CardRecur | null,
+): Promise<KbCardRow> {
+  return updateCard(cardId, { recur });
 }
 
 // Move: innerhalb derselben Spalte oder cross-column. Bei cross-column
