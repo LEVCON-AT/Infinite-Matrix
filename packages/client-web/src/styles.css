@@ -2048,6 +2048,27 @@ button[type='submit']:hover:not(:disabled) {
   gap: var(--space-xs);
 }
 
+/* Tag/Who-Editor: zwei gleichbreite Spalten auf Desktop, eine auf
+   schmalen Screens. Jedes Feld hat Input + Chip-Preview darunter. */
+.overlay-tag-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+
+@media (max-width: 600px) {
+  .overlay-tag-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.overlay-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
 /* Shake-Animation bei Fehler */
 @keyframes flashError {
   0%, 100% { transform: translateX(0); }

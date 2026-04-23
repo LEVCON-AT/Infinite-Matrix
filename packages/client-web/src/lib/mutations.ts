@@ -385,6 +385,14 @@ export function setCardPriority(
   return updateCard(cardId, { priority });
 }
 
+export function setCardTags(cardId: string, tags: string[]): Promise<KbCardRow> {
+  return updateCard(cardId, { tags });
+}
+
+export function setCardWho(cardId: string, who: string[]): Promise<KbCardRow> {
+  return updateCard(cardId, { who });
+}
+
 // Move: innerhalb derselben Spalte oder cross-column. Bei cross-column
 // bekommt die Karte Position ans Ende der Ziel-Spalte (kein Reorder
 // innerhalb — kommt in 0e.1.h).

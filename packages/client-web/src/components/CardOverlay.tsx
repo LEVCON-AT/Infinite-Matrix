@@ -25,6 +25,8 @@ import {
   setCardDeadline,
   setCardNote,
   setCardPriority,
+  setCardTags,
+  setCardWho,
   toggleCardDone,
   toggleCardInlineItem,
   toggleChecklistItemDone,
@@ -147,6 +149,47 @@ const CardOverlay: Component<Props> = (p) => {
     if (next !== null && !Number.isFinite(next)) return;
     if (next === (p.card.priority ?? null)) return;
     await wrap(() => setCardPriority(p.card.id, next));
+  }
+
+  // Comma/Whitespace-separierte Eingabe → normalisiertes Array.
+  // Duplikate raus (case-insensitive), leere Strings raus. Reihenfolge
+  // wird erhalten (erste Nennung gewinnt). "#" / "@" am Anfang werden
+  // gestrippt, weil das Chip-Rendering sie selbst setzt — sonst
+  // tauchen ## / @@ auf.
+  function parseTagList(raw: string): string[] {
+    const parts = raw
+      .split(/[,\s]+/)
+      .map((t) => t.replace(/^[#@]+/, '').trim())
+      .filter((t) => t.length > 0);
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const t of parts) {
+      const key = t.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(t);
+    }
+    return out;
+  }
+
+  function arraysEqual(a: string[], b: string[]): boolean {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+  }
+
+  async function onTags(raw: string) {
+    const next = parseTagList(raw);
+    const cur = p.card.tags ?? [];
+    if (arraysEqual(next, cur)) return;
+    await wrap(() => setCardTags(p.card.id, next));
+  }
+
+  async function onWho(raw: string) {
+    const next = parseTagList(raw);
+    const cur = p.card.who ?? [];
+    if (arraysEqual(next, cur)) return;
+    await wrap(() => setCardWho(p.card.id, next));
   }
 
   async function onDelete() {
@@ -350,27 +393,62 @@ const CardOverlay: Component<Props> = (p) => {
             </label>
           </section>
 
-          <Show
-            when={
-              (p.card.tags?.length ?? 0) > 0 ||
-              (p.card.who?.length ?? 0) > 0 ||
-              p.card.recur != null
-            }
-          >
+          <Show when={p.card.recur}>
             <div class="overlay-meta">
-              <For each={p.card.tags ?? []}>
-                {(t) => <span class="kb-tag">#{t}</span>}
-              </For>
-              <For each={p.card.who ?? []}>
-                {(w) => <span class="kb-who">@{w}</span>}
-              </For>
-              <Show when={p.card.recur}>
-                <span class="kb-recur" title="wiederkehrend">
-                  ↻
-                </span>
-              </Show>
+              <span class="kb-recur" title="wiederkehrend">
+                ↻
+              </span>
             </div>
           </Show>
+
+          <section class="overlay-section overlay-tag-grid">
+            <label class="overlay-field">
+              <span class="overlay-field-label">Tags</span>
+              <input
+                type="text"
+                class="overlay-input"
+                value={(p.card.tags ?? []).join(', ')}
+                placeholder="design, review, legal"
+                onBlur={(e) => onTags(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    (e.currentTarget as HTMLInputElement).blur();
+                  }
+                }}
+              />
+              <Show when={(p.card.tags ?? []).length > 0}>
+                <div class="overlay-chip-row">
+                  <For each={p.card.tags ?? []}>
+                    {(t) => <span class="kb-tag">#{t}</span>}
+                  </For>
+                </div>
+              </Show>
+            </label>
+            <label class="overlay-field">
+              <span class="overlay-field-label">Zustaendig</span>
+              <input
+                type="text"
+                class="overlay-input"
+                value={(p.card.who ?? []).join(', ')}
+                placeholder="anna, tom"
+                onBlur={(e) => onWho(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    (e.currentTarget as HTMLInputElement).blur();
+                  }
+                }}
+              />
+              <Show when={(p.card.who ?? []).length > 0}>
+                <div class="overlay-chip-row">
+                  <For each={p.card.who ?? []}>
+                    {(w) => <span class="kb-who">@{w}</span>}
+                  </For>
+                </div>
+              </Show>
+            </label>
+          </section>
 
           <section class="overlay-section">
             <h4>Notiz</h4>
