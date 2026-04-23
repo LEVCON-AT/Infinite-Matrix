@@ -37,6 +37,7 @@ const SECTIONS: ShortcutSection[] = [
       { keys: ['↑', '↓', '←', '→'], desc: 'Zwischen Zellen navigieren' },
       { keys: ['Enter'], desc: 'Zelle oeffnen (Edit-Mode) oder Sub-Node bei genau einem Target' },
       { keys: ['1', '2', '3', '4'], desc: 'Feature togglen (im Zell-Overlay)' },
+      { keys: ['d'], desc: 'Doku-Popup fuer fokussierte Zelle (mit Quell-Alias)' },
     ],
   },
   {

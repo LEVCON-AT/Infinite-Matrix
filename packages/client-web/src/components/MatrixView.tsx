@@ -27,6 +27,7 @@ import {
 import { showToast, showUndoToast } from '../lib/toasts';
 import { rememberFocus, useLastFocus } from '../lib/navigation-focus';
 import { translateDbError } from '../lib/errors';
+import { openDocsPopup } from '../lib/docs-ui';
 import CellOverlay from './CellOverlay';
 
 const FEATURE_ORDER: CellFeature[] = ['matrix', 'board', 'info', 'checklists'];
@@ -296,6 +297,21 @@ const MatrixView: Component<Props> = (p) => {
           `.mx-cell[data-row-id="${nrow.id}"][data-col-id="${ncol.id}"]`,
         ) as HTMLElement | null;
         el?.focus({ preventScroll: false });
+        return;
+      }
+
+      // "d" — Doku-Popup fuer diese Zelle oeffnen. source_alias +
+      // attachedCellId werden vorausgefuellt, damit die Doku direkt
+      // mit der Quelle verknuepft entsteht. Klappt auch auf Zellen
+      // ohne Alias: source_alias ist dann null, der Doc bleibt
+      // trotzdem via attached_cell_id und Doku-Pill auffindbar.
+      if (e.key === 'd' || e.key === 'D') {
+        const cell = cellMap().get(`${rowId}::${colId}`);
+        e.preventDefault();
+        openDocsPopup({
+          sourceAlias: cell?.alias ?? null,
+          attachedCellId: cell?.id ?? null,
+        });
         return;
       }
 
