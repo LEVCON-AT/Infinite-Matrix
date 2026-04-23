@@ -632,13 +632,45 @@ button[type='submit']:hover:not(:disabled) {
 
 /* Workspace-Switcher */
 .ws-switcher-label,
+.node-tree-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  padding: 0 var(--space-xs) var(--space-xs);
+}
+
 .node-tree-label {
   color: var(--text3);
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding: 0 var(--space-xs) var(--space-xs);
-  margin: 0;
+  flex-shrink: 0;
+}
+
+.node-tree-filter {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 6px;
+  font-size: 11px;
+  background: var(--bg2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  color: var(--text);
+  transition: var(--tr-std);
+}
+
+.node-tree-filter:focus-visible {
+  border-color: var(--blue);
+  background: var(--bg);
+  outline: none;
+}
+
+.tree-match {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+  padding: 0 1px;
+  border-radius: 2px;
 }
 
 .ws-list {
