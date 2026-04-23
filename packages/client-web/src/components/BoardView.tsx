@@ -21,6 +21,7 @@ import {
   delKbCol,
   moveCard,
   renameKbCol,
+  setCardPosition,
   setKbColColor,
   setKbColPosition,
 } from '../lib/mutations';
@@ -193,6 +194,23 @@ const BoardView: Component<Props> = (p) => {
     );
   }
 
+  // Within-column-Reorder: Swap mit direktem Listen-Nachbarn. Positionen
+  // sind pro Spalte eindeutig nicht garantiert, aber auch nicht per UNIQUE
+  // erzwungen — Swap bleibt also safe. cardsByCol() ist bereits nach
+  // position sortiert (fetchBoardContent ordnet kb_cards aufsteigend).
+  async function onMoveCardWithin(card: KbCardRow, direction: 'up' | 'down') {
+    const list = cardsByCol().get(card.col_id) ?? [];
+    const idx = list.findIndex((c) => c.id === card.id);
+    if (idx < 0) return;
+    const neighbourIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (neighbourIdx < 0 || neighbourIdx >= list.length) return;
+    const neighbour = list[neighbourIdx];
+    await wrap(async () => {
+      await setCardPosition(card.id, neighbour.position);
+      await setCardPosition(neighbour.id, card.position);
+    });
+  }
+
   async function onAddChecklist() {
     await wrap(() =>
       addChecklist({ workspaceId: p.workspaceId, boardId: p.boardId }),
@@ -346,7 +364,7 @@ const BoardView: Component<Props> = (p) => {
                       >
                         <ul class="kb-cards">
                           <For each={list()}>
-                            {(card) => {
+                            {(card, cardIdx) => {
                               const progress = createMemo(() =>
                                 checklistProgress(card, p.content!),
                               );
@@ -424,6 +442,26 @@ const BoardView: Component<Props> = (p) => {
                                     class="kb-card-edit-bar"
                                     onClick={(e) => e.stopPropagation()}
                                   >
+                                    <button
+                                      type="button"
+                                      class="mx-move-btn"
+                                      title="Karte nach oben"
+                                      aria-label="Karte nach oben"
+                                      onClick={() => onMoveCardWithin(card, 'up')}
+                                      disabled={busy() || cardIdx() === 0}
+                                    >
+                                      ↑
+                                    </button>
+                                    <button
+                                      type="button"
+                                      class="mx-move-btn"
+                                      title="Karte nach unten"
+                                      aria-label="Karte nach unten"
+                                      onClick={() => onMoveCardWithin(card, 'down')}
+                                      disabled={busy() || cardIdx() === list().length - 1}
+                                    >
+                                      ↓
+                                    </button>
                                     <select
                                       class="kb-card-move"
                                       value={card.col_id}

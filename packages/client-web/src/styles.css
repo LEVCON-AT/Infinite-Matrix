@@ -1368,6 +1368,16 @@ button[type='submit']:hover:not(:disabled) {
   border-radius: var(--rs);
 }
 
+/* Move/Del-Buttons im Edit-Bar: der Wrapper togglet via opacity, die
+   Kinder duerfen ihre eigene Ghost-Opacity (aus .mx-move-btn /
+   .mx-del-btn) nicht multiplizieren. Daher hier explizit opacity:1 +
+   pointer-events:auto fuer den Edit-Bar-Kontext. */
+.kb-card-edit-bar .mx-move-btn:not(:disabled),
+.kb-card-edit-bar .mx-del-btn:not(:disabled) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 /* ── Checklisten ─────────────────────────────────────────────── */
 .cl-list {
   list-style: none;

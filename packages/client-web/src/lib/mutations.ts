@@ -461,6 +461,17 @@ export async function moveCard(args: {
   return data as KbCardRow;
 }
 
+export async function setCardPosition(
+  cardId: string,
+  position: number,
+): Promise<void> {
+  const { error } = await supabase
+    .from('kb_cards')
+    .update({ position })
+    .eq('id', cardId);
+  if (error) throw error;
+}
+
 export async function delCard(cardId: string): Promise<void> {
   const { error } = await supabase.from('kb_cards').delete().eq('id', cardId);
   if (error) throw error;
