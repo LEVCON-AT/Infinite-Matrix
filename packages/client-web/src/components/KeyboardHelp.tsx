@@ -26,7 +26,7 @@ const SECTIONS: ShortcutSection[] = [
       { keys: ['^'], desc: 'Alias-Quicknav direkt' },
       { keys: ['/'], desc: 'Suche in Matrizen, Boards, Karten, Checklisten' },
       { keys: ['Shift+D'], desc: 'Dokumentations-Popup oeffnen' },
-      { keys: ['Shift+P'], desc: 'Command-Palette (neue Karte, Clone, ...)' },
+      { keys: ['Shift+P'], desc: 'Command-Palette (n/copy/del/ren/nd/k)' },
       { keys: ['Shift+N'], desc: 'Sidebar-Modus zyklen (full → rails → aus)' },
       { keys: ['s'], desc: 'Fokus Sidebar ↔ Canvas swappen' },
       { keys: ['Shift+E'], desc: 'Edit-Mode togglen' },

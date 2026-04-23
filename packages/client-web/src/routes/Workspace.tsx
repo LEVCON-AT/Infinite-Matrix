@@ -662,6 +662,7 @@ const Workspace: Component = () => {
           workspaceId={params.workspaceId as string}
           currentNode={currentNode()}
           onClose={() => setShowCommand(false)}
+          onShowHelp={() => setShowHelp(true)}
         />
       </Show>
 

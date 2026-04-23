@@ -923,6 +923,37 @@ button[type='submit']:hover:not(:disabled) {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+/* Sekundaerer Sub-Prompt innerhalb der Palette: z.B. Col-Picker fuer
+   move-card ohne explizite Spalte. Liste + zwei Buttons. */
+.command-palette-colpick {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.command-palette-colpick-title {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.command-palette-colpick-select {
+  width: 100%;
+  padding: var(--space-xs);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.command-palette-colpick-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
 /* ── Global-Search (/ Modal) ──────────────────────────────────── */
 .global-search-scrim {
   align-items: flex-start;

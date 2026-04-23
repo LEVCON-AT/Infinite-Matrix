@@ -3,22 +3,43 @@
 //
 // Die Palette akzeptiert Commands ohne fuehrenden ^ — das Prefix ist
 // Input-Kosmetik (ein separater `^`-Badge vor dem Input zeigt dem User
-// den Kontext, wie bei AliasQuicknav).
+// den Kontext, wie bei AliasQuicknav). Aliases als Argumente werden
+// ebenfalls ohne fuehrendes ^ geschrieben (Einfachheits-Prinzip).
 //
-// Commands in Sprint 1:
-//   n <alias>               — neue Karte im aktuellen Board, Alias optional
-//   copy <src> [dst]        — klont alle Checklisten eines Boards in ein
-//                             anderes Board (dst leer = aktuelles Board)
+// Sprint 1:
+//   n <alias>               — neue Karte im aktuellen Board
+//   copy <src> [dst]        — Checklisten-Clone zwischen Boards
 //
-// Stubs (bekannte Verben aus dem Vorbild, noch nicht implementiert):
-//   w, s, k, sc, c, move, delete, cl-to-card, fa, fi, fh, fc
-//   → liefern ein `unsupported`-Ergebnis, damit der User eine freundliche
-//     Meldung sieht statt eines generischen "unbekannt"-Fehlers.
+// Sprint 2:
+//   n <card> -m <target> [col]  — Card cross-board move (Col-Picker
+//                                  wenn col fehlt und >1 Spalte da ist)
+//   del <alias>             — Alias resolven + Loeschen (node/card/
+//                             checklist/doc). window.confirm vorher.
+//   ren <alias> <label>     — Alias resolven + Umbenennen
+//   nd                      — Docs-Popup oeffnen
+//   k                       — KeyboardHelp oeffnen
+//
+// Stubs (noch nicht implementiert):
+//   w, s, sc, c, move (Rest), cl-to-card, fa, fi, fh, fc
 
 import type { NodeRow } from './types';
-import { addCard, setCardAlias, addChecklist, addChecklistItem } from './mutations';
+import {
+  addCard,
+  setCardAlias,
+  addChecklist,
+  addChecklistItem,
+  delCard,
+  delChecklist,
+  delDoc,
+  deleteNode,
+  moveCardToBoard,
+  renameCard,
+  renameChecklist,
+  renameNode,
+  setDocTitle,
+} from './mutations';
 import { fetchBoardContent } from './queries';
-import { resolveAlias } from './alias-resolve';
+import { resolveAlias, type AliasResolveResult } from './alias-resolve';
 import { showToast } from './toasts';
 import { translateDbError } from './errors';
 
@@ -31,6 +52,10 @@ export type ParsedCommand =
       colName: string | null;
     }
   | { kind: 'copy'; source: string; target: string | null }
+  | { kind: 'delete-alias'; alias: string }
+  | { kind: 'rename-alias'; alias: string; label: string }
+  | { kind: 'new-doc' }
+  | { kind: 'show-help' }
   | { kind: 'unsupported'; verb: string }
   | { kind: 'unknown'; raw: string };
 
@@ -39,35 +64,65 @@ export function parseCommand(raw: string): ParsedCommand | null {
   if (!trimmed) return null;
   // Fuehrendes ^ dulden — User tippt's oft reflexartig.
   const stripped = trimmed.startsWith('^') ? trimmed.slice(1) : trimmed;
-  const parts = stripped.toLowerCase().split(/\s+/);
-  if (!parts[0]) return null;
+  // Verb + lowercase Args. Wir splitten in 2 Modi: "uniform tokens" fuer
+  // die meisten Commands (alles lowercase + whitespace-split), und "mixed"
+  // fuer ren <alias> <label...> — da bleibt der Label-Teil case-preserved.
+  const tokens = stripped.split(/\s+/);
+  const verb = tokens[0]?.toLowerCase();
+  const lower = tokens.map((t) => t.toLowerCase());
+  if (!verb) return null;
 
   // n cardAlias -m targetAlias [colName]
-  if (parts[0] === 'n' && parts.length >= 4 && parts[2] === '-m') {
+  if (verb === 'n' && tokens.length >= 4 && lower[2] === '-m') {
     return {
       kind: 'move-card',
-      cardAlias: parts[1],
-      targetAlias: parts[3],
-      colName: parts.slice(4).join(' ') || null,
+      cardAlias: lower[1],
+      targetAlias: lower[3],
+      colName: tokens.slice(4).join(' ') || null,
     };
   }
 
   // n [alias]
-  if (parts[0] === 'n') {
-    return { kind: 'new-card', alias: parts[1] || null };
+  if (verb === 'n') {
+    return { kind: 'new-card', alias: lower[1] || null };
   }
 
   // copy src [dst]
-  if (parts[0] === 'copy') {
-    if (!parts[1]) return { kind: 'unknown', raw };
-    return { kind: 'copy', source: parts[1], target: parts[2] || null };
+  if (verb === 'copy') {
+    if (!tokens[1]) return { kind: 'unknown', raw };
+    return { kind: 'copy', source: lower[1], target: lower[2] || null };
+  }
+
+  // del <alias>
+  if (verb === 'del') {
+    if (!tokens[1]) return { kind: 'unknown', raw };
+    return { kind: 'delete-alias', alias: lower[1] };
+  }
+
+  // ren <alias> <label> — Label behaelt Original-Case.
+  if (verb === 'ren') {
+    if (!tokens[1] || !tokens[2]) return { kind: 'unknown', raw };
+    return {
+      kind: 'rename-alias',
+      alias: lower[1],
+      label: tokens.slice(2).join(' '),
+    };
+  }
+
+  // nd — neue Doku (oeffnet Docs-Popup)
+  if (verb === 'nd') {
+    return { kind: 'new-doc' };
+  }
+
+  // k — KeyboardHelp
+  if (verb === 'k') {
+    return { kind: 'show-help' };
   }
 
   // Known-but-unsupported verbs.
   const stubs = [
     'w',
     's',
-    'k',
     'sc',
     'c',
     'move',
@@ -78,8 +133,8 @@ export function parseCommand(raw: string): ParsedCommand | null {
     'fh',
     'fc',
   ];
-  if (stubs.includes(parts[0])) {
-    return { kind: 'unsupported', verb: parts[0] };
+  if (stubs.includes(verb)) {
+    return { kind: 'unsupported', verb };
   }
 
   return { kind: 'unknown', raw };
@@ -91,12 +146,30 @@ export type CommandOutcome =
   | { ok: true; message?: string; navigateTo?: string }
   | { ok: false; message: string };
 
+// Side-Effect-Callbacks fuer Commands, die eine UI-Aktion ausloesen
+// (Popup, Sekundaer-Prompt). Das executor-Framework ruft sie, statt
+// das Outcome mit discriminierten Varianten zu verunreinigen.
+export type CommandUiHooks = {
+  onShowHelp: () => void;
+  onOpenDocs: () => void;
+  onColPick: (args: {
+    cardId: string;
+    cardLabel: string;
+    boardId: string;
+    boardLabel: string;
+    cols: Array<{ id: string; label: string }>;
+  }) => void;
+};
+
+export type CommandContext = {
+  workspaceId: string;
+  currentNode: NodeRow | undefined;
+  ui: CommandUiHooks;
+};
+
 export async function executeCommand(
   cmd: ParsedCommand,
-  ctx: {
-    workspaceId: string;
-    currentNode: NodeRow | undefined;
-  },
+  ctx: CommandContext,
 ): Promise<CommandOutcome> {
   if (cmd.kind === 'unknown') {
     return { ok: false, message: `Unbekannter Command: ${cmd.raw}` };
@@ -108,19 +181,19 @@ export async function executeCommand(
     };
   }
 
-  if (cmd.kind === 'new-card') {
-    return execNewCard(cmd, ctx);
-  }
+  if (cmd.kind === 'new-card') return execNewCard(cmd, ctx);
+  if (cmd.kind === 'copy') return execCopy(cmd, ctx);
+  if (cmd.kind === 'move-card') return execMoveCard(cmd, ctx);
+  if (cmd.kind === 'delete-alias') return execDeleteAlias(cmd, ctx);
+  if (cmd.kind === 'rename-alias') return execRenameAlias(cmd, ctx);
 
-  if (cmd.kind === 'copy') {
-    return execCopy(cmd, ctx);
+  if (cmd.kind === 'new-doc') {
+    ctx.ui.onOpenDocs();
+    return { ok: true };
   }
-
-  if (cmd.kind === 'move-card') {
-    return {
-      ok: false,
-      message: '"n … -m …" kommt in einem spaeteren Sprint.',
-    };
+  if (cmd.kind === 'show-help') {
+    ctx.ui.onShowHelp();
+    return { ok: true };
   }
 
   return { ok: false, message: 'Command nicht erkannt.' };
@@ -128,7 +201,7 @@ export async function executeCommand(
 
 async function execNewCard(
   cmd: Extract<ParsedCommand, { kind: 'new-card' }>,
-  ctx: { workspaceId: string; currentNode: NodeRow | undefined },
+  ctx: CommandContext,
 ): Promise<CommandOutcome> {
   const node = ctx.currentNode;
   if (!node || node.type !== 'board') {
@@ -176,7 +249,7 @@ async function execNewCard(
 
 async function execCopy(
   cmd: Extract<ParsedCommand, { kind: 'copy' }>,
-  ctx: { workspaceId: string; currentNode: NodeRow | undefined },
+  ctx: CommandContext,
 ): Promise<CommandOutcome> {
   // Source resolven (muss Board sein).
   const srcOutcome = await resolveAlias(cmd.source, ctx.workspaceId);
@@ -259,6 +332,213 @@ async function execCopy(
     return {
       ok: true,
       message: `${clonedCount} Checkliste(n) in "${tgtLabel}" geklont.`,
+    };
+  } catch (err) {
+    return { ok: false, message: translateDbError(err) };
+  }
+}
+
+// ─── Sprint 2: move-card / del / ren ─────────────────────────────
+
+async function execMoveCard(
+  cmd: Extract<ParsedCommand, { kind: 'move-card' }>,
+  ctx: CommandContext,
+): Promise<CommandOutcome> {
+  // Card resolven.
+  const cardOutcome = await resolveAlias(cmd.cardAlias, ctx.workspaceId);
+  if (!cardOutcome.ok) {
+    return { ok: false, message: `Karte "^${cmd.cardAlias}": ${cardOutcome.msg}` };
+  }
+  if (cardOutcome.result.kind !== 'card') {
+    return {
+      ok: false,
+      message: `"^${cmd.cardAlias}" ist keine Karte.`,
+    };
+  }
+  const card = cardOutcome.result;
+
+  // Ziel-Board resolven.
+  const boardOutcome = await resolveAlias(cmd.targetAlias, ctx.workspaceId);
+  if (!boardOutcome.ok) {
+    return { ok: false, message: `Ziel "^${cmd.targetAlias}": ${boardOutcome.msg}` };
+  }
+  if (
+    boardOutcome.result.kind !== 'node' ||
+    boardOutcome.result.nodeType !== 'board'
+  ) {
+    return {
+      ok: false,
+      message: `Ziel "^${cmd.targetAlias}" ist kein Board.`,
+    };
+  }
+  const board = boardOutcome.result;
+
+  if (card.boardId === board.nodeId) {
+    return {
+      ok: false,
+      message: 'Karte ist bereits in diesem Board.',
+    };
+  }
+
+  // Ziel-Spalten laden.
+  let content;
+  try {
+    content = await fetchBoardContent(board.nodeId, ctx.workspaceId);
+  } catch (err) {
+    return { ok: false, message: translateDbError(err) };
+  }
+  const cols = content.kbCols;
+  if (cols.length === 0) {
+    return { ok: false, message: `Board "${board.label}" hat keine Spalte.` };
+  }
+
+  // Spalten-Resolution: explizit per Name, sonst Auto/Picker.
+  let targetCol: (typeof cols)[number] | undefined;
+  if (cmd.colName) {
+    const wanted = cmd.colName.toLowerCase();
+    targetCol =
+      cols.find((c) => (c.label || '').toLowerCase() === wanted) ||
+      cols.find((c) => (c.label || '').toLowerCase().startsWith(wanted));
+    if (!targetCol) {
+      const list = cols.map((c) => `"${c.label || '(leer)'}"`).join(', ');
+      return {
+        ok: false,
+        message: `Spalte "${cmd.colName}" nicht gefunden. Vorhanden: ${list}.`,
+      };
+    }
+  } else if (cols.length === 1) {
+    targetCol = cols[0];
+  } else {
+    // Col-Picker-UI ausloesen. Der User waehlt, Palette-Flow endet hier.
+    ctx.ui.onColPick({
+      cardId: card.cardId,
+      cardLabel: card.name,
+      boardId: board.nodeId,
+      boardLabel: board.label,
+      cols: cols.map((c) => ({ id: c.id, label: c.label || '(leer)' })),
+    });
+    return {
+      ok: true,
+      message: `Spalte in "${board.label}" waehlen…`,
+    };
+  }
+
+  // Position ans Ende der Ziel-Spalte.
+  const posInCol = content.kbCards
+    .filter((c) => c.col_id === targetCol!.id)
+    .reduce((max, c) => Math.max(max, c.position ?? 0), -1);
+
+  try {
+    await moveCardToBoard(card.cardId, board.nodeId, targetCol.id, posInCol + 1);
+    return {
+      ok: true,
+      message: `Karte "${card.name}" in "${board.label}" / "${targetCol.label || '(leer)'}" verschoben.`,
+    };
+  } catch (err) {
+    return { ok: false, message: translateDbError(err) };
+  }
+}
+
+// Liefert ein Display-Label fuer einen resolvten Alias (fuer Toasts +
+// Confirms). "Card" heisst name, "Doc" heisst title, Node heisst label,
+// Checklist analog.
+function describeResult(result: AliasResolveResult): {
+  typeLabel: string;
+  displayLabel: string;
+} {
+  switch (result.kind) {
+    case 'node':
+      return {
+        typeLabel: result.nodeType === 'matrix' ? 'Matrix' : 'Board',
+        displayLabel: result.label || '(ohne Label)',
+      };
+    case 'card':
+      return { typeLabel: 'Karte', displayLabel: result.name || '(ohne Name)' };
+    case 'checklist-board':
+    case 'checklist-cell':
+      return { typeLabel: 'Checkliste', displayLabel: result.label || '(ohne Label)' };
+    case 'doc':
+      return { typeLabel: 'Doku', displayLabel: result.title || '(ohne Titel)' };
+    case 'cell':
+      return { typeLabel: 'Zelle', displayLabel: '(Zelle)' };
+    case 'link':
+      return { typeLabel: 'Link', displayLabel: result.label || '(ohne Label)' };
+  }
+}
+
+async function execDeleteAlias(
+  cmd: Extract<ParsedCommand, { kind: 'delete-alias' }>,
+  ctx: CommandContext,
+): Promise<CommandOutcome> {
+  const r = await resolveAlias(cmd.alias, ctx.workspaceId);
+  if (!r.ok) return { ok: false, message: `"^${cmd.alias}": ${r.msg}` };
+  const info = describeResult(r.result);
+
+  // Unterstuetzte Kinds festlegen.
+  const kind = r.result.kind;
+  if (kind === 'cell' || kind === 'link') {
+    return {
+      ok: false,
+      message: `${info.typeLabel}-Loeschung per ^del nicht unterstuetzt.`,
+    };
+  }
+
+  // Confirm-Dialog. Bei Node besonders warnen (Subtree).
+  const prompt =
+    kind === 'node'
+      ? `${info.typeLabel} "${info.displayLabel}" (^${cmd.alias}) loeschen? Alle darunter liegenden Nodes, Zellen und Karten verschwinden mit.`
+      : `${info.typeLabel} "${info.displayLabel}" (^${cmd.alias}) loeschen?`;
+  if (!window.confirm(prompt)) {
+    return { ok: false, message: 'Abgebrochen.' };
+  }
+
+  try {
+    if (r.result.kind === 'node') await deleteNode(r.result.nodeId);
+    else if (r.result.kind === 'card') await delCard(r.result.cardId);
+    else if (r.result.kind === 'checklist-board')
+      await delChecklist(r.result.checklistId);
+    else if (r.result.kind === 'checklist-cell')
+      await delChecklist(r.result.checklistId);
+    else if (r.result.kind === 'doc') await delDoc(r.result.docId);
+    return {
+      ok: true,
+      message: `${info.typeLabel} "${info.displayLabel}" geloescht.`,
+    };
+  } catch (err) {
+    return { ok: false, message: translateDbError(err) };
+  }
+}
+
+async function execRenameAlias(
+  cmd: Extract<ParsedCommand, { kind: 'rename-alias' }>,
+  ctx: CommandContext,
+): Promise<CommandOutcome> {
+  const r = await resolveAlias(cmd.alias, ctx.workspaceId);
+  if (!r.ok) return { ok: false, message: `"^${cmd.alias}": ${r.msg}` };
+  const info = describeResult(r.result);
+  const trimmed = cmd.label.trim();
+  if (!trimmed) return { ok: false, message: 'Neuer Name darf nicht leer sein.' };
+
+  try {
+    if (r.result.kind === 'node') {
+      await renameNode(r.result.nodeId, trimmed);
+    } else if (r.result.kind === 'card') {
+      await renameCard(r.result.cardId, trimmed);
+    } else if (r.result.kind === 'checklist-board') {
+      await renameChecklist(r.result.checklistId, trimmed);
+    } else if (r.result.kind === 'checklist-cell') {
+      await renameChecklist(r.result.checklistId, trimmed);
+    } else if (r.result.kind === 'doc') {
+      await setDocTitle(r.result.docId, trimmed);
+    } else {
+      return {
+        ok: false,
+        message: `${info.typeLabel}-Umbenennung per ^ren nicht unterstuetzt.`,
+      };
+    }
+    return {
+      ok: true,
+      message: `${info.typeLabel} "${info.displayLabel}" → "${trimmed}".`,
     };
   } catch (err) {
     return { ok: false, message: translateDbError(err) };
