@@ -32,6 +32,7 @@ import {
   setBoardLinkLabel,
   setBoardLinkType,
   setBoardLinkUrl,
+  setCardColAndPosition,
   setCardPosition,
   setKbColColor,
   setKbColPosition,
@@ -137,13 +138,31 @@ const BoardView: Component<Props> = (p) => {
   const boardUi = useBoardUi(p.boardId);
 
   // Drag-State: welche Card wird gerade gezogen, welcher Col-Container
-  // ist gerade der Hover-Drop-Target. Keine DOM-Klasse anfassen —
-  // reaktive Signale treiben classList.
+  // ist gerade der Hover-Drop-Target. Plus: welche Card ist Slot-Target
+  // (dragOverCardId) und ob die Insertion vor oder nach ihr passieren
+  // soll (dragOverBefore — bestimmt aus Maus-Y vs Card-Mittelpunkt).
+  // Keine DOM-Klasse anfassen — reaktive Signale treiben classList.
   const [draggingCardId, setDraggingCardId] = createSignal<string | null>(null);
   const [dragOverColId, setDragOverColId] = createSignal<string | null>(null);
+  const [dragOverCardId, setDragOverCardId] = createSignal<string | null>(null);
+  const [dragOverBefore, setDragOverBefore] = createSignal(true);
+
+  function clearDragState() {
+    setDraggingCardId(null);
+    setDragOverColId(null);
+    setDragOverCardId(null);
+  }
 
   function onCardDragStart(card: KbCardRow, e: DragEvent) {
     if (!e.dataTransfer) return;
+    // Reorder via Drag setzt voraus, dass die manuelle Sortierung aktiv
+    // ist. Bei automatischem Sort waere das Drop-Ergebnis sofort
+    // weg-sortiert — irritierend. Daher early-abort, kein drag.
+    if (boardUi.sort() !== 'manual') {
+      e.preventDefault();
+      showToast('Drag nur bei manueller Sortierung.', 'info');
+      return;
+    }
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/matrix-card-id', card.id);
     // Fallback fuer Browser die den custom-type ignorieren.
@@ -152,8 +171,7 @@ const BoardView: Component<Props> = (p) => {
   }
 
   function onCardDragEnd() {
-    setDraggingCardId(null);
-    setDragOverColId(null);
+    clearDragState();
   }
 
   function onColDragOver(colId: string, e: DragEvent) {
@@ -173,28 +191,145 @@ const BoardView: Component<Props> = (p) => {
     const related = e.relatedTarget as Node | null;
     const current = e.currentTarget as HTMLElement;
     if (related && current.contains(related)) return;
-    if (dragOverColId() === colId) setDragOverColId(null);
+    if (dragOverColId() === colId) {
+      setDragOverColId(null);
+      setDragOverCardId(null);
+    }
+  }
+
+  // Card-level DragOver fuer Slot-Vorschau. Nur auf den Karten gebunden,
+  // damit die Berechnung pro Karte lokal bleibt.
+  function onCardDragOver(card: KbCardRow, e: DragEvent) {
+    const src = draggingCardId();
+    if (!src) return;
+    if (src === card.id) return; // auf sich selbst kein Slot
+    e.preventDefault();
+    // Event nicht bubblen lassen — sonst uebersteuert onColDragOver
+    // unsere feinere Slot-Berechnung.
+    e.stopPropagation();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const before = e.clientY < midY;
+    if (dragOverColId() !== card.col_id) setDragOverColId(card.col_id);
+    if (dragOverCardId() !== card.id) setDragOverCardId(card.id);
+    if (dragOverBefore() !== before) setDragOverBefore(before);
+  }
+
+  // Re-nummerierung einer Spalte — setzt alle position-Werte linear auf
+  // 0, 1, 2, … gemaess orderedIds. Bestehende Werte werden ueberschrieben.
+  // Sequenziell statt Promise.all, damit kein konkurrierender UPDATE-Storm
+  // an RLS/Policy-Zaehler stoert (nebenbei: Reihenfolge der Logs bleibt
+  // nachvollziehbar).
+  async function writeColOrder(orderedIds: string[]): Promise<void> {
+    for (let i = 0; i < orderedIds.length; i++) {
+      await setCardPosition(orderedIds[i], i);
+    }
+  }
+
+  // Bestimmt die Ziel-Reihenfolge der Spalte toColId, nachdem srcCard
+  // an Slot `anchorIdx` (before) / `anchorIdx+1` (after) eingefuegt
+  // wurde. In-Col-Fall: die Karte wird aus der Liste entfernt, dann
+  // neu eingesetzt. Cross-Col: nur Einfuege-Seite.
+  function computeInsertOrder(
+    srcCard: KbCardRow,
+    toColId: string,
+    anchorCardId: string | null,
+    before: boolean,
+  ): string[] {
+    const listAll = cardsByCol().get(toColId) ?? [];
+    // Src entfernen, damit wir eine saubere Referenz fuer den Ziel-
+    // Index haben (andernfalls waere der anchor-Index falsch, wenn src
+    // vor dem anchor lag).
+    const list = listAll.filter((c) => c.id !== srcCard.id);
+    let insertAt = list.length;
+    if (anchorCardId) {
+      const idx = list.findIndex((c) => c.id === anchorCardId);
+      if (idx >= 0) insertAt = before ? idx : idx + 1;
+    }
+    const ids = list.map((c) => c.id);
+    ids.splice(insertAt, 0, srcCard.id);
+    return ids;
+  }
+
+  // Reorder-Handler. Ziel: `toColId` an Slot vor/nach `anchorCardId`.
+  // Wenn kein anchor: ans Ende.
+  async function performReorder(
+    srcCard: KbCardRow,
+    toColId: string,
+    anchorCardId: string | null,
+    before: boolean,
+  ) {
+    const fromColId = srcCard.col_id;
+    const isCrossCol = fromColId !== toColId;
+    const targetOrder = computeInsertOrder(
+      srcCard,
+      toColId,
+      anchorCardId,
+      before,
+    );
+    const insertPos = targetOrder.indexOf(srcCard.id);
+
+    // Quell-Spalte (falls cross-col) zuerst neu nummerieren — dann
+    // cascaded die Src-Card mit neuer col_id+position in die Ziel-Spalte.
+    // Zuletzt: Ziel-Spalte re-nummerieren (ohne Src, weil die schon
+    // explizit auf insertPos gesetzt wird).
+    await wrap(async () => {
+      if (isCrossCol) {
+        const fromList = (cardsByCol().get(fromColId) ?? []).filter(
+          (c) => c.id !== srcCard.id,
+        );
+        for (let i = 0; i < fromList.length; i++) {
+          await setCardPosition(fromList[i].id, i);
+        }
+        await setCardColAndPosition(srcCard.id, toColId, insertPos);
+        for (let i = 0; i < targetOrder.length; i++) {
+          const id = targetOrder[i];
+          if (id === srcCard.id) continue;
+          await setCardPosition(id, i);
+        }
+      } else {
+        await writeColOrder(targetOrder);
+      }
+    });
+  }
+
+  async function onCardDrop(targetCard: KbCardRow, e: DragEvent) {
+    const srcId =
+      e.dataTransfer?.getData('text/matrix-card-id') ||
+      e.dataTransfer?.getData('text/plain') ||
+      draggingCardId();
+    const before = dragOverBefore();
+    clearDragState();
+    if (!srcId || srcId === targetCard.id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const srcCard = (p.content?.kbCards ?? []).find((c) => c.id === srcId);
+    if (!srcCard) return;
+    await performReorder(srcCard, targetCard.col_id, targetCard.id, before);
   }
 
   async function onColDrop(colId: string, e: DragEvent) {
+    // Wenn ein Card-Slot-Drop aktiv war, hat onCardDrop das schon
+    // abgehandelt. Das Col-Drop-Event feuert bei manchen Browsern
+    // zusaetzlich (Drag-Target-Bubble). Guard via dragOverCardId:
+    // wenn gesetzt, ist der Card-Handler zustaendig.
+    const anchorCardId = dragOverCardId();
     const cardId =
       e.dataTransfer?.getData('text/matrix-card-id') ||
       e.dataTransfer?.getData('text/plain') ||
       draggingCardId();
-    setDraggingCardId(null);
-    setDragOverColId(null);
+    const before = dragOverBefore();
+    clearDragState();
     if (!cardId) return;
     e.preventDefault();
     const card = (p.content?.kbCards ?? []).find((c) => c.id === cardId);
-    if (!card || card.col_id === colId) return;
-    await wrap(() =>
-      moveCard({
-        cardId: card.id,
-        boardId: p.boardId,
-        workspaceId: p.workspaceId,
-        toColId: colId,
-      }),
-    );
+    if (!card) return;
+    if (anchorCardId) {
+      // Card-Drop-Pfad uebernahm bereits — hier nur state cleanup.
+      return;
+    }
+    await performReorder(card, colId, null, before);
   }
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedCardId, setSelectedCardId] = createSignal<string | null>(null);
@@ -823,6 +958,14 @@ const BoardView: Component<Props> = (p) => {
                                 checklistProgress(card, p.content!),
                               );
                               const deadline = fmtDate(card.deadline);
+                              const dropBefore = () =>
+                                dragOverCardId() === card.id &&
+                                draggingCardId() !== card.id &&
+                                dragOverBefore();
+                              const dropAfter = () =>
+                                dragOverCardId() === card.id &&
+                                draggingCardId() !== card.id &&
+                                !dragOverBefore();
                               return (
                                 <li
                                   class="kb-card"
@@ -831,12 +974,16 @@ const BoardView: Component<Props> = (p) => {
                                     'kb-card-archived': card.archived,
                                     'kb-card-dragging':
                                       draggingCardId() === card.id,
+                                    'kb-card-drop-before': dropBefore(),
+                                    'kb-card-drop-after': dropAfter(),
                                   }}
                                   role="button"
                                   tabIndex={0}
                                   draggable={true}
                                   onDragStart={(e) => onCardDragStart(card, e)}
                                   onDragEnd={onCardDragEnd}
+                                  onDragOver={(e) => onCardDragOver(card, e)}
+                                  onDrop={(e) => onCardDrop(card, e)}
                                   onClick={() => setSelectedCardId(card.id)}
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter' || e.key === ' ') {

@@ -514,6 +514,22 @@ export async function setCardPosition(
   if (error) throw error;
 }
 
+// Cross-Col-Move mit exakter Position. Ein Update statt zweier. Wird
+// vom Drag-Reorder gerufen, wenn die Ziel-Spalte von der Quell-Spalte
+// abweicht — die umliegenden Karten werden separat durch setCardPosition
+// neu nummeriert, damit die gewaehlte Slot-Position passt.
+export async function setCardColAndPosition(
+  cardId: string,
+  toColId: string,
+  position: number,
+): Promise<void> {
+  const { error } = await supabase
+    .from('kb_cards')
+    .update({ col_id: toColId, position })
+    .eq('id', cardId);
+  if (error) throw error;
+}
+
 export async function delCard(cardId: string): Promise<void> {
   const { error } = await supabase.from('kb_cards').delete().eq('id', cardId);
   if (error) throw error;

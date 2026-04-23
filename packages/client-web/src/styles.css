@@ -1654,6 +1654,35 @@ button[type='submit']:hover:not(:disabled) {
   transform: rotate(-1deg);
 }
 
+/* Drop-Slot-Indikator: ein 2px-Balken in Blue ueber oder unter der
+   Card. position:relative am .kb-card ist schon durch Kartenlayout
+   gegeben; ::before/::after haengen sich entsprechend an die Kante. */
+.kb-card {
+  position: relative;
+}
+
+.kb-card-drop-before::before,
+.kb-card-drop-after::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--blue);
+  border-radius: 1px;
+  box-shadow: 0 0 0 2px var(--bluebg);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.kb-card-drop-before::before {
+  top: -3px;
+}
+
+.kb-card-drop-after::after {
+  bottom: -3px;
+}
+
 .kb-col-collapsed .mx-head-input {
   font-size: 11px;
 }
