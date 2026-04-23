@@ -35,6 +35,7 @@ import CellChecklistsPage from '../components/CellChecklistsPage';
 import CellDocsPage from '../components/CellDocsPage';
 import CellInfoPage from '../components/CellInfoPage';
 import AliasQuicknav from '../components/AliasQuicknav';
+import CommandPalette from '../components/CommandPalette';
 import DocsPopup from '../components/DocsPopup';
 import GlobalSearch from '../components/GlobalSearch';
 import ImportDialog from '../components/ImportDialog';
@@ -70,6 +71,7 @@ const Workspace: Component = () => {
   const [showImport, setShowImport] = createSignal(false);
   const [showQuicknav, setShowQuicknav] = createSignal(false);
   const [showSearch, setShowSearch] = createSignal(false);
+  const [showCommand, setShowCommand] = createSignal(false);
   const [showDocs, setShowDocs] = createSignal(false);
   const [showHelp, setShowHelp] = createSignal(false);
   const docsRequest = useDocsRequest();
@@ -302,7 +304,7 @@ const Workspace: Component = () => {
 
     const onKey = (e: KeyboardEvent) => {
       if (!params.workspaceId) return;
-      if (showQuicknav() || showSearch()) return;
+      if (showQuicknav() || showSearch() || showCommand()) return;
 
       // Cmd/Ctrl+K
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
@@ -355,6 +357,20 @@ const Workspace: Component = () => {
         if (isTextInput(e.target)) return;
         e.preventDefault();
         openDocsPopup();
+        return;
+      }
+
+      // Shift+P: Command-Palette oeffnen.
+      if (
+        e.shiftKey &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        (e.key === 'P' || e.key === 'p')
+      ) {
+        if (isTextInput(e.target)) return;
+        e.preventDefault();
+        setShowCommand(true);
         return;
       }
 
@@ -504,6 +520,14 @@ const Workspace: Component = () => {
         <GlobalSearch
           workspaceId={params.workspaceId as string}
           onClose={() => setShowSearch(false)}
+        />
+      </Show>
+
+      <Show when={showCommand() && params.workspaceId}>
+        <CommandPalette
+          workspaceId={params.workspaceId as string}
+          currentNode={currentNode()}
+          onClose={() => setShowCommand(false)}
         />
       </Show>
 

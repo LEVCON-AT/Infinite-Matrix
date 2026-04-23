@@ -640,6 +640,70 @@ button[type='submit']:hover:not(:disabled) {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+/* ── Command-Palette (Shift+P) ────────────────────────────────── */
+/* Aehnliches Layout wie alias-quicknav, aber mit breiterem Input
+   (Commands haben mehrere Woerter) und Amber statt Blau fuer das ^,
+   damit der User den Kontext (Command vs. Nav) sofort sieht. */
+.command-palette-scrim {
+  align-items: flex-start;
+  padding-top: 15vh;
+}
+
+.command-palette-card {
+  max-width: 600px;
+  padding: var(--space-md) var(--space-lg) var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.command-palette-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  border-bottom: 0.5px solid var(--border);
+  padding: var(--space-xs) 0;
+}
+
+.command-palette-prefix {
+  font-size: 20px;
+  color: var(--amber);
+  font-weight: 600;
+  line-height: 1;
+  user-select: none;
+}
+
+.command-palette-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 18px;
+  padding: 4px 0;
+  outline: none;
+  font-family: inherit;
+}
+
+.command-palette-input::placeholder {
+  color: var(--text3);
+}
+
+.command-palette-error {
+  margin: 0;
+  color: var(--red);
+  background: var(--redbg);
+  font-size: 12px;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--rs);
+}
+
+.command-palette-hint {
+  margin: 0;
+  color: var(--text3);
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 /* ── Global-Search (/ Modal) ──────────────────────────────────── */
 .global-search-scrim {
   align-items: flex-start;

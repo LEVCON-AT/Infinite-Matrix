@@ -26,6 +26,7 @@ const SECTIONS: ShortcutSection[] = [
       { keys: ['^'], desc: 'Alias-Quicknav direkt' },
       { keys: ['/'], desc: 'Suche in Matrizen, Boards, Karten, Checklisten' },
       { keys: ['Shift+D'], desc: 'Dokumentations-Popup oeffnen' },
+      { keys: ['Shift+P'], desc: 'Command-Palette (neue Karte, Clone, ...)' },
       { keys: ['Shift+E'], desc: 'Edit-Mode togglen' },
       { keys: ['Shift+A'], desc: 'Sidebar: alles aufklappen (sticky)' },
       { keys: ['Esc'], desc: 'Overlay schliessen / eine Ebene hoch' },
