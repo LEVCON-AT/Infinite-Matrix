@@ -1505,6 +1505,20 @@ button[type='submit']:hover:not(:disabled) {
   margin-top: var(--space-sm);
 }
 
+/* Overlay-Checkliste: Karten sind nicht edit-gated (Memory:
+   feedback_card_not_structural), also sind Add/Del/Rename immer
+   aktiv. Das edit-mode-Gate aus .cl-item[data-edit='true'] auf
+   .cl-it-del greift hier nicht — wir oeffnen das in der Overlay
+   explizit. Visuell: Del-Icon nur beim Hover sichtbar, aber klickbar. */
+.overlay-cl .cl-it-del:not(:disabled) {
+  pointer-events: auto;
+}
+
+.overlay-cl .cl-it:hover .cl-it-del:not(:disabled),
+.overlay-cl .cl-it-del:not(:disabled):focus-visible {
+  opacity: 1;
+}
+
 /* Board-Section (Checklisten unterhalb der Kanban-Spalten) */
 .board-checklists {
   margin-top: var(--space-lg);

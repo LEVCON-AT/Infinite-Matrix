@@ -13,13 +13,21 @@ import type {
   KbCardRow,
 } from '../lib/types';
 import {
+  addCardInlineItem,
+  addChecklistItem,
   delCard,
+  delCardInlineItem,
+  delChecklistItem,
   renameCard,
+  renameCardInlineItem,
+  renameChecklistItem,
   setCardAlias,
   setCardDeadline,
   setCardNote,
   setCardPriority,
   toggleCardDone,
+  toggleCardInlineItem,
+  toggleChecklistItemDone,
 } from '../lib/mutations';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
@@ -34,6 +42,7 @@ type Props = {
 };
 
 type OverlayItem = {
+  id: string;
   text: string;
   done: boolean;
   level: 0 | 1 | 2;
@@ -158,17 +167,30 @@ const CardOverlay: Component<Props> = (p) => {
   }
 
   // Quelle der Checklist-Items: ref → checklist_items, sonst inline.
+  //
+  // `id` brauchen wir in beiden Pfaden stabil, damit toggle/rename/del
+  // das richtige Item treffen. Bei checklist_items liefert die DB es
+  // direkt; bei inline geben Legacy-Items evtl. keine id, in dem Fall
+  // fallen wir auf den Array-Index zurueck (`i-<idx>`). Der naechste
+  // Schreibzugriff (ensureItemId in mutations.ts) haengt dann eine
+  // UUID dran.
   const items = createMemo<OverlayItem[]>(() => {
     const c = p.card;
     if (c.checklist_ref) {
       return p.content.checklistItems
         .filter((it) => it.checklist_id === c.checklist_ref)
         .sort((a, b) => a.position - b.position)
-        .map((it) => ({ text: it.text, done: it.done, level: it.level }));
+        .map((it) => ({
+          id: it.id,
+          text: it.text,
+          done: it.done,
+          level: it.level,
+        }));
     }
     const inline = c.checklist;
     if (Array.isArray(inline)) {
-      return inline.map((i: InlineChecklistItem) => ({
+      return inline.map((i: InlineChecklistItem, idx) => ({
+        id: i.id ?? `i-${idx}`,
         text: i.text,
         done: !!i.done,
         level: (i.level ?? 0) as 0 | 1 | 2,
@@ -182,6 +204,53 @@ const CardOverlay: Component<Props> = (p) => {
     const cl = p.content.checklists.find((c) => c.id === p.card.checklist_ref);
     return cl ? cl.label || '(Liste)' : null;
   });
+
+  // Mutations-Dispatch: Ref-Mode → checklist_items-Tabelle, sonst
+  // Inline-JSONB auf der Karte. Fuer den Caller ist das transparent.
+  async function onToggleItem(item: OverlayItem, done: boolean) {
+    if (done === item.done) return;
+    await wrap(async () => {
+      if (p.card.checklist_ref) {
+        await toggleChecklistItemDone(item.id, done);
+      } else {
+        await toggleCardInlineItem(p.card.id, item.id, done);
+      }
+    });
+  }
+
+  async function onRenameItem(item: OverlayItem, text: string) {
+    if (text === item.text) return;
+    await wrap(async () => {
+      if (p.card.checklist_ref) {
+        await renameChecklistItem(item.id, text);
+      } else {
+        await renameCardInlineItem(p.card.id, item.id, text);
+      }
+    });
+  }
+
+  async function onDelItem(item: OverlayItem) {
+    await wrap(async () => {
+      if (p.card.checklist_ref) {
+        await delChecklistItem(item.id);
+      } else {
+        await delCardInlineItem(p.card.id, item.id);
+      }
+    });
+  }
+
+  async function onAddItem() {
+    await wrap(async () => {
+      if (p.card.checklist_ref) {
+        await addChecklistItem({
+          workspaceId: p.card.workspace_id,
+          checklistId: p.card.checklist_ref,
+        });
+      } else {
+        await addCardInlineItem({ cardId: p.card.id });
+      }
+    });
+  }
 
   return (
     <div
@@ -314,17 +383,20 @@ const CardOverlay: Component<Props> = (p) => {
             />
           </section>
 
-          <Show when={items().length > 0}>
-            <section class="overlay-section">
-              <h4>
-                Checkliste
-                <Show when={refChecklistLabel()}>
-                  <span class="hint">
-                    {' '}
-                    — Referenz auf „{refChecklistLabel()}"
-                  </span>
-                </Show>
-              </h4>
+          <section class="overlay-section">
+            <h4>
+              Checkliste
+              <Show when={refChecklistLabel()}>
+                <span class="hint">
+                  {' '}
+                  — Referenz auf „{refChecklistLabel()}"
+                </span>
+              </Show>
+            </h4>
+            <Show
+              when={items().length > 0}
+              fallback={<p class="hint">Noch keine Punkte.</p>}
+            >
               <ul class="cl-items overlay-cl">
                 <For each={items()}>
                   {(it) => (
@@ -333,16 +405,52 @@ const CardOverlay: Component<Props> = (p) => {
                       classList={{ 'cl-it-done': it.done }}
                       style={{ '--cl-level': it.level }}
                     >
-                      <span class="cl-checkbox" aria-hidden>
-                        {it.done ? '☑' : '☐'}
-                      </span>
-                      <span class="cl-text">{it.text}</span>
+                      <input
+                        type="checkbox"
+                        class="cl-checkbox-input"
+                        checked={it.done}
+                        aria-label="Erledigt"
+                        onChange={(e) =>
+                          onToggleItem(it, e.currentTarget.checked)
+                        }
+                      />
+                      <input
+                        class="cl-text-input"
+                        type="text"
+                        value={it.text}
+                        placeholder="(Punkt)"
+                        onBlur={(e) => onRenameItem(it, e.currentTarget.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            (e.currentTarget as HTMLInputElement).blur();
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        class="cl-it-del"
+                        title="Punkt loeschen"
+                        aria-label="Punkt loeschen"
+                        onClick={() => onDelItem(it)}
+                        disabled={busy()}
+                      >
+                        ✕
+                      </button>
                     </li>
                   )}
                 </For>
               </ul>
-            </section>
-          </Show>
+            </Show>
+            <button
+              type="button"
+              class="cl-add-item-btn"
+              onClick={onAddItem}
+              disabled={busy()}
+            >
+              + Punkt
+            </button>
+          </section>
 
           <Show when={p.card.source_label || p.card.source_cl_id}>
             <p class="hint overlay-source">

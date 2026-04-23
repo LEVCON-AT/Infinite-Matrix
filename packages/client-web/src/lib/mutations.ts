@@ -15,6 +15,7 @@ import type {
   ColRow,
   InfoField,
   InfoLink,
+  InlineChecklistItem,
   KbCardRow,
   KbColRow,
   NodeRow,
@@ -821,4 +822,96 @@ export async function delCellLink(
     const links = readInfoLinks(cellData).filter((l) => l.id !== linkId);
     return { data: { ...cellData, links }, result: undefined };
   });
+}
+
+// ─── Karten-Inline-Checkliste (kb_cards.checklist jsonb) ───────
+// Read-modify-write, gleiches Muster wie mutateCellData. Nur relevant,
+// wenn die Karte KEINE checklist_ref hat — im Ref-Modus gehen alle
+// Aenderungen ueber die normalen checklist_item-Mutations, weil die
+// Daten dann in der checklist_items-Tabelle liegen.
+async function mutateCardChecklist<T>(
+  cardId: string,
+  mutator: (items: InlineChecklistItem[]) => {
+    items: InlineChecklistItem[];
+    result: T;
+  },
+): Promise<T> {
+  const { data: cur, error: readErr } = await supabase
+    .from('kb_cards')
+    .select('checklist')
+    .eq('id', cardId)
+    .single();
+  if (readErr) throw readErr;
+  const raw = (cur as { checklist: unknown } | null)?.checklist;
+  const current: InlineChecklistItem[] = Array.isArray(raw)
+    ? (raw as InlineChecklistItem[])
+    : [];
+  const { items, result } = mutator(current);
+  const { error: writeErr } = await supabase
+    .from('kb_cards')
+    .update({ checklist: items })
+    .eq('id', cardId);
+  if (writeErr) throw writeErr;
+  return result;
+}
+
+function genInlineItemId(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'ii_' + Math.random().toString(36).slice(2, 10);
+}
+
+function ensureItemId(it: InlineChecklistItem): InlineChecklistItem {
+  return it.id ? it : { ...it, id: genInlineItemId() };
+}
+
+export async function addCardInlineItem(args: {
+  cardId: string;
+  text?: string;
+  level?: 0 | 1 | 2;
+}): Promise<InlineChecklistItem> {
+  return mutateCardChecklist(args.cardId, (items) => {
+    const newItem: InlineChecklistItem = {
+      id: genInlineItemId(),
+      text: args.text ?? '',
+      done: false,
+      level: args.level ?? 0,
+    };
+    return { items: [...items.map(ensureItemId), newItem], result: newItem };
+  });
+}
+
+export async function toggleCardInlineItem(
+  cardId: string,
+  itemId: string,
+  done: boolean,
+): Promise<void> {
+  await mutateCardChecklist(cardId, (items) => ({
+    items: items
+      .map(ensureItemId)
+      .map((it) => (it.id === itemId ? { ...it, done } : it)),
+    result: undefined,
+  }));
+}
+
+export async function renameCardInlineItem(
+  cardId: string,
+  itemId: string,
+  text: string,
+): Promise<void> {
+  await mutateCardChecklist(cardId, (items) => ({
+    items: items
+      .map(ensureItemId)
+      .map((it) => (it.id === itemId ? { ...it, text } : it)),
+    result: undefined,
+  }));
+}
+
+export async function delCardInlineItem(
+  cardId: string,
+  itemId: string,
+): Promise<void> {
+  await mutateCardChecklist(cardId, (items) => ({
+    items: items.map(ensureItemId).filter((it) => it.id !== itemId),
+    result: undefined,
+  }));
 }
