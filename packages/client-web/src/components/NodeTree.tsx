@@ -15,7 +15,7 @@ import { supabase } from '../lib/supabase';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import ContextMenu, { type CtxMenuState } from './ContextMenu';
-import Icon from './Icon';
+import Icon, { type IconName } from './Icon';
 
 type Props = {
   workspaceId: string;
@@ -25,12 +25,12 @@ type Props = {
 
 // Icon-Lookup nach Entry-Kind / Node-Type. Portiert die Feature-Farben
 // aus dem HTML-Vorbild: matrix=blau, board=teal, cell=amber/grau.
-function iconFor(entry: TreeEntry): string {
+function iconNameFor(entry: TreeEntry): IconName {
   if (entry.kind === 'node') {
-    return entry.node.type === 'matrix' ? '▦' : '▤';
+    return entry.node.type === 'matrix' ? 'squares-2x2' : 'view-columns';
   }
-  // Cells: Punkt, Subsection-Indikator
-  return '·';
+  // Cells: kleiner ausgefuellter Punkt
+  return 'dot-filled';
 }
 
 function dotColorFor(entry: TreeEntry): string {
@@ -246,7 +246,7 @@ const TreeItem: Component<{
         >
           <span class="tree-dot" aria-hidden="true" style={dotStyle} />
           <span class="tree-ico" aria-hidden="true">
-            {iconFor(p.entry)}
+            <Icon name={iconNameFor(p.entry)} size={14} />
           </span>
           <span class="tree-label">
             <For each={highlightLabel(labelOf(p.entry), p.query)}>

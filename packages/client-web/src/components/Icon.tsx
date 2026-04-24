@@ -48,7 +48,12 @@ export type IconName =
   | 'arrow-uturn-left'
   | 'paint-brush'
   | 'archive-box'
-  | 'link';
+  | 'link'
+  | 'squares-2x2'
+  | 'view-columns'
+  | 'information-circle'
+  | 'dot-filled'
+  | 'arrow-down-tray';
 
 // Heroicons v2 outline path-data. 24x24 viewBox. Factory-Functions
 // wichtig: sonst shared Solid dieselben DOM-Nodes zwischen mehreren
@@ -241,6 +246,43 @@ const ICONS: Record<IconName, () => JSX.Element> = {
     <>
       <path d="M10 14a4 4 0 0 1 0-5.6l2.8-2.8a4 4 0 0 1 5.6 5.6L17 12.6" />
       <path d="M14 10a4 4 0 0 1 0 5.6l-2.8 2.8a4 4 0 0 1-5.6-5.6L7 11.4" />
+    </>
+  ),
+  // Matrix-Feature-Icon: 2x2 Grid (heroicons squares-2x2)
+  'squares-2x2': () => (
+    <>
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
+      <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
+    </>
+  ),
+  // Board-Feature-Icon: drei vertikale Spalten (Kanban)
+  'view-columns': () => (
+    <>
+      <rect x="3.5" y="4" width="5" height="16" rx="1" />
+      <rect x="9.5" y="4" width="5" height="16" rx="1" />
+      <rect x="15.5" y="4" width="5" height="16" rx="1" />
+    </>
+  ),
+  // Info-Feature-Icon: Kreis mit i
+  'information-circle': () => (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v6" />
+      <circle cx="12" cy="8" r="0.6" fill="currentColor" />
+    </>
+  ),
+  // Cell-Indicator: kleiner ausgefuellter Punkt
+  'dot-filled': () => (
+    <circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none" />
+  ),
+  // Export-Icon: Download-Pfeil
+  'arrow-down-tray': () => (
+    <>
+      <path d="M12 4v12" />
+      <path d="m7 11 5 5 5-5" />
+      <path d="M4 20h16" />
     </>
   ),
 };

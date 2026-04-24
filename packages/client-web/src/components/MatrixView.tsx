@@ -30,14 +30,15 @@ import { translateDbError } from '../lib/errors';
 import { openDocsPopup } from '../lib/docs-ui';
 import CellOverlay from './CellOverlay';
 import MatrixAggregateSection from './MatrixAggregateSection';
+import Icon, { type IconName } from './Icon';
 
 const FEATURE_ORDER: CellFeature[] = ['matrix', 'board', 'info', 'checklists'];
 
-const FEATURE_ICON: Record<CellFeature, string> = {
-  matrix: '▦',
-  board: '▤',
-  info: 'i',
-  checklists: '✓',
+const FEATURE_ICON: Record<CellFeature, IconName> = {
+  matrix: 'squares-2x2',
+  board: 'view-columns',
+  info: 'information-circle',
+  checklists: 'check-circle',
 };
 
 const FEATURE_LABEL: Record<CellFeature, string> = {
@@ -700,7 +701,7 @@ const MatrixView: Component<Props> = (p) => {
                                           onChipClick(e, cell(), f, row, col)
                                         }
                                       >
-                                        {FEATURE_ICON[f]}
+                                        <Icon name={FEATURE_ICON[f]} size={14} />
                                       </span>
                                     );
                                   }}
@@ -723,7 +724,7 @@ const MatrixView: Component<Props> = (p) => {
                                       );
                                     }}
                                   >
-                                    ¶
+                                    <Icon name="document-text" size={14} />
                                   </span>
                                 </Show>
                               </div>

@@ -49,6 +49,7 @@ import { showToast, showUndoToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import CardOverlay from './CardOverlay';
 import ChecklistPanel from './ChecklistPanel';
+import Icon from './Icon';
 
 type Props = {
   workspaceId: string;
@@ -1068,7 +1069,9 @@ const BoardView: Component<Props> = (p) => {
                                         </span>
                                       </Show>
                                       <Show when={card.recur != null}>
-                                        <span class="kb-recur">↻</span>
+                                        <span class="kb-recur" title="Wiederkehrend">
+                                          <Icon name="arrow-path" size={12} />
+                                        </span>
                                       </Show>
                                       <Show when={progress()}>
                                         <span class="kb-cl-progress">

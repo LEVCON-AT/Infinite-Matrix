@@ -41,6 +41,7 @@ import ChecklistToCardPopup from './ChecklistToCardPopup';
 import ChecklistActionModal from './ChecklistActionModal';
 import { executeChecklistAction, parseChecklistAction } from '../lib/checklist-action';
 import { useNavigate } from '@solidjs/router';
+import Icon from './Icon';
 
 type Props = {
   checklist: ChecklistRow;
@@ -421,7 +422,7 @@ const ChecklistPanel: Component<Props> = (p) => {
         </span>
         <Show when={p.checklist.recur}>
           <span class="cl-recur" title="wiederkehrend">
-            ↻
+            <Icon name="arrow-path" size={12} />
           </span>
         </Show>
       </header>

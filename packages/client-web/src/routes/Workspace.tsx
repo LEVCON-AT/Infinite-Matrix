@@ -665,7 +665,8 @@ const Workspace: Component = () => {
               class="btn-subtle"
               onClick={() => setShowImport(true)}
             >
-              + JSON importieren
+              <Icon name="plus" size={14} />
+              JSON importieren
             </button>
             <button
               type="button"
@@ -674,7 +675,8 @@ const Workspace: Component = () => {
               disabled={exporting()}
               title="Kompletten Workspace als JSON herunterladen"
             >
-              ⇩ Export
+              <Icon name="arrow-down-tray" size={14} />
+              Export
             </button>
           </Show>
         </div>

@@ -426,7 +426,9 @@ const CellOverlay: Component<Props> = (p) => {
                   title={`${def.label} (Taste ${def.hotkey})`}
                 >
                   <span class="cell-feat-hotkey">{def.hotkey}</span>
-                  <span class="cell-feat-ico">{def.icon}</span>
+                  <span class="cell-feat-ico">
+                    <Icon name={def.iconName} size={16} />
+                  </span>
                   <span class="cell-feat-label">{def.label}</span>
                 </button>
               )}

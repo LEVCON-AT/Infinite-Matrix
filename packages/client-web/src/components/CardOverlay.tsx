@@ -725,7 +725,8 @@ const CardOverlay: Component<Props> = (p) => {
               <h4>Wiederholung</h4>
               <Show when={recurVal().type !== 'none'}>
                 <span class="card-recur-summary" title={recurHumanLabel(recurVal()) + (recurEndLabel(recurVal()) ? ' · ' + recurEndLabel(recurVal()) : '')}>
-                  ↻ {recurHumanLabel(recurVal())}
+                  <Icon name="arrow-path" size={12} />
+                  {' '}{recurHumanLabel(recurVal())}
                   <Show when={recurEndLabel(recurVal())}>
                     {' '}
                     <span class="card-recur-end-hint">· {recurEndLabel(recurVal())}</span>
