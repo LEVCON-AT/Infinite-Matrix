@@ -24,7 +24,7 @@ import type { ParsedPasteItem } from '../lib/checklist-paste-parse';
 import { cellTarget } from '../lib/alias-dispatch';
 import { supabase } from '../lib/supabase';
 import { showToast } from '../lib/toasts';
-import { showChoice, showConfirm, showPrompt } from '../lib/dialog';
+import { showChoice, showPrompt } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
 import { useVis } from '../lib/settings';
 import { useEditMode } from '../lib/edit-mode';
@@ -46,6 +46,7 @@ import {
   executeSubtreeImportIntoMatrix,
   ImportError,
   parseImportPayload,
+  type ImportMode,
   type ImportTarget,
 } from '../lib/subtree-import';
 import ContextMenu, { type CtxMenuState } from './ContextMenu';
@@ -526,13 +527,37 @@ const NodeTree: Component<Props> = (props) => {
         return;
       }
       const summary = summarizeExport(payload);
-      const ok = await showConfirm({
-        title: 'Import einfuegen?',
-        message: `Dieser Export enthaelt: ${summary}.\n\nDie Daten werden unter dem gewaehlten Ziel angehaengt. Aliase mit gleichem Namen bekommen einen Suffix (z.B. "-2").`,
-        confirmLabel: 'Einfuegen',
-        cancelLabel: 'Abbrechen',
+      // Einheitliche 3-Weg-Wahl fuer alle Import-Targets. Die Message
+      // passt sich an den Target-Typ an.
+      const messagePrefix = `Dieser Export enthaelt: ${summary}.`;
+      const messageSuffix =
+        target.kind === 'matrix'
+          ? '\n\nSoll er an die bestehenden Zeilen/Spalten angehaengt werden, oder die Matrix ersetzen? Beim Ersetzen kannst du optional vorher einen Sicherungs-Export speichern.'
+          : '\n\nSoll er an die bestehenden Daten angehaengt werden, oder bestehende Daten ersetzen? Beim Ersetzen kannst du optional vorher einen Sicherungs-Export speichern.';
+      const modeChoice = await showChoice({
+        title: 'Wie einfuegen?',
+        message: messagePrefix + messageSuffix,
+        choices: [
+          {
+            id: 'add',
+            label: 'Hinzufuegen',
+            variant: 'primary',
+          },
+          {
+            id: 'export-overwrite',
+            label: 'Sichern + Ersetzen',
+            variant: 'default',
+          },
+          {
+            id: 'overwrite',
+            label: 'Ersetzen',
+            variant: 'danger',
+          },
+        ],
       });
-      if (!ok) return;
+      if (!modeChoice) return;
+      const mode = modeChoice as ImportMode;
+
       if (target.kind === 'matrix') {
         await runMenuMutation(
           () =>
@@ -540,8 +565,9 @@ const NodeTree: Component<Props> = (props) => {
               payload,
               workspaceId: props.workspaceId,
               targetMatrixId: target.matrixNodeId,
+              mode,
             }).then(() => undefined),
-          `Import: ${summary}`,
+          `Matrix-Import: ${summary}`,
         );
       } else if (target.kind === 'cell') {
         if (payload.payloadType === 'feature-info') {
@@ -551,6 +577,7 @@ const NodeTree: Component<Props> = (props) => {
                 payload,
                 workspaceId: props.workspaceId,
                 targetCellId: target.cellId,
+                mode,
               }).then(() => undefined),
             `Info-Import: ${summary}`,
           );
@@ -561,6 +588,7 @@ const NodeTree: Component<Props> = (props) => {
                 payload,
                 workspaceId: props.workspaceId,
                 targetCellId: target.cellId,
+                mode,
               }).then(() => undefined),
             `Checklisten-Import: ${summary}`,
           );
@@ -571,6 +599,7 @@ const NodeTree: Component<Props> = (props) => {
                 payload,
                 workspaceId: props.workspaceId,
                 targetCellId: target.cellId,
+                mode,
               }).then(() => undefined),
             `Subtree-Import: ${summary}`,
           );
@@ -582,6 +611,7 @@ const NodeTree: Component<Props> = (props) => {
               payload,
               workspaceId: props.workspaceId,
               targetCellId: target.cellId,
+              mode,
             }).then(() => undefined),
           `Info-Import: ${summary}`,
         );
@@ -592,6 +622,7 @@ const NodeTree: Component<Props> = (props) => {
               payload,
               workspaceId: props.workspaceId,
               targetCellId: target.cellId,
+              mode,
             }).then(() => undefined),
           `Checklisten-Import: ${summary}`,
         );
@@ -998,12 +1029,13 @@ const NodeTree: Component<Props> = (props) => {
             })();
           },
         });
-        // Import nur fuer Matrix-Nodes (Boards sind Blaetter — da
-        // macht Subtree-Import keinen Sinn, man wuerde Cards haben
-        // wollen, das ist eine andere Operation).
+        // Import nur auf Matrix-Nodes (Boards haben keine Rows/Cols zum
+        // mergen). Matrix-Matrix-Merge: Rows+Cols+Cells der Quelle
+        // werden in die Ziel-Matrix integriert, Modus-Dialog steuert
+        // Hinzufuegen / Ersetzen / Sichern+Ersetzen.
         if (entry.node.type === 'matrix') {
           items.push({
-            label: 'Importieren (Subtree)',
+            label: 'Importieren',
             icon: '↑',
             onClick: () => {
               triggerImport({ kind: 'matrix', matrixNodeId: entry.id });

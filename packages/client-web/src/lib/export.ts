@@ -37,6 +37,10 @@ export type WorkspaceExport = {
   checklists: Record<string, unknown>[];
   checklist_items: Record<string, unknown>[];
   links: Record<string, unknown>[];
+  // Dokumente mit attached_cell_id innerhalb des Subtree. Workspace-
+  // freie Docs (attached_cell_id=NULL) werden nur vom Full-Workspace-
+  // Export erfasst. Default leer, damit alte Parser nichts brechen.
+  docs: Record<string, unknown>[];
   // Nur bei Cell-Subtree-Exports gesetzt: Meta-Info zur Quell-Zelle,
   // damit der Importer ihre info-Felder/Links und Feature-Flags in
   // die Ziel-Zelle mergen kann — ohne die Zelle selbst in cells[]
@@ -60,6 +64,7 @@ export type ExportStats = {
   links: number;
   infoFields: number;
   infoLinks: number;
+  docs: number;
 };
 
 function statsOf(e: WorkspaceExport): ExportStats {
@@ -91,6 +96,7 @@ function statsOf(e: WorkspaceExport): ExportStats {
     links: e.links.length,
     infoFields,
     infoLinks,
+    docs: e.docs.length,
   };
 }
 
@@ -123,6 +129,7 @@ export function formatExportStats(s: ExportStats): string {
     parts.push(
       `${s.infoLinks} ${s.infoLinks === 1 ? 'Info-Link' : 'Info-Links'}`,
     );
+  if (s.docs) parts.push(`${s.docs} ${s.docs === 1 ? 'Doku' : 'Dokus'}`);
   return parts.length === 0 ? '(leer)' : parts.join(' · ');
 }
 
@@ -154,6 +161,7 @@ export async function exportWorkspace(
     checklistsRes,
     checklistItemsRes,
     linksRes,
+    docsRes,
   ] = await Promise.all([
     supabase.from('nodes').select('*').eq('workspace_id', workspaceId),
     supabase.from('rows').select('*').eq('workspace_id', workspaceId),
@@ -167,6 +175,7 @@ export async function exportWorkspace(
       .select('*')
       .eq('workspace_id', workspaceId),
     supabase.from('links').select('*').eq('workspace_id', workspaceId),
+    supabase.from('docs').select('*').eq('workspace_id', workspaceId),
   ]);
 
   for (const res of [
@@ -179,6 +188,7 @@ export async function exportWorkspace(
     checklistsRes,
     checklistItemsRes,
     linksRes,
+    docsRes,
   ]) {
     if (res.error) throw res.error;
   }
@@ -200,6 +210,7 @@ export async function exportWorkspace(
       unknown
     >[],
     links: (linksRes.data ?? []) as Record<string, unknown>[],
+    docs: (docsRes.data ?? []) as Record<string, unknown>[],
   };
 }
 
@@ -255,6 +266,7 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     checklistsRes,
     checklistItemsRes,
     linksRes,
+    docsRes,
     wsRes,
   ] = await Promise.all([
     supabase.from('nodes').select('*').eq('workspace_id', workspaceId),
@@ -269,6 +281,7 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
       .select('*')
       .eq('workspace_id', workspaceId),
     supabase.from('links').select('*').eq('workspace_id', workspaceId),
+    supabase.from('docs').select('*').eq('workspace_id', workspaceId),
     supabase.from('workspaces').select('*').eq('id', workspaceId).single(),
   ]);
   for (const res of [
@@ -281,6 +294,7 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     checklistsRes,
     checklistItemsRes,
     linksRes,
+    docsRes,
     wsRes,
   ]) {
     if (res.error) throw res.error;
@@ -312,6 +326,10 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
       checklist_id: string;
     }>,
     links: (linksRes.data ?? []) as Array<{ id: string; board_id: string }>,
+    docs: (docsRes.data ?? []) as Array<{
+      id: string;
+      attached_cell_id: string | null;
+    }>,
   };
 }
 
@@ -383,7 +401,16 @@ export async function exportSubtree(
   const inNodes = (id: string) => sub.nodeIds.has(id);
   const inCells = (id: string) => sub.cellIds.has(id);
 
-  const filteredNodes = all.nodes.filter((n) => inNodes(n.id));
+  // Root-Node im Export als "kontext-frei" markieren: parent_cell_id
+  // wird auf null gesetzt, damit der Importer den Root erkennt — auch
+  // wenn der Quell-Node im Ursprungs-Workspace eine Sub-Matrix (mit
+  // parent_cell_id) war. Ohne diesen Strip findet die Import-Seite
+  // keinen Start-Punkt und meldet "Export unvollstaendig".
+  const filteredNodes = all.nodes
+    .filter((n) => inNodes(n.id))
+    .map((n) =>
+      n.id === rootNodeId ? { ...n, parent_cell_id: null } : n,
+    );
   const filteredRows = all.rows.filter((r) => sub.rowIds.has(r.id));
   const filteredCols = all.cols.filter((c) => sub.colIds.has(c.id));
   const filteredCells = all.cells.filter((c) => inCells(c.id));
@@ -399,6 +426,10 @@ export async function exportSubtree(
     filteredChecklistIds.has(it.checklist_id),
   );
   const filteredLinks = all.links.filter((l) => inNodes(l.board_id));
+  // Docs wandern mit, wenn sie an einer Subtree-Cell kleben.
+  const filteredDocs = all.docs.filter(
+    (d) => d.attached_cell_id && inCells(d.attached_cell_id),
+  );
 
   return {
     version: WORKSPACE_EXPORT_VERSION,
@@ -415,6 +446,7 @@ export async function exportSubtree(
     checklist_items:
       filteredChecklistItems as unknown as Record<string, unknown>[],
     links: filteredLinks as unknown as Record<string, unknown>[],
+    docs: filteredDocs as unknown as Record<string, unknown>[],
   };
 }
 
@@ -497,6 +529,12 @@ export async function exportCellSubtree(
     filteredChecklistIds.has(it.checklist_id),
   );
   const filteredLinks = all.links.filter((l) => inNodes(l.board_id));
+  // Docs: die an der Quell-Zelle haengen UND die in Sub-Struktur-Cells.
+  const filteredDocs = all.docs.filter(
+    (d) =>
+      d.attached_cell_id === cellId ||
+      (d.attached_cell_id && inCells(d.attached_cell_id)),
+  );
 
   return {
     version: WORKSPACE_EXPORT_VERSION,
@@ -513,6 +551,7 @@ export async function exportCellSubtree(
     checklist_items:
       filteredChecklistItems as unknown as Record<string, unknown>[],
     links: filteredLinks as unknown as Record<string, unknown>[],
+    docs: filteredDocs as unknown as Record<string, unknown>[],
     sourceCell: {
       data: cell.data ?? {},
       features: Array.isArray(cell.features) ? cell.features : [],
@@ -586,6 +625,7 @@ export async function exportFeatureInfo(
     checklists: [],
     checklist_items: [],
     links: [],
+    docs: [],
   };
 }
 
@@ -616,5 +656,6 @@ export async function exportFeatureChecklists(
     checklists: cellChecklists as unknown as Record<string, unknown>[],
     checklist_items: items as unknown as Record<string, unknown>[],
     links: [],
+    docs: [],
   };
 }

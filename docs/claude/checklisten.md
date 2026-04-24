@@ -27,6 +27,23 @@ Konventionen beschreiben *was* gilt, Prüfroutinen *wann* was zu prüfen ist. Vo
 - [ ] **Inline-Styles**: keine statischen `style="…"` — nur dynamische Werte (User-Input, berechnete Position) als `style="--x:${v}"` mit CSS-Klasse die `var(--x)` liest.
 - [ ] **Kontext-Rückbindung**: öffnet das Element ein Menü/Dialog? → Breadcrumb oder Source-Highlight zeigen, damit User sieht „worauf" gewirkt wird.
 
+## Trigger: Strukturelle Änderung (neue Tabelle / Spalte / FK / Feature)
+
+Schema-Änderungen dürfen nicht isoliert bleiben. Für jede strukturelle Änderung durchläuft der Change **vier Artefakte** — Export/Import ist gleichrangig zu MCP (ohne Export-Nachzug gibt es stille Datenverluste beim Round-Trip).
+
+- [ ] **DB-Schema** in `infra/supabase/migrations/*.sql` — Tabelle/Spalte/FK angelegt, idempotent, mit ON DELETE-Verhalten definiert.
+- [ ] **Client-Mutations** in `packages/client-web/src/lib/mutations.ts` — CRUD-Helper (`add*`, `set*`, `del*`) plus ggf. `restore*` für Undo.
+- [ ] **MCP-Tool-Trio**: Bridge-Schema in `packages/bridge/src/tools/<gruppe>.ts` + Client-Handler in `MATRIX_TOOLS` + Vitest (siehe [architektur.md](architektur.md#tool-trio-regel)).
+- [ ] **Export/Import** in `packages/client-web/src/lib/export.ts` + `lib/subtree-import.ts`:
+  - [ ] Neue Tabelle: `WorkspaceExport`-Shape erweitert, `fetchWorkspaceRowsForExport` lädt sie, alle `export*`-Varianten filtern sie subtree-korrekt, `parseImportPayload` liest sie tolerant, Import-Insert in FK-sicherer Reihenfolge, Clear-Helpers (für Overwrite-Modus) räumen sie auf.
+  - [ ] Neue Spalte: Spread `{ ...row }` deckt's ab; FK-Spalten explizit per `remap(...)` durchreichen.
+  - [ ] Neuer FK: Remap-Map um das Feld erweitern.
+  - [ ] Neues Cell-Feature: prüfen ob ein eigener `feature-<name>`-Export/Import nötig ist.
+  - [ ] JSONB-Felder mit embedded IDs: Remap auch dort (wie `kb_cards.checklist_ref` in `kb_cards.checklist[].id` wäre der Pattern).
+  - [ ] `formatExportStats` / `summarizeExport`: Count für den neuen Typ anzeigen.
+
+Merksatz: *Jede strukturelle Änderung braucht den Vier-Artefakte-Durchlauf — Schema + Mutations + MCP + Export/Import.*
+
 ## Trigger: Neues MATRIX_TOOL / Bridge-Endpoint
 
 - [ ] **Tool-Trio vollständig**: Schema + Client-Handler + Vitest (siehe [architektur.md](architektur.md#tool-trio-regel)).
