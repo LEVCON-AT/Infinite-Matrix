@@ -26,8 +26,14 @@ import { supabase } from '../lib/supabase';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import { useVis } from '../lib/settings';
+import { useEditMode } from '../lib/edit-mode';
 import { useSidebarChips } from '../lib/sidebar-chips';
 import { openDocsPopup } from '../lib/docs-ui';
+import {
+  downloadSubtreeExport,
+  exportCellSubtree,
+  exportSubtree,
+} from '../lib/export';
 import ContextMenu, { type CtxMenuState } from './ContextMenu';
 import ChecklistPastePopup from './ChecklistPastePopup';
 import Icon, { type IconName } from './Icon';
@@ -444,6 +450,9 @@ const NodeTree: Component<Props> = (props) => {
   // der User per Settings-Modal toggelt.
   const canAddInfoField = useVis('addInfoField');
   const canAddFeature = useVis('addFeature');
+  // Export/Import/Loeschen ignorieren vis-Settings und haengen nur am
+  // editMode — Ausnahme-Regel aus der Kontextmenue-Spec.
+  const editMode = useEditMode();
 
   // Zentraler Mutation-Wrapper: Toast bei Erfolg/Fehler, onChanged-
   // Propagation, optionales success-Label. Kapselt die 4-Zeilen-try-
@@ -804,6 +813,19 @@ const NodeTree: Component<Props> = (props) => {
           })();
         },
       });
+      if (editMode()) {
+        items.push({ label: '', onClick: () => {}, divider: true });
+        items.push({
+          label: 'Exportieren (mit Unterstruktur)',
+          icon: '↓',
+          onClick: () => {
+            void runMenuMutation(async () => {
+              const data = await exportSubtree(entry.id, props.workspaceId);
+              downloadSubtreeExport(data, entry.node.label);
+            }, 'Export geladen.');
+          },
+        });
+      }
       items.push({ label: '', onClick: () => {}, divider: true });
       items.push({
         label: 'Loeschen',
@@ -887,6 +909,20 @@ const NodeTree: Component<Props> = (props) => {
                 cellId: cell.id,
               });
             }, 'Checkliste angelegt.');
+          },
+        });
+      }
+      if (editMode()) {
+        items.push({ label: '', onClick: () => {}, divider: true });
+        items.push({
+          label: 'Exportieren (mit Unterstruktur)',
+          icon: '↓',
+          onClick: () => {
+            const labelGuess = `${entry.rowLabel}-${entry.colLabel}`;
+            void runMenuMutation(async () => {
+              const data = await exportCellSubtree(cell.id, props.workspaceId);
+              downloadSubtreeExport(data, labelGuess);
+            }, 'Export geladen.');
           },
         });
       }

@@ -123,3 +123,287 @@ export function downloadWorkspaceExport(
   // Cleanup nach naechstem Paint — sonst revocet Chrome den Download.
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
+
+// ─── Subtree-Export ────────────────────────────────────────────
+// Dasselbe Payload-Format wie der volle Workspace-Export, aber
+// gefiltert auf den Subtree unter einem Root-Node (Matrix/Board) oder
+// einer Cell. So kann der User Teile rauslösen (archivieren, auf
+// anderen Workspace re-importieren). Round-trip-Import ist SB.1d —
+// V1 liefert nur die Download-Seite.
+
+type SubtreeRowSet = {
+  nodeIds: Set<string>;
+  cellIds: Set<string>;
+  rowIds: Set<string>;
+  colIds: Set<string>;
+};
+
+async function fetchWorkspaceRowsForExport(workspaceId: string) {
+  // Dieselben Tabellen wie exportWorkspace, aber ohne workspace-Row.
+  // Nur einmal laden + danach filtern — spart runden gegen Supabase.
+  const [
+    nodesRes,
+    rowsRes,
+    colsRes,
+    cellsRes,
+    kbColsRes,
+    kbCardsRes,
+    checklistsRes,
+    checklistItemsRes,
+    linksRes,
+    wsRes,
+  ] = await Promise.all([
+    supabase.from('nodes').select('*').eq('workspace_id', workspaceId),
+    supabase.from('rows').select('*').eq('workspace_id', workspaceId),
+    supabase.from('cols').select('*').eq('workspace_id', workspaceId),
+    supabase.from('cells').select('*').eq('workspace_id', workspaceId),
+    supabase.from('kb_cols').select('*').eq('workspace_id', workspaceId),
+    supabase.from('kb_cards').select('*').eq('workspace_id', workspaceId),
+    supabase.from('checklists').select('*').eq('workspace_id', workspaceId),
+    supabase
+      .from('checklist_items')
+      .select('*')
+      .eq('workspace_id', workspaceId),
+    supabase.from('links').select('*').eq('workspace_id', workspaceId),
+    supabase.from('workspaces').select('*').eq('id', workspaceId).single(),
+  ]);
+  for (const res of [
+    nodesRes,
+    rowsRes,
+    colsRes,
+    cellsRes,
+    kbColsRes,
+    kbCardsRes,
+    checklistsRes,
+    checklistItemsRes,
+    linksRes,
+    wsRes,
+  ]) {
+    if (res.error) throw res.error;
+  }
+  return {
+    workspace: wsRes.data as Record<string, unknown>,
+    nodes: (nodesRes.data ?? []) as Array<{ id: string; parent_cell_id: string | null; type: string }>,
+    rows: (rowsRes.data ?? []) as Array<{ id: string; matrix_id: string }>,
+    cols: (colsRes.data ?? []) as Array<{ id: string; matrix_id: string }>,
+    cells: (cellsRes.data ?? []) as Array<{
+      id: string;
+      matrix_id: string;
+      row_id: string;
+      col_id: string;
+      child_matrix_id: string | null;
+      board_id: string | null;
+    }>,
+    kb_cols: (kbColsRes.data ?? []) as Array<{ id: string; board_id: string }>,
+    kb_cards: (kbCardsRes.data ?? []) as Array<{ id: string; board_id: string }>,
+    checklists: (checklistsRes.data ?? []) as Array<{
+      id: string;
+      board_id: string | null;
+      cell_id: string | null;
+    }>,
+    checklist_items: (checklistItemsRes.data ?? []) as Array<{
+      id: string;
+      checklist_id: string;
+    }>,
+    links: (linksRes.data ?? []) as Array<{ id: string; board_id: string }>,
+  };
+}
+
+// Sammelt alle IDs, die zum Subtree unter rootNodeId gehoeren.
+// Walk-Strategie: starte bei rootNodeId, fuege alle matrix-Cells dazu,
+// folge deren child_matrix_id/board_id als neue Root-Nodes, rekursiv.
+function collectSubtreeIds(
+  rootNodeId: string,
+  nodes: Array<{ id: string; parent_cell_id: string | null; type: string }>,
+  cells: Array<{
+    id: string;
+    matrix_id: string;
+    row_id: string;
+    col_id: string;
+    child_matrix_id: string | null;
+    board_id: string | null;
+  }>,
+  rows: Array<{ id: string; matrix_id: string }>,
+  cols: Array<{ id: string; matrix_id: string }>,
+): SubtreeRowSet {
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+  const set: SubtreeRowSet = {
+    nodeIds: new Set(),
+    cellIds: new Set(),
+    rowIds: new Set(),
+    colIds: new Set(),
+  };
+  const stack = [rootNodeId];
+  while (stack.length > 0) {
+    const id = stack.pop()!;
+    if (set.nodeIds.has(id)) continue;
+    const node = nodeById.get(id);
+    if (!node) continue;
+    set.nodeIds.add(id);
+    if (node.type === 'matrix') {
+      // Rows + Cols dieser Matrix
+      for (const r of rows) if (r.matrix_id === id) set.rowIds.add(r.id);
+      for (const c of cols) if (c.matrix_id === id) set.colIds.add(c.id);
+      // Cells + FKs auf Sub-Nodes
+      for (const cell of cells) {
+        if (cell.matrix_id !== id) continue;
+        set.cellIds.add(cell.id);
+        if (cell.child_matrix_id) stack.push(cell.child_matrix_id);
+        if (cell.board_id) stack.push(cell.board_id);
+      }
+    }
+    // Boards haben keine eigenen sub-nodes — sie sind Blaetter im Tree
+    // (Cards/Checklists haengen direkt dran, per board_id FK).
+  }
+  return set;
+}
+
+export async function exportSubtree(
+  rootNodeId: string,
+  workspaceId: string,
+): Promise<WorkspaceExport> {
+  const all = await fetchWorkspaceRowsForExport(workspaceId);
+  const sub = collectSubtreeIds(
+    rootNodeId,
+    all.nodes,
+    all.cells,
+    all.rows,
+    all.cols,
+  );
+
+  // Pro Tabelle auf Subtree filtern. Board-abhaengige Tabellen
+  // (kb_cols, kb_cards, links, checklists mit board_id) ueber
+  // nodeIds-Set gegen board_id matchen.
+  const inNodes = (id: string) => sub.nodeIds.has(id);
+  const inCells = (id: string) => sub.cellIds.has(id);
+
+  const filteredNodes = all.nodes.filter((n) => inNodes(n.id));
+  const filteredRows = all.rows.filter((r) => sub.rowIds.has(r.id));
+  const filteredCols = all.cols.filter((c) => sub.colIds.has(c.id));
+  const filteredCells = all.cells.filter((c) => inCells(c.id));
+  const filteredKbCols = all.kb_cols.filter((k) => inNodes(k.board_id));
+  const filteredKbCards = all.kb_cards.filter((k) => inNodes(k.board_id));
+  const filteredChecklists = all.checklists.filter(
+    (cl) =>
+      (cl.board_id && inNodes(cl.board_id)) ||
+      (cl.cell_id && inCells(cl.cell_id)),
+  );
+  const filteredChecklistIds = new Set(filteredChecklists.map((cl) => cl.id));
+  const filteredChecklistItems = all.checklist_items.filter((it) =>
+    filteredChecklistIds.has(it.checklist_id),
+  );
+  const filteredLinks = all.links.filter((l) => inNodes(l.board_id));
+
+  return {
+    version: WORKSPACE_EXPORT_VERSION,
+    exportedAt: new Date().toISOString(),
+    workspace: all.workspace,
+    nodes: filteredNodes as unknown as Record<string, unknown>[],
+    rows: filteredRows as unknown as Record<string, unknown>[],
+    cols: filteredCols as unknown as Record<string, unknown>[],
+    cells: filteredCells as unknown as Record<string, unknown>[],
+    kb_cols: filteredKbCols as unknown as Record<string, unknown>[],
+    kb_cards: filteredKbCards as unknown as Record<string, unknown>[],
+    checklists: filteredChecklists as unknown as Record<string, unknown>[],
+    checklist_items:
+      filteredChecklistItems as unknown as Record<string, unknown>[],
+    links: filteredLinks as unknown as Record<string, unknown>[],
+  };
+}
+
+// Cell-Subtree: die Cell selbst + eventuelle Sub-Matrix + Sub-Board.
+// Rekursion greift automatisch, weil collectSubtreeIds die FKs folgt
+// — hier wird nur die Root-Liste bestimmt.
+export async function exportCellSubtree(
+  cellId: string,
+  workspaceId: string,
+): Promise<WorkspaceExport> {
+  const all = await fetchWorkspaceRowsForExport(workspaceId);
+  const cell = all.cells.find((c) => c.id === cellId);
+  if (!cell) throw new Error('Zelle nicht gefunden.');
+
+  // Sammle IDs aus Sub-Matrix UND Sub-Board als Roots. Dann Cell/Row/Col
+  // manuell dazu, weil collectSubtreeIds bei Cell-Ebene ansetzt wuerde
+  // (wir wollen nur DIESE eine Cell, nicht alle Cells der Parent-Matrix).
+  const sub: SubtreeRowSet = {
+    nodeIds: new Set(),
+    cellIds: new Set([cellId]),
+    rowIds: new Set([cell.row_id]),
+    colIds: new Set([cell.col_id]),
+  };
+  for (const rootId of [cell.child_matrix_id, cell.board_id].filter(
+    (x): x is string => !!x,
+  )) {
+    const sub2 = collectSubtreeIds(
+      rootId,
+      all.nodes,
+      all.cells,
+      all.rows,
+      all.cols,
+    );
+    for (const id of sub2.nodeIds) sub.nodeIds.add(id);
+    for (const id of sub2.cellIds) sub.cellIds.add(id);
+    for (const id of sub2.rowIds) sub.rowIds.add(id);
+    for (const id of sub2.colIds) sub.colIds.add(id);
+  }
+
+  const inNodes = (id: string) => sub.nodeIds.has(id);
+  const inCells = (id: string) => sub.cellIds.has(id);
+
+  const filteredNodes = all.nodes.filter((n) => inNodes(n.id));
+  const filteredRows = all.rows.filter((r) => sub.rowIds.has(r.id));
+  const filteredCols = all.cols.filter((c) => sub.colIds.has(c.id));
+  const filteredCells = all.cells.filter((c) => inCells(c.id));
+  const filteredKbCols = all.kb_cols.filter((k) => inNodes(k.board_id));
+  const filteredKbCards = all.kb_cards.filter((k) => inNodes(k.board_id));
+  const filteredChecklists = all.checklists.filter(
+    (cl) =>
+      (cl.board_id && inNodes(cl.board_id)) ||
+      (cl.cell_id && inCells(cl.cell_id)),
+  );
+  const filteredChecklistIds = new Set(filteredChecklists.map((cl) => cl.id));
+  const filteredChecklistItems = all.checklist_items.filter((it) =>
+    filteredChecklistIds.has(it.checklist_id),
+  );
+  const filteredLinks = all.links.filter((l) => inNodes(l.board_id));
+
+  return {
+    version: WORKSPACE_EXPORT_VERSION,
+    exportedAt: new Date().toISOString(),
+    workspace: all.workspace,
+    nodes: filteredNodes as unknown as Record<string, unknown>[],
+    rows: filteredRows as unknown as Record<string, unknown>[],
+    cols: filteredCols as unknown as Record<string, unknown>[],
+    cells: filteredCells as unknown as Record<string, unknown>[],
+    kb_cols: filteredKbCols as unknown as Record<string, unknown>[],
+    kb_cards: filteredKbCards as unknown as Record<string, unknown>[],
+    checklists: filteredChecklists as unknown as Record<string, unknown>[],
+    checklist_items:
+      filteredChecklistItems as unknown as Record<string, unknown>[],
+    links: filteredLinks as unknown as Record<string, unknown>[],
+  };
+}
+
+// Subtree-Download mit automatischem Dateinamen-Präfix basierend auf
+// Label (Workspace-Name wird vom Workspace-Export-Download verwendet,
+// hier leiten wir Kontext aus dem Subtree-Root ab).
+export function downloadSubtreeExport(
+  exportData: WorkspaceExport,
+  filenameLabel: string,
+): void {
+  const pretty = JSON.stringify(exportData, null, 2);
+  const blob = new Blob([pretty], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const date = new Date().toISOString().slice(0, 10);
+  const safeLabel = (filenameLabel || 'subtree')
+    .replace(/[^a-z0-9-]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase() || 'subtree';
+  a.href = url;
+  a.download = `subtree-${safeLabel}-${date}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
