@@ -89,6 +89,37 @@ export function clip(s: string, max = 120): string {
   return s.slice(0, max - 1).trimEnd() + '…';
 }
 
+// Extrahiert einen Kontext-Fenster um das erste Match des Terms im Text.
+// Wenn `term` nicht gefunden wird, liefert clip(text, window). Port aus
+// HTML-Suche, wo die Ergebnisliste den Satz rund um das Treffer-Token
+// zeigt (statt nur Anfangs-Clip). Window ist Zeichen-Anzahl inkl.
+// Ellipsen-Markern.
+export function matchExcerpt(text: string, term: string, window = 140): string {
+  if (!text) return '';
+  if (!term) return clip(text, window);
+  const lower = text.toLowerCase();
+  const idx = lower.indexOf(term.toLowerCase());
+  if (idx < 0) return clip(text, window);
+  const halfWin = Math.max(20, Math.floor((window - term.length) / 2));
+  const start = Math.max(0, idx - halfWin);
+  const end = Math.min(text.length, idx + term.length + halfWin);
+  let out = text.slice(start, end);
+  if (start > 0) out = '… ' + out;
+  if (end < text.length) out = out + ' …';
+  return out;
+}
+
+// Splittet Multi-Term-Queries am `|`-Separator (HTML-Parity).
+// `"foo|bar"` → ['foo', 'bar']. Leerer/Whitespace-Terms werden entfernt.
+// Einzel-Term ohne Pipe → [trimmed]. Fuer simple Queries ohne Pipe
+// bleibt der ganze String ein einziger Term.
+export function splitTerms(raw: string): string[] {
+  return raw
+    .split('|')
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+}
+
 export async function searchWorkspace(
   rawQuery: string,
   workspaceId: string,

@@ -1113,6 +1113,16 @@ button[type='submit']:hover:not(:disabled) {
   white-space: nowrap;
 }
 
+/* Highlight fuer Treffer-Stellen in Title + Excerpt (HTML-Parity mit
+   `<mark class="sr-mark">`). Amber-Hintergrund signalisiert: "das war
+   der Grund, warum dieser Eintrag matched". */
+.sr-mark {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+  padding: 0 2px;
+  border-radius: 3px;
+}
+
 .global-search-badge[data-type='doc'] {
   background: var(--surface, var(--bg));
   border-color: var(--blue);

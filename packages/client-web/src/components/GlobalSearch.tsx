@@ -22,7 +22,7 @@ import {
   type Component,
 } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
-import { clip, searchWorkspace, type SearchResult } from '../lib/search';
+import { matchExcerpt, searchWorkspace, type SearchResult } from '../lib/search';
 import { rememberFocus } from '../lib/navigation-focus';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
@@ -204,12 +204,37 @@ const GlobalSearch: Component<Props> = (p) => {
     }
   }
 
-  // Snippet: fuer Card-Notizen und Doc-Content eine gekuerzte Excerpt-
-  // Zeile. Keine Treffer-Fenster-Suche — nur Anfangs-Excerpt.
+  // Snippet: fuer Card-Notizen und Doc-Content ein Kontext-Fenster um
+  // das Match herum (HTML-Parity — ohne Fenster-Suche konnte der User
+  // nur den Anfang des Texts sehen, nicht warum der Treffer gelistet
+  // wurde). matchExcerpt zentriert auf das erste Vorkommen des Terms.
   function subtitleFor(r: SearchResult): string | null {
-    if (r.kind === 'card' && r.note) return clip(r.note, 100);
-    if (r.kind === 'doc' && r.content) return clip(r.content, 100);
+    const term = query().trim();
+    if (r.kind === 'card' && r.note) return matchExcerpt(r.note, term, 140);
+    if (r.kind === 'doc' && r.content) return matchExcerpt(r.content, term, 140);
     return null;
+  }
+
+  // Wraps alle Vorkommen von `term` im `text` in <mark>-Tags. Gibt JSX-
+  // Array zurueck. Case-insensitiv, erhaelt Original-Casing im Match.
+  // Kein Regex-Escape noetig — wir splitten mit toLowerCase-indexOf.
+  function highlight(text: string, term: string) {
+    if (!term || !text) return [text];
+    const lower = text.toLowerCase();
+    const needle = term.toLowerCase();
+    const parts: (string | { mark: string })[] = [];
+    let pos = 0;
+    while (pos < text.length) {
+      const hit = lower.indexOf(needle, pos);
+      if (hit < 0) {
+        parts.push(text.slice(pos));
+        break;
+      }
+      if (hit > pos) parts.push(text.slice(pos, hit));
+      parts.push({ mark: text.slice(hit, hit + term.length) });
+      pos = hit + term.length;
+    }
+    return parts;
   }
 
   // Kind-Labels fuer Badges.
@@ -311,7 +336,15 @@ const GlobalSearch: Component<Props> = (p) => {
                           </span>
                           <div class="global-search-text">
                             <div class="global-search-title">
-                              {r.title}
+                              <For each={highlight(r.title, query().trim())}>
+                                {(part) =>
+                                  typeof part === 'string' ? (
+                                    <>{part}</>
+                                  ) : (
+                                    <mark class="sr-mark">{part.mark}</mark>
+                                  )
+                                }
+                              </For>
                               <Show when={r.alias}>
                                 <span class="global-search-alias">
                                   ^{r.alias}
@@ -320,7 +353,15 @@ const GlobalSearch: Component<Props> = (p) => {
                             </div>
                             <Show when={subtitleFor(r)}>
                               <div class="global-search-subtitle">
-                                {subtitleFor(r)}
+                                <For each={highlight(subtitleFor(r) as string, query().trim())}>
+                                  {(part) =>
+                                    typeof part === 'string' ? (
+                                      <>{part}</>
+                                    ) : (
+                                      <mark class="sr-mark">{part.mark}</mark>
+                                    )
+                                  }
+                                </For>
                               </div>
                             </Show>
                           </div>
