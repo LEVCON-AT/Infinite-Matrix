@@ -53,9 +53,18 @@ const ContextMenu: Component<Props> = (p) => {
   });
 
   // ESC im Capture-Phase, sonst schluckt der globale Back-Handler.
+  //
+  // WICHTIG: Guard auf p.state — die ContextMenu-Komponente bleibt
+  // dauerhaft gemountet (sie wird vom Parent ohne <Show>-Gate gerendert
+  // und haelt den Menu-Zustand via state-Prop). Ohne den Guard wuerde
+  // *jedes* Escape unkonditionell stopImmediatePropagation ausloesen und
+  // damit den globalen ESC-Handler (Parent-Nav) ausschalten. Zwei
+  // ContextMenu-Instanzen (NodeTree + Workspace-Alias-Chip) verstaerken
+  // das: 100% der ESC-Events werden geschluckt.
   onMount(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      if (!p.state) return;
       e.stopImmediatePropagation();
       p.onClose();
     };

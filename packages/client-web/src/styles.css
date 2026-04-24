@@ -798,71 +798,10 @@ button[type='submit']:hover:not(:disabled) {
   outline-offset: var(--focus-offset);
 }
 
-/* ── Alias-Quicknav (Ctrl+K Modal) ────────────────────────────── */
-.alias-quicknav-scrim {
-  align-items: flex-start;
-  padding-top: 15vh;
-}
-
-.alias-quicknav-card {
-  max-width: 480px;
-  padding: var(--space-md) var(--space-lg) var(--space-sm);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.alias-quicknav-form {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  border-bottom: 0.5px solid var(--border);
-  padding: var(--space-xs) 0;
-}
-
-.alias-quicknav-prefix {
-  font-size: 20px;
-  color: var(--blue);
-  font-weight: 600;
-  line-height: 1;
-  user-select: none;
-}
-
-.alias-quicknav-input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  color: var(--text);
-  font-size: 18px;
-  padding: 4px 0;
-  outline: none;
-  font-family: inherit;
-}
-
-.alias-quicknav-input::placeholder {
-  color: var(--text3);
-}
-
-.alias-quicknav-error {
-  margin: 0;
-  color: var(--red);
-  background: var(--redbg);
-  font-size: 12px;
-  padding: var(--space-xs) var(--space-sm);
-  border-radius: var(--rs);
-}
-
-.alias-quicknav-hint {
-  margin: 0;
-  color: var(--text3);
-  font-size: 11px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
-
-/* ── Command-Palette (Shift+P) ────────────────────────────────── */
-/* Aehnliches Layout wie alias-quicknav, aber mit breiterem Input
-   (Commands haben mehrere Woerter) und Amber statt Blau fuer das ^,
-   damit der User den Kontext (Command vs. Nav) sofort sieht. */
+/* ── Command-Palette (^) ──────────────────────────────────────── */
+/* Einheitliche Palette (frueher getrennt als alias-quicknav + command-
+   palette). Breiterer Input fuer Commands, Amber-^ als Kontext-Anker.
+   Inline-Help-Liste unter dem Input bei leerer Eingabe / "help". */
 .command-palette-scrim {
   align-items: flex-start;
   padding-top: 15vh;
@@ -921,6 +860,47 @@ button[type='submit']:hover:not(:disabled) {
   color: var(--text3);
   font-size: 11px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* ^help / leerer-Input-Dropdown: Liste der Command-Syntax + Beschreibung.
+   Kein eigenes Modal — Inline unter dem Input, damit der User weiter
+   tippen und die Uebersicht gleichzeitig scannen kann. */
+.command-palette-help {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.command-palette-help-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 32%) 1fr;
+  gap: var(--space-sm);
+  align-items: baseline;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--rs);
+}
+
+.command-palette-help-row:hover {
+  background: var(--bg2);
+}
+
+.command-palette-help-syntax {
+  color: var(--amber);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.command-palette-help-desc {
+  color: var(--text2);
+  font-size: 12px;
 }
 
 /* Sekundaerer Sub-Prompt innerhalb der Palette: z.B. Col-Picker fuer
@@ -1759,10 +1739,22 @@ button[type='submit']:hover:not(:disabled) {
   padding: 0;
 }
 
-.tree-root {
+/* Gleicher vertikaler Abstand zwischen allen Tree-Rows — egal ob
+   Siblings oder Parent→erstes-Child. Ohne gleichmaessigen Gap sitzt
+   das erste Child unmittelbar unter dem Parent-Row (ul/li stapeln
+   default margin:0), waehrend Siblings einen 1px-Gap haben. */
+.tree-root,
+.tree-root ul,
+.tree-root li {
   display: flex;
   flex-direction: column;
   gap: 1px;
+}
+
+.tree-root ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .tree-row {
@@ -1782,11 +1774,23 @@ button[type='submit']:hover:not(:disabled) {
   padding: 0;
   background: transparent;
   border: 0;
+  padding: 0;
   color: var(--text3);
   font-size: 10px;
   line-height: 1;
   cursor: pointer;
-  flex-shrink: 0;
+  /* Feste Box 16×20. min-width:0 schaltet das Flex-Item-Default
+     `min-width:auto` aus — sonst laesst der Browser den intrinsischen
+     Content-Width (Pfeil-Glyphe) durch und der Button wird 20-23 px
+     breit. Die Tree-Dots sollen pro Depth gleichmaessig versetzt sein;
+     inkonsistente Chevron-Widths brechen die SVG-Rails-Geometrie. */
+  flex: 0 0 16px;
+  box-sizing: border-box;
+  width: 16px;
+  min-width: 0;
+  max-width: 16px;
+  overflow: hidden;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1803,9 +1807,9 @@ button[type='submit']:hover:not(:disabled) {
 }
 
 .tree-chevron-empty {
-  width: 16px;
+  flex: 0 0 16px;
+  height: 20px;
   display: inline-block;
-  flex-shrink: 0;
 }
 
 .tree-link {
@@ -1861,22 +1865,65 @@ button[type='submit']:hover:not(:disabled) {
   position: relative;
 }
 
-.tree-row[style*='--tree-depth']::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: calc(var(--tree-depth, 0) * 12px + 10px);
-  width: 1px;
-  background: var(--border2);
-  pointer-events: none;
+/* ── SVG-Verbindungslinien (Tree-Rails) ─────────────────────────────
+   Portiert aus .sb-connections (matrix_tool_beta.html Z641-658).
+   Position absolut relativ zum node-tree-scroll; die .tree-root
+   bleibt auf z-index:1, das SVG auf z-index:2 mit pointer-events:none
+   (darf keine Klicks absorbieren). Gezeichnet von drawConnections().
+*/
+.node-tree-scroll {
+  position: relative;
 }
 
-/* Root-Ebene: keine Linie ueber der Matrix (sonst zieht sich ein
-   Strich durch Matrizen die gar keinen Parent haben). */
-.tree-row[style*='--tree-depth: 0']::before,
-.tree-root > li:first-child > .tree-row::before {
-  display: none;
+.tree-root {
+  position: relative;
+  z-index: 1;
+}
+
+.tree-connections {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 2;
+}
+
+.tree-connections path {
+  fill: none;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tree-connections path.ln-rail {
+  stroke: var(--border2);
+  opacity: 0.9;
+}
+
+.tree-connections path.ln-split {
+  opacity: 0.55;
+}
+
+.tree-connections path.ln-split.ln-matrix { stroke: var(--blue); }
+.tree-connections path.ln-split.ln-board  { stroke: var(--teal); }
+.tree-connections path.ln-split.ln-cell   { stroke: var(--amber); }
+
+.tree-connections circle.tree-dot-svg {
+  stroke: var(--bg2);
+  stroke-width: 1.5;
+  transition: r 120ms;
+}
+.tree-connections circle.dot-matrix { fill: var(--blue); }
+.tree-connections circle.dot-board  { fill: var(--teal); }
+.tree-connections circle.dot-cell   { fill: var(--amber); }
+.tree-connections circle.dot-active { stroke-width: 2; }
+
+/* Inline `.tree-dot`-Span haelt die Layout-Reserve, der SVG-Dot
+   ersetzt den sichtbaren Farb-Punkt. Ohne Reserve-Platzhalter wuerde
+   der Chevron an den Row-Rand rutschen. */
+.tree-dot {
+  opacity: 0;
 }
 
 /* Typ-Filter-Chips unter dem Filter-Input. Kleine toggle-buttons,

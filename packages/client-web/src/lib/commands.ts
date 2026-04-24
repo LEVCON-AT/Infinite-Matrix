@@ -56,8 +56,34 @@ export type ParsedCommand =
   | { kind: 'rename-alias'; alias: string; label: string }
   | { kind: 'new-doc' }
   | { kind: 'show-help' }
+  // Implicit: wenn der User einfach ^alias tippt (nur ein Token, kein
+  // Verb), landet das hier. Behaviour = Quicknav-Dispatch.
+  | { kind: 'navigate'; alias: string }
   | { kind: 'unsupported'; verb: string }
   | { kind: 'unknown'; raw: string };
+
+// Liste aller Verben — fuer Parser-Dispatch und fuer die Help-Uebersicht.
+// Eintraege werden in der Reihenfolge im ^help-Dropdown gezeigt.
+export const COMMAND_VERBS: Array<{
+  verb: string;
+  syntax: string;
+  description: string;
+  supported: boolean;
+}> = [
+  { verb: 'n', syntax: 'n [alias]', description: 'Neue Karte im aktuellen Board', supported: true },
+  {
+    verb: 'n -m',
+    syntax: 'n <card> -m <board> [col]',
+    description: 'Karte in anderes Board verschieben',
+    supported: true,
+  },
+  { verb: 'copy', syntax: 'copy <src> [dst]', description: 'Checkliste clonen', supported: true },
+  { verb: 'del', syntax: 'del <alias>', description: 'Alias aufloesen + loeschen', supported: true },
+  { verb: 'ren', syntax: 'ren <alias> <label>', description: 'Alias umbenennen', supported: true },
+  { verb: 'nd', syntax: 'nd', description: 'Neue Doku (Docs-Popup oeffnen)', supported: true },
+  { verb: 'help', syntax: 'help', description: 'Diese Uebersicht zeigen', supported: true },
+  { verb: '<alias>', syntax: '<alias>', description: 'Zum Alias springen (Navigation)', supported: true },
+];
 
 export function parseCommand(raw: string): ParsedCommand | null {
   const trimmed = raw.trim();
@@ -114,8 +140,8 @@ export function parseCommand(raw: string): ParsedCommand | null {
     return { kind: 'new-doc' };
   }
 
-  // k — KeyboardHelp
-  if (verb === 'k') {
+  // help / k — KeyboardHelp + Command-Uebersicht (Shortcut-Hilfe)
+  if (verb === 'help' || verb === 'k') {
     return { kind: 'show-help' };
   }
 
@@ -135,6 +161,13 @@ export function parseCommand(raw: string): ParsedCommand | null {
   ];
   if (stubs.includes(verb)) {
     return { kind: 'unsupported', verb };
+  }
+
+  // Kein bekanntes Verb UND nur ein Token UND das Token sieht wie ein Alias
+  // aus (a-z, 0-9) — als Navigation interpretieren. Macht ^kuerzel zum
+  // "jump to alias"-Shortcut, so wie frueher Ctrl+K / AliasQuicknav.
+  if (tokens.length === 1 && /^[a-z0-9]+$/.test(lower[0])) {
+    return { kind: 'navigate', alias: lower[0] };
   }
 
   return { kind: 'unknown', raw };
@@ -159,6 +192,10 @@ export type CommandUiHooks = {
     boardLabel: string;
     cols: Array<{ id: string; label: string }>;
   }) => void;
+  // Navigation: die Palette uebergibt dispatch-Logik (Router + Cell-Focus-
+  // Restore + window.open fuer Links). Rueckgabe entscheidet ob die Palette
+  // nach Dispatch schliesst (ok) oder eine Fehlermeldung anzeigt (msg).
+  onNavigateAlias: (alias: string) => Promise<{ ok: true } | { ok: false; msg: string }>;
 };
 
 export type CommandContext = {
@@ -194,6 +231,11 @@ export async function executeCommand(
   if (cmd.kind === 'show-help') {
     ctx.ui.onShowHelp();
     return { ok: true };
+  }
+  if (cmd.kind === 'navigate') {
+    const res = await ctx.ui.onNavigateAlias(cmd.alias);
+    if (res.ok) return { ok: true };
+    return { ok: false, message: res.msg };
   }
 
   return { ok: false, message: 'Command nicht erkannt.' };

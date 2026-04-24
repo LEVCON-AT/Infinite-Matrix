@@ -39,6 +39,17 @@ function dotColorFor(entry: TreeEntry): string {
   return 'var(--amber)';
 }
 
+// Dot-Typ-Schluessel fuer die SVG-Verbindungslinien. Entspricht den
+// .ln-<type>/.dot-<type>-CSS-Klassen in der tree-connections-Schicht.
+// matrix=blau, board=teal, cell=amber. Erweiterungsfaehig um feature-
+// Ebene (info/checklists/cellbox) wenn die Sidebar-Extension kommt.
+function dotTypeFor(entry: TreeEntry): 'matrix' | 'board' | 'cell' {
+  if (entry.kind === 'node') {
+    return entry.node.type === 'matrix' ? 'matrix' : 'board';
+  }
+  return 'cell';
+}
+
 function labelOf(entry: TreeEntry): string {
   if (entry.kind === 'node') return entry.node.label || '(ohne Label)';
   return `${entry.rowLabel} / ${entry.colLabel}`;
@@ -124,8 +135,10 @@ const TreeItem: Component<{
   entry: TreeEntry;
   currentNodeId: string | undefined;
   depth: number;
+  parentId?: string;
   expand: ReturnType<typeof useTreeExpand>;
   query: string;
+  activePath: Set<string>;
   openMenu: (entry: TreeEntry, rowEl: HTMLElement, x: number, y: number) => void;
   dragOverBoardId: () => string | null;
   onCardDragOver: (boardId: string, e: DragEvent) => void;
@@ -133,9 +146,20 @@ const TreeItem: Component<{
   onCardDrop: (boardId: string, e: DragEvent) => void;
 }> = (p) => {
   const hasChildren = () => p.entry.children.length > 0;
-  // Bei aktivem Filter ignorieren wir den persistierten Expand-State:
-  // der User will den Pfad zu den Treffern sofort sehen.
-  const expanded = () => (p.query ? true : p.expand.isExpanded(p.entry.id));
+  // Expand-Regeln in Reihenfolge (HTML-Parity, siehe sbExpanded-Logik
+  // matrix_tool_beta.html Z2654):
+  //   1. Filter aktiv → alles offen (Pfad zu Treffern)
+  //   2. User-Toggle (persisted) → explizit offen
+  //   3. Active-Path → auto-expanded (Pfad zur currentNodeId)
+  // Die aktive Node selbst ist nicht im activePath-Set — so kann der
+  // User sie explizit einklappen, ohne dass sie sich sofort wieder
+  // aufklappt.
+  const expanded = () => {
+    if (p.query) return true;
+    if (p.expand.isExpanded(p.entry.id)) return true;
+    if (p.activePath.has(p.entry.id)) return true;
+    return false;
+  };
 
   let rowRef: HTMLDivElement | undefined;
 
@@ -153,6 +177,10 @@ const TreeItem: Component<{
         }}
         data-entry-kind={p.entry.kind}
         data-node-type={p.entry.kind === 'node' ? p.entry.node.type : undefined}
+        data-tree-id={p.entry.id}
+        data-tree-parent={p.parentId ?? ''}
+        data-tree-depth={p.depth}
+        data-dot-type={dotTypeFor(p.entry)}
         style={{
           'padding-left': `${p.depth * 12 + 4}px`,
           '--tree-depth': p.depth,
@@ -195,8 +223,10 @@ const TreeItem: Component<{
           href={hrefOf(p.workspaceId, p.entry)}
           class="tree-link"
           classList={{
-            active:
-              p.entry.kind === 'node' && p.entry.id === p.currentNodeId,
+            // Active auf Node- UND Cell-Routen: currentNodeId kommt
+            // entweder aus /n/:nodeId oder aus /c/:cellId. Beide matchen
+            // auf entry.id (Nodes: node.id, Cells: cell.id).
+            active: p.entry.id === p.currentNodeId,
           }}
           data-tree-entry-id={p.entry.id}
           data-tree-has-children={hasChildren() ? 'yes' : 'no'}
@@ -240,8 +270,10 @@ const TreeItem: Component<{
                 entry={child}
                 currentNodeId={p.currentNodeId}
                 depth={p.depth + 1}
+                parentId={p.entry.id}
                 expand={p.expand}
                 query={p.query}
+                activePath={p.activePath}
                 openMenu={p.openMenu}
                 dragOverBoardId={p.dragOverBoardId}
                 onCardDragOver={p.onCardDragOver}
@@ -264,6 +296,128 @@ const NodeTree: Component<Props> = (props) => {
   const [ctxMenu, setCtxMenu] = createSignal<CtxMenuState | null>(null);
   const [dragOverBoardId, setDragOverBoardId] = createSignal<string | null>(null);
   let inputRef: HTMLInputElement | undefined;
+  let scrollRef: HTMLDivElement | undefined;
+  let svgRef: SVGSVGElement | undefined;
+
+  // SVG-Verbindungslinien zeichnen — portiert aus sbDrawConnections
+  // (matrix_tool_beta.html ~Z2935). Drei Schichten:
+  //   - Own-Rail:    grau, vertikal durch Parent-Dot → bis letztes Descendant
+  //   - Sibling-Rail: grau, vertikal bei Child-x zwischen 1. + letztem Kind
+  //   - Split-Curve:  farbig (Kind-Typ), Bezier Parent-Dot → erster Kind-Dot
+  // Dots oben drauf, farbig per dot-<type>. Die data-tree-*-Attribute
+  // an den .tree-row-Nodes liefern id/parent/depth/dotType.
+  //
+  // Abweichung zum HTML-Vorbild: dort sassen Nodes in einem festen
+  // Grid — cx war per `depth*INDENT + DOT_IN_SLOT` berechenbar. Unser
+  // SolidJS-Client nutzt flex + padding-left, deshalb messen wir die
+  // Position des inline `.tree-dot`-Spans pro Row direkt via
+  // getBoundingClientRect. Der inline-Dot wird via CSS unsichtbar
+  // gemacht (opacity:0), haelt aber die Layout-Reserve — der SVG-Dot
+  // zeichnet sich exakt ueber seinen Platz.
+  function drawConnections() {
+    if (!scrollRef || !svgRef) return;
+    const rootUl = scrollRef.querySelector<HTMLElement>('.tree-root');
+    if (!rootUl) {
+      svgRef.innerHTML = '';
+      return;
+    }
+    const w = rootUl.clientWidth;
+    const h = rootUl.scrollHeight;
+    if (w <= 1 || h <= 1) return;
+    svgRef.setAttribute('width', String(w));
+    svgRef.setAttribute('height', String(h));
+    svgRef.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    svgRef.style.width = `${w}px`;
+    svgRef.style.height = `${h}px`;
+    svgRef.style.top = `${rootUl.offsetTop}px`;
+    svgRef.style.left = `${rootUl.offsetLeft}px`;
+
+    const rootRect = rootUl.getBoundingClientRect();
+    const rows = Array.from(
+      scrollRef.querySelectorAll<HTMLElement>('.tree-row'),
+    );
+
+    type Meta = {
+      cx: number;
+      cy: number;
+      depth: number;
+      dotType: string;
+      el: HTMLElement;
+    };
+    const meta = new Map<string, Meta>();
+    const byParent = new Map<string, string[]>();
+    // cx pro Depth LINEAR berechnen — nicht aus dem inline-Dot messen.
+    // Der inline-Dot sitzt je nach Chevron-Typ und Link-Padding an
+    // leicht anderer x-Position, was die Split-Curves optisch
+    // asymmetrisch macht (manche Kurven lang, manche gequetscht).
+    // Mit festem INDENT=14 sind alle Kurven identisch breit.
+    const INDENT = 14;
+    const ORIGIN_X = 14;
+    rows.forEach((el) => {
+      const id = el.dataset.treeId;
+      if (!id) return;
+      const parent = el.dataset.treeParent || '';
+      const depth = parseInt(el.dataset.treeDepth || '0', 10);
+      const dotType = el.dataset.dotType || 'matrix';
+      const r = el.getBoundingClientRect();
+      const cx = depth * INDENT + ORIGIN_X;
+      const cy = r.top + r.height / 2 - rootRect.top;
+      meta.set(id, { cx, cy, depth, dotType, el });
+      if (parent) {
+        if (!byParent.has(parent)) byParent.set(parent, []);
+        byParent.get(parent)!.push(id);
+      }
+    });
+
+    function lastDescendantCy(nodeId: string): number {
+      const kids = byParent.get(nodeId);
+      if (!kids || kids.length === 0) {
+        const m = meta.get(nodeId);
+        return m ? m.cy : -Infinity;
+      }
+      let maxY = -Infinity;
+      for (const cid of kids) {
+        const y = lastDescendantCy(cid);
+        if (y > maxY) maxY = y;
+      }
+      return maxY;
+    }
+
+    const activeId = props.currentNodeId;
+    let rails = '';
+    let splits = '';
+    byParent.forEach((kids, parentId) => {
+      const pm = meta.get(parentId);
+      if (!pm) return;
+      const firstMeta = meta.get(kids[0]);
+      const lastMeta = meta.get(kids[kids.length - 1]);
+      if (!firstMeta || !lastMeta) return;
+      const ownLastY = lastDescendantCy(parentId);
+      if (ownLastY > pm.cy + 3) {
+        rails += `<path class="ln-rail" d="M ${pm.cx} ${pm.cy} L ${pm.cx} ${ownLastY}"/>`;
+      }
+      const railX = firstMeta.cx;
+      if (kids.length > 1 && lastMeta.cy > firstMeta.cy) {
+        rails += `<path class="ln-rail" d="M ${railX} ${firstMeta.cy} L ${railX} ${lastMeta.cy}"/>`;
+      }
+      const py = pm.cy;
+      const cyFirst = firstMeta.cy;
+      const d = `M ${pm.cx} ${py + 3} C ${pm.cx} ${cyFirst}, ${railX} ${cyFirst - 6}, ${railX} ${cyFirst}`;
+      splits += `<path class="ln-split ln-${firstMeta.dotType}" d="${d}"/>`;
+    });
+
+    let dots = '';
+    meta.forEach((m, id) => {
+      const isActive = id === activeId;
+      const r = isActive ? 4.2 : 3;
+      const activeCls = isActive ? ' dot-active' : '';
+      dots += `<circle class="tree-dot-svg dot-${m.dotType}${activeCls}" cx="${m.cx}" cy="${m.cy}" r="${r}"/>`;
+    });
+
+    svgRef.innerHTML = rails + splits + dots;
+  }
+
+  // Effect weiter unten, nach filtered() registriert (Use-Before-Decl).
 
   // Card-Drop auf Board-Eintraege in der Sidebar (cross-board move).
   // BoardView setzt den Card-ID auf text/matrix-card-id; wir holen ihn
@@ -350,6 +504,49 @@ const NodeTree: Component<Props> = (props) => {
   const filtered = createMemo(() =>
     filterTree(props.tree, query().trim(), chips()),
   );
+
+  // Active-Path: Set aller Ancestor-IDs, die zur currentNodeId fuehren.
+  // Wird im TreeItem benutzt, um Pfad zur aktiven Node automatisch
+  // aufzuklappen (Port aus HTML `activePath`/`sbExpanded` auto-expand,
+  // siehe matrix_tool_beta.html Z2621-2654). Die aktive Node selbst
+  // ist NICHT im Set — nur ihre Eltern. So bleibt sie collapsed, wenn
+  // der User explizit ihren eigenen Chevron einklappt.
+  const activePath = createMemo<Set<string>>(() => {
+    const target = props.currentNodeId;
+    if (!target) return new Set();
+    const path = new Set<string>();
+    // Rekursiv durch den Tree laufen: wenn wir eine Node finden deren
+    // id === target, geben wir true zurueck + der Caller fuegt sich
+    // selbst hinzu (NOT target selbst, damit man den Self-Collapse
+    // behalten kann). Bei Cells tragen wir Parent-Cell + Matrix ein.
+    function walk(entries: TreeEntry[]): boolean {
+      for (const e of entries) {
+        if (e.id === target) return true;
+        if (e.children.length === 0) continue;
+        if (walk(e.children)) {
+          path.add(e.id);
+          return true;
+        }
+      }
+      return false;
+    }
+    walk(props.tree);
+    return path;
+  });
+
+  // SVG-Linien neu zeichnen bei jeder State-Aenderung, die Rows zeigt/
+  // versteckt/verschiebt. requestAnimationFrame wartet auf DOM-Flush.
+  createEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    filtered();
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    props.currentNodeId;
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    expand.state();
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    query();
+    requestAnimationFrame(() => drawConnections());
+  });
 
   function openMenu(entry: TreeEntry, rowEl: HTMLElement, x: number, y: number) {
     const items: CtxMenuState['items'] = [];
@@ -576,7 +773,13 @@ const NodeTree: Component<Props> = (props) => {
           · Zellen
         </button>
       </div>
-      <div class="node-tree-scroll">
+      <div class="node-tree-scroll" ref={scrollRef}>
+      <svg
+        class="tree-connections"
+        ref={svgRef}
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+      />
       <Show
         when={filtered().length > 0}
         fallback={
@@ -597,6 +800,7 @@ const NodeTree: Component<Props> = (props) => {
                 depth={0}
                 expand={expand}
                 query={query().trim()}
+                activePath={activePath()}
                 openMenu={openMenu}
                 dragOverBoardId={dragOverBoardId}
                 onCardDragOver={onCardDragOver}

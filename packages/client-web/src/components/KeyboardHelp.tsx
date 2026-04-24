@@ -22,11 +22,9 @@ const SECTIONS: ShortcutSection[] = [
     title: 'Global',
     entries: [
       { keys: ['?'], desc: 'Diese Hilfe oeffnen/schliessen' },
-      { keys: ['Ctrl+K'], desc: 'Alias-Quicknav (auch Cmd+K)' },
-      { keys: ['^'], desc: 'Alias-Quicknav direkt' },
+      { keys: ['^'], desc: 'Palette — Alias springen + Commands (n/copy/del/ren/nd/help)' },
       { keys: ['/'], desc: 'Suche in Matrizen, Boards, Karten, Checklisten' },
       { keys: ['Shift+D'], desc: 'Dokumentations-Popup oeffnen' },
-      { keys: ['Shift+P'], desc: 'Command-Palette (n/copy/del/ren/nd/k)' },
       { keys: ['Shift+N'], desc: 'Sidebar-Modus zyklen (full → rails → aus)' },
       { keys: ['s'], desc: 'Fokus Sidebar ↔ Canvas swappen' },
       { keys: ['Shift+W'], desc: 'Aufgabenuebersicht ↔ Intervallmatrix toggeln (im Matrix-Kontext)' },

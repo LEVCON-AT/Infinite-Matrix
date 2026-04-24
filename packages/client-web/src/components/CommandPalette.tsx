@@ -1,18 +1,20 @@
-// Command-Palette: Shift+P oeffnet sie. Anders als die AliasQuicknav,
-// die reine Navigation macht, fuehrt die Palette Mutations aus
-// (neue Karte, Clone, Move, Del, Ren, ...). Siehe lib/commands.ts fuer
-// Parser + Dispatcher.
+// Command-Palette: `^` oeffnet sie (Shift+P/Ctrl+K wurden entfernt —
+// einheitlicher Entry-Point). Die Palette vereinigt die frueher separate
+// AliasQuicknav: ein Token ohne Verb = Navigation (Alias-Jump), sonst
+// Command-Parser (siehe lib/commands.ts).
 //
 // Input akzeptiert Leerzeichen und Minus — sonst funktioniert z.B.
 // "n alias" oder "n karte -m board" nicht. Filter nur auf offen-
 // sichtlich gefaehrliche Zeichen.
 //
-// Zwei Modi:
+// Drei Modi:
 //   input    — Normaler Command-Eingabe-Modus (Default).
+//   help     — ^help oder leere Eingabe zeigt Command-Uebersicht.
 //   col-pick — Sekundaer-Prompt fuer move-card ohne explizite Spalte:
 //              zeigt die Ziel-Board-Spalten als Select, User bestaetigt.
 
 import {
+  createMemo,
   createSignal,
   For,
   onCleanup,
@@ -20,13 +22,17 @@ import {
   Show,
   type Component,
 } from 'solid-js';
+import { useNavigate } from '@solidjs/router';
 import type { NodeRow } from '../lib/types';
 import {
+  COMMAND_VERBS,
   executeCommand,
   parseCommand,
   reportOutcome,
   type CommandUiHooks,
 } from '../lib/commands';
+import { resolveAlias } from '../lib/alias-resolve';
+import { dispatchAliasResult } from '../lib/alias-dispatch';
 import { moveCardToBoard } from '../lib/mutations';
 import { supabase } from '../lib/supabase';
 import { flashError } from '../lib/flash';
@@ -51,12 +57,22 @@ type ColPickState = {
 };
 
 const CommandPalette: Component<Props> = (p) => {
+  const navigate = useNavigate();
   const [query, setQuery] = createSignal('');
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [colPick, setColPick] = createSignal<ColPickState | null>(null);
   let inputRef: HTMLInputElement | undefined;
   let colSelectRef: HTMLSelectElement | undefined;
+
+  // Help-Modus: leere Eingabe ODER exakt "help"/"k" zeigen die Command-
+  // Uebersicht als Inline-Dropdown unter dem Input. Kein extra Modal —
+  // der User sieht die Verben waehrend er tippt, und sobald er was
+  // eingibt was kein Help-Token ist, verschwindet die Uebersicht.
+  const showHelpList = createMemo(() => {
+    const q = query().trim().toLowerCase();
+    return q === '' || q === 'help' || q === 'k';
+  });
 
   let prevFocus: HTMLElement | null = null;
   onMount(() => {
@@ -108,6 +124,23 @@ const CommandPalette: Component<Props> = (p) => {
       });
       // Focus wandert zum Select; setTimeout wegen Mount-Reihenfolge.
       setTimeout(() => colSelectRef?.focus(), 0);
+    },
+    onNavigateAlias: async (alias) => {
+      // Gemergt aus AliasQuicknav (vorher separate Komponente). Alias
+      // aufloesen + ueber dispatchAliasResult navigieren. Fehlerfall
+      // liefert Msg zurueck, damit die Palette den Input-Flash triggert.
+      try {
+        const outcome = await resolveAlias(alias, p.workspaceId);
+        if (!outcome.ok) return { ok: false, msg: outcome.msg };
+        dispatchAliasResult(outcome.result, {
+          workspaceId: p.workspaceId,
+          navigate,
+          onError: (msg) => showToast(msg, 'error'),
+        });
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, msg: translateDbError(err) };
+      }
     },
   };
 
@@ -206,7 +239,7 @@ const CommandPalette: Component<Props> = (p) => {
               class="command-palette-input"
               type="text"
               value={query()}
-              placeholder={'z.B. "n alias", "ren alias Titel", "del alias", "nd"'}
+              placeholder={'kuerzel springen · "n alias" · "ren alias Titel" · "help"'}
               autocomplete="off"
               spellcheck={false}
               disabled={busy()}
@@ -228,9 +261,27 @@ const CommandPalette: Component<Props> = (p) => {
               {error()}
             </p>
           </Show>
-          <p class="command-palette-hint">
-            <strong>n</strong>/<strong>copy</strong>/<strong>del</strong>/<strong>ren</strong>/<strong>nd</strong>/<strong>k</strong> · Enter = ausfuehren · Esc = schliessen
-          </p>
+          {/* Help-Dropdown: bei leerer Eingabe ODER "help"/"k" das volle
+              Command-Vokabular als Liste anzeigen. Gleichzeitig hint-
+              artig: User sieht was moeglich ist, ohne extra Modal zu
+              oeffnen. Bei jeder anderen Eingabe wird es ausgeblendet. */}
+          <Show when={showHelpList()}>
+            <ul class="command-palette-help" role="list" aria-label="Verfuegbare Commands">
+              <For each={COMMAND_VERBS}>
+                {(entry) => (
+                  <li class="command-palette-help-row">
+                    <code class="command-palette-help-syntax">{entry.syntax}</code>
+                    <span class="command-palette-help-desc">{entry.description}</span>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </Show>
+          <Show when={!showHelpList()}>
+            <p class="command-palette-hint">
+              Enter = ausfuehren · Esc = schliessen · "help" = Uebersicht
+            </p>
+          </Show>
         </Show>
 
         <Show when={colPick()}>

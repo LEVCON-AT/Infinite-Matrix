@@ -40,7 +40,6 @@ import CellChecklistsPage from '../components/CellChecklistsPage';
 import CellDocsPage from '../components/CellDocsPage';
 import CellInfoPage from '../components/CellInfoPage';
 import AliasAutocomplete from '../components/AliasAutocomplete';
-import AliasQuicknav from '../components/AliasQuicknav';
 import ContextMenu from '../components/ContextMenu';
 import { aliasChipMenuState, closeAliasChipMenu } from '../lib/alias-chip-menu';
 import CommandPalette from '../components/CommandPalette';
@@ -129,8 +128,10 @@ const Workspace: Component = () => {
 
   const [workspaces] = createResource(() => fetchMyWorkspaces());
   const [showImport, setShowImport] = createSignal(false);
-  const [showQuicknav, setShowQuicknav] = createSignal(false);
   const [showSearch, setShowSearch] = createSignal(false);
+  // Einheitliche `^`-Palette — frueher getrennt als Quicknav (Ctrl+K)
+  // und Command-Palette (Shift+P). Benutzer-Entscheidung 2026-04-24:
+  // alles ueber `^`; Ctrl+K / Shift+P entfernt.
   const [showCommand, setShowCommand] = createSignal(false);
   const [showDocs, setShowDocs] = createSignal(false);
   const [showHelp, setShowHelp] = createSignal(false);
@@ -358,7 +359,9 @@ const Workspace: Component = () => {
     onCleanup(() => document.removeEventListener('keydown', onKey));
   });
 
-  // Quicknav: Ctrl+K / Cmd+K ODER direktes ^ oeffnen das Alias-Modal.
+  // Palette-Shortcut: `^` ist der einzige Entry-Point (Ctrl+K und Shift+P
+  // entfernt auf User-Wunsch 2026-04-24). Die Palette macht sowohl
+  // Alias-Navigation als auch Commands — siehe CommandPalette.tsx.
   //
   // ^-Erkennung cross-layout:
   //   - US-Tastatur: Shift+6 liefert e.key = '^'
@@ -369,8 +372,7 @@ const Workspace: Component = () => {
   //
   // Wenn der User in einem Input/Textarea tippt, lassen wir ^ als
   // normales Zeichen durch — sonst kann er kein Zirkumflex im Text
-  // mehr setzen. Gleiche Regel fuer Cmd+K (OS-Konvention: in Inputs
-  // ignorieren).
+  // mehr setzen.
   onMount(() => {
     const isTextInput = (t: EventTarget | null): boolean => {
       const el = t as HTMLElement | null;
@@ -382,17 +384,7 @@ const Workspace: Component = () => {
 
     const onKey = (e: KeyboardEvent) => {
       if (!params.workspaceId) return;
-      if (showQuicknav() || showSearch() || showCommand()) return;
-
-      // Cmd/Ctrl+K
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
-        if (e.key === 'k' || e.key === 'K') {
-          if (isTextInput(e.target)) return;
-          e.preventDefault();
-          setShowQuicknav(true);
-          return;
-        }
-      }
+      if (showSearch() || showCommand()) return;
 
       // "/" oeffnet Global-Search. Auf DE-Layout ist "/" = Shift+7, auf
       // US direkt — e.key ist '/' in beiden Faellen. In Inputs ignorieren
@@ -435,20 +427,6 @@ const Workspace: Component = () => {
         if (isTextInput(e.target)) return;
         e.preventDefault();
         openDocsPopup();
-        return;
-      }
-
-      // Shift+P: Command-Palette oeffnen.
-      if (
-        e.shiftKey &&
-        !e.ctrlKey &&
-        !e.metaKey &&
-        !e.altKey &&
-        (e.key === 'P' || e.key === 'p')
-      ) {
-        if (isTextInput(e.target)) return;
-        e.preventDefault();
-        setShowCommand(true);
         return;
       }
 
@@ -516,14 +494,15 @@ const Workspace: Component = () => {
         return;
       }
 
-      // ^ direkt (ohne Modifier ausser evtl. Shift fuer US-Tastatur)
+      // ^ direkt (ohne Modifier ausser evtl. Shift fuer US-Tastatur) —
+      // oeffnet die einheitliche Palette fuer Alias-Navigation + Commands.
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const isCaret =
         e.key === '^' || (e.key === 'Dead' && e.code === 'Backquote');
       if (!isCaret) return;
       if (isTextInput(e.target)) return;
       e.preventDefault();
-      setShowQuicknav(true);
+      setShowCommand(true);
     };
     document.addEventListener('keydown', onKey);
     onCleanup(() => document.removeEventListener('keydown', onKey));
@@ -637,7 +616,7 @@ const Workspace: Component = () => {
           <NodeTree
             workspaceId={params.workspaceId as string}
             tree={tree()}
-            currentNodeId={params.nodeId}
+            currentNodeId={params.nodeId ?? params.cellId}
           />
         </Show>
         <div class="ws-actions">
@@ -698,13 +677,6 @@ const Workspace: Component = () => {
           im DOM, egal wie viele Chips gerade gerendert sind. */}
       <ContextMenu state={aliasChipMenuState()} onClose={closeAliasChipMenu} />
 
-      <Show when={showQuicknav() && params.workspaceId}>
-        <AliasQuicknav
-          workspaceId={params.workspaceId as string}
-          onClose={() => setShowQuicknav(false)}
-        />
-      </Show>
-
       <Show when={showSearch() && params.workspaceId}>
         <GlobalSearch
           workspaceId={params.workspaceId as string}
@@ -747,7 +719,11 @@ const Workspace: Component = () => {
               <span class="ws-breadcrumb-ws">{currentWs()?.name}</span>
               <For each={breadcrumb()}>
                 {(crumb, i) => {
-                  const isLast = () => i() === breadcrumb().length - 1;
+                  // Wenn auf /c/:cellId — die Cell-Row/Col-Span folgt NACH
+                  // dem For-Loop und ist die eigentliche "current". Dann
+                  // duerfen alle Matrix/Board-Crumbs Links bleiben.
+                  const isLast = () =>
+                    !currentCell() && i() === breadcrumb().length - 1;
                   return (
                     <>
                       <span class="ws-breadcrumb-sep" aria-hidden>
