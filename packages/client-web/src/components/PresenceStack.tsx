@@ -19,18 +19,19 @@ type Props = {
 
 const MAX_VISIBLE = 4;
 
-const Avatar: Component<{ user: () => PresenceUser; isSelf: () => boolean }> = (p) => {
-  const email = () => p.user().email;
-  const colorVar = () => avatarColorFor(email());
+const Avatar: Component<{ user: PresenceUser; isSelf: boolean }> = (p) => {
+  // p.user ist via Solid-Reactive-Props automatisch reaktiv — Avatar
+  // bleibt permanent gemountet dank <Index> im Parent. Nur der reaktive
+  // Inhalt (Email, Color) aktualisiert sich.
   return (
     <span
       class="presence-avatar"
-      classList={{ 'presence-avatar-self': p.isSelf() }}
-      style={{ '--avatar-color': `var(${colorVar()})` }}
-      title={p.isSelf() ? `${email()} (Du)` : email()}
-      aria-label={email()}
+      classList={{ 'presence-avatar-self': p.isSelf }}
+      style={{ '--avatar-color': `var(${avatarColorFor(p.user.email)})` }}
+      title={p.isSelf ? `${p.user.email} (Du)` : p.user.email}
+      aria-label={p.user.email}
     >
-      {avatarInitial(email())}
+      {avatarInitial(p.user.email)}
     </span>
   );
 };
@@ -52,7 +53,7 @@ const PresenceStack: Component<Props> = (p) => {
           der Avatar-DOM-Node nie ersetzt — nur sein Inhalt aktualisiert.
           Damit bleibt das Layout frame-stable, kein Blink, kein Shift. */}
       <Index each={visible()}>
-        {(u) => <Avatar user={u} isSelf={() => u().userId === p.selfUserId} />}
+        {(u) => <Avatar user={u()} isSelf={u().userId === p.selfUserId} />}
       </Index>
       <Show when={overflow() > 0}>
         <span

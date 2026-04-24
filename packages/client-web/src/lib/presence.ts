@@ -13,7 +13,13 @@
 // haengt an den gelesenen Accessors; onCleanup im Effect entfernt
 // den alten Channel bevor der neue entsteht.
 
-import { type Accessor, createEffect, createSignal, onCleanup } from 'solid-js';
+import {
+  type Accessor,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+} from 'solid-js';
 import { supabase } from './supabase';
 
 export type PresenceUser = {
@@ -29,10 +35,23 @@ export function usePresence(
 ): Accessor<PresenceUser[]> {
   const [users, setUsers] = createSignal<PresenceUser[]>([]);
 
+  // Supabase emittiert `onAuthStateChange` auch bei reinen Token-Refreshs
+  // (TOKEN_REFRESHED ohne Identity-Wechsel). Das produziert ein neues
+  // Session-Object → neue User-Reference → `user()` emittiert → unser
+  // Effect unten wuerde den Presence-Channel voellig abreissen und neu
+  // aufbauen — das fuehrt zu einem Avatar-Blink im Sekunden-/Minuten-
+  // Takt. Die createMemos stabilisieren die Effect-Deps auf String-
+  // Equality (createMemo default `equals:===`): solange ID, Email und
+  // WsId wirklich gleich sind, emittiert das Memo nicht und der Effect
+  // laeuft nicht erneut.
+  const wsIdMemo = createMemo(() => workspaceId());
+  const selfIdMemo = createMemo(() => selfUserId());
+  const emailMemo = createMemo(() => selfEmail());
+
   createEffect(() => {
-    const wsId = workspaceId();
-    const selfId = selfUserId();
-    const email = selfEmail();
+    const wsId = wsIdMemo();
+    const selfId = selfIdMemo();
+    const email = emailMemo();
     if (!wsId || !selfId) {
       setUsers([]);
       return;
@@ -54,6 +73,17 @@ export function usePresence(
         string,
         Array<{ email?: string; joinedAt?: string }>
       >;
+      // Stale-State-Filter: Auf Staging feuert der Realtime-Server
+      // periodisch CHANNEL_ERROR → SUBSCRIBED (~1 s-Takt). In dem Re-
+      // Subscribe-Fenster ist channel.presenceState() kurz leer, bevor
+      // unser eigener track() wieder durchkommt (~35 ms spaeter).
+      // Diesen Zwischenstand darf das UI nicht sehen — sonst unmountet/
+      // remountet der Avatar im Blink-Rhythmus. Solange wir subscribed
+      // sind, MUESSEN wir selbst im Presence-State sein. Fehlt self
+      // → stale, rebuild ignorieren, auf das naechste sync warten.
+      if (selfId && !(selfId in raw)) {
+        return;
+      }
       const list: PresenceUser[] = [];
       for (const [userId, metas] of Object.entries(raw)) {
         const meta = metas[0];
