@@ -84,6 +84,12 @@ const CommandPalette: Component<Props> = (p) => {
   });
 
   let prevFocus: HTMLElement | null = null;
+  // Dead-Key-Grace: wenn der User die Palette via `^` oeffnet, liefert
+  // das DE-Layout danach ein zusammengesetztes Zeichen (ê, ô, â, ...)
+  // bzw. einen blanken `^` ans naechste Input-Feld. Wir verwerfen die
+  // ersten beforeinput-Events in einem kurzen Fenster, wenn sie mit
+  // einem Circumflex-Zeichen anfangen.
+  const openedAt = Date.now();
   onMount(() => {
     prevFocus = document.activeElement as HTMLElement | null;
     setTimeout(() => inputRef?.focus(), 0);
@@ -301,6 +307,18 @@ const CommandPalette: Component<Props> = (p) => {
               autocomplete="off"
               spellcheck={false}
               disabled={busy()}
+              onBeforeInput={(e) => {
+                // DeadKey-Schutz: innerhalb der ersten 400 ms nach
+                // Modal-Open Circumflex-Composites (^/ê/ô/â/û/î + Gross-
+                // varianten) aus dem naechsten beforeinput ausfiltern.
+                // Kommen von der `^`-Aktivierung, nicht vom User-Tippen.
+                if (Date.now() - openedAt > 400) return;
+                const data = (e as InputEvent).data;
+                if (typeof data !== 'string' || !data) return;
+                if (/^[\^êôâûîÊÔÂÛÎ]/.test(data)) {
+                  e.preventDefault();
+                }
+              }}
               onInput={(e) => {
                 // Nur potenziell gefaehrliche Zeichen stripen. Leerzeichen
                 // und Minus bleiben — Commands brauchen sie.
