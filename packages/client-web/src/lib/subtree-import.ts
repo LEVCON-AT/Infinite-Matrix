@@ -328,7 +328,7 @@ async function clearCellSubstructure(cellId: string): Promise<void> {
 }
 
 // Leert infoFields + links in cell.data und nimmt 'info' aus features.
-async function clearCellInfoData(cellId: string): Promise<void> {
+export async function clearCellInfoData(cellId: string): Promise<void> {
   const { data: cell, error } = await supabase
     .from('cells')
     .select('data, features')
@@ -349,7 +349,7 @@ async function clearCellInfoData(cellId: string): Promise<void> {
 
 // Loescht alle Cell-scoped Checklisten + Items + nimmt 'checklists'
 // aus features.
-async function clearCellChecklistsData(cellId: string): Promise<void> {
+export async function clearCellChecklistsData(cellId: string): Promise<void> {
   const { data: lists, error } = await supabase
     .from('checklists')
     .select('id')
@@ -397,7 +397,7 @@ async function clearCellDocs(cellId: string): Promise<void> {
 
 // Alle zusammen — wird bei Cell-Subtree-Overwrite benutzt, weil der
 // neue Import alles an der Zielzelle ersetzt.
-async function clearCellCompletely(cellId: string): Promise<void> {
+export async function clearCellCompletely(cellId: string): Promise<void> {
   await clearCellSubstructure(cellId);
   await clearCellInfoData(cellId);
   await clearCellChecklistsData(cellId);
@@ -445,7 +445,7 @@ async function collectDescendantNodeIds(
 // (sonst werden sie beim Cell-Delete orphan wegen nodes.parent_cell_id
 // ON DELETE SET NULL), dann Docs, dann Cells/Rows/Cols der Matrix.
 // Der Matrix-Node selbst (mit Label/Alias/Notizen) bleibt unberuehrt.
-async function clearMatrixContents(matrixId: string): Promise<void> {
+export async function clearMatrixContents(matrixId: string): Promise<void> {
   // 1. Alle descendant-Nodes sammeln (sub-Matrizen / sub-Boards
   //    rekursiv). Diese muessen explizit geloescht werden — das
   //    Schema hat nodes.parent_cell_id ON DELETE SET NULL, nicht

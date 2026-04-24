@@ -63,11 +63,18 @@ import { rememberFocus } from '../lib/navigation-focus';
 import { openDocsPopup } from '../lib/docs-ui';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
+import {
+  runResetAll,
+  runResetScope,
+  type ResetScope,
+} from '../lib/workspace-reset';
 import Icon from './Icon';
 
 type Props = {
   workspaceId: string;
   currentNode: NodeRow | undefined;
+  currentCellId?: string;
+  currentFeature?: 'info' | 'checklists' | 'docs';
   onShowHelp: () => void;
   // Damit wir die HeaderSearchBar von aussen fokussieren koennen
   // (`f`-Global-Keybind in Workspace.tsx).
@@ -375,6 +382,50 @@ const HeaderSearchBar: Component<Props> = (p) => {
         return { ok: false, msg: translateDbError(err) };
       }
     },
+    onResetHere: async () => {
+      let scope: ResetScope | null = null;
+      let nodeLabel: string | undefined;
+      if (p.currentFeature === 'info' && p.currentCellId) {
+        scope = { kind: 'feature-info', cellId: p.currentCellId };
+      } else if (p.currentFeature === 'checklists' && p.currentCellId) {
+        scope = { kind: 'feature-checklists', cellId: p.currentCellId };
+      } else if (p.currentCellId) {
+        scope = { kind: 'cell', cellId: p.currentCellId };
+      } else if (p.currentNode) {
+        nodeLabel = p.currentNode.label;
+        scope =
+          p.currentNode.type === 'matrix'
+            ? { kind: 'matrix', matrixNodeId: p.currentNode.id }
+            : { kind: 'board', boardNodeId: p.currentNode.id };
+      }
+      if (!scope) {
+        showToast(
+          'Keine aktive Ebene zum Leeren. Oeffne eine Matrix/Zelle/Feature und versuch es nochmal.',
+          'error',
+        );
+        return false;
+      }
+      return await runResetScope({
+        workspaceId: p.workspaceId,
+        scope,
+        nodeLabel,
+      });
+    },
+    onResetAll: async (skipConfirm) => {
+      const result = await runResetAll({
+        workspaceId: p.workspaceId,
+        skipConfirm,
+      });
+      if (result) {
+        inputRef?.blur();
+        setTimeout(
+          () => navigate(`/w/${p.workspaceId}/n/${result.rootMatrixId}`),
+          0,
+        );
+        return true;
+      }
+      return false;
+    },
   };
 
   async function applyCommand() {
@@ -389,6 +440,8 @@ const HeaderSearchBar: Component<Props> = (p) => {
     const outcome = await executeCommand(cmd, {
       workspaceId: p.workspaceId,
       currentNode: p.currentNode,
+      currentCellId: p.currentCellId,
+      currentFeature: p.currentFeature,
       ui: uiHooks,
     });
     setBusy(false);

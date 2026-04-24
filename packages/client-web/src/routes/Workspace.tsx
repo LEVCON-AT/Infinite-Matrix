@@ -850,6 +850,8 @@ const Workspace: Component = () => {
         <CommandPalette
           workspaceId={params.workspaceId as string}
           currentNode={currentNode()}
+          currentCellId={params.cellId}
+          currentFeature={cellSection() ?? undefined}
           onClose={() => setShowCommand(false)}
           onShowHelp={() => setShowHelp(true)}
         />
@@ -942,6 +944,8 @@ const Workspace: Component = () => {
               <HeaderSearchBar
                 workspaceId={params.workspaceId as string}
                 currentNode={currentNode()}
+                currentCellId={params.cellId}
+                currentFeature={cellSection() ?? undefined}
                 onShowHelp={() => setShowHelp(true)}
                 registerFocus={(fn) => {
                   focusHeaderSearch = fn;

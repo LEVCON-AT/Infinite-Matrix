@@ -38,6 +38,7 @@ import {
   exportSubtree,
   summarizeExport,
 } from '../lib/export';
+import { runResetScope } from '../lib/workspace-reset';
 import {
   checkTypeCompatibility,
   executeFeatureChecklistsImport,
@@ -1042,6 +1043,33 @@ const NodeTree: Component<Props> = (props) => {
             },
           });
         }
+        items.push({
+          label: 'Leeren',
+          icon: '⌫',
+          onClick: () => {
+            void (async () => {
+              try {
+                const ran = await runResetScope({
+                  workspaceId: props.workspaceId,
+                  scope:
+                    entry.node.type === 'matrix'
+                      ? { kind: 'matrix', matrixNodeId: entry.id }
+                      : { kind: 'board', boardNodeId: entry.id },
+                  nodeLabel: entry.node.label,
+                });
+                if (ran) {
+                  showToast(
+                    `${entry.node.type === 'matrix' ? 'Matrix' : 'Board'} geleert.`,
+                    'success',
+                  );
+                  props.onChanged?.();
+                }
+              } catch (err) {
+                showToast(translateDbError(err), 'error');
+              }
+            })();
+          },
+        });
       }
       items.push({ label: '', onClick: () => {}, divider: true });
       items.push({
@@ -1167,6 +1195,26 @@ const NodeTree: Component<Props> = (props) => {
           icon: '↑',
           onClick: () => {
             triggerImport({ kind: 'cell', cellId: cell.id });
+          },
+        });
+        items.push({
+          label: 'Leeren',
+          icon: '⌫',
+          onClick: () => {
+            void (async () => {
+              try {
+                const ran = await runResetScope({
+                  workspaceId: props.workspaceId,
+                  scope: { kind: 'cell', cellId: cell.id },
+                });
+                if (ran) {
+                  showToast('Zelle geleert.', 'success');
+                  props.onChanged?.();
+                }
+              } catch (err) {
+                showToast(translateDbError(err), 'error');
+              }
+            })();
           },
         });
       }
@@ -1307,6 +1355,34 @@ const NodeTree: Component<Props> = (props) => {
                 ? { kind: 'feature-info', cellId }
                 : { kind: 'feature-checklists', cellId },
             );
+          },
+        });
+        items.push({
+          label: 'Leeren',
+          icon: '⌫',
+          onClick: () => {
+            void (async () => {
+              try {
+                const ran = await runResetScope({
+                  workspaceId: props.workspaceId,
+                  scope:
+                    entry.feature === 'info'
+                      ? { kind: 'feature-info', cellId }
+                      : { kind: 'feature-checklists', cellId },
+                });
+                if (ran) {
+                  showToast(
+                    entry.feature === 'info'
+                      ? 'Info-Felder geleert.'
+                      : 'Checklisten geleert.',
+                    'success',
+                  );
+                  props.onChanged?.();
+                }
+              } catch (err) {
+                showToast(translateDbError(err), 'error');
+              }
+            })();
           },
         });
       }

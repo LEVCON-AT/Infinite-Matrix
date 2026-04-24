@@ -33,6 +33,11 @@ import {
 } from '../lib/commands';
 import { resolveAlias } from '../lib/alias-resolve';
 import { dispatchAliasResult } from '../lib/alias-dispatch';
+import {
+  runResetAll,
+  runResetScope,
+  type ResetScope,
+} from '../lib/workspace-reset';
 import { moveCardToBoard } from '../lib/mutations';
 import { supabase } from '../lib/supabase';
 import { flashError } from '../lib/flash';
@@ -43,6 +48,10 @@ import { translateDbError } from '../lib/errors';
 type Props = {
   workspaceId: string;
   currentNode: NodeRow | undefined;
+  // Fuer ^reset: wenn der User auf einer Cell-Page ist, bezieht sich
+  // "reset-here" auf die Cell bzw. die gezeigte Feature-Seite.
+  currentCellId?: string;
+  currentFeature?: 'info' | 'checklists' | 'docs';
   onClose: () => void;
   onShowHelp: () => void;
 };
@@ -142,6 +151,53 @@ const CommandPalette: Component<Props> = (p) => {
         return { ok: false, msg: translateDbError(err) };
       }
     },
+    onResetHere: async () => {
+      // Scope aus dem aktuellen Kontext ableiten: currentFeature >
+      // currentCellId > currentNode.type. Wenn kein Kontext: Fehler.
+      let scope: ResetScope | null = null;
+      let nodeLabel: string | undefined;
+      if (p.currentFeature === 'info' && p.currentCellId) {
+        scope = { kind: 'feature-info', cellId: p.currentCellId };
+      } else if (p.currentFeature === 'checklists' && p.currentCellId) {
+        scope = { kind: 'feature-checklists', cellId: p.currentCellId };
+      } else if (p.currentCellId) {
+        scope = { kind: 'cell', cellId: p.currentCellId };
+      } else if (p.currentNode) {
+        nodeLabel = p.currentNode.label;
+        scope =
+          p.currentNode.type === 'matrix'
+            ? { kind: 'matrix', matrixNodeId: p.currentNode.id }
+            : { kind: 'board', boardNodeId: p.currentNode.id };
+      }
+      if (!scope) {
+        showToast(
+          'Keine aktive Ebene zum Leeren. Oeffne eine Matrix/Zelle/Feature und versuch es nochmal.',
+          'error',
+        );
+        return false;
+      }
+      return await runResetScope({
+        workspaceId: p.workspaceId,
+        scope,
+        nodeLabel,
+      });
+    },
+    onResetAll: async (skipConfirm) => {
+      const result = await runResetAll({
+        workspaceId: p.workspaceId,
+        skipConfirm,
+      });
+      if (result) {
+        // Nach Reset zur neuen Root-Matrix navigieren.
+        p.onClose();
+        setTimeout(
+          () => navigate(`/w/${p.workspaceId}/n/${result.rootMatrixId}`),
+          0,
+        );
+        return true;
+      }
+      return false;
+    },
   };
 
   async function onSubmit(e: SubmitEvent) {
@@ -163,6 +219,8 @@ const CommandPalette: Component<Props> = (p) => {
     const outcome = await executeCommand(cmd, {
       workspaceId: p.workspaceId,
       currentNode: p.currentNode,
+      currentCellId: p.currentCellId,
+      currentFeature: p.currentFeature,
       ui: uiHooks,
     });
     setBusy(false);

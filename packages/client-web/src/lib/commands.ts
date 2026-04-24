@@ -56,6 +56,14 @@ export type ParsedCommand =
   | { kind: 'rename-alias'; alias: string; label: string }
   | { kind: 'new-doc' }
   | { kind: 'show-help' }
+  // Reset-here: leert den Ebene-Kontext (Matrix / Board / Cell /
+  // Feature) — was genau geleert wird, bestimmt ctx.currentNode +
+  // ctx.currentCellId + ctx.currentFeature.
+  | { kind: 'reset-here' }
+  // Reset-all: Workspace komplett leeren + frische Root-Matrix.
+  // skipConfirm=true (via -y-Flag): keine Rueckfrage, keine Export-
+  // Nachfrage — fuer schnelles Testen.
+  | { kind: 'reset-all'; skipConfirm: boolean }
   // Implicit: wenn der User einfach ^alias tippt (nur ein Token, kein
   // Verb), landet das hier. Behaviour = Quicknav-Dispatch.
   | { kind: 'navigate'; alias: string }
@@ -83,6 +91,13 @@ export const COMMAND_VERBS: Array<{
   { verb: 'del', syntax: 'del <alias>', description: 'Alias aufloesen + loeschen', supported: true },
   { verb: 'ren', syntax: 'ren <alias> <label>', description: 'Alias umbenennen', supported: true },
   { verb: 'nd', syntax: 'nd', description: 'Neue Doku (Docs-Popup oeffnen)', supported: true },
+  {
+    verb: 'reset',
+    syntax: 'reset [-all] [-y]',
+    description:
+      'Inhalt der aktuellen Ebene leeren. `-all` = ganzer Workspace. `-y` = ohne Rueckfrage.',
+    supported: true,
+  },
   { verb: 'help', syntax: 'help', description: 'Diese Uebersicht zeigen', supported: true },
   { verb: '<alias>', syntax: '<alias>', description: 'Zum Alias springen (Navigation)', supported: true },
   // Stubs — parseCommand liefert {kind:'unsupported'}, die Bar zeigt sie
@@ -160,6 +175,15 @@ export function parseCommand(raw: string): ParsedCommand | null {
     return { kind: 'show-help' };
   }
 
+  // reset [-all] [-y]
+  if (verb === 'reset') {
+    const flags = new Set(lower.slice(1));
+    const isAll = flags.has('-all') || flags.has('--all');
+    const skipConfirm = flags.has('-y') || flags.has('--yes');
+    if (isAll) return { kind: 'reset-all', skipConfirm };
+    return { kind: 'reset-here' };
+  }
+
   // Known-but-unsupported verbs.
   const stubs = [
     'w',
@@ -211,11 +235,21 @@ export type CommandUiHooks = {
   // Restore + window.open fuer Links). Rueckgabe entscheidet ob die Palette
   // nach Dispatch schliesst (ok) oder eine Fehlermeldung anzeigt (msg).
   onNavigateAlias: (alias: string) => Promise<{ ok: true } | { ok: false; msg: string }>;
+  // reset-here / reset-all: Palette delegiert den destruktiven Flow
+  // inkl. optionalem Export-Prompt an die UI-Schicht. Rueckgabe true
+  // wenn ausgefuehrt, false wenn abgebrochen (Fehler gehen via throw).
+  onResetHere: () => Promise<boolean>;
+  onResetAll: (skipConfirm: boolean) => Promise<boolean>;
 };
 
 export type CommandContext = {
   workspaceId: string;
   currentNode: NodeRow | undefined;
+  // Fuer ^reset ohne -all: Zelle/Feature, auf dem der User gerade
+  // steht. Beide optional — wenn keins gesetzt, bezieht sich `reset-
+  // here` auf currentNode (Matrix / Board).
+  currentCellId?: string;
+  currentFeature?: 'info' | 'checklists' | 'docs';
   ui: CommandUiHooks;
 };
 
@@ -246,6 +280,24 @@ export async function executeCommand(
   if (cmd.kind === 'show-help') {
     ctx.ui.onShowHelp();
     return { ok: true };
+  }
+  if (cmd.kind === 'reset-here') {
+    try {
+      const ok = await ctx.ui.onResetHere();
+      if (!ok) return { ok: false, message: 'Abgebrochen.' };
+      return { ok: true, message: 'Ebene geleert.' };
+    } catch (err) {
+      return { ok: false, message: translateDbError(err) };
+    }
+  }
+  if (cmd.kind === 'reset-all') {
+    try {
+      const ok = await ctx.ui.onResetAll(cmd.skipConfirm);
+      if (!ok) return { ok: false, message: 'Abgebrochen.' };
+      return { ok: true, message: 'Workspace geleert.' };
+    } catch (err) {
+      return { ok: false, message: translateDbError(err) };
+    }
   }
   if (cmd.kind === 'navigate') {
     const res = await ctx.ui.onNavigateAlias(cmd.alias);
