@@ -322,11 +322,28 @@ export function buildTree(nodes: NodeRow[], cells: CellRow[]): TreeNode[] {
 //   - ein Child-Node (Board/Matrix) an ihr haengt (parent_cell_id match).
 // Zell-Label ist "rowLabel / colLabel"; wenn Row/Col fehlen (orphaned),
 // wird die Zelle ausgelassen.
+// Chip-Daten fuer den Sidebar-Tree (SB.2). Leer lassen heisst "Chip
+// aus" — dann werden keine Extra-Rows emittiert. Die Maps sind indiziert
+// nach dem passenden Parent, damit buildNode O(1)-Lookup hat.
+export type SidebarChipData = {
+  // Board-Links (LinkRow) indiziert nach board_id.
+  linksByBoardId?: Map<string, LinkRow[]>;
+  // Docs indiziert nach attached_cell_id.
+  docsByCellId?: Map<string, DocRow[]>;
+  // Filter nach Link-Typ: 'url' zeigt URLs, 'mail' zeigt Mails.
+  // Beides in einem Set bedeutet beide Typen anzeigen; leer = keine.
+  linkTypes?: Set<'url' | 'mail'>;
+  // Show cell.data.links (info-field-links) wenn 'url' oder 'mail' im
+  // Set ist. Wird auch fuers showMail-Flag gebraucht.
+  showInfoLinks?: boolean;
+};
+
 export function buildSidebarTree(
   nodes: NodeRow[],
   cells: CellRow[],
   rows: RowRow[],
   cols: ColRow[],
+  chipData?: SidebarChipData,
 ): TreeEntry[] {
   const rowById = new Map(rows.map((r) => [r.id, r]));
   const colById = new Map(cols.map((c) => [c.id, c]));
@@ -344,6 +361,70 @@ export function buildSidebarTree(
     childNodesByCell.set(n.parent_cell_id, arr);
   }
 
+  // Chip-Daten-Shortcuts. Leer heisst: Chip aus, nichts emittieren.
+  const linkTypes = chipData?.linkTypes ?? new Set<'url' | 'mail'>();
+  const showInfoLinks = chipData?.showInfoLinks === true;
+  const linksByBoardId = chipData?.linksByBoardId ?? new Map<string, LinkRow[]>();
+  const docsByCellId = chipData?.docsByCellId ?? new Map<string, DocRow[]>();
+
+  function linkEntryFromBoardLink(l: LinkRow): TreeEntry {
+    return {
+      kind: 'link',
+      id: `link-board-${l.id}`,
+      linkType: l.type,
+      label: l.label || l.url,
+      url: l.url,
+      alias: l.alias,
+      children: [],
+    };
+  }
+
+  function linkEntryFromInfoLink(
+    cellId: string,
+    l: { id: string; label: string; url: string },
+  ): TreeEntry {
+    // InfoLinks haben keinen Typ-Discriminator (InfoLink hat nur
+    // id/label/url). Wir derivieren url/mail aus dem Prefix; das ist
+    // dieselbe Heuristik wie in der Link-Add-Eingabe.
+    const looksLikeMail =
+      l.url.includes('@') && !/^[a-z]+:\/\//i.test(l.url);
+    return {
+      kind: 'link',
+      id: `link-info-${cellId}-${l.id}`,
+      linkType: looksLikeMail ? 'mail' : 'url',
+      label: l.label || l.url,
+      url: l.url,
+      alias: null,
+      children: [],
+    };
+  }
+
+  function docEntry(d: DocRow): TreeEntry {
+    return {
+      kind: 'doc',
+      id: `doc-${d.id}`,
+      docId: d.id,
+      title: d.title || '(ohne Titel)',
+      alias: d.alias,
+      children: [],
+    };
+  }
+
+  // InfoLinks aus cell.data.links extrahieren. Nicht alle Cells tragen
+  // das Feld — nur solche, die schonmal Link-Mutationen hatten.
+  function readCellInfoLinks(cell: CellRow): Array<{ id: string; label: string; url: string }> {
+    const raw = (cell.data as { links?: unknown } | null)?.links;
+    if (!Array.isArray(raw)) return [];
+    return raw.filter(
+      (l): l is { id: string; label: string; url: string } =>
+        !!l &&
+        typeof l === 'object' &&
+        typeof (l as { id?: unknown }).id === 'string' &&
+        typeof (l as { label?: unknown }).label === 'string' &&
+        typeof (l as { url?: unknown }).url === 'string',
+    );
+  }
+
   function buildNode(node: NodeRow): TreeEntry {
     const entry: TreeEntry = {
       kind: 'node',
@@ -351,6 +432,15 @@ export function buildSidebarTree(
       node,
       children: [],
     };
+    // Board-Node: Chip-Links direkt als Children anhaengen.
+    if (node.type === 'board' && linkTypes.size > 0) {
+      const links = linksByBoardId.get(node.id) ?? [];
+      const filtered = links.filter((l) => linkTypes.has(l.type));
+      (entry.children as TreeEntry[]).push(
+        ...filtered.map(linkEntryFromBoardLink),
+      );
+      return entry;
+    }
     if (node.type !== 'matrix') return entry;
 
     const myCells = cellsByMatrix.get(node.id) ?? [];
@@ -396,6 +486,20 @@ export function buildSidebarTree(
       // weil sie keinen eigenen Sub-Node haben und die Row die
       // Feature-Seite repraesentiert.
       const featureChildren: TreeEntry[] = [];
+      // Info-Link-Chips haengen unter der info-Feature-Row, wenn
+      // der Chip aktiv ist und die Cell info-Links hat.
+      const infoLinkChildren: TreeEntry[] =
+        showInfoLinks && features.includes('info')
+          ? readCellInfoLinks(cell)
+              .filter((l) => {
+                const looksLikeMail =
+                  l.url.includes('@') && !/^[a-z]+:\/\//i.test(l.url);
+                const t: 'url' | 'mail' = looksLikeMail ? 'mail' : 'url';
+                return linkTypes.has(t);
+              })
+              .map((l) => linkEntryFromInfoLink(cell.id, l))
+          : [];
+
       for (const feat of FEATURE_ORDER) {
         if (!features.includes(feat)) continue;
         if (feat === 'matrix' && cell.child_matrix_id) {
@@ -404,7 +508,15 @@ export function buildSidebarTree(
         } else if (feat === 'board' && cell.board_id) {
           const childNode = kids.find((k) => k.id === cell.board_id);
           if (childNode) featureChildren.push(buildNode(childNode));
-        } else if (feat === 'info' || feat === 'checklists') {
+        } else if (feat === 'info') {
+          featureChildren.push({
+            kind: 'feature',
+            id: `feat-${cell.id}-${feat}`,
+            cellId: cell.id,
+            feature: feat,
+            children: infoLinkChildren,
+          });
+        } else if (feat === 'checklists') {
           featureChildren.push({
             kind: 'feature',
             id: `feat-${cell.id}-${feat}`,
@@ -414,6 +526,12 @@ export function buildSidebarTree(
           });
         }
       }
+
+      // Docs-Chip: Docu-Rows haengen direkt unter der Cell-Row, noch vor
+      // den Features. So ist "Doku" im Tree oberhalb der Features gut
+      // auffindbar und konkurriert nicht mit Info-Feldern.
+      const cellDocs = docsByCellId.get(cell.id) ?? [];
+      const docChildren = cellDocs.map(docEntry);
 
       // Waisen-Child-Nodes, die keinen FK-Match gefunden haben
       // (parent_cell_id zeigt auf diese Cell, aber weder cell.board_id
@@ -433,7 +551,11 @@ export function buildSidebarTree(
         cell,
         rowLabel: row!.label || '(Zeile)',
         colLabel: col!.label || '(Spalte)',
-        children: [...featureChildren, ...orphanKids.map(buildNode)],
+        children: [
+          ...docChildren,
+          ...featureChildren,
+          ...orphanKids.map(buildNode),
+        ],
       };
       (entry.children as TreeEntry[]).push(cellEntry);
     }
@@ -495,6 +617,38 @@ export async function fetchDocsForCell(
     .select('*')
     .eq('workspace_id', workspaceId)
     .eq('attached_cell_id', cellId)
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as DocRow[];
+}
+
+// Alle Board-Links im Workspace. Fuer den Sidebar-Tree-Links-Chip
+// (SB.2) — wenn aktiv, haengen die Links unter dem jeweiligen
+// Board-Node. Erwartete Groesse: wenige hundert Rows, tragbar ohne
+// Paging.
+export async function fetchWorkspaceLinks(
+  workspaceId: string,
+): Promise<LinkRow[]> {
+  const { data, error } = await supabase
+    .from('links')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .order('position', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as LinkRow[];
+}
+
+// Alle Dokus mit attached_cell_id im Workspace. Fuer den Sidebar-
+// Tree-Docs-Chip (SB.2) — Rendering haengt die Doc-Row unter die
+// passende Cell-Row.
+export async function fetchWorkspaceAttachedDocs(
+  workspaceId: string,
+): Promise<DocRow[]> {
+  const { data, error } = await supabase
+    .from('docs')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .not('attached_cell_id', 'is', null)
     .order('updated_at', { ascending: false });
   if (error) throw error;
   return (data ?? []) as DocRow[];

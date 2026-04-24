@@ -21,7 +21,11 @@ import {
   fetchMyWorkspaces,
   fetchNodesForWorkspace,
   fetchRowsForWorkspace,
+  fetchWorkspaceAttachedDocs,
+  fetchWorkspaceLinks,
+  type SidebarChipData,
 } from '../lib/queries';
+import { useSidebarChips } from '../lib/sidebar-chips';
 import { toggleEditMode, useEditMode } from '../lib/edit-mode';
 import { useSidebarMode } from '../lib/sidebar-mode';
 import { useAggregateView } from '../lib/aggregate-view';
@@ -218,8 +222,67 @@ const Workspace: Component = () => {
     async (wid) => (wid ? fetchCellIdsWithDocs(wid) : new Set<string>()),
   );
 
+  // Deep-Dive-Chips (SB.2): opt-in Tree-Extras. State pro Workspace
+  // persistiert. Fetches nur aktiv, wenn der passende Chip auch an ist —
+  // sonst bleibt die Sidebar schlank.
+  const chips = params.workspaceId
+    ? useSidebarChips(params.workspaceId as string)
+    : null;
+
+  const [wsLinks] = createResource(
+    () =>
+      params.workspaceId &&
+      chips &&
+      (chips.isOn('links') || chips.isOn('mails'))
+        ? { workspaceId: params.workspaceId as string }
+        : null,
+    async (key) => (key ? fetchWorkspaceLinks(key.workspaceId) : []),
+  );
+  const [wsDocs] = createResource(
+    () =>
+      params.workspaceId && chips && chips.isOn('docs')
+        ? { workspaceId: params.workspaceId as string }
+        : null,
+    async (key) => (key ? fetchWorkspaceAttachedDocs(key.workspaceId) : []),
+  );
+
+  const chipData = createMemo<SidebarChipData | undefined>(() => {
+    if (!chips) return undefined;
+    const linkTypes = new Set<'url' | 'mail'>();
+    if (chips.isOn('links')) linkTypes.add('url');
+    if (chips.isOn('mails')) linkTypes.add('mail');
+    const showDocs = chips.isOn('docs');
+    if (linkTypes.size === 0 && !showDocs) return undefined;
+
+    const linksByBoardId = new Map<string, (typeof (wsLinks() ?? [])[number])[]>();
+    for (const l of wsLinks() ?? []) {
+      const arr = linksByBoardId.get(l.board_id) ?? [];
+      arr.push(l);
+      linksByBoardId.set(l.board_id, arr);
+    }
+    const docsByCellId = new Map<string, (typeof (wsDocs() ?? [])[number])[]>();
+    for (const d of wsDocs() ?? []) {
+      if (!d.attached_cell_id) continue;
+      const arr = docsByCellId.get(d.attached_cell_id) ?? [];
+      arr.push(d);
+      docsByCellId.set(d.attached_cell_id, arr);
+    }
+    return {
+      linksByBoardId,
+      docsByCellId,
+      linkTypes,
+      showInfoLinks: linkTypes.size > 0,
+    };
+  });
+
   const tree = createMemo(() =>
-    buildSidebarTree(nodes() ?? [], cells() ?? [], rows() ?? [], colsData() ?? []),
+    buildSidebarTree(
+      nodes() ?? [],
+      cells() ?? [],
+      rows() ?? [],
+      colsData() ?? [],
+      chipData(),
+    ),
   );
 
   // Path-Focus Expand: bei jeder Route-Change den Weg vom aktuellen

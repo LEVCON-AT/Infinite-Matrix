@@ -287,9 +287,31 @@ export type TreeEntry =
       id: string; // `feat-<cellId>-<feature>` — stable fuer expanded-Set
       cellId: string;
       feature: 'info' | 'checklists';
-      // In V1 keine Kinder. Mit SB.2-Chips kommen optional Docs/Links/
-      // Mails darunter.
+      // V1 keine Kinder. SB.2-Chips koennen optional Docs/Links/Mails
+      // darunter haengen (Chip-aktiviert, sonst [] bleibend).
       children: TreeEntry[];
+    }
+  | {
+      // Link-Row unter einem Board-Node (LinkRow aus 'links' table) oder
+      // unter einer Feature-'info'-Row (InfoLink aus cell.data.links).
+      // Nur sichtbar wenn der passende Chip aktiv ist (Links bzw. Mails).
+      kind: 'link';
+      id: string; // `link-<source>-<linkId>` — stable fuer expanded-Set
+      linkType: 'url' | 'mail';
+      label: string;
+      url: string;
+      alias: string | null;
+      children: TreeEntry[]; // Immer []; pro Struktur vorhanden.
+    }
+  | {
+      // Doc-Row unter einer Cell oder Feature-info-Row. Nur sichtbar,
+      // wenn der Docs-Chip aktiv ist.
+      kind: 'doc';
+      id: string; // `doc-<docId>` — stable fuer expanded-Set
+      docId: string;
+      title: string;
+      alias: string | null;
+      children: TreeEntry[]; // Immer [].
     };
 
 // Backward-compat alias — legacy code spricht TreeNode, entspricht einem

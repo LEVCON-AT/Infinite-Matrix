@@ -6,6 +6,7 @@ import {
   createSignal,
   type Component,
 } from 'solid-js';
+import { Dynamic } from 'solid-js/web';
 import { A, useNavigate } from '@solidjs/router';
 import type { CellFeature, CellRow, TreeEntry } from '../lib/types';
 import { useTreeExpand } from '../lib/tree-expand';
@@ -25,6 +26,8 @@ import { supabase } from '../lib/supabase';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import { useVis } from '../lib/settings';
+import { useSidebarChips } from '../lib/sidebar-chips';
+import { openDocsPopup } from '../lib/docs-ui';
 import ContextMenu, { type CtxMenuState } from './ContextMenu';
 import ChecklistPastePopup from './ChecklistPastePopup';
 import Icon, { type IconName } from './Icon';
@@ -53,6 +56,10 @@ function iconNameFor(entry: TreeEntry): IconName {
   if (entry.kind === 'feature') {
     return entry.feature === 'info' ? 'information-circle' : 'check-circle';
   }
+  if (entry.kind === 'link') {
+    return entry.linkType === 'mail' ? 'envelope' : 'arrow-top-right-on-square';
+  }
+  if (entry.kind === 'doc') return 'document-text';
   // Cells: kleiner ausgefuellter Punkt
   return 'dot-filled';
 }
@@ -64,6 +71,10 @@ function dotColorFor(entry: TreeEntry): string {
   if (entry.kind === 'feature') {
     return entry.feature === 'info' ? 'var(--amber)' : 'var(--purple)';
   }
+  if (entry.kind === 'link') {
+    return entry.linkType === 'mail' ? 'var(--amber)' : 'var(--text3)';
+  }
+  if (entry.kind === 'doc') return 'var(--amber)';
   return 'var(--amber)';
 }
 
@@ -71,13 +82,25 @@ function dotColorFor(entry: TreeEntry): string {
 // .ln-<type>/.dot-<type>-CSS-Klassen in der tree-connections-Schicht.
 function dotTypeFor(
   entry: TreeEntry,
-): 'matrix' | 'board' | 'cell' | 'info' | 'checklists' {
+):
+  | 'matrix'
+  | 'board'
+  | 'cell'
+  | 'info'
+  | 'checklists'
+  | 'link'
+  | 'mail'
+  | 'doc' {
   if (entry.kind === 'node') {
     return entry.node.type === 'matrix' ? 'matrix' : 'board';
   }
   if (entry.kind === 'feature') {
     return entry.feature;
   }
+  if (entry.kind === 'link') {
+    return entry.linkType === 'mail' ? 'mail' : 'link';
+  }
+  if (entry.kind === 'doc') return 'doc';
   return 'cell';
 }
 
@@ -91,12 +114,16 @@ const FEATURE_LABEL: Record<'info' | 'checklists', string> = {
 function labelOf(entry: TreeEntry): string {
   if (entry.kind === 'node') return entry.node.label || '(ohne Label)';
   if (entry.kind === 'feature') return FEATURE_LABEL[entry.feature];
+  if (entry.kind === 'link') return entry.label;
+  if (entry.kind === 'doc') return entry.title;
   return `${entry.rowLabel} / ${entry.colLabel}`;
 }
 
 function aliasOf(entry: TreeEntry): string | null {
   if (entry.kind === 'node') return entry.node.alias;
   if (entry.kind === 'feature') return null;
+  if (entry.kind === 'link') return entry.alias;
+  if (entry.kind === 'doc') return entry.alias;
   return entry.cell.alias;
 }
 
@@ -104,6 +131,15 @@ function hrefOf(workspaceId: string, entry: TreeEntry): string {
   if (entry.kind === 'node') return `/w/${workspaceId}/n/${entry.id}`;
   if (entry.kind === 'feature') {
     return `/w/${workspaceId}/c/${entry.cellId}/${entry.feature}`;
+  }
+  if (entry.kind === 'link') {
+    // External-Link oeffnet target=_blank; fuer mail mailto-URL.
+    return entry.linkType === 'mail' ? `mailto:${entry.url}` : entry.url;
+  }
+  if (entry.kind === 'doc') {
+    // Docs haben keine eigene Route im client-web — wir triggern das
+    // Docs-Popup ueber ?doc=<id>-Param, das Workspace.tsx auswertet.
+    return `/w/${workspaceId}?doc=${entry.docId}`;
   }
   return cellTarget(workspaceId, {
     cellId: entry.cell.id,
@@ -133,11 +169,11 @@ function filterTree(
 
   function entryKindKey(e: TreeEntry): FilterChip {
     if (e.kind === 'cell') return 'cell';
-    if (e.kind === 'feature') {
-      // Feature-Rows sind keine eigene Chip-Kategorie in V1 —
-      // in den bestehenden chip-Filter mappen wir auf 'cell', weil
-      // sie ja zur Zelle gehoeren (und die User die Feature-Filter
-      // erst mit SB.2-Chips bekommen).
+    if (e.kind === 'feature' || e.kind === 'link' || e.kind === 'doc') {
+      // Feature/Link/Doc-Rows sind keine eigene Chip-Kategorie in der
+      // Filter-Leiste (die SB.2-Chips sind eine andere Dimension). In
+      // den Matrix/Board/Cell-Filter-Chips mappen wir sie auf 'cell',
+      // weil sie an Cells haengen.
       return 'cell';
     }
     return e.node.type === 'matrix' ? 'matrix' : 'board';
@@ -273,8 +309,25 @@ const TreeItem: Component<{
             <Icon name="chevron-right" size={14} />
           </button>
         </Show>
-        <A
-          href={hrefOf(p.workspaceId, p.entry)}
+        <Dynamic
+          component={
+            p.entry.kind === 'link' || p.entry.kind === 'doc' ? 'a' : A
+          }
+          href={
+            p.entry.kind === 'doc' ? '#' : hrefOf(p.workspaceId, p.entry)
+          }
+          target={p.entry.kind === 'link' && p.entry.linkType === 'url' ? '_blank' : undefined}
+          rel={p.entry.kind === 'link' && p.entry.linkType === 'url' ? 'noopener noreferrer' : undefined}
+          onClick={
+            p.entry.kind === 'doc'
+              ? (e: MouseEvent) => {
+                  e.preventDefault();
+                  openDocsPopup({
+                    initialDocId: (p.entry as Extract<TreeEntry, { kind: 'doc' }>).docId,
+                  });
+                }
+              : undefined
+          }
           class="tree-link"
           classList={{
             // Active auf Node- UND Cell-Routen: currentNodeId kommt
@@ -341,7 +394,7 @@ const TreeItem: Component<{
           <Show when={aliasOf(p.entry)}>
             <span class="tree-alias">^{aliasOf(p.entry)}</span>
           </Show>
-        </A>
+        </Dynamic>
       </div>
       <Show when={hasChildren() && expanded()}>
         <ul>
@@ -374,6 +427,7 @@ const TreeItem: Component<{
 
 const NodeTree: Component<Props> = (props) => {
   const expand = useTreeExpand(props.workspaceId);
+  const deepChips = useSidebarChips(props.workspaceId);
   const navigate = useNavigate();
   const [query, setQuery] = createSignal('');
   const [chips, setChips] = createSignal<Set<FilterChip>>(new Set());
@@ -836,6 +890,23 @@ const NodeTree: Component<Props> = (props) => {
           },
         });
       }
+    } else if (entry.kind === 'link') {
+      items.push({
+        label: entry.linkType === 'mail' ? 'Mail oeffnen' : 'Link oeffnen',
+        icon: '→',
+        onClick: () => {
+          const href =
+            entry.linkType === 'mail' ? `mailto:${entry.url}` : entry.url;
+          if (entry.linkType === 'mail') window.location.href = href;
+          else window.open(href, '_blank', 'noopener,noreferrer');
+        },
+      });
+    } else if (entry.kind === 'doc') {
+      items.push({
+        label: 'Doku oeffnen',
+        icon: '→',
+        onClick: () => navigate(hrefOf(props.workspaceId, entry)),
+      });
     } else {
       // Feature-Entry (info/checklists). Navigation + Feature-spezifische
       // Quick-Adds. Ctrl+V-Hinweis bei Checklists — der eigentliche
@@ -914,7 +985,13 @@ const NodeTree: Component<Props> = (props) => {
           ? entry.feature === 'info'
             ? 'i'
             : '✓'
-          : '·';
+          : entry.kind === 'link'
+            ? entry.linkType === 'mail'
+              ? '✉'
+              : '↗'
+            : entry.kind === 'doc'
+              ? '¶'
+              : '·';
 
     setCtxMenu({
       x,
@@ -1061,6 +1138,42 @@ const NodeTree: Component<Props> = (props) => {
           title="Nur Zellen zeigen"
         >
           · Zellen
+        </button>
+      </div>
+      <div
+        class="node-tree-chips node-tree-chips-deep"
+        role="toolbar"
+        aria-label="Extra-Rows (Links, Mails, Dokus)"
+      >
+        <button
+          type="button"
+          class="tree-chip"
+          classList={{ active: deepChips.isOn('links') }}
+          onClick={() => deepChips.toggle('links')}
+          title="Board-Links + Cell-Info-Links im Tree anzeigen"
+        >
+          <Icon name="arrow-top-right-on-square" size={11} />
+          <span>Links</span>
+        </button>
+        <button
+          type="button"
+          class="tree-chip"
+          classList={{ active: deepChips.isOn('mails') }}
+          onClick={() => deepChips.toggle('mails')}
+          title="Mail-Links im Tree anzeigen"
+        >
+          <Icon name="envelope" size={11} />
+          <span>Mails</span>
+        </button>
+        <button
+          type="button"
+          class="tree-chip"
+          classList={{ active: deepChips.isOn('docs') }}
+          onClick={() => deepChips.toggle('docs')}
+          title="Dokus im Tree anzeigen (unter Zellen)"
+        >
+          <Icon name="document-text" size={11} />
+          <span>Docu</span>
         </button>
       </div>
       <div class="node-tree-scroll" ref={scrollRef}>

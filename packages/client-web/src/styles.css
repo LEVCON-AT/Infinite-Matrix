@@ -2380,6 +2380,9 @@ button[type='submit']:hover:not(:disabled) {
 .tree-connections path.ln-split.ln-cell       { stroke: var(--amber); }
 .tree-connections path.ln-split.ln-info       { stroke: var(--amber); }
 .tree-connections path.ln-split.ln-checklists { stroke: var(--purple); }
+.tree-connections path.ln-split.ln-link       { stroke: var(--text3); }
+.tree-connections path.ln-split.ln-mail       { stroke: var(--amber); }
+.tree-connections path.ln-split.ln-doc        { stroke: var(--amber); }
 
 .tree-connections circle.tree-dot-svg {
   stroke: var(--bg2);
@@ -2391,6 +2394,9 @@ button[type='submit']:hover:not(:disabled) {
 .tree-connections circle.dot-cell       { fill: var(--amber); }
 .tree-connections circle.dot-info       { fill: var(--amber); }
 .tree-connections circle.dot-checklists { fill: var(--purple); }
+.tree-connections circle.dot-link       { fill: var(--text3); }
+.tree-connections circle.dot-mail       { fill: var(--amber); }
+.tree-connections circle.dot-doc        { fill: var(--amber); }
 .tree-connections circle.dot-active { stroke-width: 2; }
 
 /* Inline `.tree-dot`-Span haelt die Layout-Reserve, der SVG-Dot
@@ -2442,6 +2448,22 @@ button[type='submit']:hover:not(:disabled) {
   background: var(--amberbg);
   color: var(--ambertxt);
   border-color: var(--amber);
+}
+
+/* Deep-Dive-Chips (SB.2): Links/Mails/Docs. Visuell etwas dezenter
+   als die Kategorie-Chips darueber — Icon + Label, Gap zum Icon. */
+.node-tree-chips-deep {
+  padding-top: 0;
+}
+.node-tree-chips-deep .tree-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.node-tree-chips-deep .tree-chip.active {
+  background: var(--surface-hover);
+  color: var(--text);
+  border-color: var(--border2);
 }
 
 .ws-sidebar[data-sb-mode='rails'] .node-tree-chips {
