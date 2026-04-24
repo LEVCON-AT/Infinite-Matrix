@@ -1102,23 +1102,25 @@ const NodeTree: Component<Props> = (props) => {
           },
         });
       }
-      items.push({ label: '', onClick: () => {}, divider: true });
-      items.push({
-        label: 'Loeschen',
-        icon: '✕',
-        danger: true,
-        onClick: () => {
-          void deleteWithExportPrompt({
-            label: entry.node.label,
-            exportFn: async () => {
-              const data = await exportSubtree(entry.id, props.workspaceId);
-              downloadSubtreeExport(data, entry.node.label);
-            },
-            deleteFn: () => deleteNode(entry.id),
-            successMsg: `"${entry.node.label}" geloescht.`,
-          });
-        },
-      });
+      if (editMode()) {
+        items.push({ label: '', onClick: () => {}, divider: true });
+        items.push({
+          label: 'Loeschen',
+          icon: '✕',
+          danger: true,
+          onClick: () => {
+            void deleteWithExportPrompt({
+              label: entry.node.label,
+              exportFn: async () => {
+                const data = await exportSubtree(entry.id, props.workspaceId);
+                downloadSubtreeExport(data, entry.node.label);
+              },
+              deleteFn: () => deleteNode(entry.id),
+              successMsg: `"${entry.node.label}" geloescht.`,
+            });
+          },
+        });
+      }
     } else if (entry.kind === 'cell') {
       // Cell-Entry: Navigation + Quick-Anlage. Die Quick-Add-Entries
       // aktivieren bei Bedarf das passende Feature (info/checklists)

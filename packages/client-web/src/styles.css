@@ -2538,6 +2538,35 @@ button[type='submit']:hover:not(:disabled) {
   font-weight: 400;
 }
 
+/* Feature-Rows (info / checklists) noch eine Stufe dezenter als
+   Cell-Rows — sie sind Unter-Elemente einer Cell. Kursiv gibt's
+   extra visuelle Unterscheidung zum Cell-Label. */
+.tree-row[data-entry-kind='feature'] .tree-link {
+  color: var(--text2);
+  font-size: 12px;
+}
+.tree-row[data-entry-kind='feature'] .tree-label {
+  font-weight: 400;
+  font-style: italic;
+}
+
+/* Link- und Doc-Rows (SB.2-Chip-aktiviert): noch kleiner, grauer.
+   Diese Rows sind Opt-in und sollen die Haupt-Struktur nicht
+   dominieren. */
+.tree-row[data-entry-kind='link'] .tree-link,
+.tree-row[data-entry-kind='doc'] .tree-link {
+  color: var(--text3);
+  font-size: 11px;
+}
+.tree-row[data-entry-kind='link'] .tree-label,
+.tree-row[data-entry-kind='doc'] .tree-label {
+  font-weight: 400;
+}
+.tree-row[data-entry-kind='link'] .tree-link:hover:not(.active),
+.tree-row[data-entry-kind='doc'] .tree-link:hover:not(.active) {
+  color: var(--text);
+}
+
 .tree-label {
   flex: 1;
   overflow: hidden;
