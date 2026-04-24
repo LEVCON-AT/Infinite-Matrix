@@ -2243,6 +2243,14 @@ button[type='submit']:hover:not(:disabled) {
   color: var(--text);
 }
 
+/* SVG-Child nicht shrinken lassen — in Flex-Container (tree-chevron
+   ist display:flex) wuerde flex-shrink default 1 das SVG auf 0 Breite
+   druecken, weil width als Attribut im HTML nicht als min-width zaehlt. */
+.tree-chevron svg {
+  flex: 0 0 auto;
+  display: block;
+}
+
 .tree-chevron-open {
   transform: rotate(90deg);
 }

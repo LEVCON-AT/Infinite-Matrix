@@ -15,6 +15,7 @@ import { supabase } from '../lib/supabase';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import ContextMenu, { type CtxMenuState } from './ContextMenu';
+import Icon from './Icon';
 
 type Props = {
   workspaceId: string;
@@ -218,7 +219,7 @@ const TreeItem: Component<{
             aria-label={expanded() ? 'Einklappen' : 'Ausklappen'}
             aria-expanded={expanded()}
           >
-            ▸
+            <Icon name="chevron-right" size={14} />
           </button>
         </Show>
         <A

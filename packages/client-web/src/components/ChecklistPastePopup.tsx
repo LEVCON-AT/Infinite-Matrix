@@ -11,6 +11,7 @@
 
 import { For, Show, createMemo, createSignal, onCleanup, onMount, type Component } from 'solid-js';
 import { parsePastedText, type ParsedPasteItem } from '../lib/checklist-paste-parse';
+import Icon from './Icon';
 
 type Props = {
   initialText: string;
@@ -68,7 +69,7 @@ const ChecklistPastePopup: Component<Props> = (p) => {
             onClick={p.onClose}
             aria-label="Schliessen"
           >
-            ✕
+            <Icon name="x" size={18} />
           </button>
         </header>
         <Show when={p.checklistLabel}>

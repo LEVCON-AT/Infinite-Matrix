@@ -23,6 +23,7 @@ import { createCardFromChecklist } from '../lib/mutations';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import type { NodeRow } from '../lib/types';
+import Icon from './Icon';
 
 type Props = {
   workspaceId: string;
@@ -130,7 +131,7 @@ const ChecklistToCardPopup: Component<Props> = (p) => {
             onClick={p.onClose}
             aria-label="Schliessen"
           >
-            ✕
+            <Icon name="x" size={18} />
           </button>
         </header>
         <div class="cl2c-body">

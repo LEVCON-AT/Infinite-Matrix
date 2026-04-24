@@ -54,6 +54,7 @@ import {
   removeDraft,
   type Draft,
 } from '../lib/docs-drafts';
+import Icon from './Icon';
 
 type Props = {
   workspaceId: string;
@@ -793,7 +794,7 @@ const DocsPopup: Component<Props> = (p) => {
             onClick={p.onClose}
             aria-label="Schliessen"
           >
-            ✕
+            <Icon name="x" size={18} />
           </button>
         </header>
 

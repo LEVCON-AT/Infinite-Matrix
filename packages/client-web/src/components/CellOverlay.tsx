@@ -23,6 +23,7 @@ import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
 import { validateAlias } from '../lib/alias';
+import Icon from './Icon';
 
 type Props = {
   workspaceId: string;
@@ -382,7 +383,7 @@ const CellOverlay: Component<Props> = (p) => {
             onClick={p.onClose}
             aria-label="Schliessen"
           >
-            ✕
+            <Icon name="x" size={18} />
           </button>
         </header>
 

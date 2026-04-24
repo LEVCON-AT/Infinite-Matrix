@@ -2,6 +2,7 @@
 // via ESC. Liste ist handgepflegt — waechst mit neuen Shortcuts.
 
 import { For, onCleanup, onMount, type Component } from 'solid-js';
+import Icon from './Icon';
 
 type Props = {
   onClose: () => void;
@@ -105,7 +106,7 @@ const KeyboardHelp: Component<Props> = (p) => {
             onClick={p.onClose}
             aria-label="Schliessen"
           >
-            ✕
+            <Icon name="x" size={18} />
           </button>
         </header>
         <div class="overlay-body kb-help-body">

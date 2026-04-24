@@ -63,6 +63,7 @@ import { rememberFocus } from '../lib/navigation-focus';
 import { openDocsPopup } from '../lib/docs-ui';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
+import Icon from './Icon';
 
 type Props = {
   workspaceId: string;
@@ -657,8 +658,11 @@ const HeaderSearchBar: Component<Props> = (p) => {
       }}
     >
       <span class="header-search-icon" aria-hidden="true">
-        <Show when={mode() === 'command'} fallback="✨">
-          ^
+        <Show
+          when={mode() === 'command'}
+          fallback={<Icon name="sparkles" size={15} />}
+        >
+          <span class="header-search-caret">^</span>
         </Show>
       </span>
       <input

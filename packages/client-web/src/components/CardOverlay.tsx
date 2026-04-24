@@ -52,6 +52,7 @@ import { validateAlias } from '../lib/alias';
 import { openDocsPopup } from '../lib/docs-ui';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 import AliasText from './AliasText';
+import Icon from './Icon';
 
 type Props = {
   card: KbCardRow;
@@ -582,7 +583,7 @@ const CardOverlay: Component<Props> = (p) => {
             onClick={p.onClose}
             aria-label="Schliessen"
           >
-            ✕
+            <Icon name="x" size={18} />
           </button>
         </header>
 

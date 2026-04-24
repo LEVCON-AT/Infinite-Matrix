@@ -13,6 +13,7 @@ import type { AggregateCell, FreqCategoryKey } from '../lib/aggregate';
 import { FREQ_CATEGORIES } from '../lib/aggregate';
 import { cellTarget } from '../lib/alias-dispatch';
 import type { CellRow, KbCardRow } from '../lib/types';
+import Icon from './Icon';
 
 type Props = {
   workspaceId: string;
@@ -219,7 +220,7 @@ const FrequencyMatrix: Component<Props> = (p) => {
                   onClick={() => setFlyout(null)}
                   aria-label="Schliessen"
                 >
-                  ✕
+                  <Icon name="x" size={18} />
                 </button>
               </header>
               <ul class="freq-flyout-list">

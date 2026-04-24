@@ -11,6 +11,7 @@ import { setChecklistAction } from '../lib/mutations';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
+import Icon from './Icon';
 
 type Props = {
   workspaceId: string;
@@ -128,7 +129,7 @@ const ChecklistActionModal: Component<Props> = (p) => {
             onClick={p.onClose}
             aria-label="Schliessen"
           >
-            ✕
+            <Icon name="x" size={18} />
           </button>
         </header>
         <div class="cl-action-body">

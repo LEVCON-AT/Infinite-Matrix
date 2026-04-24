@@ -42,6 +42,7 @@ import CellInfoPage from '../components/CellInfoPage';
 import AliasAutocomplete from '../components/AliasAutocomplete';
 import ContextMenu from '../components/ContextMenu';
 import HeaderSearchBar from '../components/HeaderSearchBar';
+import Icon from '../components/Icon';
 import { aliasChipMenuState, closeAliasChipMenu } from '../lib/alias-chip-menu';
 import CommandPalette from '../components/CommandPalette';
 import DocsPopup from '../components/DocsPopup';
@@ -631,7 +632,19 @@ const Workspace: Component = () => {
             }
             aria-label="Sidebar-Modus"
           >
-            {sidebar.mode() === 'full' ? '‹' : sidebar.mode() === 'rails' ? '‹‹' : '›'}
+            <Show
+              when={sidebar.mode() === 'full'}
+              fallback={
+                <Show
+                  when={sidebar.mode() === 'rails'}
+                  fallback={<Icon name="chevron-right" size={16} />}
+                >
+                  <Icon name="chevron-double-left" size={16} />
+                </Show>
+              }
+            >
+              <Icon name="chevron-left" size={16} />
+            </Show>
           </button>
         </div>
         <Show when={params.workspaceId}>
@@ -749,7 +762,7 @@ const Workspace: Component = () => {
                   return (
                     <>
                       <span class="ws-breadcrumb-sep" aria-hidden>
-                        ›
+                        <Icon name="chevron-right" size={14} />
                       </span>
                       <Show
                         when={!isLast()}
@@ -811,7 +824,7 @@ const Workspace: Component = () => {
               title="Tastatur-Shortcuts (?)"
               aria-label="Tastatur-Shortcuts"
             >
-              ?
+              <Icon name="question-mark" size={18} />
             </button>
             <button
               type="button"
@@ -820,7 +833,7 @@ const Workspace: Component = () => {
               title={theme() === 'dark' ? 'Light-Mode' : 'Dark-Mode'}
               aria-label={theme() === 'dark' ? 'Light-Mode' : 'Dark-Mode'}
             >
-              {theme() === 'dark' ? '☀' : '☾'}
+              <Icon name={theme() === 'dark' ? 'sun' : 'moon'} size={18} />
             </button>
             <button
               type="button"
