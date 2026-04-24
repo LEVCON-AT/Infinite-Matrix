@@ -2450,6 +2450,19 @@ button[type='submit']:hover:not(:disabled) {
   border-color: var(--amber);
 }
 
+/* Versteckter File-Input fuer Subtree/Feature-Import. Nicht
+   display:none — sonst darf er nicht geclickt werden. */
+.tree-import-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 /* Deep-Dive-Chips (SB.2): Links/Mails/Docs. Visuell etwas dezenter
    als die Kategorie-Chips darueber — Icon + Label, Gap zum Icon. */
 .node-tree-chips-deep {

@@ -12,8 +12,20 @@ import { supabase } from './supabase';
 
 export const WORKSPACE_EXPORT_VERSION = 1 as const;
 
+// Payload-Typ-Tag. 'workspace' und 'subtree' haben dieselbe Shape
+// (alle Tabellen); 'feature-info' enthaelt genau eine Cell (ohne
+// FK-Ziele), deren data.infoFields + .links der eigentliche Inhalt
+// sind. 'feature-checklists' enthaelt eine Cell + cell-scoped
+// Checklisten + Items.
+export type ExportPayloadType =
+  | 'workspace'
+  | 'subtree'
+  | 'feature-info'
+  | 'feature-checklists';
+
 export type WorkspaceExport = {
   version: typeof WORKSPACE_EXPORT_VERSION;
+  payloadType: ExportPayloadType;
   exportedAt: string;
   workspace: Record<string, unknown>;
   nodes: Record<string, unknown>[];
@@ -26,6 +38,73 @@ export type WorkspaceExport = {
   checklist_items: Record<string, unknown>[];
   links: Record<string, unknown>[];
 };
+
+// Zahlen fuer den Sanity-Toast nach Export.
+export type ExportStats = {
+  nodes: number;
+  cells: number;
+  cards: number;
+  checklists: number;
+  checklistItems: number;
+  links: number;
+  infoFields: number;
+  infoLinks: number;
+};
+
+function statsOf(e: WorkspaceExport): ExportStats {
+  let infoFields = 0;
+  let infoLinks = 0;
+  for (const c of e.cells) {
+    const data = (c as { data?: unknown }).data;
+    if (data && typeof data === 'object') {
+      const f = (data as { infoFields?: unknown }).infoFields;
+      if (Array.isArray(f)) infoFields += f.length;
+      const l = (data as { links?: unknown }).links;
+      if (Array.isArray(l)) infoLinks += l.length;
+    }
+  }
+  return {
+    nodes: e.nodes.length,
+    cells: e.cells.length,
+    cards: e.kb_cards.length,
+    checklists: e.checklists.length,
+    checklistItems: e.checklist_items.length,
+    links: e.links.length,
+    infoFields,
+    infoLinks,
+  };
+}
+
+export function formatExportStats(s: ExportStats): string {
+  // Nur Zahlen > 0 anzeigen — ein Feature-Export zeigt sonst nutzlose
+  // "0 Nodes · 0 Karten"-Zeilen.
+  const parts: string[] = [];
+  if (s.nodes) parts.push(`${s.nodes} ${s.nodes === 1 ? 'Node' : 'Nodes'}`);
+  if (s.cells) parts.push(`${s.cells} ${s.cells === 1 ? 'Zelle' : 'Zellen'}`);
+  if (s.cards) parts.push(`${s.cards} ${s.cards === 1 ? 'Karte' : 'Karten'}`);
+  if (s.checklists)
+    parts.push(
+      `${s.checklists} ${s.checklists === 1 ? 'Checkliste' : 'Checklisten'}`,
+    );
+  if (s.checklistItems)
+    parts.push(
+      `${s.checklistItems} ${s.checklistItems === 1 ? 'Punkt' : 'Punkte'}`,
+    );
+  if (s.links) parts.push(`${s.links} Board-Links`);
+  if (s.infoFields)
+    parts.push(
+      `${s.infoFields} ${s.infoFields === 1 ? 'Info-Feld' : 'Info-Felder'}`,
+    );
+  if (s.infoLinks)
+    parts.push(
+      `${s.infoLinks} ${s.infoLinks === 1 ? 'Info-Link' : 'Info-Links'}`,
+    );
+  return parts.length === 0 ? '(leer)' : parts.join(' · ');
+}
+
+export function summarizeExport(e: WorkspaceExport): string {
+  return formatExportStats(statsOf(e));
+}
 
 export async function exportWorkspace(
   workspaceId: string,
@@ -82,6 +161,7 @@ export async function exportWorkspace(
 
   return {
     version: WORKSPACE_EXPORT_VERSION,
+    payloadType: 'workspace',
     exportedAt: new Date().toISOString(),
     workspace: wsRes.data as Record<string, unknown>,
     nodes: (nodesRes.data ?? []) as Record<string, unknown>[],
@@ -296,6 +376,7 @@ export async function exportSubtree(
 
   return {
     version: WORKSPACE_EXPORT_VERSION,
+    payloadType: 'subtree',
     exportedAt: new Date().toISOString(),
     workspace: all.workspace,
     nodes: filteredNodes as unknown as Record<string, unknown>[],
@@ -369,6 +450,7 @@ export async function exportCellSubtree(
 
   return {
     version: WORKSPACE_EXPORT_VERSION,
+    payloadType: 'subtree',
     exportedAt: new Date().toISOString(),
     workspace: all.workspace,
     nodes: filteredNodes as unknown as Record<string, unknown>[],
@@ -400,10 +482,79 @@ export function downloadSubtreeExport(
     .replace(/[^a-z0-9-]+/gi, '-')
     .replace(/^-+|-+$/g, '')
     .toLowerCase() || 'subtree';
+  // Dateinamen-Prefix unterscheidet die Payload-Typen, damit der User
+  // spaeter beim Import-Flow erkennt was er gerade offen hat.
+  const prefix =
+    exportData.payloadType === 'feature-info'
+      ? 'info'
+      : exportData.payloadType === 'feature-checklists'
+        ? 'checklists'
+        : 'subtree';
   a.href = url;
-  a.download = `subtree-${safeLabel}-${date}.json`;
+  a.download = `${prefix}-${safeLabel}-${date}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+// ─── Feature-Export ────────────────────────────────────────────
+// Feature-spezifische Exports liefern genau die minimalen Tabellen-
+// Rows, die der Import-Seite reichen, um Felder/Links bzw. Listen
+// anzuhaengen. Die Cell-Row selbst ist enthalten, aber nur als
+// Container fuer cell.data.infoFields/links. Der Importer nutzt die
+// Cell-Row *nicht* zum Erzeugen einer neuen Zelle — die Target-
+// Zelle wird vom Import-Menue gewaehlt.
+
+export async function exportFeatureInfo(
+  cellId: string,
+  workspaceId: string,
+): Promise<WorkspaceExport> {
+  const all = await fetchWorkspaceRowsForExport(workspaceId);
+  const cell = all.cells.find((c) => c.id === cellId);
+  if (!cell) throw new Error('Zelle nicht gefunden.');
+  return {
+    version: WORKSPACE_EXPORT_VERSION,
+    payloadType: 'feature-info',
+    exportedAt: new Date().toISOString(),
+    workspace: all.workspace,
+    nodes: [],
+    rows: [],
+    cols: [],
+    // Nur diese eine Cell-Row — ihre data.infoFields + .links sind
+    // der Inhalt. Der Importer liest nur diese Felder aus.
+    cells: [cell as unknown as Record<string, unknown>],
+    kb_cols: [],
+    kb_cards: [],
+    checklists: [],
+    checklist_items: [],
+    links: [],
+  };
+}
+
+export async function exportFeatureChecklists(
+  cellId: string,
+  workspaceId: string,
+): Promise<WorkspaceExport> {
+  const all = await fetchWorkspaceRowsForExport(workspaceId);
+  const cell = all.cells.find((c) => c.id === cellId);
+  if (!cell) throw new Error('Zelle nicht gefunden.');
+  const cellChecklists = all.checklists.filter((cl) => cl.cell_id === cellId);
+  const clIds = new Set(cellChecklists.map((cl) => cl.id));
+  const items = all.checklist_items.filter((it) => clIds.has(it.checklist_id));
+  return {
+    version: WORKSPACE_EXPORT_VERSION,
+    payloadType: 'feature-checklists',
+    exportedAt: new Date().toISOString(),
+    workspace: all.workspace,
+    nodes: [],
+    rows: [],
+    cols: [],
+    cells: [cell as unknown as Record<string, unknown>],
+    kb_cols: [],
+    kb_cards: [],
+    checklists: cellChecklists as unknown as Record<string, unknown>[],
+    checklist_items: items as unknown as Record<string, unknown>[],
+    links: [],
+  };
 }

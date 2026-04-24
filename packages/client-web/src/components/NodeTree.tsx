@@ -32,8 +32,21 @@ import { openDocsPopup } from '../lib/docs-ui';
 import {
   downloadSubtreeExport,
   exportCellSubtree,
+  exportFeatureChecklists,
+  exportFeatureInfo,
   exportSubtree,
+  summarizeExport,
 } from '../lib/export';
+import {
+  checkTypeCompatibility,
+  executeFeatureChecklistsImport,
+  executeFeatureInfoImport,
+  executeSubtreeImportIntoCell,
+  executeSubtreeImportIntoMatrix,
+  ImportError,
+  parseImportPayload,
+  type ImportTarget,
+} from '../lib/subtree-import';
 import ContextMenu, { type CtxMenuState } from './ContextMenu';
 import ChecklistPastePopup from './ChecklistPastePopup';
 import Icon, { type IconName } from './Icon';
@@ -482,6 +495,153 @@ const NodeTree: Component<Props> = (props) => {
     await updateCell(cell.id, { features: [...current, feature] });
   }
 
+  // File-Picker fuer Import. Ein verstecktes input-Element, das wir
+  // je Menu-Klick neu triggern — so kann der User dieselbe Datei
+  // mehrfach waehlen (value='' nach jedem Trigger reset). Der
+  // Import-Target-Context wird via Ref gehalten.
+  let importInputRef: HTMLInputElement | undefined;
+  let pendingImportTarget: ImportTarget | null = null;
+
+  function triggerImport(target: ImportTarget): void {
+    if (!importInputRef) return;
+    pendingImportTarget = target;
+    // Reset value, damit change-Event auch bei gleicher Datei feuert.
+    importInputRef.value = '';
+    importInputRef.click();
+  }
+
+  async function onImportFileChosen(e: Event): Promise<void> {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    const target = pendingImportTarget;
+    pendingImportTarget = null;
+    if (!file || !target) return;
+    try {
+      const text = await file.text();
+      const payload = parseImportPayload(text);
+      const mismatch = checkTypeCompatibility(payload, target);
+      if (mismatch) {
+        showToast(mismatch, 'error');
+        return;
+      }
+      const summary = summarizeExport(payload);
+      if (
+        !window.confirm(
+          `Import: ${summary}. Unter dem gewaehlten Ziel einhaengen?`,
+        )
+      ) {
+        return;
+      }
+      if (target.kind === 'matrix') {
+        await runMenuMutation(
+          () =>
+            executeSubtreeImportIntoMatrix({
+              payload,
+              workspaceId: props.workspaceId,
+              targetMatrixId: target.matrixNodeId,
+            }).then(() => undefined),
+          `Import: ${summary}`,
+        );
+      } else if (target.kind === 'cell') {
+        if (payload.payloadType === 'feature-info') {
+          await runMenuMutation(
+            () =>
+              executeFeatureInfoImport({
+                payload,
+                workspaceId: props.workspaceId,
+                targetCellId: target.cellId,
+              }).then(() => undefined),
+            `Info-Import: ${summary}`,
+          );
+        } else if (payload.payloadType === 'feature-checklists') {
+          await runMenuMutation(
+            () =>
+              executeFeatureChecklistsImport({
+                payload,
+                workspaceId: props.workspaceId,
+                targetCellId: target.cellId,
+              }).then(() => undefined),
+            `Checklisten-Import: ${summary}`,
+          );
+        } else {
+          await runMenuMutation(
+            () =>
+              executeSubtreeImportIntoCell({
+                payload,
+                workspaceId: props.workspaceId,
+                targetCellId: target.cellId,
+              }).then(() => undefined),
+            `Subtree-Import: ${summary}`,
+          );
+        }
+      } else if (target.kind === 'feature-info') {
+        await runMenuMutation(
+          () =>
+            executeFeatureInfoImport({
+              payload,
+              workspaceId: props.workspaceId,
+              targetCellId: target.cellId,
+            }).then(() => undefined),
+          `Info-Import: ${summary}`,
+        );
+      } else if (target.kind === 'feature-checklists') {
+        await runMenuMutation(
+          () =>
+            executeFeatureChecklistsImport({
+              payload,
+              workspaceId: props.workspaceId,
+              targetCellId: target.cellId,
+            }).then(() => undefined),
+          `Checklisten-Import: ${summary}`,
+        );
+      }
+    } catch (err) {
+      if (err instanceof ImportError) {
+        showToast(err.message, 'error');
+      } else {
+        showToast(translateDbError(err), 'error');
+      }
+    }
+  }
+
+  // Delete-Flow mit Export-vor-Loeschen: zweistufig. Erst 'Vor dem
+  // Loeschen exportieren?' (OK / Cancel) — bei OK wird der Export
+  // ausgefuehrt; danach zweite Bestaetigung 'Jetzt wirklich loeschen?'.
+  // Cancel am ersten Prompt ist NICHT abort; der User kann loeschen
+  // ohne Export. Abort geht nur durch Cancel am zweiten Prompt.
+  async function deleteWithExportPrompt(args: {
+    label: string;
+    exportFn: () => Promise<void>;
+    deleteFn: () => Promise<void>;
+    successMsg: string;
+  }): Promise<void> {
+    const doExport = window.confirm(
+      `Vor dem Loeschen exportieren? "${args.label}"\n\nOK = Export + Loeschen\nAbbrechen = nur Loeschen`,
+    );
+    if (doExport) {
+      try {
+        await args.exportFn();
+      } catch (err) {
+        showToast(translateDbError(err), 'error');
+        return; // Export fehlgeschlagen → kein Loeschen
+      }
+    }
+    if (
+      !window.confirm(
+        `Jetzt wirklich loeschen? "${args.label}"\n\nKann nicht rueckgaengig gemacht werden.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      await args.deleteFn();
+      showToast(args.successMsg, 'success');
+      props.onChanged?.();
+    } catch (err) {
+      showToast(translateDbError(err), 'error');
+    }
+  }
+
   // Clipboard-gesteuerter Paste-Flow fuer neue Checkliste.
   // Liest navigator.clipboard (User-Gesture vorausgesetzt), oeffnet
   // PastePopup mit Preview; onCommit legt Checkliste an und haengt die
@@ -819,12 +979,29 @@ const NodeTree: Component<Props> = (props) => {
           label: 'Exportieren (mit Unterstruktur)',
           icon: '↓',
           onClick: () => {
-            void runMenuMutation(async () => {
-              const data = await exportSubtree(entry.id, props.workspaceId);
-              downloadSubtreeExport(data, entry.node.label);
-            }, 'Export geladen.');
+            void (async () => {
+              try {
+                const data = await exportSubtree(entry.id, props.workspaceId);
+                downloadSubtreeExport(data, entry.node.label);
+                showToast(`Export geladen — ${summarizeExport(data)}`, 'success');
+              } catch (err) {
+                showToast(translateDbError(err), 'error');
+              }
+            })();
           },
         });
+        // Import nur fuer Matrix-Nodes (Boards sind Blaetter — da
+        // macht Subtree-Import keinen Sinn, man wuerde Cards haben
+        // wollen, das ist eine andere Operation).
+        if (entry.node.type === 'matrix') {
+          items.push({
+            label: 'Importieren (Subtree)',
+            icon: '↑',
+            onClick: () => {
+              triggerImport({ kind: 'matrix', matrixNodeId: entry.id });
+            },
+          });
+        }
       }
       items.push({ label: '', onClick: () => {}, divider: true });
       items.push({
@@ -832,21 +1009,15 @@ const NodeTree: Component<Props> = (props) => {
         icon: '✕',
         danger: true,
         onClick: () => {
-          if (
-            !window.confirm(
-              `"${entry.node.label}" loeschen? Alle darunter liegenden Nodes, Zellen und Karten verschwinden mit.`,
-            )
-          ) {
-            return;
-          }
-          void (async () => {
-            try {
-              await deleteNode(entry.id);
-              showToast(`"${entry.node.label}" geloescht.`, 'success');
-            } catch (err) {
-              showToast(translateDbError(err), 'error');
-            }
-          })();
+          void deleteWithExportPrompt({
+            label: entry.node.label,
+            exportFn: async () => {
+              const data = await exportSubtree(entry.id, props.workspaceId);
+              downloadSubtreeExport(data, entry.node.label);
+            },
+            deleteFn: () => deleteNode(entry.id),
+            successMsg: `"${entry.node.label}" geloescht.`,
+          });
         },
       });
     } else if (entry.kind === 'cell') {
@@ -914,15 +1085,33 @@ const NodeTree: Component<Props> = (props) => {
       }
       if (editMode()) {
         items.push({ label: '', onClick: () => {}, divider: true });
+        const labelGuess = `${entry.rowLabel}-${entry.colLabel}`;
         items.push({
           label: 'Exportieren (mit Unterstruktur)',
           icon: '↓',
           onClick: () => {
-            const labelGuess = `${entry.rowLabel}-${entry.colLabel}`;
-            void runMenuMutation(async () => {
-              const data = await exportCellSubtree(cell.id, props.workspaceId);
-              downloadSubtreeExport(data, labelGuess);
-            }, 'Export geladen.');
+            void (async () => {
+              try {
+                const data = await exportCellSubtree(
+                  cell.id,
+                  props.workspaceId,
+                );
+                downloadSubtreeExport(data, labelGuess);
+                showToast(
+                  `Export geladen — ${summarizeExport(data)}`,
+                  'success',
+                );
+              } catch (err) {
+                showToast(translateDbError(err), 'error');
+              }
+            })();
+          },
+        });
+        items.push({
+          label: 'Importieren',
+          icon: '↑',
+          onClick: () => {
+            triggerImport({ kind: 'cell', cellId: cell.id });
           },
         });
       }
@@ -1007,6 +1196,47 @@ const NodeTree: Component<Props> = (props) => {
           icon: '⌨',
           onClick: () => {
             void triggerPasteForCell(cellId);
+          },
+        });
+      }
+      // Feature-level Import/Export. editMode-only, unabhaengig von
+      // vis-Settings (Export/Import/Loeschen sind in der Spec als
+      // Ausnahme-Kategorie markiert).
+      if (editMode()) {
+        items.push({ label: '', onClick: () => {}, divider: true });
+        items.push({
+          label: 'Exportieren',
+          icon: '↓',
+          onClick: () => {
+            void (async () => {
+              try {
+                const data =
+                  entry.feature === 'info'
+                    ? await exportFeatureInfo(cellId, props.workspaceId)
+                    : await exportFeatureChecklists(
+                        cellId,
+                        props.workspaceId,
+                      );
+                downloadSubtreeExport(data, entry.feature);
+                showToast(
+                  `Export geladen — ${summarizeExport(data)}`,
+                  'success',
+                );
+              } catch (err) {
+                showToast(translateDbError(err), 'error');
+              }
+            })();
+          },
+        });
+        items.push({
+          label: 'Importieren',
+          icon: '↑',
+          onClick: () => {
+            triggerImport(
+              entry.feature === 'info'
+                ? { kind: 'feature-info', cellId }
+                : { kind: 'feature-checklists', cellId },
+            );
           },
         });
       }
@@ -1254,6 +1484,16 @@ const NodeTree: Component<Props> = (props) => {
       </Show>
       </div>
       <ContextMenu state={ctxMenu()} onClose={() => setCtxMenu(null)} />
+      {/* Hidden file-input fuer Subtree/Feature-Import. Wird per
+          triggerImport() geclickt — value wird vorher auf '' gesetzt,
+          damit auch gleiche Datei wieder den change-Event feuert. */}
+      <input
+        ref={importInputRef}
+        type="file"
+        accept="application/json,.json"
+        class="tree-import-hidden"
+        onChange={(e) => void onImportFileChosen(e)}
+      />
       <Show when={pasteTarget()}>
         <ChecklistPastePopup
           initialText={pasteTarget()!.text}
