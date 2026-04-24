@@ -246,18 +246,33 @@ p.ok {
   border-color: var(--focus-color);
 }
 
-/* ── Button-System (HTML-Vorbild) ───────────────────────────── */
+/* ── Button-System — HyperUI/shadcn-inspiriert ─────────────────
+   Konvention:
+     .btn            Default — white Paper mit Border (Secondary-Action)
+     .btn-p / submit Primary — solid dark, white text (Hauptaktion)
+     .btn-c /
+     .btn-secondary  Outline-only (transparent, mit Border)
+     .btn-subtle     Ghost — kein Border, leicht getoent auf Hover
+     .btn-danger     Red — destruktive Aktion
+     .ico-btn        Icon-only, 28x28 square
+   Alle teilen dieselbe Base (Padding, Font, Radius, Transition). */
 .btn,
 button[type='submit'],
 button[type='button'] {
-  padding: 5px 11px;
-  font-size: 12px;
-  border-radius: var(--r);
-  border: 0.5px solid var(--border2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  line-height: 1.4;
+  border-radius: var(--rs);
+  border: 1px solid var(--border2);
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
-  font-family: inherit;
   white-space: nowrap;
   transition: background var(--tr-std), border-color var(--tr-std),
     color var(--tr-std), opacity var(--tr-std);
@@ -266,6 +281,14 @@ button[type='button'] {
 .btn:hover:not(:disabled),
 button[type='submit']:hover:not(:disabled) {
   background: var(--surface-hover);
+  border-color: var(--text3);
+}
+
+.btn:focus-visible,
+button[type='submit']:focus-visible,
+button[type='button']:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
 }
 
 /* Disabled-Look NUR auf echten .btn*-Klassen + Submit.
@@ -291,60 +314,79 @@ button[type='submit']:disabled,
   cursor: not-allowed;
 }
 
+/* Primary — solid dunkler Button fuer Hauptaktionen. HyperUI-Vorbild:
+   bg-slate-900 text-white hover:bg-slate-700. */
 .btn-p,
 button[type='submit'] {
-  padding: 6px 14px;
-  border: none;
+  border: 1px solid var(--text);
   background: var(--text);
-  color: var(--bg);
+  color: var(--surface);
 }
 
 .btn-p:hover:not(:disabled),
 button[type='submit']:hover:not(:disabled) {
-  background: var(--text);
-  opacity: 0.85;
+  background: var(--text2);
+  border-color: var(--text2);
 }
 
+/* Outline / Secondary — transparent mit Border, HyperUI-Outline-Style. */
 .btn-c,
 .btn-secondary {
-  padding: 6px 12px;
-  border: 0.5px solid var(--border2);
   background: transparent;
   color: var(--text2);
+  border: 1px solid var(--border2);
 }
 
 .btn-c:hover:not(:disabled),
 .btn-secondary:hover:not(:disabled) {
-  background: var(--bg2);
+  background: var(--surface-hover);
   color: var(--text);
+  border-color: var(--text3);
 }
 
+/* Danger — rote Destruktiv-Aktion. Outline-Variante (fuer Card-Actions
+   dezent), bei Hover gefuellt. */
 .btn-danger {
   color: var(--red);
   border-color: var(--red);
-  background: transparent;
+  background: var(--surface);
 }
 
 .btn-danger:hover:not(:disabled) {
   background: var(--redbg);
 }
 
-/* Subtle / Ghost — "+ JSON importieren", "+ Checkliste" etc. */
+/* Ghost — kein Border, transparent. Fuer dezente Inline-Actions und
+   "+ Neue..."-Trigger. Leicht getoent auf Hover, keine dashed-Border
+   mehr (Holdover aus fruehem HTML-Vorbild). */
 .btn-subtle {
-  padding: 5px 11px;
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  line-height: 1.4;
   background: transparent;
   color: var(--text2);
-  border: 0.5px dashed var(--border2);
-  border-radius: var(--r);
+  border: 1px solid transparent;
+  border-radius: var(--rs);
   cursor: pointer;
-  transition: var(--tr-std);
+  white-space: nowrap;
+  transition: background var(--tr-std), color var(--tr-std),
+    border-color var(--tr-std), opacity var(--tr-std);
 }
 
 .btn-subtle:hover:not(:disabled) {
-  border-style: solid;
-  border-color: var(--blue);
-  color: var(--blue);
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.btn-subtle:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
 }
 
 /* Icon-Button */
@@ -4229,19 +4271,25 @@ button[type='submit']:hover:not(:disabled) {
 
 .overlay-input {
   width: 100%;
-  padding: 6px 10px;
+  padding: 7px 10px;
   font-size: 13px;
-  background: var(--bg);
+  background: var(--surface);
   color: var(--text);
-  border: 0.5px solid var(--border2);
-  border-radius: var(--r);
+  border: 1px solid var(--border2);
+  border-radius: var(--rs);
   font-family: inherit;
   box-sizing: border-box;
+  transition: border-color var(--tr-std), box-shadow var(--tr-std);
 }
 
 .overlay-input:focus-visible {
   border-color: var(--focus-color);
   outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-color) 20%, transparent);
+}
+
+.overlay-input::placeholder {
+  color: var(--text3);
 }
 
 /* Meta-Zeile: Alias, Deadline, Prioritaet, Farbe — 4 Spalten gleich-
@@ -4290,21 +4338,25 @@ button[type='submit']:hover:not(:disabled) {
 
 .overlay-section input[type='text'],
 .overlay-section input[type='date'],
+.overlay-section input[type='number'],
 .overlay-section select,
 .overlay-section textarea {
-  padding: 6px 10px;
+  padding: 7px 10px;
   font-size: 13px;
-  background: var(--bg);
+  background: var(--surface);
   color: var(--text);
-  border: 0.5px solid var(--border2);
-  border-radius: var(--r);
+  border: 1px solid var(--border2);
+  border-radius: var(--rs);
   font-family: inherit;
+  transition: border-color var(--tr-std), box-shadow var(--tr-std);
 }
 
 .overlay-section input:focus-visible,
 .overlay-section select:focus-visible,
 .overlay-section textarea:focus-visible {
   border-color: var(--focus-color);
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-color) 20%, transparent);
 }
 
 .overlay-section textarea {
