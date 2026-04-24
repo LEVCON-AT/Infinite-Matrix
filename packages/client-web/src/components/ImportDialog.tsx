@@ -15,6 +15,7 @@ import { ImportExecError, executeImport } from '../lib/import-exec';
 import type { ImportPlan, ImportStats } from '../lib/import-types';
 import { planStats } from '../lib/import-types';
 import { decryptPayload, isEncrypted } from '../lib/crypto';
+import Icon from './Icon';
 
 type Props = {
   workspaceId: string;
@@ -149,7 +150,7 @@ const ImportDialog: Component<Props> = (p) => {
             disabled={phase() === 'running'}
             aria-label="Schliessen"
           >
-            ✕
+            <Icon name="x" size={18} />
           </button>
         </header>
 

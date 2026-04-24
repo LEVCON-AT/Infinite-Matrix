@@ -2,7 +2,10 @@ import { Show, createEffect, type JSX, type ParentComponent } from 'solid-js';
 import { useLocation, useNavigate } from '@solidjs/router';
 import { bootstrapAuth, useAuthReady, useSession } from './lib/auth';
 import { useEditModeHotkey } from './lib/edit-mode';
+import { useThemeBootstrap } from './lib/theme';
 import Toasts from './components/Toasts';
+import DialogHost from './components/DialogHost';
+import ProgressOverlay from './components/ProgressOverlay';
 
 bootstrapAuth();
 
@@ -13,6 +16,7 @@ const App: ParentComponent = (props): JSX.Element => {
   const navigate = useNavigate();
 
   useEditModeHotkey();
+  useThemeBootstrap();
 
   // Route-Guard: ohne Session -> /login, mit Session auf /login -> /
   createEffect(() => {
@@ -31,6 +35,8 @@ const App: ParentComponent = (props): JSX.Element => {
         {props.children}
       </Show>
       <Toasts />
+      <DialogHost />
+      <ProgressOverlay />
     </div>
   );
 };

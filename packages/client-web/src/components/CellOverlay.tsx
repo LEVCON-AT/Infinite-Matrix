@@ -22,6 +22,8 @@ import { isNodeEmpty } from '../lib/queries';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
+import { validateAlias } from '../lib/alias';
+import Icon from './Icon';
 
 type Props = {
   workspaceId: string;
@@ -74,14 +76,19 @@ const CellOverlay: Component<Props> = (p) => {
     return (current()?.features ?? []).includes(key);
   }
 
-  function targetNodeId(): string | null {
+  // Anzahl navigierbarer Strukturen (Matrix + Board) an der Zelle.
+  // 0 = nichts zu oeffnen, 1 = eindeutig (Enter + "Oeffnen"-Button),
+  // 2 = ambig — User entscheidet per Chip-Klick, Dialog schliesst ohne Nav.
+  const navTargetCount = createMemo(() => {
     const c = current();
-    if (!c) return null;
-    return c.child_matrix_id ?? c.board_id ?? null;
-  }
+    if (!c) return 0;
+    return (c.child_matrix_id ? 1 : 0) + (c.board_id ? 1 : 0);
+  });
 
-  function canOpen(): boolean {
-    return targetNodeId() !== null;
+  function soleTargetNodeId(): string | null {
+    if (navTargetCount() !== 1) return null;
+    const c = current()!;
+    return c.child_matrix_id ?? c.board_id ?? null;
   }
 
   async function wrap<T>(key: string, fn: () => Promise<T>) {
@@ -138,7 +145,9 @@ const CellOverlay: Component<Props> = (p) => {
       return;
     }
     // On: Zelle sicherstellen, Node anlegen, Feature rein, FK setzen.
-    const baseCell = cur ?? (await ensureCell({ features: cur?.features ?? [] }));
+    // Wenn cur null ist, ist cur?.features ebenfalls undefined — also
+    // direkt [] starten, das spart die redundante Narrowing-Fehlspur.
+    const baseCell = cur ?? (await ensureCell({ features: [] }));
     const newNode =
       def.key === 'matrix'
         ? await createChildMatrix({
@@ -173,21 +182,37 @@ const CellOverlay: Component<Props> = (p) => {
   }
 
   // ─── Alias-Speichern (on blur) ───────────────────────────────
+  // Cross-Table-Alias-Check (Zelle vs. Karten/Matrizen/Checklisten/
+  // Links/Nodes) laeuft ueber den zentralen validateAlias-Helper.
   async function onAliasBlur() {
-    const next = aliasDraft().trim() || null;
-    const cur = current();
-    if ((cur?.alias ?? null) === next) return;
     if (busy()) return;
+    const cur = current();
+    const currentAlias = cur?.alias ?? null;
     setBusy('alias');
     try {
+      // Neue Zelle hat noch keine id — Platzhalter ist harmlos im
+      // neq()-Filter, weil dann alle DB-Matches als Konflikt gelten.
+      const selfId = cur?.id ?? '__new__';
+      const res = await validateAlias(aliasDraft(), p.workspaceId, {
+        type: 'cell',
+        id: selfId,
+      });
+      if (!res.ok) {
+        showToast(res.msg, 'error');
+        flashError(aliasInput);
+        window.setTimeout(() => {
+          aliasInput?.focus();
+          aliasInput?.select();
+        }, 420);
+        return;
+      }
+      const next = res.canonical;
+      if (next === currentAlias) return;
       await ensureCell({ alias: next });
       p.onChanged();
     } catch (err) {
       showToast(translateDbError(err), 'error');
       flashError(aliasInput);
-      // Eingabe NICHT revertieren — User soll korrigieren koennen.
-      // Nach Shake-Animation Fokus zurueck + Text markieren, damit das
-      // naechste Tippen direkt ueberschreibt.
       window.setTimeout(() => {
         aliasInput?.focus();
         aliasInput?.select();
@@ -198,8 +223,10 @@ const CellOverlay: Component<Props> = (p) => {
   }
 
   // ─── Navigation ──────────────────────────────────────────────
+  // Bei genau einem Ziel navigieren. Bei 0 oder 2 nur schliessen —
+  // User entscheidet dann per Chip-Klick in der Zelle selbst.
   function onOpen() {
-    const nid = targetNodeId();
+    const nid = soleTargetNodeId();
     if (!nid) {
       p.onClose();
       return;
@@ -274,44 +301,64 @@ const CellOverlay: Component<Props> = (p) => {
     }
   }
 
-  // ─── ESC / Global Hotkeys 1-9 + Autofocus ────────────────────
+  // Props sind in Solid accessor-basiert. Nach Unmount kann der Zugriff
+  // auf p.row.id / p.col.id stale werden — hier bei Mount einmalig in
+  // Konstanten capturen, damit der onCleanup safe ist.
+  const capturedRowId = p.row.id;
+  const capturedColId = p.col.id;
+
+  // Alias-Input sofort fokussieren + globaler Keyboard-Handler.
   onMount(() => {
-    // Alias-Input sofort fokussieren — User kann ohne Klick tippen.
     aliasInput?.focus();
-
-    const onKey = (e: KeyboardEvent) => {
-      // Nicht greifen, wenn User im Alias-Input / Textarea tippt.
-      const t = e.target as HTMLElement | null;
-      const inEditable =
-        !!t &&
-        (t.tagName === 'INPUT' ||
-          t.tagName === 'TEXTAREA' ||
-          t.isContentEditable);
-
-      if (e.key === 'Escape') {
-        e.stopImmediatePropagation();
-        p.onClose();
-        return;
-      }
-
-      if (inEditable) return;
-
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        if (canOpen()) onOpen();
-        else p.onClose();
-        return;
-      }
-
-      const def = findFeatureByHotkey(e.key);
-      if (def) {
-        e.preventDefault();
-        void onToggle(def);
-      }
-    };
-    document.addEventListener('keydown', onKey, true);
-    onCleanup(() => document.removeEventListener('keydown', onKey, true));
+    document.addEventListener('keydown', onGlobalKeyDown, true);
   });
+
+  // Fokus zurueck auf die DOM-Zelle bei Unmount — damit Enter/Pfeil im
+  // Read/Edit-Mode sofort weiter funktioniert.
+  onCleanup(() => {
+    document.removeEventListener('keydown', onGlobalKeyDown, true);
+    const el = document.querySelector(
+      `.mx-cell[data-row-id="${capturedRowId}"][data-col-id="${capturedColId}"]`,
+    ) as HTMLElement | null;
+    el?.focus({ preventScroll: true });
+  });
+
+  // Globaler Keyboard-Handler auf document (Capture-Phase). Greift auch
+  // wenn der Fokus ausserhalb des Overlays landet (z.B. nach Alias-blur
+  // auf body). stopImmediatePropagation verhindert, dass der Workspace-
+  // ESC-Handler (Parent-Navigation) den Event zu sehen bekommt.
+  function onGlobalKeyDown(e: KeyboardEvent) {
+    const t = e.target as HTMLElement | null;
+    const inEditable =
+      !!t &&
+      (t.tagName === 'INPUT' ||
+        t.tagName === 'TEXTAREA' ||
+        t.isContentEditable);
+
+    if (e.key === 'Escape') {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      p.onClose();
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      if (inEditable) return; // Input-lokaler Handler macht blur -> save
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      onOpen();
+      return;
+    }
+
+    // Hotkeys 1-9: greifen auch im Alias-Input. preventDefault verhindert,
+    // dass die Ziffer in den Text wandert.
+    const def = findFeatureByHotkey(e.key);
+    if (def) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      void onToggle(def);
+    }
+  }
 
   // Breadcrumb-Label oben
   const breadcrumb = () =>
@@ -336,7 +383,7 @@ const CellOverlay: Component<Props> = (p) => {
             onClick={p.onClose}
             aria-label="Schliessen"
           >
-            ✕
+            <Icon name="x" size={18} />
           </button>
         </header>
 
@@ -354,6 +401,9 @@ const CellOverlay: Component<Props> = (p) => {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
+                  // Enter im Alias = nur save (via blur). Dialog bleibt
+                  // offen, damit User anschliessend mit 1-9 Features
+                  // auswaehlen und dann selbst mit Enter oeffnen kann.
                   (e.currentTarget as HTMLInputElement).blur();
                 }
               }}
@@ -376,14 +426,16 @@ const CellOverlay: Component<Props> = (p) => {
                   title={`${def.label} (Taste ${def.hotkey})`}
                 >
                   <span class="cell-feat-hotkey">{def.hotkey}</span>
-                  <span class="cell-feat-ico">{def.icon}</span>
+                  <span class="cell-feat-ico">
+                    <Icon name={def.iconName} size={16} />
+                  </span>
                   <span class="cell-feat-label">{def.label}</span>
                 </button>
               )}
             </For>
           </div>
 
-          <Show when={canOpen()}>
+          <Show when={navTargetCount() === 1}>
             <button
               type="button"
               class="cell-open-btn"

@@ -17,9 +17,12 @@ const roleLabel: Record<WorkspaceWithRole['role'], string> = {
 const WorkspaceSwitcher: Component<Props> = (props) => {
   const navigate = useNavigate();
 
+  // "Workspace"-Label aus der alten Stack-Variante entfernt — der
+  // Switcher sitzt jetzt in der schmalen Sidebar-Head-Leiste inline
+  // mit dem Collapse-Button. Multi-Workspace-Support waere ein Dropdown,
+  // fuer V1 zeigen wir die Liste als Buttons nacheinander (skip-label).
   return (
     <div class="ws-switcher">
-      <div class="ws-switcher-label">Workspace</div>
       <Show
         when={props.workspaces && props.workspaces.length > 0}
         fallback={<div class="ws-empty">Kein Workspace.</div>}

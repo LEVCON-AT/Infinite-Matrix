@@ -1,15 +1,61 @@
-import { For, Show, createMemo, createSignal, type Component } from 'solid-js';
+import {
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  type Component,
+} from 'solid-js';
+import { useSearchParams } from '@solidjs/router';
 import type {
   BoardContent,
   KbCardRow,
   KbColRow,
+  LinkRow,
+  LinkType,
 } from '../lib/types';
+import { useVis } from '../lib/settings';
+import { useBoardUi } from '../lib/board-ui-state';
+import {
+  addBoardLink,
+  addCard,
+  addChecklist,
+  addKbCol,
+  delBoardLink,
+  delCard,
+  delKbCol,
+  InvalidUrlError,
+  moveCard,
+  renameKbCol,
+  restoreBoardLink,
+  restoreCard,
+  setBoardLinkLabel,
+  setBoardLinkType,
+  setBoardLinkUrl,
+  setCardColAndPosition,
+  setCardPosition,
+  setCardDoneOccurrences,
+  setKbColColor,
+  setKbColPosition,
+  toggleCardDone,
+} from '../lib/mutations';
+import {
+  isCardDone,
+  isRecurCard,
+  todayIso,
+  toggleOccurrence,
+} from '../lib/recur';
+import { showToast, showUndoToast } from '../lib/toasts';
+import { translateDbError } from '../lib/errors';
 import CardOverlay from './CardOverlay';
+import ChecklistPanel from './ChecklistPanel';
+import Icon from './Icon';
 
 type Props = {
   workspaceId: string;
   boardId: string;
   content: BoardContent | undefined;
+  onChanged?: () => void;
 };
 
 // Liefert N/M fuer eine Karte — inline-Checkliste oder resolved via ref.
@@ -36,18 +82,322 @@ function checklistProgress(
 
 function fmtDate(iso: string | null): string | null {
   if (!iso) return null;
-  // ISO date-only (YYYY-MM-DD); keep locale-agnostic but readable.
   const [y, m, d] = iso.split('-');
   if (!y || !m || !d) return iso;
   return `${d}.${m}.${y}`;
 }
 
+// Deadline-State relativ zu heute:
+//   overdue  = strikt vor heute
+//   today    = heute
+//   soon     = innerhalb der naechsten 3 Tage (heute exklusiv)
+//   future   = spaeter
+// Donecards bekommen keinen State — "erledigt" ueberschreibt
+// das Dringlichkeitssignal.
+function deadlineState(
+  iso: string | null,
+  done: boolean,
+): 'overdue' | 'today' | 'soon' | 'future' | null {
+  if (!iso || done) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(iso);
+  d.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((d.getTime() - today.getTime()) / 86_400_000);
+  if (diffDays < 0) return 'overdue';
+  if (diffDays === 0) return 'today';
+  if (diffDays <= 3) return 'soon';
+  return 'future';
+}
+
+// Comparator-Factory fuer Card-Sort. In allen Modi sortieren wir
+// done-Karten ans Ende (erledigt = weniger relevant). Null-Werte
+// (kein Deadline, keine Prio) landen ebenfalls hinten.
+function sortComparator(
+  mode: 'deadline' | 'priority' | 'name',
+): (a: KbCardRow, b: KbCardRow) => number {
+  return (a, b) => {
+    const aDone = isCardDone(a);
+    const bDone = isCardDone(b);
+    if (aDone !== bDone) return aDone ? 1 : -1;
+    if (mode === 'deadline') {
+      const aHas = !!a.deadline;
+      const bHas = !!b.deadline;
+      if (aHas !== bHas) return aHas ? -1 : 1;
+      if (aHas && a.deadline !== b.deadline) {
+        return a.deadline! < b.deadline! ? -1 : 1;
+      }
+    } else if (mode === 'priority') {
+      const ap = a.priority;
+      const bp = b.priority;
+      const aHas = ap != null;
+      const bHas = bp != null;
+      if (aHas !== bHas) return aHas ? -1 : 1;
+      if (aHas && ap !== bp) return (ap as number) - (bp as number);
+    } else if (mode === 'name') {
+      const cmp = a.name.localeCompare(b.name);
+      if (cmp !== 0) return cmp;
+    }
+    // Tiebreaker: bestehende Position, stabil.
+    return a.position - b.position;
+  };
+}
+
 const BoardView: Component<Props> = (p) => {
+  // Kanban-Struktur: + Spalte / Link-Leiste / Checklisten-Anlage, Color-
+  // Picker, Spalte umbenennen, Spalte verschieben, Spalte loeschen.
+  // Karten-Aktionen (Move/Del) bleiben immer sichtbar — Karten sind kein
+  // Struktur-Level.
+  const canAddKbCol = useVis('addKbCol');
+  const canColorPicker = useVis('colorPicker');
+  const canRenameHeaders = useVis('renameHeaders');
+  const canMoveRowCol = useVis('moveArrows');
+  const canDeleteRowCol = useVis('deleteRowCol');
+  const canAddInfoField = useVis('addInfoField');
+  const colHeadEditable = () =>
+    canRenameHeaders() ||
+    canMoveRowCol() ||
+    canDeleteRowCol() ||
+    canColorPicker();
+  const boardUi = useBoardUi(p.boardId);
+
+  // Drag-State: welche Card wird gerade gezogen, welcher Col-Container
+  // ist gerade der Hover-Drop-Target. Plus: welche Card ist Slot-Target
+  // (dragOverCardId) und ob die Insertion vor oder nach ihr passieren
+  // soll (dragOverBefore — bestimmt aus Maus-Y vs Card-Mittelpunkt).
+  // Keine DOM-Klasse anfassen — reaktive Signale treiben classList.
+  const [draggingCardId, setDraggingCardId] = createSignal<string | null>(null);
+  const [dragOverColId, setDragOverColId] = createSignal<string | null>(null);
+  const [dragOverCardId, setDragOverCardId] = createSignal<string | null>(null);
+  const [dragOverBefore, setDragOverBefore] = createSignal(true);
+
+  function clearDragState() {
+    setDraggingCardId(null);
+    setDragOverColId(null);
+    setDragOverCardId(null);
+  }
+
+  function onCardDragStart(card: KbCardRow, e: DragEvent) {
+    if (!e.dataTransfer) return;
+    // Reorder via Drag setzt voraus, dass die manuelle Sortierung aktiv
+    // ist. Bei automatischem Sort waere das Drop-Ergebnis sofort
+    // weg-sortiert — irritierend. Daher early-abort, kein drag.
+    if (boardUi.sort() !== 'manual') {
+      e.preventDefault();
+      showToast('Drag nur bei manueller Sortierung.', 'info');
+      return;
+    }
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/matrix-card-id', card.id);
+    // Fallback fuer Browser die den custom-type ignorieren.
+    e.dataTransfer.setData('text/plain', card.id);
+    setDraggingCardId(card.id);
+  }
+
+  function onCardDragEnd() {
+    clearDragState();
+  }
+
+  function onColDragOver(colId: string, e: DragEvent) {
+    // Nur wenn eine Card gezogen wird (draggingCardId gesetzt).
+    // Der dataTransfer-Typ-Check ist unzuverlaessig im dragover-Event
+    // (Firefox/Chrome-Diff), deshalb verlassen wir uns auf das Signal.
+    if (!draggingCardId()) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    if (dragOverColId() !== colId) setDragOverColId(colId);
+  }
+
+  function onColDragLeave(colId: string, e: DragEvent) {
+    // Nur wenn wir wirklich den Container verlassen (nicht ein Child
+    // betreten). relatedTarget ist das neu-fokussierte Element;
+    // wenn es ausserhalb des aktuellen Col-Divs liegt, leaven.
+    const related = e.relatedTarget as Node | null;
+    const current = e.currentTarget as HTMLElement;
+    if (related && current.contains(related)) return;
+    if (dragOverColId() === colId) {
+      setDragOverColId(null);
+      setDragOverCardId(null);
+    }
+  }
+
+  // Card-level DragOver fuer Slot-Vorschau. Nur auf den Karten gebunden,
+  // damit die Berechnung pro Karte lokal bleibt.
+  function onCardDragOver(card: KbCardRow, e: DragEvent) {
+    const src = draggingCardId();
+    if (!src) return;
+    if (src === card.id) return; // auf sich selbst kein Slot
+    e.preventDefault();
+    // Event nicht bubblen lassen — sonst uebersteuert onColDragOver
+    // unsere feinere Slot-Berechnung.
+    e.stopPropagation();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const before = e.clientY < midY;
+    if (dragOverColId() !== card.col_id) setDragOverColId(card.col_id);
+    if (dragOverCardId() !== card.id) setDragOverCardId(card.id);
+    if (dragOverBefore() !== before) setDragOverBefore(before);
+  }
+
+  // Re-nummerierung einer Spalte — setzt alle position-Werte linear auf
+  // 0, 1, 2, … gemaess orderedIds. Bestehende Werte werden ueberschrieben.
+  // Sequenziell statt Promise.all, damit kein konkurrierender UPDATE-Storm
+  // an RLS/Policy-Zaehler stoert (nebenbei: Reihenfolge der Logs bleibt
+  // nachvollziehbar).
+  async function writeColOrder(orderedIds: string[]): Promise<void> {
+    for (let i = 0; i < orderedIds.length; i++) {
+      await setCardPosition(orderedIds[i], i);
+    }
+  }
+
+  // Bestimmt die Ziel-Reihenfolge der Spalte toColId, nachdem srcCard
+  // an Slot `anchorIdx` (before) / `anchorIdx+1` (after) eingefuegt
+  // wurde. In-Col-Fall: die Karte wird aus der Liste entfernt, dann
+  // neu eingesetzt. Cross-Col: nur Einfuege-Seite.
+  function computeInsertOrder(
+    srcCard: KbCardRow,
+    toColId: string,
+    anchorCardId: string | null,
+    before: boolean,
+  ): string[] {
+    const listAll = cardsByCol().get(toColId) ?? [];
+    // Src entfernen, damit wir eine saubere Referenz fuer den Ziel-
+    // Index haben (andernfalls waere der anchor-Index falsch, wenn src
+    // vor dem anchor lag).
+    const list = listAll.filter((c) => c.id !== srcCard.id);
+    let insertAt = list.length;
+    if (anchorCardId) {
+      const idx = list.findIndex((c) => c.id === anchorCardId);
+      if (idx >= 0) insertAt = before ? idx : idx + 1;
+    }
+    const ids = list.map((c) => c.id);
+    ids.splice(insertAt, 0, srcCard.id);
+    return ids;
+  }
+
+  // Reorder-Handler. Ziel: `toColId` an Slot vor/nach `anchorCardId`.
+  // Wenn kein anchor: ans Ende.
+  async function performReorder(
+    srcCard: KbCardRow,
+    toColId: string,
+    anchorCardId: string | null,
+    before: boolean,
+  ) {
+    const fromColId = srcCard.col_id;
+    const isCrossCol = fromColId !== toColId;
+    const targetOrder = computeInsertOrder(
+      srcCard,
+      toColId,
+      anchorCardId,
+      before,
+    );
+    const insertPos = targetOrder.indexOf(srcCard.id);
+
+    // Quell-Spalte (falls cross-col) zuerst neu nummerieren — dann
+    // cascaded die Src-Card mit neuer col_id+position in die Ziel-Spalte.
+    // Zuletzt: Ziel-Spalte re-nummerieren (ohne Src, weil die schon
+    // explizit auf insertPos gesetzt wird).
+    await wrap(async () => {
+      if (isCrossCol) {
+        const fromList = (cardsByCol().get(fromColId) ?? []).filter(
+          (c) => c.id !== srcCard.id,
+        );
+        for (let i = 0; i < fromList.length; i++) {
+          await setCardPosition(fromList[i].id, i);
+        }
+        await setCardColAndPosition(srcCard.id, toColId, insertPos);
+        for (let i = 0; i < targetOrder.length; i++) {
+          const id = targetOrder[i];
+          if (id === srcCard.id) continue;
+          await setCardPosition(id, i);
+        }
+      } else {
+        await writeColOrder(targetOrder);
+      }
+    });
+  }
+
+  async function onCardDrop(targetCard: KbCardRow, e: DragEvent) {
+    const srcId =
+      e.dataTransfer?.getData('text/matrix-card-id') ||
+      e.dataTransfer?.getData('text/plain') ||
+      draggingCardId();
+    const before = dragOverBefore();
+    clearDragState();
+    if (!srcId || srcId === targetCard.id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const srcCard = (p.content?.kbCards ?? []).find((c) => c.id === srcId);
+    if (!srcCard) return;
+    await performReorder(srcCard, targetCard.col_id, targetCard.id, before);
+  }
+
+  async function onColDrop(colId: string, e: DragEvent) {
+    // Wenn ein Card-Slot-Drop aktiv war, hat onCardDrop das schon
+    // abgehandelt. Das Col-Drop-Event feuert bei manchen Browsern
+    // zusaetzlich (Drag-Target-Bubble). Guard via dragOverCardId:
+    // wenn gesetzt, ist der Card-Handler zustaendig.
+    const anchorCardId = dragOverCardId();
+    const cardId =
+      e.dataTransfer?.getData('text/matrix-card-id') ||
+      e.dataTransfer?.getData('text/plain') ||
+      draggingCardId();
+    const before = dragOverBefore();
+    clearDragState();
+    if (!cardId) return;
+    e.preventDefault();
+    const card = (p.content?.kbCards ?? []).find((c) => c.id === cardId);
+    if (!card) return;
+    if (anchorCardId) {
+      // Card-Drop-Pfad uebernahm bereits — hier nur state cleanup.
+      return;
+    }
+    await performReorder(card, colId, null, before);
+  }
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedCardId, setSelectedCardId] = createSignal<string | null>(null);
+  const [busy, setBusy] = createSignal(false);
+
+  // Deep-Link ?card=<id> → CardOverlay direkt oeffnen (Quicknav).
+  // Erst wenn content vorhanden ist und die Karte wirklich existiert.
+  // Query-Param danach aufraeumen, damit ein Refresh die Karte nicht
+  // erneut oeffnet und die URL sauber bleibt.
+  createEffect(() => {
+    const content = p.content;
+    if (!content) return;
+    const want = searchParams.card;
+    if (!want || typeof want !== 'string') return;
+    const exists = content.kbCards.some((c) => c.id === want);
+    if (!exists) return;
+    setSelectedCardId(want);
+    setSearchParams({ card: undefined }, { replace: true });
+  });
+
+  const [showArchived, setShowArchived] = createSignal(false);
+  const [filter, setFilter] = createSignal('');
+  let filterInputRef: HTMLInputElement | undefined;
 
   const visibleCols = createMemo<KbColRow[]>(() => p.content?.kbCols ?? []);
-  const activeCards = createMemo<KbCardRow[]>(() =>
-    (p.content?.kbCards ?? []).filter((c) => !c.archived),
+  // Archiv-Filter: per Default ausgeblendet. Toggle-Button im Board-Head
+  // setzt showArchived — dann kommen die archivierten Karten mit
+  // kb-card-archived-Klasse sichtbar rein.
+  const activeCards = createMemo<KbCardRow[]>(() => {
+    const all = showArchived()
+      ? p.content?.kbCards ?? []
+      : (p.content?.kbCards ?? []).filter((c) => !c.archived);
+    const q = filter().trim().toLowerCase();
+    if (!q) return all;
+    return all.filter((c) => {
+      if (c.name.toLowerCase().includes(q)) return true;
+      if (c.alias && c.alias.toLowerCase().includes(q)) return true;
+      if ((c.tags ?? []).some((t) => t.toLowerCase().includes(q))) return true;
+      if ((c.who ?? []).some((w) => w.toLowerCase().includes(q))) return true;
+      return false;
+    });
+  });
+  const archivedCount = createMemo(
+    () => (p.content?.kbCards ?? []).filter((c) => c.archived).length,
   );
 
   const cardsByCol = createMemo(() => {
@@ -57,8 +407,28 @@ const BoardView: Component<Props> = (p) => {
       if (arr) arr.push(c);
       else map.set(c.col_id, [c]);
     }
+    // Sort pro Spalte. Position-Order kommt schon sortiert aus der
+    // Query — nichts zu tun im 'manual'-Modus.
+    const mode = boardUi.sort();
+    if (mode !== 'manual') {
+      const cmp = sortComparator(mode);
+      for (const list of map.values()) list.sort(cmp);
+    }
     return map;
   });
+
+  // Treffer-Counter fuer den Filter: ueber cardsByCol zaehlen, damit
+  // die Zahl genau dem entspricht, was gerendert wird.
+  const totalCardsShown = createMemo(() =>
+    Array.from(cardsByCol().values()).reduce((n, l) => n + l.length, 0),
+  );
+  const totalCardsAll = createMemo(
+    () =>
+      (showArchived()
+        ? p.content?.kbCards ?? []
+        : (p.content?.kbCards ?? []).filter((c) => !c.archived)
+      ).length,
+  );
 
   const selectedCard = createMemo(() => {
     const id = selectedCardId();
@@ -66,36 +436,414 @@ const BoardView: Component<Props> = (p) => {
     return (p.content?.kbCards ?? []).find((c) => c.id === id);
   });
 
+  async function wrap<T>(fn: () => Promise<T>, successMsg?: string) {
+    if (busy()) return;
+    setBusy(true);
+    try {
+      await fn();
+      if (successMsg) showToast(successMsg, 'success');
+      p.onChanged?.();
+    } catch (err) {
+      showToast(translateDbError(err), 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onAddCol() {
+    await wrap(() =>
+      addKbCol({ workspaceId: p.workspaceId, boardId: p.boardId }),
+    );
+  }
+
+  async function onRenameCol(col: KbColRow, newLabel: string) {
+    if (newLabel === col.label) return;
+    await wrap(() => renameKbCol(col.id, newLabel));
+  }
+
+  async function onColorCol(col: KbColRow, color: string | null) {
+    if ((color ?? null) === (col.color ?? null)) return;
+    await wrap(() => setKbColColor(col.id, color));
+  }
+
+  async function onMoveCol(col: KbColRow, direction: 'left' | 'right') {
+    const list = visibleCols();
+    const idx = list.findIndex((c) => c.id === col.id);
+    if (idx < 0) return;
+    const neighbourIdx = direction === 'left' ? idx - 1 : idx + 1;
+    if (neighbourIdx < 0 || neighbourIdx >= list.length) return;
+    const neighbour = list[neighbourIdx];
+    await wrap(async () => {
+      await setKbColPosition(col.id, neighbour.position);
+      await setKbColPosition(neighbour.id, col.position);
+    });
+  }
+
+  async function onDelCol(col: KbColRow) {
+    const count = (cardsByCol().get(col.id) ?? []).length;
+    if (count > 0) {
+      if (
+        !window.confirm(
+          `Spalte "${col.label || '(leer)'}" loeschen? Enthaelt ${count} Karte(n) — werden mitgeloescht.`,
+        )
+      ) {
+        return;
+      }
+    }
+    await wrap(() => delKbCol(col.id), 'Spalte geloescht.');
+  }
+
+  async function onAddCard(col: KbColRow) {
+    await wrap(() =>
+      addCard({
+        workspaceId: p.workspaceId,
+        boardId: p.boardId,
+        colId: col.id,
+      }),
+    );
+  }
+
+  async function onDelCard(card: KbCardRow) {
+    if (!window.confirm(`Karte "${card.name || '(ohne Titel)'}" loeschen?`)) {
+      return;
+    }
+    const snap: KbCardRow = { ...card };
+    await wrap(() => delCard(card.id));
+    showUndoToast(`Karte "${snap.name || '(ohne Titel)'}" geloescht.`, () => {
+      void (async () => {
+        try {
+          await restoreCard(snap);
+          showToast('Karte wiederhergestellt.', 'success');
+          p.onChanged?.();
+        } catch (err) {
+          showToast(translateDbError(err), 'error');
+        }
+      })();
+    });
+  }
+
+  async function onMoveCard(card: KbCardRow, toColId: string) {
+    if (toColId === card.col_id) return;
+    await wrap(() =>
+      moveCard({
+        cardId: card.id,
+        boardId: p.boardId,
+        workspaceId: p.workspaceId,
+        toColId,
+      }),
+    );
+  }
+
+  // Within-column-Reorder: Swap mit direktem Listen-Nachbarn. Positionen
+  // sind pro Spalte eindeutig nicht garantiert, aber auch nicht per UNIQUE
+  // erzwungen — Swap bleibt also safe. cardsByCol() ist bereits nach
+  // position sortiert (fetchBoardContent ordnet kb_cards aufsteigend).
+  async function onMoveCardWithin(card: KbCardRow, direction: 'up' | 'down') {
+    const list = cardsByCol().get(card.col_id) ?? [];
+    const idx = list.findIndex((c) => c.id === card.id);
+    if (idx < 0) return;
+    const neighbourIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (neighbourIdx < 0 || neighbourIdx >= list.length) return;
+    const neighbour = list[neighbourIdx];
+    await wrap(async () => {
+      await setCardPosition(card.id, neighbour.position);
+      await setCardPosition(neighbour.id, card.position);
+    });
+  }
+
+  async function onAddChecklist() {
+    await wrap(() =>
+      addChecklist({ workspaceId: p.workspaceId, boardId: p.boardId }),
+    );
+  }
+
+  // Board-Links: Add via Prompt (URL dann Label). Invalid-URL liefert
+  // eine freundliche Fehler-Toast, Sanitization greift im
+  // Mutations-Layer.
+  async function onAddLink() {
+    const rawUrl = window.prompt(
+      'URL oder E-Mail-Adresse:',
+      'https://',
+    );
+    if (!rawUrl) return;
+    const raw = rawUrl.trim();
+    if (!raw) return;
+    // Simple Heuristik: enthaelt @ ohne :// → wohl eine Mail.
+    const looksLikeMail = raw.includes('@') && !/^[a-z]+:\/\//i.test(raw);
+    const type: LinkType = looksLikeMail ? 'mail' : 'url';
+    const label = window.prompt('Anzeigetext (optional):', '') ?? '';
+    try {
+      await addBoardLink({
+        workspaceId: p.workspaceId,
+        boardId: p.boardId,
+        type,
+        label,
+        url: raw,
+      });
+      p.onChanged?.();
+    } catch (err) {
+      if (err instanceof InvalidUrlError) {
+        showToast('URL ist ungueltig.', 'error');
+      } else {
+        showToast(translateDbError(err), 'error');
+      }
+    }
+  }
+
+  async function onDelLink(link: LinkRow) {
+    if (
+      !window.confirm(
+        `Link "${link.label || link.url}" loeschen?`,
+      )
+    ) {
+      return;
+    }
+    const snap: LinkRow = { ...link };
+    await wrap(() => delBoardLink(link.id));
+    showUndoToast(`Link "${snap.label || snap.url}" geloescht.`, () => {
+      void (async () => {
+        try {
+          await restoreBoardLink(snap);
+          showToast('Link wiederhergestellt.', 'success');
+          p.onChanged?.();
+        } catch (err) {
+          showToast(translateDbError(err), 'error');
+        }
+      })();
+    });
+  }
+
+  async function onRenameLink(link: LinkRow, label: string) {
+    if (label.trim() === link.label) return;
+    await wrap(() => setBoardLinkLabel(link.id, label));
+  }
+
+  async function onLinkUrl(link: LinkRow, url: string) {
+    if (url.trim() === link.url) return;
+    try {
+      await setBoardLinkUrl(link.id, url);
+      p.onChanged?.();
+    } catch (err) {
+      if (err instanceof InvalidUrlError) {
+        showToast('URL ist ungueltig.', 'error');
+      } else {
+        showToast(translateDbError(err), 'error');
+      }
+    }
+  }
+
+  async function onLinkType(link: LinkRow, type: LinkType) {
+    if (type === link.type) return;
+    await wrap(() => setBoardLinkType(link.id, type));
+  }
+
+  async function onToggleCardDone(card: KbCardRow, done: boolean) {
+    const current = isCardDone(card);
+    if (done === current) return;
+    if (isRecurCard(card)) {
+      const next = toggleOccurrence(card.done_occurrences, todayIso(), done);
+      await wrap(() => setCardDoneOccurrences(card.id, next));
+    } else {
+      await wrap(() => toggleCardDone(card.id, done));
+    }
+  }
+
   return (
-    <Show
-      when={p.content}
-      fallback={<p class="hint">Lade Board…</p>}
-    >
+    <Show when={p.content} fallback={<p class="hint">Lade Board…</p>}>
       {(_) => (
         <div class="board">
-          {/* Links-Leiste */}
-          <Show when={(p.content!.links ?? []).length > 0}>
-            <div class="board-links">
-              <For each={p.content!.links}>
-                {(link) => (
-                  <a
-                    class="board-link-chip"
-                    data-link-type={link.type}
-                    href={link.type === 'mail' ? `mailto:${link.url}` : link.url}
-                    target={link.type === 'url' ? '_blank' : undefined}
-                    rel={link.type === 'url' ? 'noopener noreferrer' : undefined}
-                    title={link.url}
+          {/* Board-Header: Filter-Suche + Archiv-Toggle. Immer sichtbar,
+              sobald das Board Karten hat — Suche sparen sich leere
+              Boards. */}
+          <Show when={(p.content!.kbCards ?? []).length > 0}>
+            <div class="board-header-bar">
+              <div class="board-filter-wrap">
+                <span class="board-filter-icon" aria-hidden="true">
+                  <Icon name="search" size={14} />
+                </span>
+                <input
+                  ref={filterInputRef}
+                  type="text"
+                  class="board-filter-input"
+                  placeholder="Suche (Name, Alias, #Tag, @Person)…"
+                  value={filter()}
+                  onInput={(e) => setFilter(e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape' && filter()) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setFilter('');
+                    }
+                  }}
+                />
+                <Show when={filter()}>
+                  <span class="board-filter-count hint">
+                    {totalCardsShown()}/{totalCardsAll()}
+                  </span>
+                  <button
+                    type="button"
+                    class="board-filter-clear"
+                    onClick={() => {
+                      setFilter('');
+                      filterInputRef?.focus();
+                    }}
+                    title="Filter loeschen"
+                    aria-label="Filter loeschen"
                   >
-                    <span class="link-ico">
-                      {link.type === 'mail' ? '✉' : '↗'}
-                    </span>
-                    <span>{link.label || link.url}</span>
-                    <Show when={link.alias}>
-                      <span class="link-alias">^{link.alias}</span>
-                    </Show>
-                  </a>
+                    <Icon name="x" size={14} />
+                  </button>
+                </Show>
+              </div>
+              <select
+                class="board-sort-select"
+                value={boardUi.sort()}
+                title="Sortierung"
+                onChange={(e) =>
+                  boardUi.setSort(
+                    (e.currentTarget as HTMLSelectElement).value as
+                      | 'manual'
+                      | 'deadline'
+                      | 'priority'
+                      | 'name',
+                  )
+                }
+              >
+                <option value="manual">Manuell</option>
+                <option value="deadline">Deadline</option>
+                <option value="priority">Prioritaet</option>
+                <option value="name">Name</option>
+              </select>
+              <Show when={archivedCount() > 0}>
+                <button
+                  type="button"
+                  class="btn-subtle board-archive-toggle"
+                  classList={{ active: showArchived() }}
+                  onClick={() => setShowArchived((v) => !v)}
+                  aria-pressed={showArchived()}
+                  title={
+                    showArchived()
+                      ? 'Archivierte Karten ausblenden'
+                      : 'Archivierte Karten anzeigen'
+                  }
+                >
+                  <Icon name="archive-box" size={14} />
+                  <span>{showArchived() ? 'Archiv: an' : 'Archiv: aus'}</span>
+                  <span class="hint">({archivedCount()})</span>
+                </button>
+              </Show>
+            </div>
+          </Show>
+
+          {/* Links-Leiste. Im View-Mode Chips als <a>, im Edit-Mode
+              Inline-Edit: Typ, Label, URL + Delete. */}
+          <Show when={(p.content!.links ?? []).length > 0 || canAddInfoField()}>
+            <div class="board-links">
+              <For each={p.content!.links ?? []}>
+                {(link) => (
+                  <Show
+                    when={canAddInfoField()}
+                    fallback={
+                      <a
+                        class="board-link-chip"
+                        data-link-type={link.type}
+                        href={
+                          link.type === 'mail' ? `mailto:${link.url}` : link.url
+                        }
+                        target={link.type === 'url' ? '_blank' : undefined}
+                        rel={
+                          link.type === 'url' ? 'noopener noreferrer' : undefined
+                        }
+                        title={link.url}
+                      >
+                        <span class="link-ico">
+                          <Icon
+                            name={link.type === 'mail' ? 'envelope' : 'arrow-top-right-on-square'}
+                            size={12}
+                          />
+                        </span>
+                        <span>{link.label || link.url}</span>
+                        <Show when={link.alias}>
+                          <span class="link-alias">^{link.alias}</span>
+                        </Show>
+                      </a>
+                    }
+                  >
+                    <div
+                      class="board-link-edit"
+                      data-link-type={link.type}
+                    >
+                      <select
+                        class="board-link-type"
+                        value={link.type}
+                        title="Link-Typ"
+                        onChange={(e) =>
+                          onLinkType(
+                            link,
+                            (e.currentTarget as HTMLSelectElement)
+                              .value as LinkType,
+                          )
+                        }
+                      >
+                        <option value="url">URL</option>
+                        <option value="mail">Mail</option>
+                      </select>
+                      <input
+                        class="board-link-label"
+                        type="text"
+                        value={link.label}
+                        placeholder="Label"
+                        onBlur={(e) =>
+                          onRenameLink(link, e.currentTarget.value)
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            (e.currentTarget as HTMLInputElement).blur();
+                          }
+                        }}
+                      />
+                      <input
+                        class="board-link-url"
+                        type="text"
+                        value={link.url}
+                        placeholder={
+                          link.type === 'mail'
+                            ? 'name@example.com'
+                            : 'https://...'
+                        }
+                        onBlur={(e) => onLinkUrl(link, e.currentTarget.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            (e.currentTarget as HTMLInputElement).blur();
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        class="mx-del-btn"
+                        title="Link loeschen"
+                        aria-label="Link loeschen"
+                        onClick={() => onDelLink(link)}
+                        disabled={busy()}
+                      >
+                        <Icon name="x" size={12} />
+                      </button>
+                    </div>
+                  </Show>
                 )}
               </For>
+              <Show when={canAddInfoField()}>
+                <button
+                  type="button"
+                  class="btn-subtle board-link-add-btn"
+                  onClick={onAddLink}
+                  disabled={busy()}
+                >
+                  <Icon name="plus" size={14} />
+                  <span>Link</span>
+                </button>
+              </Show>
             </div>
           </Show>
 
@@ -105,45 +853,187 @@ const BoardView: Component<Props> = (p) => {
             fallback={
               <div class="board-empty">
                 <p class="hint">
-                  Board ohne Spalten — Kanban-Konfiguration kommt ab 0e.
+                  Board ohne Spalten.
+                  <Show when={canAddKbCol()}>
+                    {' '}
+                    + Spalte, um zu starten.
+                  </Show>
                 </p>
+                <Show when={canAddKbCol()}>
+                  <button
+                    type="button"
+                    class="btn-subtle"
+                    onClick={onAddCol}
+                    disabled={busy()}
+                  >
+                    <Icon name="plus" size={14} />
+                    <span>Spalte</span>
+                  </button>
+                </Show>
               </div>
             }
           >
             <div class="board-cols">
               <For each={visibleCols()}>
-                {(col) => {
+                {(col, colIdx) => {
                   const list = () => cardsByCol().get(col.id) ?? [];
+                  const collapsed = () => boardUi.isCollapsed(col.id);
                   return (
                     <div
                       class="kb-col"
+                      classList={{
+                        'kb-col-collapsed': collapsed(),
+                        'kb-col-drag-over': dragOverColId() === col.id,
+                      }}
                       style={col.color ? { '--kb-col-color': col.color } : undefined}
                       data-has-color={col.color ? 'yes' : 'no'}
+                      onDragOver={(e) => onColDragOver(col.id, e)}
+                      onDragLeave={(e) => onColDragLeave(col.id, e)}
+                      onDrop={(e) => onColDrop(col.id, e)}
                     >
-                      <header class="kb-col-head">
-                        <span class="kb-col-label">
-                          {col.label || '(Spalte)'}
-                        </span>
+                      <header
+                        class="kb-col-head"
+                        classList={{ 'mx-editable': colHeadEditable() }}
+                      >
+                        <button
+                          type="button"
+                          class="kb-col-collapse-btn"
+                          title={
+                            collapsed() ? 'Spalte aufklappen' : 'Spalte kollabieren'
+                          }
+                          aria-label={
+                            collapsed() ? 'Spalte aufklappen' : 'Spalte kollabieren'
+                          }
+                          aria-expanded={!collapsed()}
+                          onClick={() => boardUi.toggleCol(col.id)}
+                        >
+                          <Icon
+                            name={collapsed() ? 'chevron-right' : 'chevron-down'}
+                            size={14}
+                          />
+                        </button>
+                        <input
+                          class="mx-head-input"
+                          type="text"
+                          value={col.label}
+                          placeholder="(Spalte)"
+                          readOnly={!canRenameHeaders()}
+                          tabIndex={canRenameHeaders() ? 0 : -1}
+                          onBlur={(e) => {
+                            if (!canRenameHeaders()) return;
+                            onRenameCol(col, e.currentTarget.value.trim());
+                          }}
+                          onKeyDown={(e) => {
+                            if (!canRenameHeaders()) return;
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              (e.currentTarget as HTMLInputElement).blur();
+                            }
+                          }}
+                        />
+                        <input
+                          type="color"
+                          class="kb-col-color-picker"
+                          value={col.color ?? '#888888'}
+                          title="Spalten-Farbe"
+                          disabled={!canColorPicker()}
+                          tabIndex={canColorPicker() ? 0 : -1}
+                          onChange={(e) => onColorCol(col, e.currentTarget.value)}
+                        />
+                        <button
+                          type="button"
+                          class="mx-del-btn"
+                          title="Farbe entfernen"
+                          aria-label="Farbe entfernen"
+                          tabIndex={canColorPicker() && col.color ? 0 : -1}
+                          onClick={() => onColorCol(col, null)}
+                          disabled={!canColorPicker() || !col.color}
+                        >
+                          <Icon name="no-symbol" size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          class="mx-move-btn"
+                          title="Spalte nach links"
+                          aria-label="Spalte nach links"
+                          tabIndex={canMoveRowCol() ? 0 : -1}
+                          onClick={() => onMoveCol(col, 'left')}
+                          disabled={busy() || !canMoveRowCol() || colIdx() === 0}
+                        >
+                          <Icon name="chevron-left" size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          class="mx-move-btn"
+                          title="Spalte nach rechts"
+                          aria-label="Spalte nach rechts"
+                          tabIndex={canMoveRowCol() ? 0 : -1}
+                          onClick={() => onMoveCol(col, 'right')}
+                          disabled={busy() || !canMoveRowCol() || colIdx() === visibleCols().length - 1}
+                        >
+                          <Icon name="chevron-right" size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          class="mx-del-btn"
+                          title="Spalte loeschen"
+                          aria-label="Spalte loeschen"
+                          tabIndex={canDeleteRowCol() ? 0 : -1}
+                          onClick={() => onDelCol(col)}
+                          disabled={busy() || !canDeleteRowCol()}
+                        >
+                          <Icon name="x" size={12} />
+                        </button>
                         <span class="kb-col-count">{list().length}</span>
                       </header>
 
                       <Show
-                        when={list().length > 0}
-                        fallback={<p class="kb-col-empty hint">leer</p>}
+                        when={!collapsed() && list().length > 0}
+                        fallback={
+                          <Show when={!collapsed()}>
+                            <p class="kb-col-empty hint">leer</p>
+                          </Show>
+                        }
                       >
                         <ul class="kb-cards">
                           <For each={list()}>
-                            {(card) => {
+                            {(card, cardIdx) => {
                               const progress = createMemo(() =>
                                 checklistProgress(card, p.content!),
                               );
                               const deadline = fmtDate(card.deadline);
+                              const dropBefore = () =>
+                                dragOverCardId() === card.id &&
+                                draggingCardId() !== card.id &&
+                                dragOverBefore();
+                              const dropAfter = () =>
+                                dragOverCardId() === card.id &&
+                                draggingCardId() !== card.id &&
+                                !dragOverBefore();
                               return (
                                 <li
                                   class="kb-card"
-                                  classList={{ 'kb-card-done': card.done }}
+                                  classList={{
+                                    'kb-card-done': isCardDone(card),
+                                    'kb-card-archived': card.archived,
+                                    'kb-card-dragging':
+                                      draggingCardId() === card.id,
+                                    'kb-card-drop-before': dropBefore(),
+                                    'kb-card-drop-after': dropAfter(),
+                                  }}
+                                  style={
+                                    card.color
+                                      ? { '--kb-card-color': card.color }
+                                      : undefined
+                                  }
+                                  data-has-color={card.color ? 'yes' : 'no'}
                                   role="button"
                                   tabIndex={0}
+                                  draggable={true}
+                                  onDragStart={(e) => onCardDragStart(card, e)}
+                                  onDragEnd={onCardDragEnd}
+                                  onDragOver={(e) => onCardDragOver(card, e)}
+                                  onDrop={(e) => onCardDrop(card, e)}
                                   onClick={() => setSelectedCardId(card.id)}
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter' || e.key === ' ') {
@@ -153,12 +1043,20 @@ const BoardView: Component<Props> = (p) => {
                                   }}
                                 >
                                   <div class="kb-card-name">
-                                    <Show when={card.done}>
-                                      <span class="kb-done-mark" aria-hidden>
-                                        ✓
-                                      </span>
-                                    </Show>
-                                    {card.name || '(ohne Titel)'}
+                                    <input
+                                      type="checkbox"
+                                      class="kb-card-done-checkbox"
+                                      checked={isCardDone(card)}
+                                      aria-label="Erledigt"
+                                      title={isCardDone(card) ? 'Wieder offen' : 'Als erledigt markieren'}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onChange={(e) => {
+                                        onToggleCardDone(card, e.currentTarget.checked);
+                                      }}
+                                    />
+                                    <span class="kb-card-title-text">
+                                      {card.name || '(ohne Titel)'}
+                                    </span>
                                     <Show when={card.alias}>
                                       <span class="kb-card-alias">
                                         ^{card.alias}
@@ -184,93 +1082,194 @@ const BoardView: Component<Props> = (p) => {
                                         {(w) => <span class="kb-who">@{w}</span>}
                                       </For>
                                       <Show when={deadline}>
-                                        <span class="kb-deadline">
-                                          ⏱ {deadline}
+                                        <span
+                                          class="kb-deadline"
+                                          data-deadline-state={
+                                            deadlineState(card.deadline, isCardDone(card)) ?? 'none'
+                                          }
+                                        >
+                                          <Icon name="clock" size={11} />
+                                          <span>{deadline}</span>
                                         </span>
                                       </Show>
                                       <Show when={card.priority != null}>
                                         <span class="kb-prio">
-                                          P{card.priority}
+                                          <Icon name="flag" size={11} />
+                                          <span>P{card.priority}</span>
                                         </span>
                                       </Show>
                                       <Show when={card.recur != null}>
-                                        <span class="kb-recur">↻</span>
+                                        <span class="kb-recur" title="Wiederkehrend">
+                                          <Icon name="arrow-path" size={12} />
+                                        </span>
                                       </Show>
                                       <Show when={progress()}>
                                         <span class="kb-cl-progress">
-                                          ✓ {progress()!.done}/
-                                          {progress()!.total}
+                                          <Icon name="check-circle" size={11} />
+                                          <span>
+                                            {progress()!.done}/{progress()!.total}
+                                          </span>
                                         </span>
                                       </Show>
                                     </div>
                                   </Show>
+
+                                  {/* Karten-Aktionen (Move/Del) immer sichtbar —
+                                      Karten sind keine strukturellen Daten. */}
+                                  <div
+                                    class="kb-card-edit-bar"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <button
+                                      type="button"
+                                      class="mx-move-btn"
+                                      title={
+                                        boardUi.sort() !== 'manual'
+                                          ? 'Sortierung aktiv — Reihenfolge automatisch'
+                                          : 'Karte nach oben'
+                                      }
+                                      aria-label="Karte nach oben"
+                                      onClick={() => onMoveCardWithin(card, 'up')}
+                                      disabled={
+                                        busy() ||
+                                        cardIdx() === 0 ||
+                                        boardUi.sort() !== 'manual'
+                                      }
+                                    >
+                                      <Icon name="arrow-up" size={12} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      class="mx-move-btn"
+                                      title={
+                                        boardUi.sort() !== 'manual'
+                                          ? 'Sortierung aktiv — Reihenfolge automatisch'
+                                          : 'Karte nach unten'
+                                      }
+                                      aria-label="Karte nach unten"
+                                      onClick={() => onMoveCardWithin(card, 'down')}
+                                      disabled={
+                                        busy() ||
+                                        cardIdx() === list().length - 1 ||
+                                        boardUi.sort() !== 'manual'
+                                      }
+                                    >
+                                      <Icon name="arrow-down" size={12} />
+                                    </button>
+                                    <select
+                                      class="kb-card-move"
+                                      value={card.col_id}
+                                      title="In andere Spalte verschieben"
+                                      onChange={(e) =>
+                                        onMoveCard(
+                                          card,
+                                          (e.currentTarget as HTMLSelectElement).value,
+                                        )
+                                      }
+                                    >
+                                      <For each={visibleCols()}>
+                                        {(opt) => (
+                                          <option value={opt.id}>
+                                            → {opt.label || '(Spalte)'}
+                                          </option>
+                                        )}
+                                      </For>
+                                    </select>
+                                    <button
+                                      type="button"
+                                      class="mx-del-btn"
+                                      title="Karte loeschen"
+                                      aria-label="Karte loeschen"
+                                      onClick={() => onDelCard(card)}
+                                      disabled={busy()}
+                                    >
+                                      <Icon name="x" size={12} />
+                                    </button>
+                                  </div>
                                 </li>
                               );
                             }}
                           </For>
                         </ul>
                       </Show>
+
+                      {/* "+ Karte" immer verfuegbar — Karten sind keine Struktur. */}
+                      <Show when={!collapsed()}>
+                        <button
+                          type="button"
+                          class="kb-card-add-btn"
+                          onClick={() => onAddCard(col)}
+                          disabled={busy()}
+                          title="Karte hinzufuegen"
+                        >
+                          <Icon name="plus" size={14} />
+                          <span>Karte</span>
+                        </button>
+                      </Show>
                     </div>
                   );
                 }}
               </For>
+
+              {/* Letzte Spalte im Edit-Mode: "+ Spalte" */}
+              <Show when={canAddKbCol()}>
+                <div class="kb-col kb-col-add">
+                  <button
+                    type="button"
+                    class="kb-col-add-btn"
+                    onClick={onAddCol}
+                    disabled={busy()}
+                    title="Spalte hinzufuegen"
+                  >
+                    <Icon name="plus" size={14} />
+                    <span>Spalte</span>
+                  </button>
+                </div>
+              </Show>
             </div>
           </Show>
 
-          {/* Standalone-Checklisten */}
-          <Show when={(p.content!.checklists ?? []).length > 0}>
+          {/* Standalone-Checklisten. Section wird gerendert, sobald
+              Listen da sind ODER der Edit-Mode aktiv ist (damit der
+              "+ Checkliste"-Button erreichbar bleibt). */}
+          <Show
+            when={
+              (p.content!.checklists ?? []).length > 0 || canAddInfoField()
+            }
+          >
             <section class="board-checklists">
               <h3 class="board-section-title">Checklisten</h3>
-              <ul class="cl-list">
-                <For each={p.content!.checklists}>
-                  {(cl) => {
-                    const items = () =>
-                      p.content!.checklistItems.filter(
-                        (it) => it.checklist_id === cl.id,
+              <Show when={(p.content!.checklists ?? []).length > 0}>
+                <ul class="cl-list">
+                  <For each={p.content!.checklists}>
+                    {(cl) => {
+                      const items = () =>
+                        p.content!.checklistItems
+                          .filter((it) => it.checklist_id === cl.id)
+                          .sort((a, b) => a.position - b.position);
+                      return (
+                        <ChecklistPanel
+                          checklist={cl}
+                          items={items()}
+                          workspaceId={p.workspaceId}
+                          onChanged={() => p.onChanged?.()}
+                        />
                       );
-                    const done = () => items().filter((i) => i.done).length;
-                    return (
-                      <li class="cl-item">
-                        <header class="cl-head">
-                          <span class="cl-label">{cl.label || '(Liste)'}</span>
-                          <Show when={cl.alias}>
-                            <span class="cl-alias">^{cl.alias}</span>
-                          </Show>
-                          <span class="cl-progress">
-                            {done()}/{items().length}
-                          </span>
-                          <Show when={cl.recur}>
-                            <span class="cl-recur" title="wiederkehrend">
-                              ↻
-                            </span>
-                          </Show>
-                        </header>
-                        <Show
-                          when={items().length > 0}
-                          fallback={<p class="hint cl-empty">leer</p>}
-                        >
-                          <ul class="cl-items">
-                            <For each={items()}>
-                              {(it) => (
-                                <li
-                                  class="cl-it"
-                                  classList={{ 'cl-it-done': it.done }}
-                                  style={{ '--cl-level': it.level }}
-                                >
-                                  <span class="cl-checkbox" aria-hidden>
-                                    {it.done ? '☑' : '☐'}
-                                  </span>
-                                  <span class="cl-text">{it.text}</span>
-                                </li>
-                              )}
-                            </For>
-                          </ul>
-                        </Show>
-                      </li>
-                    );
-                  }}
-                </For>
-              </ul>
+                    }}
+                  </For>
+                </ul>
+              </Show>
+              <Show when={canAddInfoField()}>
+                <button
+                  type="button"
+                  class="btn-subtle cl-add-btn"
+                  onClick={onAddChecklist}
+                  disabled={busy()}
+                >
+                  <Icon name="plus" size={14} />
+                  <span>Checkliste</span>
+                </button>
+              </Show>
             </section>
           </Show>
 
@@ -279,6 +1278,7 @@ const BoardView: Component<Props> = (p) => {
               card={selectedCard()!}
               content={p.content!}
               onClose={() => setSelectedCardId(null)}
+              onChanged={() => p.onChanged?.()}
             />
           </Show>
         </div>

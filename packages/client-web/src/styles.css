@@ -1,20 +1,118 @@
+/* ════════════════════════════════════════════════════════════════
+   Infinite Matrix — Web-Client Styles
+   Vorbild: client/matrix_tool_beta.html
+   Ports: Token-System, Feature-Farben, Spacing, Animations.
+   Default-Theme: Light. Dark via [data-theme="dark"].
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Tokens ──────────────────────────────────────────────────── */
 :root {
-  --bg: #0f1115;
-  --bg-elev: #161a22;
-  --bg-elev-2: #1b2029;
-  --fg: #e6e8eb;
-  --muted: #9aa0a6;
-  --accent: #4c8bf5;
-  --accent-soft: #1f2b44;
-  --accent-hover: #6aa0ff;
-  --danger: #ff6b6b;
-  --ok: #6be3a6;
-  --border: #2a2f3a;
+  /* Surface / Canvas — HyperUI-/Tailwind-inspirierte Skala:
+     Canvas ist der leicht getoente Gesamt-Hintergrund (gray-50),
+     Surface ist reinweiss (Paper — Sidebar, Header, Cards, Inputs),
+     Surface-Hover ist die naechst-leicht-dunklere Stufe (gray-100).
+     Die Legacy-Aliase --bg / --bg2 / --bg3 zeigen auf die neuen Tokens,
+     damit alle bestehenden Regeln ohne Rewrite mitziehen. */
+  --canvas: #f6f7f9;
+  --surface: #ffffff;
+  --surface-hover: #f3f4f6;
+
+  --bg: var(--canvas);
+  --bg2: var(--surface);
+  --bg3: var(--surface-hover);
+
+  --text: #111827;
+  --text2: #4b5563;
+  --text3: #9ca3af;
+  --border: rgba(15, 23, 42, 0.08);
+  --border2: rgba(15, 23, 42, 0.16);
+
+  /* Feature-Farben — 4-Säulen-System */
+  --blue: #378add;
+  --bluebg: #e6f1fb;
+  --bluetxt: #0c447c;
+  --teal: #1d9e75;
+  --tealbg: #e1f5ee;
+  --tealtxt: #085041;
+  --amber: #ba7517;
+  --amberbg: #faeeda;
+  --ambertxt: #633806;
+  --purple: #7f77dd;
+  --purplebg: #eeedfe;
+  --purpletxt: #3c3489;
+
+  /* Priorität / Alert */
+  --red: #e24b4a;
+  --redbg: #fcebeb;
+  --redtxt: #7a1f1e;
+  --prio-medium: #e8a317;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+
+  /* Transitions */
+  --tr-std: 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  --tr-enter: 180ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Focus */
+  --focus-color: var(--blue);
+  --focus-width: 2px;
+  --focus-offset: 2px;
+
+  /* Shadows — HyperUI/Tailwind-Parity. Subtil gehalten, damit die
+     Oberflaeche clean wirkt; tiefere Shadows nur fuer Modal-Overlays. */
+  --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.1), 0 4px 6px -4px rgba(15, 23, 42, 0.05);
+
+  /* Overlays */
+  --overlay-soft: rgba(0, 0, 0, 0.28);
+  --overlay-strong: rgba(0, 0, 0, 0.4);
+
+  /* Radien */
+  --rs: 4px;
+  --r: 8px;
+  --rl: 12px;
+
+  /* Font-Sizes */
+  --fs-title: clamp(14px, 0.9vw + 10px, 17px);
+  --fs-subtitle: clamp(13px, 0.6vw + 9px, 15px);
+
+  /* Layout */
   --sidebar-w: 280px;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* Basis-Font */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Roboto,
+    sans-serif;
+  color-scheme: light;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+[data-theme='dark'] {
+  /* Dark-Pendant zur gleichen Surface/Canvas-Semantik: Canvas ist das
+     dunklere Gesamt-Flaechenbild, Surface ist das etwas hellere Paper. */
+  --canvas: #0f1115;
+  --surface: #1a1d23;
+  --surface-hover: #232730;
+  --bg: var(--canvas);
+  --bg2: var(--surface);
+  --bg3: var(--surface-hover);
+  --text: #e5e7eb;
+  --text2: #9ca3af;
+  --text3: #6b7280;
+  --border: rgba(255, 255, 255, 0.08);
+  --border2: rgba(255, 255, 255, 0.14);
+  --overlay-soft: rgba(0, 0, 0, 0.45);
+  --overlay-strong: rgba(0, 0, 0, 0.55);
   color-scheme: dark;
 }
 
+/* ── Reset ──────────────────────────────────────────────────── */
 * {
   box-sizing: border-box;
 }
@@ -26,162 +124,2019 @@ body,
   padding: 0;
   height: 100%;
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
 }
 
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text);
+}
+
+h1 { font-size: var(--fs-title); }
+h2 { font-size: var(--fs-title); }
+h3 { font-size: var(--fs-subtitle); }
+
+p {
+  margin: 0 0 var(--space-sm);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+code,
+kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: var(--bg2);
+  padding: 0.1em 0.35em;
+  border-radius: var(--rs);
+  font-size: 0.85em;
+}
+
+/* Focus-Reset (eng gescopet — global :focus-visible greift) */
+button:focus,
+a:focus,
+input:focus,
+select:focus,
+textarea:focus,
+[contenteditable]:focus,
+[tabindex]:focus,
+.mx-cell:focus,
+.sb-node:focus,
+.kb-card:focus,
+.tab:focus,
+.btn:focus,
+.ico-btn:focus {
+  outline: none;
+}
+
+*:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: var(--focus-offset);
+  border-radius: var(--rs);
+}
+
+/* ── Utilities ──────────────────────────────────────────────── */
+.hint {
+  color: var(--text2);
+  font-size: 13px;
+}
+
+.muted {
+  color: var(--text2);
+  font-size: 13px;
+}
+
+p.error {
+  color: var(--red);
+}
+
+p.ok {
+  color: var(--teal);
+}
+
+.boot {
+  padding: var(--space-xl);
+  color: var(--text2);
+}
+
+/* ── App-Shell ───────────────────────────────────────────────── */
 .app-shell {
   min-height: 100%;
   display: flex;
   flex-direction: column;
 }
 
-.boot {
-  padding: 2rem;
-  color: var(--muted);
-}
-
-h1 {
-  font-size: 1.5rem;
-  margin: 0 0 1rem;
-}
-
-h2 {
-  font-size: 1.15rem;
-  margin: 0 0 0.5rem;
-}
-
-p {
-  color: var(--muted);
-  line-height: 1.5;
-}
-
-p.error {
-  color: var(--danger);
-}
-
-p.ok {
-  color: var(--ok);
-}
-
-p.ok strong,
-p.muted strong {
-  color: var(--fg);
-}
-
-.hint {
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.muted {
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-code {
-  background: var(--bg-elev);
-  padding: 0.1em 0.35em;
-  border-radius: 3px;
-  font-size: 0.85em;
-}
-
-/* ─── Login ─── */
+/* ── Login ───────────────────────────────────────────────────── */
 .login {
-  padding: 2rem;
-  max-width: 640px;
+  padding: var(--space-xl);
+  max-width: 420px;
   margin: 0 auto;
 }
 
 .login form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  margin-top: 1rem;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
 }
 
 .login label {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
-  color: var(--muted);
-  font-size: 0.875rem;
+  gap: var(--space-xs);
+  color: var(--text2);
+  font-size: 12px;
 }
 
 .login input {
-  padding: 0.625rem 0.75rem;
-  font-size: 1rem;
-  background: var(--bg-elev);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 14px;
+  background: var(--surface);
+  color: var(--text);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--r);
   outline: none;
-  transition: border-color 180ms ease;
+  transition: border-color var(--tr-std);
 }
 
 .login input:focus-visible {
-  border-color: var(--accent);
+  border-color: var(--focus-color);
 }
 
-button[type='submit'],
-button[type='button'] {
-  padding: 0.625rem 1rem;
-  font-size: 0.95rem;
-  background: var(--accent);
-  color: #fff;
-  border: 0;
-  border-radius: 6px;
+/* ── Button-System — HyperUI/shadcn-inspiriert ─────────────────
+   Konvention:
+     .btn            Default — white Paper mit Border (Secondary-Action)
+     .btn-p / submit Primary — solid dark, white text (Hauptaktion)
+     .btn-c /
+     .btn-secondary  Outline-only (transparent, mit Border)
+     .btn-subtle     Ghost — kein Border, leicht getoent auf Hover
+     .btn-danger     Red — destruktive Aktion
+     .ico-btn        Icon-only, 28x28 square
+   Alle teilen dieselbe Base (Padding, Font, Radius, Transition).
+
+   WICHTIG: Die Base-Regel gilt nur fuer .btn und submit. Plain
+   button[type='button'] ohne .btn-Klasse wird NICHT gestylt — sonst
+   uebernimmt jeder custom-styled Button (tree-chevron, overlay-close,
+   ico-btn, ws-sidebar-mode-btn, ...) unerwuenscht die Base. */
+.btn,
+button[type='submit'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  line-height: 1.4;
+  border-radius: var(--rs);
+  border: 1px solid var(--border2);
+  background: var(--surface);
+  color: var(--text);
   cursor: pointer;
-  transition: background 180ms ease;
+  white-space: nowrap;
+  transition: background var(--tr-std), border-color var(--tr-std),
+    color var(--tr-std), opacity var(--tr-std);
 }
 
-button[type='submit']:hover:not(:disabled),
-button[type='button']:hover:not(:disabled) {
-  background: var(--accent-hover);
+.btn:hover:not(:disabled),
+button[type='submit']:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--text3);
 }
 
+.btn:focus-visible,
+button[type='submit']:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+/* Disabled-Look NUR auf echten .btn*-Klassen + Submit.
+   NICHT generisch auf `button:disabled` — das wuerde sonst
+   transparent-gated Buttons wie .mx-del-btn / .cl-it-del halb
+   sichtbar machen (opacity 0.5 ueberlagert das opacity:0 der
+   ghost-Buttons). */
+.btn:disabled,
+.btn-p:disabled,
+.btn-c:disabled,
+.btn-secondary:disabled,
+.btn-danger:disabled,
+.btn-subtle:disabled,
+.addfull:disabled,
+.cl-add-item-btn:disabled,
+.kb-card-add-btn:disabled,
+.kb-col-add-btn:disabled,
+.mx-add-btn:disabled,
+.edit-mode-btn:disabled,
 button[type='submit']:disabled,
-button[type='button']:disabled {
+.ico-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-/* ─── Workspace-Shell: Sidebar + Main ─── */
+/* Primary — solid dunkler Button fuer Hauptaktionen. HyperUI-Vorbild:
+   bg-slate-900 text-white hover:bg-slate-700. */
+.btn-p,
+button[type='submit'] {
+  border: 1px solid var(--text);
+  background: var(--text);
+  color: var(--surface);
+}
+
+.btn-p:hover:not(:disabled),
+button[type='submit']:hover:not(:disabled) {
+  background: var(--text2);
+  border-color: var(--text2);
+}
+
+/* Outline / Secondary — transparent mit Border, HyperUI-Outline-Style. */
+.btn-c,
+.btn-secondary {
+  background: transparent;
+  color: var(--text2);
+  border: 1px solid var(--border2);
+}
+
+.btn-c:hover:not(:disabled),
+.btn-secondary:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+  border-color: var(--text3);
+}
+
+/* Danger — rote Destruktiv-Aktion. Outline-Variante (fuer Card-Actions
+   dezent), bei Hover gefuellt. */
+.btn-danger {
+  color: var(--red);
+  border-color: var(--red);
+  background: var(--surface);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--redbg);
+}
+
+/* Ghost — kein Border, transparent. Fuer dezente Inline-Actions und
+   "+ Neue..."-Trigger. Leicht getoent auf Hover, keine dashed-Border
+   mehr (Holdover aus fruehem HTML-Vorbild). */
+.btn-subtle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  line-height: 1.4;
+  background: transparent;
+  color: var(--text2);
+  border: 1px solid transparent;
+  border-radius: var(--rs);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--tr-std), color var(--tr-std),
+    border-color var(--tr-std), opacity var(--tr-std);
+}
+
+.btn-subtle:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.btn-subtle:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+/* Icon-Button */
+.ico-btn {
+  padding: 4px 7px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0.5px solid transparent;
+  color: var(--text2);
+  border-radius: var(--rs);
+  cursor: pointer;
+}
+
+.ico-btn:hover:not(:disabled) {
+  background: var(--bg2);
+  color: var(--text);
+}
+
+/* Full-width Add-Button (Kanban-Spalte, Checkliste "+ Punkt") */
+.addfull,
+.cl-add-item-btn,
+.kb-card-add-btn,
+.kb-col-add-btn {
+  width: 100%;
+  padding: 6px;
+  border: 0.5px dashed var(--border2);
+  background: transparent;
+  color: var(--text3);
+  border-radius: var(--r);
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  transition: var(--tr-std);
+}
+
+.addfull:hover:not(:disabled),
+.cl-add-item-btn:hover:not(:disabled),
+.kb-card-add-btn:hover:not(:disabled),
+.kb-col-add-btn:hover:not(:disabled) {
+  border-style: solid;
+  border-color: var(--blue);
+  color: var(--blue);
+  background: transparent;
+}
+
+.btn-small {
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+/* ── Workspace-Shell: Sidebar + Main ──────────────────────────── */
+/* Sidebar-Modi (Shift+N zyklet): full | rails | collapsed.
+   - full: default Breite --sidebar-w (280px)
+   - rails: schmal (52px), nur Icons/Chevrons
+   - collapsed: weg (0px), Edge-Toggle am Rand sichtbar
+   Grid-Columns passt sich an, damit Main-Content die freie Flaeche
+   bekommt. Transition auf width + grid-template-columns fuehlen sich
+   zaeh an — deshalb nur der Sidebar selbst animiert, das Grid springt. */
 .ws-shell {
   display: grid;
   grid-template-columns: var(--sidebar-w) 1fr;
   min-height: 100vh;
+  background: var(--bg);
+}
+
+.ws-shell[data-sb-mode='rails'] {
+  grid-template-columns: 52px 1fr;
+}
+
+.ws-shell[data-sb-mode='collapsed'] {
+  grid-template-columns: 0 1fr;
 }
 
 .ws-sidebar {
-  background: var(--bg-elev);
-  border-right: 1px solid var(--border);
+  background: var(--bg2);
+  border-right: 0.5px solid var(--border);
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding: 1rem 0.75rem;
+  gap: var(--space-md);
+  /* Kein top-Padding — ws-sidebar-head ist eine eigene Header-Leiste
+     mit border-bottom und sitzt bündig oben (Pendant zur ws-main-header
+     im Main-Column). So sind Collapse-Chevron links und User-Chip
+     rechts auf derselben Y-Position. */
+  padding: 0 var(--space-sm) var(--space-md);
+  overflow: hidden;
+  transition: padding var(--tr-std);
+}
+
+.ws-sidebar[data-sb-mode='rails'] {
+  padding: 0 var(--space-xs) var(--space-sm);
+  gap: var(--space-sm);
+}
+
+.ws-sidebar[data-sb-mode='collapsed'] {
+  padding: 0;
+  border-right: none;
+  overflow: hidden;
+}
+
+/* Rails-Modus: Elemente die nur im full-Modus Sinn ergeben, verstecken.
+   Tree-Icons/Chevrons bleiben — der Rest (Filter-Input, Labels,
+   Aliase, Action-Buttons, User-Block) wird auf 0 geschrumpft. */
+.ws-sidebar[data-sb-mode='rails'] .ws-actions,
+.ws-sidebar[data-sb-mode='rails'] .ws-user-block,
+.ws-sidebar[data-sb-mode='rails'] .node-tree-head,
+.ws-sidebar[data-sb-mode='rails'] .ws-switcher,
+.ws-sidebar[data-sb-mode='rails'] .tree-label,
+.ws-sidebar[data-sb-mode='rails'] .tree-alias {
+  display: none;
+}
+
+/* Collapsed-Modus: Alles verstecken. Die ws-shell-Column ist eh 0.
+   Belt-and-braces, falls Inhalt doch irgendwie overflow produziert. */
+.ws-sidebar[data-sb-mode='collapsed'] > * {
+  display: none;
+}
+
+/* Sidebar-Head: schmale Top-Leiste mit WorkspaceSwitcher-Chip (links,
+   flex:1) + Collapse-Button (rechts, fix). Pendant zur ws-main-header
+   — beide 44px hoch, border-bottom, Surface-Weiss. Negative Side-
+   Margins ziehen die Leiste bis an die Sidebar-Kanten. Overflow-hidden
+   verhindert dass der Switcher-Chip die Hoehe aufblaeht wenn sein
+   Content (Name + Role-Badge) zu breit waere. */
+.ws-sidebar-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  margin: 0 calc(-1 * var(--space-sm));
+  border-bottom: 0.5px solid var(--border);
+  background: var(--surface);
+  min-height: 44px;
+  height: 44px;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  overflow: hidden;
+}
+
+.ws-sidebar-head .ws-switcher {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.ws-sidebar-mode-btn {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border2);
+  border-radius: var(--rs);
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+  /* Icon-Zentrierung: inline-flex + center/center. Ohne das sitzt
+     das SVG linksbuendig in der Button-Box. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--tr-std), color var(--tr-std),
+    border-color var(--tr-std);
+}
+
+.ws-sidebar-mode-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+  border-color: var(--text3);
+}
+
+/* Im Rails-Modus: Mode-Btn stackt unter den WorkspaceSwitcher-Platzhalter
+   (letzter ist ohnehin verborgen). Button zentriert. */
+.ws-sidebar[data-sb-mode='rails'] .ws-sidebar-head {
+  justify-content: center;
+}
+
+/* Edge-Toggle bei collapsed. Fixed links am Rand, klein, auffaellig. */
+.ws-sidebar-edge-toggle {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 44px;
+  padding: 0;
+  border: 0.5px solid var(--border);
+  border-left: none;
+  border-radius: 0 var(--rs) var(--rs) 0;
+  background: var(--bg2);
+  color: var(--text2);
+  cursor: pointer;
+  z-index: 40;
+  font-size: 14px;
+  line-height: 1;
+  box-shadow: var(--shadow-sm);
+  transition: background var(--tr-std), color var(--tr-std);
+}
+
+.ws-sidebar-edge-toggle:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ── Context-Menu ─────────────────────────────────────────────── */
+/* Generisches Rechts-Klick / "+"-Shortcut-Menu. Portiert aus
+   sbContextMenu im HTML-Vorbild. Positionierung fixed am Mauszeiger
+   (Caller setzt style.left/top); Boundary-Korrektur in der Komponente. */
+.ctx-menu {
+  position: fixed;
+  z-index: 200;
+  min-width: 200px;
+  max-width: 320px;
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-md);
+  padding: 4px 0;
+  font-size: 13px;
+  color: var(--text);
+  animation: popIn 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ctx-menu-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: 0.5px solid var(--border2);
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: var(--text2);
+}
+
+.ctx-menu-badge {
+  color: var(--blue);
+  font-weight: 600;
+}
+
+.ctx-menu-head-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.ctx-menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ctx-menu-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 6px var(--space-sm);
+  background: transparent;
+  border: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  transition: background var(--tr-std);
+}
+
+.ctx-menu-btn:hover:not(:disabled),
+.ctx-menu-btn:focus-visible {
+  background: var(--bg2);
+}
+
+.ctx-menu-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ctx-menu-btn-danger {
+  color: var(--red);
+}
+
+.ctx-menu-btn-danger:hover:not(:disabled) {
+  background: var(--redbg);
+}
+
+.ctx-menu-ico {
+  width: 16px;
+  text-align: center;
+  color: var(--text3);
+  flex-shrink: 0;
+}
+
+.ctx-menu-btn-danger .ctx-menu-ico {
+  color: var(--red);
+}
+
+.ctx-menu-label {
+  flex: 1;
+}
+
+.ctx-menu-divider {
+  height: 1px;
+  background: var(--border2);
+  margin: 4px 0;
+  list-style: none;
+}
+
+/* Source-Row-Highlight solange das Menu offen ist. */
+.tree-row.ctx-menu-source {
+  background: var(--bluebg);
 }
 
 .ws-main {
-  padding: 1.5rem 2rem;
+  /* Kein top-Padding — die sticky Header-Bar sitzt buendig oben.
+     Content-Abstand zum Header kommt aus dem Header-margin-bottom. */
+  padding: 0 var(--space-xl) var(--space-xl);
   overflow: auto;
+  background: var(--bg);
 }
 
 .ws-main-header {
-  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  /* Weisse Paper-Leiste ueber dem getoenten Canvas — HyperUI-Look.
+     Horizontaler negativer Margin zieht sie bis an den Canvas-Rand
+     (Parent .ws-main hat --space-xl Side-Padding). Sticky top:0 haelt
+     sie beim Scrollen oben. min-height matcht .ws-sidebar-head, damit
+     beide Header-Leisten (Sidebar + Main) auf derselben Y-Linie sitzen. */
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--border);
+  padding: var(--space-sm) var(--space-xl);
+  margin: 0 calc(-1 * var(--space-xl)) var(--space-lg);
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+  /* Header-Bar bricht auf schmalen Screens in die zweite Zeile —
+     ws-breadcrumb bleibt oben, HeaderSearchBar wird full-width. */
+  .ws-main-header .header-search-wrap {
+    order: 99;
+    width: 100%;
+    margin-top: var(--space-sm);
+    max-width: none;
+  }
 }
 
 .ws-main-header h1 {
+  font-size: var(--fs-title);
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Breadcrumb ersetzt den nackten Workspace-Namen im Main-Header.
+   HyperUI-Look: gleichmaessig gegraute Kette (text2), Separator als
+   dezenter Chevron in text3, keine Sonderfarbe fuer das current-
+   Segment (nur Weight). Feature-Farben gibt's woanders (Icon-Chips). */
+.ws-breadcrumb {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  font-size: 14px;
+  font-weight: 500;
+  min-width: 0;
+  color: var(--text2);
+  line-height: 1.4;
+}
+
+.ws-breadcrumb-ws {
+  color: var(--text3);
+  font-weight: 500;
+}
+
+.ws-breadcrumb-sep {
+  color: var(--text3);
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.ws-breadcrumb-link {
+  color: var(--text2);
+  text-decoration: none;
+  padding: 2px 4px;
+  border-radius: var(--rs);
+  transition: var(--tr-std);
+}
+
+.ws-breadcrumb-link:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.ws-breadcrumb-current {
+  color: var(--text);
+  font-weight: 600;
+  padding: 2px 4px;
+}
+
+/* Feature-Farben nur als subtile Tinting auf Hover bei Links — das
+   Current-Segment bleibt neutral text-color (HyperUI-Look). Die
+   Matrix/Board/Cell-Unterscheidung wird durch Icons/Badges im Content
+   kommuniziert, nicht ueber Breadcrumb-Farbhierarchie. */
+
+/* Presence-Avatar-Stack im Main-Header. Avatars ueberlappen leicht.
+   flex-shrink:0 damit die Breite stabil ist. contain:layout isoliert
+   jegliche interne Re-Renders (Reconnect/Heartbeat) vom Nachbar-Flex —
+   selbst wenn ein Avatar kurz remountet wuerde, shiften die Geschwister
+   (HeaderSearchBar) nicht mit. */
+.presence-stack {
+  display: flex;
+  align-items: center;
+  padding-right: var(--space-xs);
+  flex: 0 0 auto;
+  contain: layout;
+}
+
+.presence-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-left: -8px;
+  background: var(--avatar-color, var(--blue));
+  color: #fff;
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  transition: transform var(--tr-std);
+}
+
+.presence-avatar:first-child {
+  margin-left: 0;
+}
+
+.presence-avatar:hover {
+  transform: translateY(-1px);
+  z-index: 1;
+}
+
+/* Eigener Avatar: zweite Border-Linie zur Unterscheidung. */
+.presence-avatar-self {
+  box-shadow: 0 0 0 1.5px var(--bg), 0 0 0 3px var(--avatar-color, var(--blue));
+}
+
+.presence-avatar-overflow {
+  background: var(--bg2);
+  color: var(--text2);
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: -0.5px;
+}
+
+/* Edit-Mode-Toggle (Pill) */
+.edit-mode-btn {
+  padding: 4px 12px;
+  font-size: 12px;
+  border: 0.5px solid var(--border2);
+  background: transparent;
+  color: var(--text2);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: var(--tr-std);
+}
+
+.edit-mode-btn:hover:not(.active) {
+  background: var(--bg2);
+  color: var(--text);
+}
+
+.edit-mode-btn.active {
+  background: var(--bluebg);
+  color: var(--bluetxt);
+  border-color: var(--blue);
+}
+
+.theme-toggle-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border2);
+  background: var(--surface);
+  color: var(--text2);
+  border-radius: var(--rs);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  transition: background var(--tr-std), color var(--tr-std),
+    border-color var(--tr-std);
+}
+
+.theme-toggle-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+  border-color: var(--text3);
+}
+
+.theme-toggle-btn:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: var(--focus-offset);
+}
+
+/* ── Command-Palette (^) ──────────────────────────────────────── */
+/* Einheitliche Palette (frueher getrennt als alias-quicknav + command-
+   palette). Breiterer Input fuer Commands, Amber-^ als Kontext-Anker.
+   Inline-Help-Liste unter dem Input bei leerer Eingabe / "help". */
+.command-palette-scrim {
+  align-items: flex-start;
+  padding-top: 15vh;
+}
+
+.command-palette-card {
+  max-width: 600px;
+  padding: var(--space-md) var(--space-lg) var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.command-palette-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  border-bottom: 0.5px solid var(--border);
+  padding: var(--space-xs) 0;
+}
+
+.command-palette-prefix {
+  font-size: 20px;
+  color: var(--amber);
+  font-weight: 600;
+  line-height: 1;
+  user-select: none;
+}
+
+.command-palette-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 18px;
+  padding: 4px 0;
+  outline: none;
+  font-family: inherit;
+}
+
+.command-palette-input::placeholder {
+  color: var(--text3);
+}
+
+.command-palette-error {
   margin: 0;
+  color: var(--red);
+  background: var(--redbg);
+  font-size: 12px;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--rs);
+}
+
+.command-palette-hint {
+  margin: 0;
+  color: var(--text3);
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* ^help / leerer-Input-Dropdown: Liste der Command-Syntax + Beschreibung.
+   Kein eigenes Modal — Inline unter dem Input, damit der User weiter
+   tippen und die Uebersicht gleichzeitig scannen kann. */
+.command-palette-help {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.command-palette-help-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 32%) 1fr;
+  gap: var(--space-sm);
+  align-items: baseline;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--rs);
+}
+
+.command-palette-help-row:hover {
+  background: var(--bg2);
+}
+
+.command-palette-help-syntax {
+  color: var(--amber);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.command-palette-help-desc {
+  color: var(--text2);
+  font-size: 12px;
+}
+
+/* Sekundaerer Sub-Prompt innerhalb der Palette: z.B. Col-Picker fuer
+   move-card ohne explizite Spalte. Liste + zwei Buttons. */
+.command-palette-colpick {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.command-palette-colpick-title {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.command-palette-colpick-select {
+  width: 100%;
+  padding: var(--space-xs);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.command-palette-colpick-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+/* ── Global-Search (/ Modal) ──────────────────────────────────── */
+.global-search-scrim {
+  align-items: flex-start;
+  padding-top: 12vh;
+}
+
+.global-search-card {
+  width: min(640px, 92vw);
+  max-height: 70vh;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.global-search-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 0.5px solid var(--border);
+}
+
+.global-search-icon {
+  font-size: 18px;
+  color: var(--text3);
+  line-height: 1;
+  user-select: none;
+}
+
+.global-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+  padding: 4px 0;
+  outline: none;
+  font-family: inherit;
+}
+
+.global-search-input::placeholder {
+  color: var(--text3);
+}
+
+.global-search-busy {
+  color: var(--text3);
+  font-size: 18px;
+  line-height: 1;
+  user-select: none;
+}
+
+.global-search-body {
+  overflow-y: auto;
+  padding: var(--space-xs) 0 var(--space-sm);
+  flex: 1 1 auto;
+}
+
+.global-search-hint {
+  margin: 0;
+  padding: var(--space-md);
+  color: var(--text3);
+  font-size: 12px;
+  text-align: center;
+}
+
+.global-search-group {
+  padding: var(--space-xs) 0;
+}
+
+.global-search-group-title {
+  margin: 0;
+  padding: var(--space-xs) var(--space-md);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text3);
+}
+
+.global-search-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.global-search-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: background-color var(--tr-std), border-color var(--tr-std);
+}
+
+.global-search-item-selected {
+  background: var(--bluebg);
+  border-left-color: var(--blue);
+}
+
+.global-search-badge {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  padding: 2px 6px;
+  border-radius: var(--rs);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: var(--surface, var(--bg));
+  border: 0.5px solid var(--border);
+  color: var(--text2);
+  white-space: nowrap;
+}
+
+.global-search-badge[data-type='matrix'] {
+  background: var(--bluebg);
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.global-search-badge[data-type='board'] {
+  background: var(--tealbg);
+  border-color: var(--teal);
+  color: var(--teal);
+}
+
+.global-search-badge[data-type='card'] {
+  background: var(--amberbg);
+  border-color: var(--amber, var(--text2));
+  color: var(--text);
+}
+
+.global-search-badge[data-type='checklist'] {
+  background: var(--surface, var(--bg));
+  border-color: var(--border);
+  color: var(--text2);
+}
+
+.global-search-badge[data-type='cell'] {
+  background: var(--surface, var(--bg));
+  border-color: var(--border);
+  color: var(--text3);
+}
+
+.global-search-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.global-search-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  font-size: 14px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.global-search-alias {
+  font-size: 11px;
+  color: var(--blue);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  flex: 0 0 auto;
+}
+
+.global-search-subtitle {
+  font-size: 12px;
+  color: var(--text3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Highlight fuer Treffer-Stellen in Title + Excerpt (HTML-Parity mit
+   `<mark class="sr-mark">`). Amber-Hintergrund signalisiert: "das war
+   der Grund, warum dieser Eintrag matched". */
+.sr-mark {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+  padding: 0 2px;
+  border-radius: 3px;
+}
+
+/* ── Header-SearchBar ─────────────────────────────────────────────
+   Zentrales Such-/Steuerfeld im ws-main-header. Vereint Text-Suche,
+   Command-Execution und Alias-Navigation. Dropdown oeffnet nach unten. */
+.header-search-wrap {
+  position: relative;
+  flex: 0 0 240px;
+  max-width: 320px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 4px 10px;
+  /* Leicht abgesetzt vom weissen Header-Parent — HyperUI-Search-Look:
+     Grey Tray (gray-100) + Border. Im fokussierten Zustand wird der
+     Background weiss und der Border faerbt sich an den Focus-Akzent. */
+  background: var(--surface-hover);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  transition: border-color var(--tr-std), box-shadow var(--tr-std), background var(--tr-std);
+}
+
+.header-search-wrap.is-focused {
+  border-color: var(--focus-color);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus-color) 25%, transparent);
+}
+
+/* Success-Flash (600ms teal-pulse) nach Command/Nav-Success. */
+@keyframes headerSearchPulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--teal) 70%, transparent); }
+  70% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--teal) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--teal) 0%, transparent); }
+}
+
+.header-search-wrap.is-success {
+  animation: headerSearchPulse 600ms ease-out;
+  border-color: var(--teal);
+}
+
+/* Error-Flash (300ms shake + rote Border). */
+@keyframes headerSearchShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  50% { transform: translateX(4px); }
+  75% { transform: translateX(-2px); }
+}
+
+.header-search-wrap.is-error {
+  animation: headerSearchShake 300ms ease-in-out;
+  border-color: var(--red);
+}
+
+.header-search-icon {
+  /* Fixe 16x16 Box damit Icons (^/✨) exakt zentriert sitzen und nicht
+     je nach Glyphe unten abgeschnitten werden. Line-height:1 verhindert
+     Font-internal Padding. */
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--text3);
+  user-select: none;
+}
+
+.header-search-wrap.is-focused .header-search-icon {
+  color: var(--amber);
+}
+
+.header-search-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  padding: 2px 0;
+  outline: none;
+}
+
+.header-search-input::placeholder {
+  color: var(--text3);
+}
+
+.header-search-busy {
+  color: var(--text3);
+  font-size: 14px;
+  flex: 0 0 auto;
+}
+
+/* Dropdown unter dem Input — absolut positioniert, floatet ueber dem
+   Content. Right-aligned relativ zum Wrap, aber breit genug fuer die
+   Result-Items. */
+.header-search-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 100%;
+  width: 420px;
+  max-width: min(560px, 92vw);
+  max-height: 420px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  box-shadow: var(--shadow-md);
+  z-index: 40;
+  padding: 4px;
+  animation: headerSearchPopIn 160ms ease-out;
+}
+
+@keyframes headerSearchPopIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.header-search-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 0;
+}
+
+.header-search-section-head {
+  margin: 0 0 4px 0;
+  padding: 0 8px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text3);
+  font-weight: 600;
+}
+
+.header-search-divider {
+  margin: 4px 8px;
+  height: 0;
+  border: 0;
+  border-top: 0.5px solid var(--border);
+}
+
+.header-search-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--rs);
+  text-align: left;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--tr-std);
+}
+
+.header-search-row:hover,
+.header-search-row.is-selected {
+  background: var(--bg2);
+}
+
+.header-search-row.is-stub {
+  opacity: 0.5;
+}
+
+.header-search-row-badge {
+  flex: 0 0 auto;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--bg2);
+  color: var(--text2);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.header-search-row-badge[data-type='matrix'] {
+  background: var(--bluebg);
+  color: var(--bluetxt);
+}
+
+.header-search-row-badge[data-type='board'] {
+  background: var(--tealbg);
+  color: var(--tealtxt);
+}
+
+.header-search-row-badge[data-type='card'] {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+}
+
+.header-search-row-badge[data-type='cell'] {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+}
+
+.header-search-row-badge[data-type='checklist'] {
+  background: color-mix(in srgb, var(--purple, #a78bfa) 20%, transparent);
+  color: var(--purple, #7c3aed);
+}
+
+.header-search-row-badge[data-type='doc'] {
+  background: var(--bluebg);
+  color: var(--bluetxt);
+}
+
+.header-search-row-badge[data-alias-kind='node'] {
+  background: var(--bluebg);
+  color: var(--bluetxt);
+}
+
+.header-search-row-badge[data-alias-kind='card'] {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+}
+
+.header-search-row-badge[data-alias-kind='cell'] {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+}
+
+.header-search-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.header-search-row-title {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header-search-row-sub {
+  font-size: 11px;
+  color: var(--text3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header-search-alias-token {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--ambertxt);
+  font-weight: 600;
+}
+
+.header-search-alias-inline {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--text3);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.header-search-verb-syntax {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--amber);
+  font-size: 12px;
+  padding: 0 4px;
+  flex: 0 0 auto;
+}
+
+.header-search-stub-tag {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--bg2);
+  color: var(--text3);
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.header-search-error {
+  margin: 0;
+  padding: 6px 10px;
+  background: var(--redbg);
+  color: var(--red);
+  font-size: 11px;
+  border-radius: var(--rs);
+}
+
+.header-search-hint {
+  margin: 0;
+  padding: 8px 10px;
+  color: var(--text3);
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* History-Row-Variante: kleineres Icon-Badge, monospace Raw-Text. */
+.header-search-row-history .header-search-row-badge {
+  background: var(--bg2);
+  color: var(--text3);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  padding: 1px 5px;
+}
+
+.header-search-row-history[data-hist-kind='command'] .header-search-row-badge {
+  color: var(--ambertxt);
+}
+
+.header-search-row-history .header-search-row-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+/* ColPick-Sub-UI innerhalb des Dropdown. */
+.header-search-colpick {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: 8px;
+}
+
+.header-search-colpick-title {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.header-search-colpick-select {
+  width: 100%;
+  padding: 4px 6px;
+  background: var(--bg);
+  color: var(--text);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.global-search-badge[data-type='doc'] {
+  background: var(--surface, var(--bg));
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+/* ── Docs-Popup (Shift+D) ─────────────────────────────────────── */
+.docs-popup-scrim {
+  align-items: flex-start;
+  padding-top: 8vh;
+}
+
+.docs-popup-card {
+  width: min(960px, 94vw);
+  max-height: 82vh;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.docs-popup-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: 0.5px solid var(--border);
+  background: var(--surface, var(--bg));
+}
+
+.docs-popup-tabs {
+  flex: 1 1 auto;
+  display: flex;
+  gap: var(--space-xs);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.docs-popup-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: var(--rs);
+  border: 0.5px solid var(--border);
+  background: var(--bg);
+  color: var(--text2);
+  cursor: pointer;
+  max-width: 220px;
+  transition: background-color var(--tr-std), border-color var(--tr-std);
+}
+
+.docs-popup-tab-active {
+  background: var(--bluebg);
+  border-color: var(--blue);
+  color: var(--text);
+}
+
+.docs-popup-tab-title {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
+}
+
+.docs-popup-tab-close {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  font-size: 14px;
+  opacity: 0.6;
+}
+
+.docs-popup-tab-close:hover {
+  opacity: 1;
+}
+
+.docs-popup-tab-add {
+  flex: 0 0 auto;
+  border: 0.5px dashed var(--border);
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: var(--rs);
+  font-size: 14px;
+  line-height: 1;
+  transition: color var(--tr-std), border-color var(--tr-std);
+}
+
+.docs-popup-tab-add:hover {
+  color: var(--blue);
+  border-color: var(--blue);
+}
+
+.docs-popup-body {
+  flex: 1 1 auto;
+  display: flex;
+  gap: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.docs-popup-editor {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-md);
+  gap: var(--space-sm);
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.docs-popup-meta-row {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.docs-popup-title {
+  flex: 1 1 240px;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--fs-title);
+  font-weight: 600;
+  padding: 4px 0;
+  border-bottom: 0.5px solid var(--border);
+  outline: none;
+}
+
+.docs-popup-title:focus {
+  border-bottom-color: var(--blue);
+}
+
+.docs-popup-alias {
+  flex: 0 0 140px;
+  border: 0.5px solid var(--border);
+  background: var(--bg);
+  color: var(--blue);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: var(--rs);
+  outline: none;
+}
+
+.docs-popup-alias:focus {
+  border-color: var(--blue);
+}
+
+.docs-popup-source-chip {
+  flex: 0 0 auto;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--rs);
+  background: var(--bluebg);
+  border: 0.5px solid var(--blue);
+  color: var(--blue);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background-color var(--tr-std);
+}
+
+.docs-popup-source-chip:hover {
+  background: var(--blue);
+  color: var(--bg);
+}
+
+.docs-popup-attach-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.docs-popup-attach-label {
+  font-size: 11px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.docs-popup-attach-input {
+  flex: 1 1 auto;
+  border: 0.5px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: var(--rs);
+  outline: none;
+}
+
+.docs-popup-attach-input:focus {
+  border-color: var(--blue);
+}
+
+.docs-popup-attach-status {
+  font-size: 11px;
+}
+
+.docs-popup-attach-chip {
+  flex: 0 0 auto;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--rs);
+  background: var(--bluebg);
+  border: 0.5px solid var(--blue);
+  color: var(--blue);
+  cursor: pointer;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  transition: background-color var(--tr-std);
+}
+
+.docs-popup-attach-chip:hover {
+  background: var(--blue);
+  color: var(--bg);
+}
+
+.docs-popup-attach-chip-noalias {
+  background: var(--surface, var(--bg));
+  border-color: var(--border);
+  color: var(--text3);
+  cursor: default;
+  font-family: inherit;
+}
+
+.docs-popup-attach-chip-noalias:hover {
+  background: var(--surface, var(--bg));
+  color: var(--text3);
+}
+
+.docs-popup-del {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.docs-popup-content {
+  flex: 1 1 auto;
+  min-height: 240px;
+  resize: vertical;
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: var(--space-sm);
+  outline: none;
+}
+
+.docs-popup-content:focus {
+  border-color: var(--blue);
+}
+
+.docs-popup-content-view {
+  flex: 1 1 auto;
+  min-height: 240px;
+  border: 0.5px solid transparent;
+  border-radius: var(--rs);
+  padding: var(--space-sm);
+  cursor: text;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  transition: border-color var(--tr-std), background-color var(--tr-std);
+}
+
+.docs-popup-content-view:hover,
+.docs-popup-content-view:focus-visible {
+  border-color: var(--border);
+  background: var(--surface, var(--bg));
+}
+
+.docs-popup-content-view p:first-child {
+  margin-top: 0;
+}
+
+.docs-popup-content-view p:last-child {
+  margin-bottom: 0;
+}
+
+.docs-popup-mode-toggle {
+  flex: 0 0 auto;
+  margin-left: var(--space-sm);
+}
+
+.docs-popup-sidebar {
+  flex: 0 0 260px;
+  border-left: 0.5px solid var(--border);
+  padding: var(--space-sm) var(--space-md);
+  overflow-y: auto;
+  background: var(--surface, var(--bg));
+}
+
+.docs-popup-sidebar-title {
+  margin: 0 0 var(--space-sm);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text3);
+}
+
+.docs-popup-recent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.docs-popup-recent-item {
+  padding: 6px 8px;
+  border-radius: var(--rs);
+  cursor: pointer;
+  border: 0.5px solid transparent;
+  transition: background-color var(--tr-std), border-color var(--tr-std);
+}
+
+.docs-popup-recent-item:hover {
+  background: var(--bluebg);
+  border-color: var(--blue);
+}
+
+.docs-popup-recent-active {
+  background: var(--bluebg);
+  border-color: var(--blue);
+}
+
+.docs-popup-recent-title {
+  font-size: 13px;
+  color: var(--text);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.docs-popup-recent-alias {
+  font-size: 10px;
+  color: var(--blue);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.docs-popup-recent-preview {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Draft-Eintraege heben sich optisch von persistierten Docs ab —
+   gestrichelter Rand + anderer Hintergrund-Ton, damit der User
+   sieht "diese Doku wurde noch nicht gespeichert". */
+.docs-popup-draft-item {
+  position: relative;
+  border: 0.5px dashed var(--border);
+  background: var(--bg);
+}
+
+.docs-popup-draft-item.docs-popup-recent-active {
+  border-style: dashed;
+}
+
+.docs-popup-draft-del {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  font-size: 14px;
+  opacity: 0.6;
+  transition: opacity var(--tr-std), color var(--tr-std);
+}
+
+.docs-popup-draft-del:hover {
+  opacity: 1;
+  color: var(--red, var(--text));
+}
+
+/* Mobile: Sidebar unter das Editor-Panel klappen */
+@media (max-width: 780px) {
+  .docs-popup-body {
+    flex-direction: column;
+  }
+  .docs-popup-sidebar {
+    flex: 0 0 auto;
+    border-left: none;
+    border-top: 0.5px solid var(--border);
+    max-height: 30vh;
+  }
+}
+
+/* ── Cell-Docs-Sektion ────────────────────────────────────────── */
+.cell-docs-section {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: 0.5px solid var(--border);
+}
+
+.cell-docs-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.cell-docs-title {
+  margin: 0;
+  font-size: var(--fs-subtitle);
+  font-weight: 600;
+  color: var(--text2);
+}
+
+.cell-docs-add {
+  margin-left: auto;
+}
+
+.cell-docs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.cell-docs-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  padding: 6px 10px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  cursor: pointer;
+  background: var(--bg);
+  transition: background-color var(--tr-std), border-color var(--tr-std);
+}
+
+.cell-docs-item:hover {
+  background: var(--bluebg);
+  border-color: var(--blue);
+}
+
+.cell-docs-date {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.cell-docs-item-title {
+  flex: 1 1 auto;
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell-docs-alias {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--blue);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* Sidebar-Tree */
+.ws-actions {
+  padding: 0 var(--space-xs);
+}
+
+.ws-user-block {
+  border-top: 0.5px solid var(--border);
+  padding-top: var(--space-sm);
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.ws-email {
+  color: var(--text2);
+  font-size: 11px;
+  padding: 0 var(--space-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ws-user-block button {
+  margin: 0 var(--space-xs);
+  padding: 4px 10px;
+  font-size: 11px;
+  background: transparent;
+  color: var(--text2);
+  border: 0.5px solid var(--border);
+}
+
+.ws-user-block button:hover {
+  background: var(--bg);
+  color: var(--text);
 }
 
 /* Workspace-Switcher */
 .ws-switcher-label,
+.node-tree-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  padding: 0 var(--space-xs) var(--space-xs);
+}
+
 .node-tree-label {
-  color: var(--muted);
-  font-size: 0.72rem;
+  color: var(--text3);
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding: 0 0.5rem 0.25rem;
+  flex-shrink: 0;
+}
+
+.node-tree-filter {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 6px;
+  font-size: 11px;
+  background: var(--bg2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  color: var(--text);
+  transition: var(--tr-std);
+}
+
+.node-tree-filter:focus-visible {
+  border-color: var(--blue);
+  background: var(--bg);
+  outline: none;
+}
+
+.tree-match {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+  padding: 0 1px;
+  border-radius: 2px;
 }
 
 .ws-list {
@@ -198,41 +2153,45 @@ button[type='button']:disabled {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 0.625rem;
+  padding: 6px 8px;
   background: transparent;
-  color: var(--fg);
-  border: 1px solid transparent;
-  border-radius: 4px;
-  font-size: 0.9rem;
+  color: var(--text);
+  border: 0.5px solid transparent;
+  border-radius: var(--rs);
+  font-size: 12px;
   text-align: left;
   cursor: pointer;
 }
 
 .ws-list button:hover:not(.active) {
-  background: var(--bg-elev-2);
+  background: var(--bg);
 }
 
 .ws-list button.active {
-  background: var(--accent-soft);
-  border-color: var(--accent);
+  background: var(--bluebg);
+  color: var(--bluetxt);
+  border-color: var(--blue);
 }
 
 .ws-role {
-  color: var(--muted);
-  font-size: 0.75rem;
+  color: var(--text3);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .ws-empty,
 .tree-empty {
-  color: var(--muted);
-  font-size: 0.85rem;
-  padding: 0 0.5rem;
+  color: var(--text3);
+  font-size: 12px;
+  padding: 0 var(--space-xs);
 }
 
 /* Node-Tree */
 .node-tree {
   flex: 1;
   overflow: auto;
+  min-height: 0;
 }
 
 .node-tree ul {
@@ -241,36 +2200,371 @@ button[type='button']:disabled {
   padding: 0;
 }
 
-.tree-root {
+/* Gleicher vertikaler Abstand zwischen allen Tree-Rows — egal ob
+   Siblings oder Parent→erstes-Child. Ohne gleichmaessigen Gap sitzt
+   das erste Child unmittelbar unter dem Parent-Row (ul/li stapeln
+   default margin:0), waehrend Siblings einen 1px-Gap haben. */
+.tree-root,
+.tree-root ul,
+.tree-root li {
   display: flex;
   flex-direction: column;
   gap: 1px;
 }
 
+.tree-root ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tree-row .tree-link {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Chevron-Spalte: quadratische 20x20-Box damit die 90deg-Rotation
+   beim Expand nicht von overflow:hidden weggeschnitten wird. Vorher
+   war sie 16x20 (rechteckig) — die Rotation tauschte Breite/Hoehe
+   und Teile des SVG wurden abgeschnitten. Quadratisch + overflow
+   visible loest das. */
+.tree-chevron {
+  flex: 0 0 20px;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--rs);
+  color: var(--text2);
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  transform: rotate(0deg);
+  transition: transform var(--tr-std), color var(--tr-std), background var(--tr-std);
+}
+
+.tree-chevron:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+/* SVG-Child nicht shrinken lassen — in Flex-Container (tree-chevron
+   ist display:flex) wuerde flex-shrink default 1 das SVG auf 0 Breite
+   druecken, weil width als Attribut im HTML nicht als min-width zaehlt. */
+.tree-chevron svg {
+  flex: 0 0 auto;
+  display: block;
+}
+
+.tree-chevron-open {
+  transform: rotate(90deg);
+}
+
+.tree-chevron-empty {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+}
+
 .tree-link {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.3rem 0.5rem 0.3rem 0.5rem;
-  color: var(--fg);
+  gap: var(--space-xs);
+  padding: 4px 8px;
+  color: var(--text);
   text-decoration: none;
-  border-radius: 4px;
-  font-size: 0.9rem;
+  border-radius: var(--rs);
+  font-size: 12px;
   line-height: 1.3;
+  transition: background var(--tr-std);
 }
 
 .tree-link:hover:not(.active) {
-  background: var(--bg-elev-2);
+  background: var(--bg);
 }
 
 .tree-link.active {
-  background: var(--accent-soft);
+  background: var(--bluebg);
+  color: var(--bluetxt);
+  font-weight: 500;
 }
 
 .tree-ico {
-  color: var(--muted);
-  width: 1em;
+  width: 14px;
   text-align: center;
+  flex-shrink: 0;
+}
+
+.tree-ico[data-type='matrix'] { color: var(--blue); }
+.tree-ico[data-type='board'] { color: var(--teal); }
+
+/* Farbiger Dot, direkt vor dem Icon. Entspricht dem .mm-dot-Pattern
+   aus dem HTML-Vorbild: blau=matrix, teal=board, amber=cell. */
+.tree-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 2px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Vertikale Tree-Lines zwischen Parent + Children. CSS-pur via
+   ::before-Pseudo auf .tree-row, per depth-Variable positioniert.
+   Der Dot (z-index:1) liegt drueber, sodass die Linie optisch durch
+   den Dot laeuft — wie beim SVG-Pattern im HTML-Vorbild, aber ohne
+   Measuring-Logik. */
+.tree-row {
+  position: relative;
+}
+
+/* ── SVG-Verbindungslinien (Tree-Rails) ─────────────────────────────
+   Portiert aus .sb-connections (matrix_tool_beta.html Z641-658).
+   Position absolut relativ zum node-tree-scroll; die .tree-root
+   bleibt auf z-index:1, das SVG auf z-index:2 mit pointer-events:none
+   (darf keine Klicks absorbieren). Gezeichnet von drawConnections().
+*/
+.node-tree-scroll {
+  position: relative;
+}
+
+.tree-root {
+  position: relative;
+  /* Tree-Content (Chevrons, Labels, Dots) ueber der SVG-Rail-Layer —
+     sonst ueberdecken die SVG-Kreise und -Pfade die Chevron-Icons und
+     der User sieht keine Klick-Affordance. SVG-Rail-Layer bleibt
+     dahinter, im Raum zwischen den Zeilen sichtbar. */
+  z-index: 2;
+}
+
+.tree-connections {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 1;
+}
+
+.tree-connections path {
+  fill: none;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tree-connections path.ln-rail {
+  stroke: var(--border2);
+  opacity: 0.9;
+}
+
+.tree-connections path.ln-split {
+  opacity: 0.55;
+}
+
+.tree-connections path.ln-split.ln-matrix     { stroke: var(--blue); }
+.tree-connections path.ln-split.ln-board      { stroke: var(--teal); }
+.tree-connections path.ln-split.ln-cell       { stroke: var(--amber); }
+.tree-connections path.ln-split.ln-info       { stroke: var(--amber); }
+.tree-connections path.ln-split.ln-checklists { stroke: var(--purple); }
+.tree-connections path.ln-split.ln-link       { stroke: var(--text3); }
+.tree-connections path.ln-split.ln-mail       { stroke: var(--amber); }
+.tree-connections path.ln-split.ln-doc        { stroke: var(--amber); }
+
+.tree-connections circle.tree-dot-svg {
+  stroke: var(--bg2);
+  stroke-width: 1.5;
+  transition: r 120ms;
+}
+.tree-connections circle.dot-matrix     { fill: var(--blue); }
+.tree-connections circle.dot-board      { fill: var(--teal); }
+.tree-connections circle.dot-cell       { fill: var(--amber); }
+.tree-connections circle.dot-info       { fill: var(--amber); }
+.tree-connections circle.dot-checklists { fill: var(--purple); }
+.tree-connections circle.dot-link       { fill: var(--text3); }
+.tree-connections circle.dot-mail       { fill: var(--amber); }
+.tree-connections circle.dot-doc        { fill: var(--amber); }
+.tree-connections circle.dot-active { stroke-width: 2; }
+
+/* Inline `.tree-dot`-Span haelt die Layout-Reserve, der SVG-Dot
+   ersetzt den sichtbaren Farb-Punkt. Ohne Reserve-Platzhalter wuerde
+   der Chevron an den Row-Rand rutschen. */
+.tree-dot {
+  opacity: 0;
+}
+
+/* Typ-Filter-Chips unter dem Filter-Input. Kleine toggle-buttons,
+   kombinierbar. Rails-Mode blendet sie mit aus (gehoert zu .node-
+   tree-head-unsichtbar-Set). */
+.node-tree-chips {
+  display: flex;
+  gap: var(--space-xs);
+  padding: 4px var(--space-xs) var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.tree-chip {
+  background: transparent;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  color: var(--text2);
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background var(--tr-std), color var(--tr-std), border-color var(--tr-std);
+}
+
+.tree-chip:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.tree-chip.active {
+  background: var(--bluebg);
+  color: var(--bluetxt);
+  border-color: var(--blue);
+}
+
+.tree-chip[data-chip='board'].active {
+  background: var(--tealbg);
+  color: var(--tealtxt);
+  border-color: var(--teal);
+}
+
+.tree-chip[data-chip='cell'].active {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+  border-color: var(--amber);
+}
+
+/* Versteckter File-Input fuer Subtree/Feature-Import. Nicht
+   display:none — sonst darf er nicht geclickt werden. */
+.tree-import-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Deep-Dive-Chips (SB.2): Links/Mails/Docs. Visuell etwas dezenter
+   als die Kategorie-Chips darueber — Icon + Label, Gap zum Icon. */
+.node-tree-chips-deep {
+  padding-top: 0;
+}
+.node-tree-chips-deep .tree-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.node-tree-chips-deep .tree-chip.active {
+  background: var(--surface-hover);
+  color: var(--text);
+  border-color: var(--border2);
+}
+
+.ws-sidebar[data-sb-mode='rails'] .node-tree-chips {
+  display: none;
+}
+
+/* Scroll-Fade-Wrapper: der Tree scrollt intern, mit Top+Bottom-Fade
+   via mask-image. Portiert die sbUpdateScrollFade-Logik aus dem
+   HTML-Vorbild — hier in reinem CSS, ohne JS-Messung. Der Fade
+   zeigt sich auch bei wenig Inhalt leicht am Rand; 16px ist knapp
+   genug, dass das nicht stoert. */
+.node-tree-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 16px,
+    #000 calc(100% - 16px),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 16px,
+    #000 calc(100% - 16px),
+    transparent 100%
+  );
+}
+
+/* node-tree muss den restlichen Sidebar-Platz einnehmen, damit der
+   Scroll-Container funktioniert. */
+.node-tree {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+/* Drop-Target-Highlight: Board-Eintrag in der Sidebar wenn eine
+   Karte darueber gezogen wird (cross-board-move). */
+.tree-row.tree-row-drop {
+  background: var(--tealbg);
+  outline: 1px dashed var(--teal);
+  outline-offset: -1px;
+}
+
+/* Zellen-Eintraege etwas dezenter als Nodes — niedrigerer Kontrast,
+   kleinerer Icon. Der User scannt primaer nach Matrix/Board. */
+.tree-row[data-entry-kind='cell'] .tree-link {
+  color: var(--text2);
+  font-size: 12px;
+}
+.tree-row[data-entry-kind='cell'] .tree-ico {
+  color: var(--text3);
+}
+.tree-row[data-entry-kind='cell'] .tree-label {
+  font-weight: 400;
+}
+
+/* Feature-Rows (info / checklists) noch eine Stufe dezenter als
+   Cell-Rows — sie sind Unter-Elemente einer Cell. Kursiv gibt's
+   extra visuelle Unterscheidung zum Cell-Label. */
+.tree-row[data-entry-kind='feature'] .tree-link {
+  color: var(--text2);
+  font-size: 12px;
+}
+.tree-row[data-entry-kind='feature'] .tree-label {
+  font-weight: 400;
+  font-style: italic;
+}
+
+/* Link- und Doc-Rows (SB.2-Chip-aktiviert): noch kleiner, grauer.
+   Diese Rows sind Opt-in und sollen die Haupt-Struktur nicht
+   dominieren. */
+.tree-row[data-entry-kind='link'] .tree-link,
+.tree-row[data-entry-kind='doc'] .tree-link {
+  color: var(--text3);
+  font-size: 11px;
+}
+.tree-row[data-entry-kind='link'] .tree-label,
+.tree-row[data-entry-kind='doc'] .tree-label {
+  font-weight: 400;
+}
+.tree-row[data-entry-kind='link'] .tree-link:hover:not(.active),
+.tree-row[data-entry-kind='doc'] .tree-link:hover:not(.active) {
+  color: var(--text);
 }
 
 .tree-label {
@@ -281,1291 +2575,3767 @@ button[type='button']:disabled {
 }
 
 .tree-alias {
-  color: var(--muted);
-  font-size: 0.75rem;
+  color: var(--text3);
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-/* User-Block unten in Sidebar */
-.ws-user-block {
-  border-top: 1px solid var(--border);
-  padding-top: 0.75rem;
-  margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.ws-email {
-  color: var(--muted);
-  font-size: 0.8rem;
-  padding: 0 0.5rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.ws-user-block button {
-  margin: 0 0.25rem;
-  padding: 0.4rem 0.75rem;
-  font-size: 0.85rem;
-  background: transparent;
-  color: var(--fg);
-  border: 1px solid var(--border);
-}
-
-.ws-user-block button:hover {
-  background: var(--bg-elev-2);
-  border-color: var(--muted);
-}
-
-/* Node-View (Main-Area) */
+/* ── Node-View (Main) ────────────────────────────────────────── */
 .node-view {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--space-md);
+}
+
+/* Node-Description: links-Akzent-Border, leicht gedimmt, nur
+   sichtbar wenn Content oder Edit-Mode. Textarea nutzt field-sizing
+   fuer Auto-Grow (Chrome/Edge ab 123, Firefox ab 129 — in aelteren
+   Browsern bleibt der Default-Height, was harmlos ist). */
+.node-desc {
+  border-left: 2px solid var(--border);
+  padding: 4px 10px;
+  color: var(--text2);
+  background: var(--bg2);
+  border-radius: 0 var(--rs) var(--rs) 0;
+}
+
+.node-desc-edit {
+  border-left-color: var(--blue);
+}
+
+.node-desc-view p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  min-height: 1em;
+}
+
+.node-desc-input {
+  width: 100%;
+  min-height: 2.4em;
+  padding: 0;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  resize: none;
+  /* Auto-Grow; Fallback: Default-Height haelt den Input nutzbar. */
+  field-sizing: content;
+}
+
+.node-desc-input:focus-visible {
+  outline: none;
+}
+
+.node-desc-input::placeholder {
+  color: var(--text3);
+  font-style: italic;
+}
+
+/* Markdown-Light-Inline-Elemente. Scoped auf Node-Description,
+   kein Leak nach draussen (falls mal anderswo Markdown-Text rendert). */
+.node-desc-view .md-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  padding: 1px 4px;
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  border-radius: 3px;
+}
+
+.node-desc-view .md-link {
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.node-desc-view .md-link:hover {
+  color: var(--bluetxt);
+}
+
+.node-desc-view strong {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.node-desc-view em {
+  font-style: italic;
 }
 
 .node-view-head {
   display: flex;
   align-items: baseline;
-  gap: 0.75rem;
+  gap: var(--space-sm);
   flex-wrap: wrap;
+  padding-bottom: var(--space-sm);
+  border-bottom: 0.5px solid var(--border);
 }
 
 .node-view-head h2 {
   margin: 0;
+  font-size: var(--fs-title);
+  font-weight: 600;
+}
+
+.node-view-head-doc-btn {
+  margin-left: auto;
+  flex: 0 0 auto;
 }
 
 .node-alias {
-  color: var(--muted);
-  font-size: 0.9rem;
+  color: var(--text2);
+  font-size: 12px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .node-type-badge {
-  font-size: 0.7rem;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding: 0.15rem 0.45rem;
-  border-radius: 3px;
-  background: var(--bg-elev);
-  color: var(--muted);
-  border: 1px solid var(--border);
+  padding: 2px 6px;
+  border-radius: var(--rs);
+  background: var(--bg2);
+  color: var(--text2);
+  border: 0.5px solid var(--border);
 }
 
 .node-type-badge[data-type='matrix'] {
-  color: var(--feat-matrix);
-  border-color: var(--feat-matrix);
+  color: var(--bluetxt);
+  background: var(--bluebg);
+  border-color: transparent;
 }
 
 .node-type-badge[data-type='board'] {
-  color: var(--feat-board);
-  border-color: var(--feat-board);
+  color: var(--tealtxt);
+  background: var(--tealbg);
+  border-color: transparent;
 }
 
-.node-placeholder {
-  padding: 1.5rem;
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+/* ── Card / Shell — wiederkehrende Box ────────────────────────── */
+.card {
+  background: var(--bg);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rl);
+  overflow: hidden;
+  margin-bottom: var(--space-sm);
 }
 
-/* Matrix-Grid */
-:root {
-  --feat-matrix: #4c8bf5;
-  --feat-board: #3db8a6;
-  --feat-info: #e0a94d;
-  --feat-checklists: #a97ce0;
+.cardhd {
+  background: var(--bg2);
+  padding: 8px 13px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text2);
+  border-bottom: 0.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+/* ── Matrix-Grid ─────────────────────────────────────────────── */
+.matrix-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
 }
 
 .matrix-empty {
-  padding: 1.5rem;
-  background: var(--bg-elev);
-  border: 1px dashed var(--border);
-  border-radius: 6px;
+  padding: var(--space-xl);
+  background: var(--bg2);
+  border: 0.5px dashed var(--border2);
+  border-radius: var(--rl);
+  text-align: center;
+}
+
+.matrix-empty .hint {
+  margin-bottom: var(--space-md);
+}
+
+.mx-toolbar {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: center;
 }
 
 .matrix-grid {
   display: grid;
   gap: 1px;
   background: var(--border);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rl);
   overflow: hidden;
 }
 
 .mx-corner {
-  background: var(--bg-elev);
+  background: var(--bg2);
 }
 
 .mx-col-head,
 .mx-row-head {
-  background: var(--bg-elev);
-  padding: 0.55rem 0.75rem;
-  font-size: 0.85rem;
-  color: var(--fg);
+  background: var(--bg2);
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text);
   font-weight: 500;
   display: flex;
   align-items: center;
-}
-
-.mx-row-head {
-  background: var(--bg-elev);
-  border-right: 0;
+  gap: var(--space-xs);
 }
 
 .mx-col-label,
 .mx-row-label {
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.mx-head-input {
+  flex: 1;
+  padding: 3px 6px;
+  background: var(--bg);
+  color: var(--text);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  font-size: 12px;
+  font-family: inherit;
+  min-width: 0;
+  transition: background var(--tr-std), border-color var(--tr-std);
+}
+
+.mx-head-input:focus-visible {
+  border-color: var(--focus-color);
+}
+
+/* Read-only Variante: visuell wie Text, dimensional identisch zum
+   editierbaren Input. So bleibt die Kopfzeile beim Edit-Toggle
+   formstabil — Inputs haben denselben Platz, nur Hintergrund/Border
+   aendert sich. */
+.mx-head-input:read-only {
+  background: transparent;
+  border-color: transparent;
+  cursor: default;
+  font-weight: 500;
+}
+
+.mx-head-input:read-only:focus-visible {
+  background: transparent;
+  border-color: transparent;
+  outline: var(--focus-width) solid var(--focus-color);
+}
+
+.mx-del-btn {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text3);
+  border: 1px solid transparent;
+  border-radius: var(--rs);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: var(--tr-std);
+}
+
+/* Sichtbar und klickbar nur im Edit-Mode (Parent traegt .mx-editable).
+   Space ist immer reserviert — kein Layout-Shift beim Toggle. */
+.mx-editable .mx-del-btn:not(:disabled) {
+  pointer-events: auto;
+}
+
+.mx-editable:hover .mx-del-btn:not(:disabled),
+.mx-editable:focus-within .mx-del-btn:not(:disabled),
+.mx-del-btn:not(:disabled):focus-visible {
+  opacity: 1;
+}
+
+.mx-del-btn:hover:not(:disabled) {
+  color: var(--red);
+  border-color: var(--red);
+  background: var(--redbg);
+}
+
+/* Move-Pfeile: analog zu mx-del-btn, aber in Tealtxt beim Hover.
+   Unsichtbar bis Edit + Hover/Focus, wie Del. */
+.mx-move-btn {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text3);
+  border: 1px solid transparent;
+  border-radius: var(--rs);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: var(--tr-std);
+}
+
+.mx-editable .mx-move-btn:not(:disabled) {
+  pointer-events: auto;
+}
+
+.mx-editable:hover .mx-move-btn:not(:disabled),
+.mx-editable:focus-within .mx-move-btn:not(:disabled),
+.mx-move-btn:not(:disabled):focus-visible {
+  opacity: 1;
+}
+
+/* Settings: vis-<key>-always hebt die Hover-Bedingung auf — Buttons
+   sind permanent sichtbar, nicht erst beim Ueberfahren der Header-Row.
+   Kommt hier nach den Hover-Regeln, damit die Spezifitaet passt. */
+body.vis-deleteRowCol-always .mx-editable .mx-del-btn:not(:disabled) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.mx-move-btn:hover:not(:disabled) {
+  color: var(--tealtxt);
+  border-color: var(--teal);
+  background: var(--tealbg);
+}
+
+.mx-add-col-cell,
+.mx-add-row-cell {
+  background: var(--bg2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xs);
+}
+
+.mx-add-row-filler {
+  background: var(--bg2);
+}
+
+.mx-add-btn {
+  padding: 4px 10px;
+  background: transparent;
+  color: var(--text3);
+  border: 0.5px dashed var(--border2);
+  border-radius: var(--rs);
+  font-size: 14px;
+  cursor: pointer;
+  line-height: 1;
+  transition: var(--tr-std);
+}
+
+.mx-add-btn:hover:not(:disabled) {
+  border-style: solid;
+  color: var(--blue);
+  border-color: var(--blue);
+}
+
+/* Zelle */
 .mx-cell {
   background: var(--bg);
-  padding: 0.55rem 0.75rem;
-  min-height: 48px;
+  padding: 8px;
+  min-height: 60px;
+  cursor: default;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  transition: background 180ms cubic-bezier(0.4, 0, 0.2, 1);
-  outline: none;
+  gap: var(--space-xs);
+  position: relative;
+  transition: background var(--tr-std);
 }
 
 .mx-cell-empty {
-  background: transparent;
+  background: var(--bg);
 }
 
 .mx-cell-clickable {
   cursor: pointer;
 }
 
-.mx-cell-clickable:hover,
-.mx-cell-clickable:focus-visible {
-  background: var(--bg-elev-2);
+.mx-cell-clickable:hover {
+  background: var(--bg2);
 }
 
-.mx-cell-clickable:focus-visible {
-  outline: 2px solid var(--accent);
+.mx-cell:focus-visible {
+  background: var(--bluebg);
+  outline: var(--focus-width) solid var(--focus-color);
   outline-offset: -2px;
+  z-index: 1;
+}
+
+.mx-cell:focus {
+  background: var(--bluebg);
 }
 
 .mx-cell-alias {
-  color: var(--muted);
-  font-size: 0.75rem;
+  font-size: 10px;
+  color: var(--text3);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  align-self: flex-start;
 }
 
 .mx-cell-feats {
   display: flex;
-  gap: 0.3rem;
   flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: auto;
 }
 
+/* Feature-Chips in der Zelle — farbige Segmente (HTML: .cell-segment) */
 .mx-feat-chip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 0.3rem;
-  border-radius: 3px;
-  font-size: 0.75rem;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--rs);
+  font-size: 11px;
   font-weight: 600;
-  line-height: 1;
-  background: var(--bg-elev);
-  color: var(--muted);
-  border: 1px solid transparent;
+  cursor: default;
+  transition: filter var(--tr-std);
 }
 
 .mx-feat-chip[data-feat='matrix'] {
-  color: var(--feat-matrix);
-  border-color: var(--feat-matrix);
+  background: var(--bluebg);
+  color: var(--bluetxt);
 }
 
 .mx-feat-chip[data-feat='board'] {
-  color: var(--feat-board);
-  border-color: var(--feat-board);
+  background: var(--tealbg);
+  color: var(--tealtxt);
 }
 
 .mx-feat-chip[data-feat='info'] {
-  color: var(--feat-info);
-  border-color: var(--feat-info);
+  background: var(--amberbg);
+  color: var(--ambertxt);
 }
 
 .mx-feat-chip[data-feat='checklists'] {
-  color: var(--feat-checklists);
-  border-color: var(--feat-checklists);
+  background: var(--purplebg);
+  color: var(--purpletxt);
 }
 
-/* ─── Board (Kanban) ─── */
+.mx-feat-chip[data-feat='doc'] {
+  background: var(--bluebg);
+  color: var(--blue);
+  border: 0.5px solid var(--blue);
+}
+
+.mx-feat-chip-link {
+  cursor: pointer;
+}
+
+.mx-feat-chip-link:hover {
+  filter: brightness(0.92);
+}
+
+/* ── Board / Kanban ──────────────────────────────────────────── */
 .board {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: var(--space-md);
 }
 
 .board-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
 }
 
 .board-link-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.3rem 0.6rem;
-  background: var(--bg-elev);
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--fg);
+  border-radius: 999px;
+  color: var(--text2);
   text-decoration: none;
-  font-size: 0.85rem;
+  transition: var(--tr-std);
 }
 
 .board-link-chip:hover {
-  border-color: var(--accent);
+  background: var(--bluebg);
+  color: var(--bluetxt);
+  border-color: color-mix(in srgb, var(--blue) 40%, var(--border));
 }
 
-.board-link-chip[data-link-type='mail'] {
-  color: var(--feat-info);
-  border-color: var(--feat-info);
+.board-link-chip[data-link-type='mail']:hover {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+  border-color: color-mix(in srgb, var(--amber) 40%, var(--border));
 }
 
 .link-ico {
-  color: var(--muted);
-  font-size: 0.9rem;
+  color: var(--text3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.board-link-chip:hover .link-ico {
+  color: currentColor;
 }
 
 .link-alias {
-  color: var(--muted);
-  font-size: 0.72rem;
+  color: var(--text3);
+  font-size: 10px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-.board-empty {
-  padding: 1.5rem;
-  background: var(--bg-elev);
-  border: 1px dashed var(--border);
-  border-radius: 6px;
+/* Edit-Row fuer einen Link. Flex-Row mit Type-Select + zwei Inputs +
+   Del. Bricht auf schmalen Screens um. */
+.board-link-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 3px 6px;
+  background: var(--bg);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+}
+
+.board-link-type {
+  font-size: 11px;
+  padding: 2px 4px;
+  background: var(--bg2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+}
+
+.board-link-label,
+.board-link-url {
+  font-size: 11px;
+  padding: 2px 6px;
+  background: transparent;
+  border: 0.5px solid transparent;
+  border-radius: var(--rs);
+  color: var(--text);
+  min-width: 80px;
+  transition: var(--tr-std);
+}
+
+.board-link-url {
+  min-width: 140px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.board-link-label:hover,
+.board-link-url:hover {
+  border-color: var(--border);
+}
+
+.board-link-label:focus-visible,
+.board-link-url:focus-visible {
+  background: var(--bg2);
+  border-color: var(--blue);
+  outline: none;
+}
+
+/* Wrapper erlaubt der Inline-del-Btn volle Sichtbarkeit auch ohne
+   .mx-editable-Parent — genau wie beim kb-card-edit-bar. */
+.board-link-edit .mx-del-btn:not(:disabled) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.board-link-add-btn {
+  font-size: 11px;
+  padding: 3px 9px;
 }
 
 .board-cols {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--space-md);
+  align-items: flex-start;
   overflow-x: auto;
-  padding-bottom: 0.5rem;
+  padding-bottom: var(--space-md);
 }
 
+.board-empty {
+  padding: var(--space-xl);
+  background: var(--bg2);
+  border: 0.5px dashed var(--border2);
+  border-radius: var(--rl);
+  text-align: center;
+}
+
+/* Kanban-Spalte */
 .kb-col {
-  flex: 0 0 260px;
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
-  border-top: 3px solid var(--kb-col-color, var(--border));
-  border-radius: 6px;
+  min-width: 260px;
+  max-width: 320px;
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 200px);
+  gap: var(--space-sm);
+  background: var(--bg2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--rl);
+  padding: var(--space-sm);
+  transition: min-width var(--tr-std), max-width var(--tr-std), flex var(--tr-std);
 }
 
-.kb-col[data-has-color='no'] {
-  border-top-color: var(--border);
+/* Kollabierte Spalte: schmal, nur Header sichtbar. min/max/flex
+   animieren (CSS-Transition), Cards/Empty-Hint/Add-Btn sind via
+   <Show> rausgenommen — keine Anzeige-Logik im CSS. */
+.kb-col-collapsed {
+  min-width: 64px;
+  max-width: 88px;
+  flex: 0 0 auto;
+}
+
+/* Drop-Target waehrend eine Card ueber der Spalte haengt: dashed
+   blauer Rand + leichter Hintergrund, damit klar ist wohin gedropt
+   werden wuerde. Transition bleibt auf dem Basis-Selektor. */
+.kb-col-drag-over {
+  border-style: dashed;
+  border-color: var(--blue);
+  background: var(--bluebg);
+}
+
+/* Karte die gerade gezogen wird: transparent + leicht rotiert, damit
+   der User sofort sieht "das ist mein Drag-Subjekt". Hover auf
+   andere Karten bleibt unveraendert. */
+.kb-card-dragging {
+  opacity: 0.4;
+  transform: rotate(-1deg);
+}
+
+/* Drop-Slot-Indikator: ein 2px-Balken in Blue ueber oder unter der
+   Card. position:relative am .kb-card ist schon durch Kartenlayout
+   gegeben; ::before/::after haengen sich entsprechend an die Kante. */
+.kb-card {
+  position: relative;
+}
+
+.kb-card-drop-before::before,
+.kb-card-drop-after::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--blue);
+  border-radius: 1px;
+  box-shadow: 0 0 0 2px var(--bluebg);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.kb-card-drop-before::before {
+  top: -3px;
+}
+
+.kb-card-drop-after::after {
+  bottom: -3px;
+}
+
+.kb-col-collapsed .mx-head-input {
+  font-size: 11px;
+}
+
+.kb-col-collapse-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  color: var(--text3);
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  border-radius: var(--rs);
+  transition: color var(--tr-std), background var(--tr-std);
+}
+
+.kb-col-collapse-btn:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.kb-col[data-has-color='yes'] {
+  border-top: 3px solid var(--kb-col-color, var(--border2));
 }
 
 .kb-col-head {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 0.55rem 0.75rem;
-  border-bottom: 1px solid var(--border);
+  gap: var(--space-xs);
 }
 
 .kb-col-label {
-  font-weight: 600;
-  color: var(--fg);
-  font-size: 0.9rem;
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .kb-col-count {
-  color: var(--muted);
-  font-size: 0.75rem;
+  font-size: 10px;
+  color: var(--text3);
+  padding: 1px 6px;
   background: var(--bg);
-  padding: 0.1rem 0.4rem;
-  border-radius: 10px;
+  border-radius: 999px;
+}
+
+.kb-col-color-picker {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  background: transparent;
+  cursor: pointer;
+  transition: opacity var(--tr-std);
+}
+
+.kb-col-color-picker:disabled {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .kb-col-empty {
-  padding: 0.75rem;
   text-align: center;
+  padding: var(--space-md) 0;
   margin: 0;
+  font-size: 11px;
+  color: var(--text3);
 }
 
 .kb-cards {
   list-style: none;
   margin: 0;
-  padding: 0.5rem;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  overflow-y: auto;
+  gap: var(--space-xs);
 }
 
+.kb-col-add {
+  min-width: 60px;
+  max-width: 80px;
+}
+
+/* Kanban-Karte — HyperUI-Paper-Look: weisse Surface, dezenter
+   Schatten (sm), klarer Border. Links Feature-Farb-Leiste (5px). */
 .kb-card {
-  padding: 0.55rem 0.65rem;
-  background: var(--bg);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: var(--rs);
+  padding: 10px 12px;
   cursor: pointer;
+  transition: background var(--tr-std), border-color var(--tr-std),
+    box-shadow var(--tr-std), transform var(--tr-std);
+  border-left: 3px solid var(--border2);
+  box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  outline: none;
-  transition: border-color 180ms cubic-bezier(0.4, 0, 0.2, 1),
-    background 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  gap: var(--space-xs);
 }
 
-.kb-card:hover,
-.kb-card:focus-visible {
-  border-color: var(--accent);
+.kb-card:hover {
+  border-color: var(--border2);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .kb-card:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
+  border-color: var(--focus-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-color) 20%, transparent);
+}
+
+.kb-card[data-prio='3'] { border-left-color: var(--red); }
+.kb-card[data-prio='2'] { border-left-color: var(--prio-medium); }
+.kb-card[data-prio='1'] { border-left-color: var(--teal); }
+
+.kb-card[data-has-color='yes'] {
+  border-top: 3px solid var(--kb-card-color, var(--border2));
 }
 
 .kb-card-done {
-  opacity: 0.6;
+  opacity: 0.65;
+}
+
+.kb-card-done .kb-card-title-text {
+  text-decoration: line-through;
+  color: var(--text3);
+}
+
+/* Archivierte Karten: staerker gedimmt + dashed-Rand, damit klar ist
+   dass sie nur durch den Archiv-Filter sichtbar sind. */
+.kb-card-archived {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.kb-card-archived .kb-card-title-text::after {
+  content: ' · archiviert';
+  color: var(--text3);
+  font-size: 10px;
+  font-weight: normal;
+}
+
+.board-header-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0 var(--space-md) var(--space-sm);
+  flex-wrap: wrap;
+}
+
+/* Filter-Wrapper mit Such-Icon links im Input — HyperUI-Look. */
+.board-filter-wrap {
+  flex: 1 1 240px;
+  max-width: 420px;
+  min-width: 200px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.board-filter-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--text3);
+  pointer-events: none;
+}
+
+.board-filter-input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 var(--space-sm) 0 32px;
+  font-size: 13px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  color: var(--text);
+  transition: border-color var(--tr-std), box-shadow var(--tr-std),
+    background var(--tr-std);
+}
+
+.board-filter-input::placeholder {
+  color: var(--text3);
+}
+
+.board-filter-input:focus-visible {
+  border-color: var(--focus-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-color) 18%, transparent);
+  outline: none;
+}
+
+.board-filter-count {
+  position: absolute;
+  right: 34px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: var(--text3);
+  pointer-events: none;
+}
+
+.board-filter-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--rs);
+  color: var(--text3);
+  cursor: pointer;
+  transition: var(--tr-std);
+}
+
+.board-filter-clear:hover {
+  color: var(--red);
+  border-color: var(--red);
+  background: var(--redbg);
+}
+
+.board-sort-select {
+  margin-left: auto;
+  height: 32px;
+  padding: 0 var(--space-sm);
+  font-size: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color var(--tr-std), box-shadow var(--tr-std);
+}
+
+.board-sort-select:hover {
+  border-color: var(--border2);
+}
+
+.board-sort-select:focus-visible {
+  border-color: var(--focus-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-color) 18%, transparent);
+  outline: none;
+}
+
+.board-archive-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+}
+
+.board-archive-toggle.active {
+  background: var(--tealbg);
+  color: var(--tealtxt);
+  border-color: color-mix(in srgb, var(--teal) 40%, var(--border));
 }
 
 .kb-card-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
   display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  font-size: 0.9rem;
-  color: var(--fg);
-  line-height: 1.3;
-}
-
-.kb-card-done .kb-card-name {
-  text-decoration: line-through;
+  align-items: center;
+  gap: var(--space-xs);
 }
 
 .kb-done-mark {
-  color: var(--ok);
-  font-weight: 700;
+  color: var(--teal);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Done-Checkbox direkt am Board-Karten-Titel. Klein, teal, klickbar
+   ohne die Karte zu oeffnen (stopPropagation auf onClick). */
+.kb-card-done-checkbox {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--teal);
+  cursor: pointer;
+}
+
+.kb-card-title-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .kb-card-alias {
-  color: var(--muted);
-  font-size: 0.72rem;
+  color: var(--text3);
+  font-size: 10px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  margin-left: auto;
 }
 
 .kb-card-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.3rem;
-  font-size: 0.72rem;
-}
-
-.kb-tag,
-.kb-who,
-.kb-deadline,
-.kb-prio,
-.kb-recur,
-.kb-cl-progress {
-  padding: 0.1rem 0.4rem;
-  border-radius: 3px;
-  background: var(--bg-elev-2);
-  color: var(--muted);
-  border: 1px solid transparent;
-  line-height: 1.4;
+  gap: 3px;
+  font-size: 10px;
 }
 
 .kb-tag {
-  color: var(--feat-info);
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--purplebg);
+  color: var(--purpletxt);
 }
 
 .kb-who {
-  color: var(--feat-checklists);
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--bluebg);
+  color: var(--bluetxt);
 }
 
 .kb-deadline {
-  color: var(--feat-board);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg2);
+  color: var(--text2);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1.2;
+}
+
+/* Faerbung nach Dringlichkeit — ueberfaellig rot, heute/bald amber,
+   erledigt (done ueberschreibt state=null) neutral. */
+.kb-deadline[data-deadline-state='overdue'] {
+  background: var(--redbg);
+  color: var(--redtxt);
+  font-weight: 600;
+}
+
+.kb-deadline[data-deadline-state='today'],
+.kb-deadline[data-deadline-state='soon'] {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+}
+
+/* Overlay-Warnung neben dem Date-Input: kleiner Chip, Farbe wie
+   Badge. Inline-Level, damit er im Flow des overlay-field bleibt. */
+.overlay-deadline-warning {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  align-self: flex-start;
+}
+
+.overlay-deadline-warning[data-deadline-state='overdue'] {
+  background: var(--redbg);
+  color: var(--redtxt);
+}
+
+.overlay-deadline-warning[data-deadline-state='today'],
+.overlay-deadline-warning[data-deadline-state='soon'] {
+  background: var(--amberbg);
+  color: var(--ambertxt);
 }
 
 .kb-prio {
-  color: var(--danger);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--redbg);
+  color: var(--redtxt);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1.2;
 }
 
 .kb-recur {
-  color: var(--feat-matrix);
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--tealbg);
+  color: var(--tealtxt);
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.2;
 }
 
 .kb-cl-progress {
-  color: var(--feat-checklists);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--purplebg);
+  color: var(--purpletxt);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1.2;
 }
 
-/* Standalone-Checklisten unter den Spalten */
-.board-checklists {
-  border-top: 1px solid var(--border);
-  padding-top: 1rem;
+/* Karten-Edit-Bar */
+.kb-card-edit-bar {
+  display: flex;
+  gap: var(--space-xs);
+  margin-top: 2px;
+  opacity: 0;
+  transition: opacity var(--tr-std);
 }
 
-.board-section-title {
-  margin: 0 0 0.75rem;
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
+.kb-card:hover .kb-card-edit-bar,
+.kb-card:focus-within .kb-card-edit-bar {
+  opacity: 1;
 }
 
+.kb-card-move {
+  flex: 1;
+  padding: 2px 4px;
+  font-size: 10px;
+  background: var(--bg2);
+  color: var(--text2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+}
+
+/* Move/Del-Buttons im Edit-Bar: der Wrapper togglet via opacity, die
+   Kinder duerfen ihre eigene Ghost-Opacity (aus .mx-move-btn /
+   .mx-del-btn) nicht multiplizieren. Daher hier explizit opacity:1 +
+   pointer-events:auto fuer den Edit-Bar-Kontext. */
+.kb-card-edit-bar .mx-move-btn:not(:disabled),
+.kb-card-edit-bar .mx-del-btn:not(:disabled) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── Checklisten ─────────────────────────────────────────────── */
 .cl-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
 }
 
 .cl-item {
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.6rem 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
+  background: var(--bg);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rl);
+  overflow: hidden;
 }
 
 .cl-head {
+  background: var(--bg2);
+  padding: 8px 13px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text2);
+  border-bottom: 0.5px solid var(--border);
   display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
+  align-items: center;
+  gap: var(--space-sm);
 }
 
 .cl-label {
-  font-weight: 600;
-  font-size: 0.88rem;
-  color: var(--fg);
   flex: 1;
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cl-alias {
-  color: var(--muted);
-  font-size: 0.72rem;
+  color: var(--text3);
+  font-size: 10px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+.cl-head-input {
+  flex: 1;
+}
+
+.cl-alias-input {
+  width: 90px;
+  padding: 3px 6px;
+  background: var(--bg);
+  color: var(--text);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.cl-alias-input:focus-visible {
+  border-color: var(--focus-color);
+}
+
 .cl-progress {
-  color: var(--feat-checklists);
-  font-size: 0.75rem;
+  font-size: 10px;
+  color: var(--text3);
+  padding: 1px 7px;
+  background: var(--bg);
+  border-radius: 999px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .cl-recur {
-  color: var(--feat-matrix);
-  font-size: 0.8rem;
-}
-
-.cl-empty {
-  margin: 0;
-  font-size: 0.8rem;
+  color: var(--teal);
+  font-size: 12px;
 }
 
 .cl-items {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
 }
 
 .cl-it {
   display: flex;
-  align-items: baseline;
-  gap: 0.4rem;
-  font-size: 0.85rem;
-  line-height: 1.3;
-  padding-left: calc(var(--cl-level, 0) * 16px);
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: 5px 13px;
+  padding-left: calc(13px + var(--space-md) * var(--cl-level, 0));
+  border-bottom: 0.5px solid var(--border);
+  transition: background var(--tr-std);
 }
 
-.cl-it-done .cl-text {
+.cl-it:last-child {
+  border-bottom: 0;
+}
+
+.cl-it:hover {
+  background: var(--bg2);
+}
+
+.cl-checkbox-input {
+  width: 15px;
+  height: 15px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--teal);
+  cursor: pointer;
+}
+
+.cl-text-ro {
+  flex: 1;
+  padding: 2px 0;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.cl-text-ro.cl-text-done,
+.cl-it-done .cl-text-ro {
   text-decoration: line-through;
-  color: var(--muted);
+  color: var(--text3);
 }
 
-.cl-checkbox {
-  color: var(--muted);
-  font-size: 0.95rem;
+.cl-text-input {
+  flex: 1;
+  padding: 2px 6px;
+  background: transparent;
+  color: var(--text);
+  border: 0.5px solid transparent;
+  border-radius: var(--rs);
+  font-size: 13px;
+  font-family: inherit;
+  transition: background var(--tr-std), border-color var(--tr-std);
 }
 
-.cl-it-done .cl-checkbox {
-  color: var(--feat-checklists);
+.cl-text-input:not(:read-only):hover {
+  border-color: var(--border);
 }
 
-.cl-text {
-  color: var(--fg);
+.cl-text-input:focus-visible {
+  outline: none;
+  border-color: var(--focus-color);
+  background: var(--bg2);
 }
 
-/* ─── Card-Overlay ─── */
+/* Read-only Variante: keine Hover-Border, Cursor=default. Dimension
+   (Padding, Font-Size) bleibt identisch -> kein Layout-Shift beim
+   Edit-Toggle. */
+.cl-text-input:read-only {
+  cursor: default;
+  background: transparent;
+  border-color: transparent;
+}
+
+.cl-text-input:read-only:focus-visible {
+  background: transparent;
+  border-color: transparent;
+}
+
+.cl-it-done .cl-text-input {
+  text-decoration: line-through;
+  color: var(--text3);
+}
+
+.cl-alias-input:read-only {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text3);
+  cursor: default;
+}
+
+.cl-it-del {
+  padding: 2px 6px;
+  background: transparent;
+  color: var(--text3);
+  border: 0.5px solid transparent;
+  border-radius: var(--rs);
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: var(--tr-std);
+}
+
+/* Space immer reserviert, nur im Edit-Mode klickbar. */
+.cl-item[data-edit='true'] .cl-it-del:not(:disabled) {
+  pointer-events: auto;
+}
+
+.cl-item[data-edit='true'] .cl-it:hover .cl-it-del:not(:disabled),
+.cl-it-del:not(:disabled):focus-visible {
+  opacity: 1;
+}
+
+.cl-it-del:hover:not(:disabled) {
+  color: var(--red);
+  border-color: var(--red);
+  background: var(--redbg);
+}
+
+.cl-add-item-btn {
+  margin: var(--space-sm);
+  width: calc(100% - 2 * var(--space-sm));
+}
+
+.cl-add-btn {
+  align-self: flex-start;
+  margin-top: var(--space-sm);
+}
+
+/* Overlay-Checkliste: Karten sind nicht edit-gated (Memory:
+   feedback_card_not_structural), also sind Add/Del/Rename immer
+   aktiv. Das edit-mode-Gate aus .cl-item[data-edit='true'] auf
+   .cl-it-del greift hier nicht — wir oeffnen das in der Overlay
+   explizit. Visuell: Del-Icon nur beim Hover sichtbar, aber klickbar. */
+.overlay-cl .cl-it-del:not(:disabled) {
+  pointer-events: auto;
+}
+
+.overlay-cl .cl-it:hover .cl-it-del:not(:disabled),
+.overlay-cl .cl-it-del:not(:disabled):focus-visible {
+  opacity: 1;
+}
+
+/* Board-Section (Checklisten unterhalb der Kanban-Spalten) */
+.board-checklists {
+  margin-top: var(--space-lg);
+}
+
+.board-section-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0 0 var(--space-sm);
+}
+
+/* ── Cell-Checklists-Page ─────────────────────────────────────── */
+.cell-checklists-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.cell-page-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  padding-bottom: var(--space-sm);
+  border-bottom: 0.5px solid var(--border);
+}
+
+.cell-page-head-text {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.cell-page-head-text h3 {
+  margin: 0;
+  font-size: var(--fs-title);
+  color: var(--text);
+}
+
+.cell-page-doc-btn {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.cell-page-sub {
+  color: var(--text2);
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* Verlinktes Breadcrumb (Cell-Page → Parent-Matrix). Hover: unterstrichen. */
+.cell-page-sub-link {
+  text-decoration: none;
+  cursor: pointer;
+  transition: color var(--tr-std);
+}
+
+.cell-page-sub-link:hover,
+.cell-page-sub-link:focus-visible {
+  color: var(--text);
+  text-decoration: underline;
+  outline: none;
+}
+
+/* ── Cell-Info-Page ───────────────────────────────────────────── */
+.cell-info-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.info-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* Einzelnes Feld — Box mit Label-Kopf und Wert-Textarea. Analog
+   HTML-Vorbild .info-field (border-bottom zwischen Feldern statt
+   Card-Style). */
+.info-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border: 0.5px solid var(--border);
+  border-radius: var(--r);
+  background: var(--bg);
+  transition: border-color var(--tr-std), background var(--tr-std);
+}
+
+.info-field[data-edit='true'] {
+  background: var(--bg2);
+  border-color: var(--border2);
+}
+
+.info-field-hd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 24px;
+}
+
+/* Arrow-Stack: ▲ / ▼ als kleine Square-Buttons, immer im DOM, im
+   View-Mode transparent (zero layout shift). */
+.info-arrow-stack {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-right: var(--space-xs);
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.info-arrow {
+  padding: 0;
+  height: 11px;
+  width: 16px;
+  line-height: 1;
+  font-size: 9px;
+  background: transparent;
+  color: var(--text3);
+  border: 0.5px solid transparent;
+  border-radius: 2px;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: var(--tr-std);
+}
+
+.info-field[data-edit='true'] .info-arrow:not(:disabled) {
+  opacity: 0.65;
+  pointer-events: auto;
+}
+
+.info-field[data-edit='true'] .info-arrow:not(:disabled):hover,
+.info-arrow:not(:disabled):focus-visible {
+  opacity: 1;
+  color: var(--text);
+  background: var(--bg3);
+  border-color: var(--border2);
+}
+
+/* Label-Input: HTML-Vorbild rendert als "info-label" (Span mit Bold).
+   Wir nutzen dasselbe readOnly-Pattern wie die Matrix-Header: Input
+   immer da, nur Hintergrund/Border gelkich transparent im View. */
+.info-label-input {
+  flex: 1;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+/* Value: Textarea, im View transparent ohne Border. auto-resize via
+   CSS field-sizing (modern Browser) — Fallback auf fixe rows=3. */
+.info-val {
+  width: 100%;
+  min-height: 64px;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg);
+  color: var(--text);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  transition: background var(--tr-std), border-color var(--tr-std);
+  field-sizing: content;
+}
+
+.info-val:focus-visible {
+  border-color: var(--focus-color);
+  outline: none;
+}
+
+.info-val:read-only {
+  background: transparent;
+  border-color: transparent;
+  cursor: default;
+  resize: none;
+  padding: var(--space-xs) 0;
+}
+
+.info-val:read-only:empty::before,
+.info-val:read-only:placeholder-shown {
+  color: var(--text3);
+  font-style: italic;
+}
+
+.info-add-btn {
+  align-self: flex-start;
+  margin-top: var(--space-sm);
+}
+
+/* ── Links-Block auf der Info-Page ─────────────────────────────
+   Sektion unter den Info-Feldern. Title im klein/uppercase-Style wie
+   board-section-title. */
+.info-links-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: 0.5px solid var(--border);
+}
+
+.info-block-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0;
+}
+
+.info-link-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.info-link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--rs);
+  transition: background var(--tr-std);
+}
+
+.info-link[data-edit='true'] {
+  background: var(--bg2);
+}
+
+.info-link-hd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 24px;
+}
+
+/* View-Mode: Link als Anker (unterstrichen beim Hover), oeffnet in
+   neuem Tab. Edit-Mode: Input fuer das Label, darunter URL-Input.
+   Beide Varianten haben identische Hoehe fuer Zero-Layout-Shift. */
+.info-link-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+  text-decoration: none;
+  padding: 3px 6px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.info-link-label-anchor:hover,
+.info-link-label-anchor:focus-visible {
+  color: var(--blue);
+  text-decoration: underline;
+  outline: none;
+}
+
+.info-link-label-input {
+  flex: 1;
+  font-weight: 500;
+}
+
+.info-link-url-input {
+  margin-left: calc(16px + var(--space-xs));
+  font-size: 11px;
+  color: var(--text2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.info-add-link-btn {
+  align-self: flex-start;
+}
+
+/* ── Overlays / Modals (HTML-smodal-Vorbild) ──────────────────── */
 .overlay-scrim {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--overlay-soft);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 50;
-  padding: 1rem;
-  animation: overlayIn 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 300;
+  padding: var(--space-md);
+  animation: overlayIn var(--tr-enter);
 }
 
 @keyframes overlayIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .overlay-card {
-  background: var(--bg-elev);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--rl);
   max-width: 640px;
   width: 100%;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-lg);
+  animation: modalIn var(--tr-enter);
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: none; }
 }
 
 .overlay-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 0.5rem;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.overlay-title {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.overlay-title h2 {
-  margin: 0;
-  font-size: 1.05rem;
-}
-
-.overlay-close {
-  background: transparent;
-  color: var(--muted);
-  border: 0;
-  font-size: 1.1rem;
-  cursor: pointer;
-  padding: 0.1rem 0.4rem;
-  border-radius: 4px;
-}
-
-.overlay-close:hover {
-  color: var(--fg);
-  background: var(--bg-elev-2);
-}
-
-.overlay-body {
-  padding: 1rem 1.25rem;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.overlay-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  font-size: 0.75rem;
-}
-
-.overlay-section h4 {
-  margin: 0 0 0.4rem;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  font-weight: 600;
-}
-
-.overlay-note {
-  white-space: pre-wrap;
-  margin: 0;
-  color: var(--fg);
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-
-.overlay-cl {
-  gap: 0.3rem;
-}
-
-.overlay-source {
-  margin: 0;
-  font-size: 0.78rem;
-  color: var(--muted);
-  padding-top: 0.25rem;
-  border-top: 1px dashed var(--border);
-}
-
-/* ─── Sidebar-Actions ─── */
-.ws-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  padding: 0 0.25rem;
-}
-
-.btn-subtle {
-  padding: 0.45rem 0.65rem;
-  font-size: 0.85rem;
-  background: transparent;
-  color: var(--fg);
-  border: 1px dashed var(--border);
-  border-radius: 4px;
-  cursor: pointer;
-  text-align: left;
-  transition: border-color 180ms cubic-bezier(0.4, 0, 0.2, 1),
-    background 180ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.btn-subtle:hover {
-  border-color: var(--accent);
-  background: var(--bg-elev-2);
-}
-
-.btn-secondary {
-  background: transparent;
-  color: var(--fg);
-  border: 1px solid var(--border);
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: var(--bg-elev-2);
-  border-color: var(--muted);
-}
-
-/* ─── Import-Dialog ─── */
-.import-card {
-  max-width: 560px;
-}
-
-.import-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.import-file-label {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  font-size: 0.82rem;
-  color: var(--muted);
-}
-
-.import-file-label input[type='file'] {
-  color: var(--fg);
-  font-size: 0.85rem;
-}
-
-.import-or {
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-
-.import-textarea {
-  margin-top: 0.75rem;
-  width: 100%;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.8rem;
-  padding: 0.5rem;
-  background: var(--bg);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  resize: vertical;
-  outline: none;
-}
-
-.import-textarea:focus-visible {
-  border-color: var(--accent);
-}
-
-.import-stats {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 0.4rem;
-}
-
-.import-stats li {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: 0.35rem 0.55rem;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font-size: 0.85rem;
-}
-
-.import-stat-label {
-  color: var(--muted);
-}
-
-.import-stat-n {
-  font-weight: 600;
-  color: var(--fg);
-}
-
-.import-actions-bottom {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-}
-
-.import-progress {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.import-progress-label {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.85rem;
-  color: var(--muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
-
-.import-progress-bar {
-  height: 8px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.import-progress-fill {
-  height: 100%;
-  background: var(--accent);
-  transition: width 180ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* ─── Edit-Mode-Button im Workspace-Header ─── */
-.ws-main-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.edit-mode-btn {
-  padding: 0.35rem 0.85rem;
-  font-size: 0.85rem;
-  background: transparent;
-  color: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  cursor: pointer;
-  transition:
-    background 180ms cubic-bezier(0.4, 0, 0.2, 1),
-    color 180ms cubic-bezier(0.4, 0, 0.2, 1),
-    border-color 180ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.edit-mode-btn:hover {
-  background: var(--bg-elev-2);
-  color: var(--fg);
-}
-
-.edit-mode-btn.active {
-  background: var(--accent-soft);
-  color: var(--accent-hover);
-  border-color: var(--accent);
-}
-
-/* ─── Matrix Edit-Mode: Add-Cells + Inline-Rename + Delete-Btn ─── */
-body.edit-mode .matrix-grid {
-  position: relative;
-}
-
-.mx-toolbar {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 1rem;
-}
-
-.mx-toolbar button {
-  padding: 0.4rem 0.85rem;
-  font-size: 0.85rem;
-  border-radius: 4px;
-  border: 1px dashed var(--border);
-  background: transparent;
-  color: var(--fg);
-  cursor: pointer;
-  transition:
-    background 180ms cubic-bezier(0.4, 0, 0.2, 1),
-    border-color 180ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.mx-toolbar button:hover:not(:disabled) {
-  background: var(--bg-elev-2);
-  border-color: var(--accent);
-}
-
-.mx-col-head.mx-editable,
-.mx-row-head.mx-editable {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.35rem 0.5rem;
-}
-
-.mx-head-input {
-  flex: 1;
-  min-width: 0;
-  padding: 0.35rem 0.5rem;
-  background: var(--bg);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  font-size: 0.85rem;
-  outline: none;
-  transition: border-color 180ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.mx-head-input:focus-visible {
-  border-color: var(--accent);
-}
-
-.mx-del-btn {
-  flex-shrink: 0;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 0;
-  border-radius: 3px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 0.9rem;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    background 180ms cubic-bezier(0.4, 0, 0.2, 1),
-    color 180ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.mx-del-btn:hover:not(:disabled) {
-  background: var(--danger);
-  color: #fff;
-}
-
-.mx-add-col-cell,
-.mx-add-row-cell {
-  background: var(--bg-elev);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.35rem;
-}
-
-.mx-add-row-filler {
-  background: var(--bg-elev);
-}
-
-.mx-row-tail {
-  background: var(--bg-elev);
-}
-
-.mx-add-btn {
-  width: 100%;
-  height: 100%;
-  min-height: 28px;
-  padding: 0.25rem 0.5rem;
-  background: transparent;
-  color: var(--muted);
-  border: 1px dashed var(--border);
-  border-radius: 3px;
-  font-size: 1rem;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    background 180ms cubic-bezier(0.4, 0, 0.2, 1),
-    color 180ms cubic-bezier(0.4, 0, 0.2, 1),
-    border-color 180ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.mx-add-btn:hover:not(:disabled) {
-  background: var(--accent-soft);
-  color: var(--accent-hover);
-  border-color: var(--accent);
-}
-
-/* ─── Toast-System ─── */
-.toast-stack {
-  position: fixed;
-  bottom: 1.25rem;
-  right: 1.25rem;
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  max-width: min(420px, calc(100vw - 2.5rem));
-  pointer-events: none;
-}
-
-.toast {
-  pointer-events: auto;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.6rem 0.75rem 0.6rem 1rem;
-  background: var(--bg-elev);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-left-width: 3px;
-  border-radius: 5px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-  font-size: 0.9rem;
-  line-height: 1.35;
-  animation: toast-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.toast[data-kind='success'] {
-  border-left-color: var(--ok);
-}
-
-.toast[data-kind='error'] {
-  border-left-color: var(--danger);
-}
-
-.toast[data-kind='info'] {
-  border-left-color: var(--accent);
-}
-
-.toast-msg {
-  flex: 1;
-  min-width: 0;
-  word-wrap: break-word;
-}
-
-.toast-close {
-  flex-shrink: 0;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  font-size: 0.9rem;
-  line-height: 1;
-  cursor: pointer;
-  border-radius: 3px;
-  transition:
-    background 180ms cubic-bezier(0.4, 0, 0.2, 1),
-    color 180ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.toast-close:hover {
-  background: var(--bg-elev-2);
-  color: var(--fg);
-}
-
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .toast {
-    animation: none;
-  }
-  .edit-mode-btn,
-  .mx-toolbar button,
-  .mx-del-btn,
-  .mx-add-btn,
-  .toast-close {
-    transition: none;
-  }
-}
-
-/* ─── Cell-Overlay (0e.1.b) ─── */
-.cell-overlay {
-  width: min(480px, calc(100vw - 2rem));
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 0.5px solid var(--border);
 }
 
 .overlay-head-text {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 2px;
+}
+
+.overlay-head-text h2 {
+  margin: 0;
+  font-size: var(--fs-title);
 }
 
 .overlay-sub {
-  color: var(--muted);
-  font-size: 0.8rem;
+  color: var(--text2);
+  font-size: 12px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.overlay-close {
+  background: transparent;
+  color: var(--text2);
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--rs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.overlay-close:hover {
+  color: var(--text);
+  background: var(--bg2);
+}
+
+.overlay-body {
+  padding: var(--space-md) var(--space-lg);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* Card/Cell-Overlay spezifisch */
+.card-overlay {
+  width: min(720px, calc(100vw - 2rem));
+}
+
+.cell-overlay {
+  width: min(480px, calc(100vw - 2rem));
 }
 
 .cell-alias-label {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  color: var(--muted);
-  font-size: 0.78rem;
+  gap: var(--space-xs);
+  color: var(--text2);
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  margin-bottom: 0.75rem;
 }
 
 .cell-alias-label input {
-  padding: 0.55rem 0.75rem;
-  background: var(--bg);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font-size: 0.95rem;
+  padding: 6px 10px;
+  font-size: 14px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: var(--bg);
+  color: var(--text);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--r);
+  letter-spacing: normal;
   text-transform: none;
-  letter-spacing: 0;
-  outline: none;
-  transition: border-color 180ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .cell-alias-label input:focus-visible {
-  border-color: var(--accent);
+  border-color: var(--focus-color);
 }
 
 .cell-feat-row {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: var(--space-sm);
 }
 
 .cell-feat-btn {
-  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-  padding: 0.75rem 0.5rem 0.6rem;
-  background: var(--bg);
-  color: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: 5px;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  background: var(--bg2);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--r);
+  color: var(--text2);
   cursor: pointer;
-  transition:
-    background 180ms cubic-bezier(0.4, 0, 0.2, 1),
-    color 180ms cubic-bezier(0.4, 0, 0.2, 1),
-    border-color 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: var(--tr-std);
 }
 
 .cell-feat-btn:hover:not(:disabled) {
-  background: var(--bg-elev-2);
-  color: var(--fg);
-}
-
-.cell-feat-btn.active {
-  color: var(--fg);
-  border-color: currentColor;
+  background: var(--bg);
+  border-color: var(--text2);
 }
 
 .cell-feat-btn.active[data-feat='matrix'] {
-  color: var(--feat-matrix);
-  background: color-mix(in srgb, var(--feat-matrix) 12%, transparent);
+  background: var(--bluebg);
+  color: var(--bluetxt);
+  border-color: var(--blue);
 }
 
 .cell-feat-btn.active[data-feat='board'] {
-  color: var(--feat-board);
-  background: color-mix(in srgb, var(--feat-board) 12%, transparent);
+  background: var(--tealbg);
+  color: var(--tealtxt);
+  border-color: var(--teal);
 }
 
 .cell-feat-btn.active[data-feat='info'] {
-  color: var(--feat-info);
-  background: color-mix(in srgb, var(--feat-info) 12%, transparent);
+  background: var(--amberbg);
+  color: var(--ambertxt);
+  border-color: var(--amber);
 }
 
 .cell-feat-btn.active[data-feat='checklists'] {
-  color: var(--feat-checklists);
-  background: color-mix(in srgb, var(--feat-checklists) 12%, transparent);
+  background: var(--purplebg);
+  color: var(--purpletxt);
+  border-color: var(--purple);
 }
 
 .cell-feat-btn.busy {
   opacity: 0.6;
-  cursor: wait;
-}
-
-.cell-feat-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
 }
 
 .cell-feat-hotkey {
-  position: absolute;
-  top: 4px;
-  right: 6px;
-  font-size: 0.7rem;
-  color: var(--muted);
+  font-size: 10px;
+  color: var(--text3);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .cell-feat-ico {
-  font-size: 1.4rem;
+  font-size: 20px;
   line-height: 1;
 }
 
 .cell-feat-label {
-  font-size: 0.8rem;
+  font-size: 11px;
+  font-weight: 500;
 }
 
 .cell-open-btn {
-  width: 100%;
-  padding: 0.65rem 1rem;
-  margin-bottom: 0.75rem;
-  background: var(--accent-soft);
-  color: var(--accent-hover);
-  border: 1px solid var(--accent);
-  border-radius: 5px;
-  font-size: 0.9rem;
+  padding: var(--space-sm);
+  background: var(--bluebg);
+  color: var(--bluetxt);
+  border: 0.5px solid var(--blue);
+  border-radius: var(--r);
+  font-size: 13px;
   cursor: pointer;
-  transition: background 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: var(--tr-std);
 }
 
 .cell-open-btn:hover {
-  background: color-mix(in srgb, var(--accent-soft) 100%, var(--accent) 15%);
+  background: var(--blue);
+  color: var(--bg);
 }
 
 .cell-overlay-footer {
   display: flex;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+  padding-top: var(--space-sm);
+  border-top: 0.5px solid var(--border);
+}
+
+/* Card-Overlay-Sections */
+.overlay-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.overlay-section h4 {
+  margin: 0 0 var(--space-xs);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text2);
+  font-weight: 500;
+}
+
+/* ── Overlay-Field-Layout ───────────────────────────────────────
+   Meta-Zeile (Alias/Deadline/Prio/Farbe) + Tag-Zeile (Tags/Wer)
+   nutzen dasselbe Field-Muster: Label darueber (kleiner Caption-
+   Stil), Input darunter. Im Grid stehen sie nebeneinander. */
+.overlay-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.overlay-field-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text3);
+  font-weight: 600;
+}
+
+.overlay-input {
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 13px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border2);
+  border-radius: var(--rs);
+  font-family: inherit;
+  box-sizing: border-box;
+  transition: border-color var(--tr-std), box-shadow var(--tr-std);
+}
+
+.overlay-input:focus-visible {
+  border-color: var(--focus-color);
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-color) 20%, transparent);
+}
+
+.overlay-input::placeholder {
+  color: var(--text3);
+}
+
+/* Meta-Zeile: Alias, Deadline, Prioritaet, Farbe — 4 Spalten gleich-
+   breit auf Desktop, 2 auf Tablet, 1 auf Mobile. */
+.overlay-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-md);
+}
+
+@media (max-width: 900px) {
+  .overlay-edit-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .overlay-edit-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Deadline-Warnung neben dem Date-Input — klein, farbig je State. */
+.overlay-deadline-warning {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  align-self: flex-start;
+}
+
+.overlay-deadline-warning[data-deadline-state='overdue'] {
+  background: var(--redbg);
+  color: var(--red);
+}
+
+.overlay-deadline-warning[data-deadline-state='today'] {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+}
+
+.overlay-deadline-warning[data-deadline-state='soon'] {
+  background: var(--bg2);
+  color: var(--text2);
+}
+
+.overlay-section input[type='text'],
+.overlay-section input[type='date'],
+.overlay-section input[type='number'],
+.overlay-section select,
+.overlay-section textarea {
+  padding: 7px 10px;
+  font-size: 13px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border2);
+  border-radius: var(--rs);
+  font-family: inherit;
+  transition: border-color var(--tr-std), box-shadow var(--tr-std);
+}
+
+.overlay-section input:focus-visible,
+.overlay-section select:focus-visible,
+.overlay-section textarea:focus-visible {
+  border-color: var(--focus-color);
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-color) 20%, transparent);
+}
+
+.overlay-section textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.overlay-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+/* Overlay-Footer: Action-Buttons in der letzten Zeile. Archivieren
+   links, Loeschen ganz rechts — Zerstoeren-Pfad haengt hinten. */
+.overlay-edit-footer {
+  display: flex;
   justify-content: space-between;
-  gap: 0.5rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--border);
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
 }
 
-.btn-danger {
-  padding: 0.5rem 0.9rem;
+.overlay-color-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.overlay-color-input {
+  width: 32px;
+  height: 28px;
+  padding: 0;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--r);
   background: transparent;
-  color: var(--danger);
-  border: 1px solid var(--danger);
-  border-radius: 4px;
-  font-size: 0.85rem;
   cursor: pointer;
-  transition:
-    background 180ms cubic-bezier(0.4, 0, 0.2, 1),
-    color 180ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.btn-danger:hover:not(:disabled) {
-  background: var(--danger);
-  color: #fff;
+.overlay-color-clear {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: opacity var(--tr-std);
 }
 
-.btn-danger:disabled {
+.overlay-color-clear:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.overlay-color-clear:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* Keyboard-Help */
+.kb-help-card {
+  max-width: 640px;
+}
+
+.kb-help-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.kb-help-section h4 {
+  margin: 0 0 var(--space-sm);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text3);
+}
+
+.kb-help-list {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) 1fr;
+  gap: 6px var(--space-md);
+  margin: 0;
+}
+
+.kb-help-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.kb-help-keys kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  background: var(--bg2);
+  border: 0.5px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: var(--rs);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--text);
+}
+
+.kb-help-sep {
+  color: var(--text3);
+  font-size: 11px;
+}
+
+.kb-help-desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+  align-self: center;
+}
+
+/* ── Generisches Dialog-System (showConfirm/Choice/Prompt) ─────── */
+.dialog-card {
+  max-width: 480px;
+}
+
+.dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.dialog-message {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.dialog-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 var(--space-sm);
+  font-size: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  color: var(--text);
+  transition: border-color var(--tr-std), box-shadow var(--tr-std);
+}
+
+.dialog-input:focus-visible {
+  border-color: var(--focus-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-color) 18%, transparent);
+  outline: none;
+}
+
+.dialog-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+.dialog-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  width: 100%;
+  justify-content: flex-end;
+}
+
+@media (max-width: 520px) {
+  .dialog-choices {
+    flex-direction: column-reverse;
+  }
+  .dialog-choices .btn-c,
+  .dialog-choices .btn-danger,
+  .dialog-choices .btn-subtle {
+    width: 100%;
+  }
+}
+
+/* ── Progress-Overlay (Import / Bulk-Ops) ───────────────────────
+   Scrim blockiert Pointer-Events und macht die Oberflaeche grau,
+   zentrierte Karte zeigt Titel + aktuelle Phase + Progress-Bar.
+   z-index ueber Dialog (9500), damit das Overlay auch ueber einem
+   geschlossenen Dialog-Residual erscheint. */
+.progress-scrim {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg) 60%, transparent);
+  backdrop-filter: grayscale(0.4) blur(1px);
+  -webkit-backdrop-filter: grayscale(0.4) blur(1px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9500;
+  /* Keine Events durchlassen — UI ist waehrend Import un-klickbar. */
+  pointer-events: all;
+}
+
+.progress-card {
+  min-width: 320px;
+  max-width: 420px;
+  padding: var(--space-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--rl);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  font-size: 14px;
+}
+
+.progress-title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.progress-phase {
+  color: var(--text2);
+  font-size: 13px;
+}
+
+.progress-bar {
+  height: 8px;
+  background: var(--bg2);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--blue);
+  border-radius: 999px;
+  transition: width 180ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.progress-meta {
+  font-size: 12px;
+  color: var(--text3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Settings-Modal ────────────────────────────────────────────── */
+.settings-card {
+  max-width: 620px;
+}
+
+.settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.settings-hint {
+  margin: 0;
+  font-size: 12px;
+}
+
+.settings-hint kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  background: var(--bg2);
+  border: 0.5px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: var(--rs);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--text);
+}
+
+.settings-group h4 {
+  margin: 0 0 var(--space-sm);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text3);
+}
+
+.settings-list {
+  display: grid;
+  grid-template-columns: 1fr minmax(160px, auto);
+  gap: 6px var(--space-md);
+  margin: 0;
+  align-items: center;
+}
+
+.settings-label {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.settings-label label {
+  cursor: pointer;
+}
+
+.settings-control {
+  margin: 0;
+}
+
+.settings-select {
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--space-sm);
+  font-size: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color var(--tr-std), box-shadow var(--tr-std);
+}
+
+.settings-select:hover {
+  border-color: var(--border2);
+}
+
+.settings-select:focus-visible {
+  border-color: var(--focus-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-color) 18%, transparent);
+  outline: none;
+}
+
+/* Generischer Overlay-Footer — auch fuer zukuenftige Modals nutzbar.
+   Rechtsbuendige Action-Buttons mit dezent abgesetzter Trennlinie. */
+.overlay-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
+}
+
+.settings-foot .btn-subtle {
+  color: var(--text2);
+}
+
+@media (max-width: 600px) {
+  .settings-list {
+    grid-template-columns: 1fr;
+  }
+  .settings-control {
+    margin-bottom: var(--space-xs);
+  }
+}
+
+/* Tag/Who-Editor: zwei gleichbreite Spalten auf Desktop, eine auf
+   schmalen Screens. Jedes Feld hat Input + Chip-Preview darunter. */
+.overlay-tag-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+
+@media (max-width: 600px) {
+  .overlay-tag-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Card-Overlay: Done-Toggle im Header ────────────────────────
+   Checkbox direkt links vom Titel, damit der User die primaere Aktion
+   ohne Scroll erreicht. Label ist reine Klick-Flaeche (visuell +
+   Touchtarget >= 32px). Ist die Karte erledigt, wird unter der Box
+   ein amber-haken sichtbar. */
+.card-overlay-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.card-overlay-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 6px;
+  margin: -6px 0;
+  cursor: pointer;
+  border-radius: var(--rs);
+  transition: background var(--tr-std);
+}
+
+.card-overlay-done:hover {
+  background: var(--bg2);
+}
+
+.card-overlay-done input {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--amber);
+}
+
+.card-overlay-title {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Card-Overlay: Recur-Block ──────────────────────────────────
+   Header mit Titel + aktueller Summary-Zeile. Rest unter dem Header
+   klappt je nach Typ: Type-Row (3 Felder), dann Weekly/Monthly/Yearly
+   spezifisch, dann End-Regel, dann Occurrences-Verlauf. */
+.card-recur {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.card-recur-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.card-recur-head h4 {
+  margin: 0;
+}
+
+.card-recur-summary {
+  font-size: 12px;
+  color: var(--text2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  padding: 2px 8px;
+  background: var(--amberbg);
+  color: var(--ambertxt);
+  border-radius: var(--rs);
+}
+
+.card-recur-end-hint {
+  opacity: 0.8;
+}
+
+.card-recur-type-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-md);
+}
+
+@media (max-width: 600px) {
+  .card-recur-type-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card-recur-every-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.card-recur-every {
+  width: 80px;
+  flex: 0 0 auto;
+}
+
+.card-recur-every-unit {
+  font-size: 13px;
+  color: var(--text2);
+}
+
+/* Generischer Block innerhalb der Recur-Sektion — Weekly-Grid, Monthly-
+   Choices, Yearly-Choices, End-Regel, Occurrences. Label links als
+   kleines Hint, Content darunter. */
+.card-recur-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-sm);
+  background: var(--bg2);
+  border-radius: var(--rs);
+  border: 0.5px solid var(--border);
+}
+
+.card-recur-block-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text3);
+  font-weight: 600;
+}
+
+.card-recur-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--ambertxt);
+}
+
+/* Weekly: 7 Toggle-Buttons in einer Reihe. Aktive Tage bekommen Amber-
+   Hintergrund (Feature-Farbe fuer Board/Cards). Inaktive sind
+   transparent mit Border. */
+.card-recur-weekday-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.card-recur-weekday {
+  padding: 8px 0;
+  font-size: 12px;
+  font-weight: 600;
+  background: transparent;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  color: var(--text2);
+  cursor: pointer;
+  transition: background var(--tr-std), color var(--tr-std), border-color var(--tr-std);
+}
+
+.card-recur-weekday:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.card-recur-weekday-on,
+.card-recur-weekday-on:hover {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+  border-color: var(--amber);
+}
+
+/* Monthly/Yearly: 2 Radio-Zeilen (day-Variante vs. weekday-Variante),
+   inline mit Input-/Select-Feldern zwischen den Span-Labels. */
+.card-recur-month-choices,
+.card-recur-end-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.card-recur-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.card-recur-radio input[type='radio'] {
+  accent-color: var(--amber);
+}
+
+.card-recur-radio input:disabled,
+.card-recur-radio select:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-/* Zell-Hover im Edit-Mode, damit User sieht "klickbar" */
-.mx-cell-editable {
+.card-recur-inline-num {
+  width: 70px;
+  flex: 0 0 auto;
+  padding: 2px 4px !important;
+  font-size: 13px !important;
+}
+
+.card-recur-inline-select {
+  flex: 0 0 auto;
+  padding: 2px 4px !important;
+  font-size: 13px !important;
+}
+
+.card-recur-inline-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* Erledigt-Verlauf: Zaehler + letztes Datum + Clear-Button. Kompakt,
+   damit der Block nicht ueberfaellt wenn viele Occurrences existieren. */
+.card-recur-occ-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.card-recur-occ-count {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.card-recur-occ-clear {
+  margin-left: auto;
+  font-size: 12px;
+}
+
+.overlay-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
+/* Shake-Animation bei Fehler */
+@keyframes flashError {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  50% { transform: translateX(6px); }
+  75% { transform: translateX(-3px); }
+}
+
+.flash-error {
+  animation: flashError 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border-color: var(--red) !important;
+}
+
+/* ── Toasts ──────────────────────────────────────────────────── */
+#toast-stack,
+.toast-stack {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  pointer-events: none;
+  max-width: min(420px, calc(100vw - 36px));
+}
+
+.toast {
+  pointer-events: auto;
+  background: var(--bg);
+  color: var(--text);
+  border: 0.5px solid var(--border2);
+  border-left: 3px solid var(--text3);
+  border-radius: var(--r);
+  padding: 10px 14px 10px 12px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  animation: toastIn var(--tr-enter);
+  max-width: 100%;
+  word-wrap: break-word;
+}
+
+.toast.error,
+.toast-error { border-left-color: var(--red); }
+.toast.success,
+.toast-success { border-left-color: var(--teal); }
+.toast.warning,
+.toast-warning { border-left-color: var(--amber); }
+.toast.info,
+.toast-info { border-left-color: var(--blue); }
+
+.toast-icon {
+  flex-shrink: 0;
+  font-size: 13px;
+}
+
+.toast-icon.error { color: var(--red); }
+.toast-icon.success { color: var(--teal); }
+.toast-icon.warning { color: var(--amber); }
+.toast-icon.info { color: var(--blue); }
+
+.toast-text {
+  flex: 1;
+}
+
+.toast-close {
+  background: transparent;
+  border: 0;
+  color: var(--text3);
+  padding: 0 4px;
+  font-size: 12px;
   cursor: pointer;
+  line-height: 1;
 }
 
-body.edit-mode .mx-cell:hover {
-  background: var(--bg-elev-2);
+.toast-close:hover {
+  color: var(--text);
 }
 
-body.edit-mode .mx-cell-empty:hover {
-  background: color-mix(in srgb, var(--bg-elev-2) 50%, transparent);
-  outline: 1px dashed var(--border);
-  outline-offset: -2px;
+.toast-action {
+  background: var(--bluebg);
+  border: 0.5px solid var(--blue);
+  color: var(--bluetxt);
+  cursor: pointer;
+  padding: 3px 9px;
+  font-size: 11px;
+  border-radius: var(--r);
 }
 
-/* ─── Error-Shake (lib/flash.ts) ─── */
-.input-error {
-  animation: shake-input 400ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
-  border-color: var(--danger) !important;
-  background: color-mix(in srgb, var(--danger) 10%, transparent) !important;
+.toast-action:hover {
+  background: var(--blue);
+  color: var(--bg);
 }
 
-@keyframes shake-input {
-  0%,
-  100% {
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(16px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ── Import-Dialog ───────────────────────────────────────────── */
+.import-dialog {
+  width: min(560px, calc(100vw - 2rem));
+}
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .ws-shell {
+    grid-template-columns: 1fr;
+  }
+  .ws-sidebar {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform var(--tr-std);
+  }
+  .ws-sidebar.open {
     transform: translateX(0);
   }
-  15% {
-    transform: translateX(-5px);
+  .ws-main {
+    padding: var(--space-md);
   }
-  30%,
-  60% {
-    transform: translateX(4px);
+}
+
+@media (max-width: 480px) {
+  .ico-btn {
+    min-width: 44px;
+    min-height: 44px;
   }
-  45%,
-  75% {
-    transform: translateX(-3px);
+  .btn,
+  .btn-subtle {
+    min-height: 36px;
   }
-  90% {
-    transform: translateX(1px);
+  /* Checklisten-spezifische Icon-Buttons (History-Del, Close-Action,
+     Item-Del). WCAG-Tap-Target im Mobile-Viewport. */
+  .cl-action-btn,
+  .cl-history-del,
+  .cl-it-del {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .cl-close-mode,
+  .cl-recur-select {
+    min-height: 36px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .input-error {
-    animation: none;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
-/* Chip mit Navigate-Ziel: cursor + leichter Hover-Effekt */
-.mx-feat-chip-link {
+/* ── Matrix-Aggregat-Sektion (Intervallmatrix / Aufgabenuebersicht) ── */
+/* Sektion unter einer Matrix, die Karten aus dem Subtree aggregiert.
+   Tab-Bar oben, Content darunter. Portiert aus dem HTML-Vorbild
+   renderTaskOverview + renderFrequencyMatrix. */
+.matrix-aggregate {
+  margin-top: var(--space-lg);
+  border-top: 0.5px solid var(--border2);
+  padding-top: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.matrix-aggregate-head {
+  display: flex;
+  align-items: center;
+}
+
+.matrix-aggregate-tabs {
+  display: flex;
+  gap: 2px;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  padding: 2px;
+  background: var(--bg2);
+}
+
+.matrix-aggregate-tab {
+  padding: 4px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text2);
   cursor: pointer;
-  transition:
-    transform 160ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  font-size: 12px;
+  border-radius: var(--rs);
+  transition: background var(--tr-std), color var(--tr-std);
 }
 
-.mx-feat-chip-link:hover {
-  transform: scale(1.08);
-  box-shadow: 0 0 0 1px currentColor;
+.matrix-aggregate-tab:hover {
+  color: var(--text);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .mx-feat-chip-link {
-    transition: none;
-  }
-  .mx-feat-chip-link:hover {
-    transform: none;
-  }
+.matrix-aggregate-tab.active {
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.freq-empty {
+  color: var(--text3);
+  font-size: 12px;
+  padding: var(--space-md);
+  text-align: center;
+}
+
+.freq-scroll-wrap {
+  overflow-x: auto;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  background: var(--bg);
+}
+
+.freq-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.freq-hd {
+  text-align: center;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg2);
+  color: var(--text2);
+  font-weight: 500;
+  font-size: 11px;
+  border-bottom: 0.5px solid var(--border2);
+  border-left: 0.5px solid var(--border2);
+  white-space: nowrap;
+}
+
+.freq-hd-corner {
+  text-align: left;
+  border-left: none;
+}
+
+.freq-row-hd {
+  text-align: left;
+  padding: 6px var(--space-sm);
+  background: transparent;
+  color: var(--text);
+  font-weight: 400;
+  border-bottom: 0.5px solid var(--border2);
+  cursor: pointer;
+  min-width: 180px;
+  transition: background var(--tr-std);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.freq-row-hd:hover,
+.freq-row-hd:focus-visible {
+  background: var(--bg2);
+}
+
+.freq-chevron {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: transform var(--tr-std);
+  transform-origin: center;
+}
+
+.freq-chevron.expanded {
+  transform: rotate(90deg);
+  color: var(--text);
+}
+
+.freq-chevron-spacer {
+  display: inline-block;
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.freq-row-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.freq-cell {
+  text-align: center;
+  padding: 6px var(--space-sm);
+  border-left: 0.5px solid var(--border2);
+  border-bottom: 0.5px solid var(--border2);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.freq-cell-empty {
+  color: var(--text3);
+  font-weight: 400;
+}
+
+.freq-cell-clickable {
+  cursor: pointer;
+  transition: background var(--tr-std);
+}
+
+.freq-cell-clickable:hover,
+.freq-cell-clickable:focus-visible {
+  background: var(--bluebg);
+  color: var(--bluetxt);
+}
+
+/* Flyout mit Karten-Liste beim Klick auf eine Freq-Cell. */
+.freq-flyout-scrim {
+  align-items: flex-start;
+  padding-top: 15vh;
+}
+
+.freq-flyout-card {
+  max-width: 480px;
+  width: 92vw;
+}
+
+.freq-flyout-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.freq-flyout-item {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  border: none;
+  border-bottom: 0.5px solid var(--border2);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  transition: background var(--tr-std);
+}
+
+.freq-flyout-item:hover,
+.freq-flyout-item:focus-visible {
+  background: var(--bg2);
+}
+
+.freq-flyout-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.freq-flyout-meta {
+  color: var(--text3);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.alias-tag {
+  color: var(--text3);
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  flex-shrink: 0;
+}
+
+/* ── Aufgabenuebersicht (TaskOverview — daily-cols) ─────────────── */
+.daily-cols {
+  display: flex;
+  gap: var(--space-sm);
+  overflow-x: auto;
+  padding-bottom: var(--space-xs);
+}
+
+.daily-col {
+  flex: 0 0 260px;
+  max-width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  background: var(--bg2);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  padding: var(--space-sm);
+}
+
+.daily-col-hd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding-bottom: var(--space-xs);
+  border-bottom: 0.5px solid var(--border2);
+}
+
+.daily-col-hd .flex-fill {
+  flex: 1;
+  min-width: 0;
+}
+
+.dcolh-name-span {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dcolh-type {
+  font-size: 10px;
+  color: var(--text3);
+}
+
+.dcolh-count {
+  background: var(--bg);
+  color: var(--text2);
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+/* Edit-Mode: Header stapelt vertikal, damit Rename-Input + Type-Select +
+   Reorder/Delete-Buttons alle erreichbar sind (Spalten sind schmal).
+   Count-Badge landet am Ende der Column-Header. */
+.daily-col-hd-edit {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.dcolh-name-input {
+  width: 100%;
+  padding: 4px 6px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--bg);
+  color: var(--text);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.dcolh-name-input:focus-visible {
+  border-color: var(--focus-color);
+  outline: none;
+}
+
+.dcolh-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dcolh-type-select {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  font-size: 11px;
+  background: var(--bg);
+  color: var(--text);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+}
+
+.dcolh-move,
+.dcolh-del {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  color: var(--text2);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.dcolh-move:hover:not(:disabled),
+.dcolh-del:hover:not(:disabled) {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.dcolh-move:disabled,
+.dcolh-del:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.dcolh-del:hover:not(:disabled) {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.dcolh-count-edit {
+  align-self: flex-end;
+}
+
+/* Wrap haelt Add- + Reset-Button beieinander und nimmt die gleiche
+   Slot-Breite wie eine normale Daily-Col ein (200px), damit das Grid
+   nicht aus dem Tritt geraet. */
+.daily-col-add-wrap {
+  flex: 0 0 200px;
+  display: flex;
+  gap: var(--space-xs);
+  align-self: stretch;
+}
+
+/* "+ Spalte"-Button als eigene Column-Shape. Fuellt den Slot bis auf
+   den Reset-Knopf-Rest, Dashed-Border signalisiert den Add-Slot. */
+.daily-col-add {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  background: transparent;
+  border: 1px dashed var(--border2);
+  border-radius: var(--rs);
+  color: var(--text3);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background var(--tr-std), border-color var(--tr-std), color var(--tr-std);
+}
+
+.daily-col-add:hover {
+  background: var(--bg2);
+  border-color: var(--text3);
+  color: var(--text2);
+}
+
+/* Reset-Button daneben — schmal, gleiche Hoehe, dezenter. Icon-only. */
+.daily-col-reset {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  padding: 0;
+  background: transparent;
+  border: 1px dashed var(--border2);
+  border-radius: var(--rs);
+  color: var(--text3);
+  cursor: pointer;
+  transition: background var(--tr-std), border-color var(--tr-std), color var(--tr-std);
+}
+
+.daily-col-reset:hover {
+  background: var(--bg2);
+  border-color: var(--text3);
+  color: var(--text2);
+}
+
+.daily-empty {
+  color: var(--text3);
+  font-size: 11px;
+  text-align: center;
+  padding: var(--space-sm);
+}
+
+.daily-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  padding: var(--space-xs);
+  background: var(--bg);
+  border: 0.5px solid var(--border2);
+  border-left: 3px solid transparent;
+  border-radius: var(--rs);
+  transition: background var(--tr-std), box-shadow var(--tr-std);
+}
+
+.daily-item:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.daily-item[data-prio='3'] { border-left-color: var(--red); }
+.daily-item[data-prio='2'] { border-left-color: var(--amber); }
+.daily-item[data-prio='1'] { border-left-color: var(--teal); }
+.daily-item[data-overdue='true'] { background: var(--redbg); }
+
+.task-check {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0.5px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg);
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 1px;
+  transition: background var(--tr-std), border-color var(--tr-std);
+}
+
+.task-check:hover {
+  background: var(--tealbg);
+  border-color: var(--teal);
+}
+
+.di-name-wrap {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.di-name {
+  font-size: 12px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.di-name[data-overdue='true'] {
+  color: var(--red);
+  font-weight: 500;
+}
+
+.di-from {
+  font-size: 10px;
+  color: var(--text3);
+}
+
+.di-overdue-text {
+  color: var(--red);
+  font-weight: 500;
+}
+
+.di-recur-badge {
+  color: var(--text3);
+}
+
+/* ── Alias-Autocomplete Popup ───────────────────────────────────────
+   Singleton-Dropdown, position:fixed via JS. Bei Typen von `^token`
+   in einem Input/Textarea zeigt sich die Liste passender Aliases.
+*/
+.alias-ac-popup {
+  min-width: 180px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--bg2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-xs) 0;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+}
+
+.alias-ac-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: var(--space-sm);
+  padding: 4px var(--space-sm);
+  cursor: pointer;
+  user-select: none;
+}
+
+.alias-ac-item.active,
+.alias-ac-item:hover {
+  background: var(--bluebg);
+  color: var(--bluetxt);
+}
+
+.alias-ac-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 600;
+  color: var(--amber);
+}
+
+.alias-ac-item.active .alias-ac-name,
+.alias-ac-item:hover .alias-ac-name {
+  color: var(--amber);
+}
+
+.alias-ac-label {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alias-ac-kind {
+  font-size: 10px;
+  color: var(--text3);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* ── Alias-Chip ────────────────────────────────────────────────────
+   Inline-`^alias`-Marker in gerendertem Text (MarkdownLightView,
+   AliasText). Click = dispatch, Rechtsklick/+ = Context-Menu.
+*/
+.alias-chip {
+  display: inline;
+  color: var(--amber);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 0 1px;
+  transition: background var(--tr-std);
+}
+
+.alias-chip:hover,
+.alias-chip:focus-visible {
+  background: var(--amberbg, rgba(240, 160, 40, 0.15));
+  outline: none;
+  text-decoration: underline;
+}
+
+/* ── Checkliste: View-Mode Item-Text ──────────────────────────────
+   Muss optisch nah am cl-text-input:read-only bleiben, damit der
+   Mode-Toggle nicht springt.
+*/
+.cl-text-view {
+  flex: 1;
+  padding: 2px 6px;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.4;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.cl-text-placeholder {
+  color: var(--text3);
+  font-style: italic;
+}
+
+.cl-it-done .cl-text-view {
+  text-decoration: line-through;
+  color: var(--text3);
+}
+
+/* ── Checklist-Paste-Popup ─────────────────────────────────────────
+   Modal mit Textarea + Live-Vorschau. Wird aus ChecklistPanel
+   getriggert, wenn mehrzeiliger Text in einen Item-Input gepasted wird.
+*/
+.cl-paste-card {
+  max-width: 560px;
+  width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+}
+
+.cl-paste-breadcrumb {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text3);
+}
+
+.cl-paste-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.cl-paste-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text2);
+}
+
+.cl-paste-ta {
+  width: 100%;
+  min-height: 120px;
+  padding: var(--space-sm);
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.cl-paste-prev-label {
+  font-size: 12px;
+  color: var(--text2);
+  margin-top: var(--space-xs);
+}
+
+.cl-paste-prev {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--bg2);
+  padding: var(--space-xs) 0;
+}
+
+.cl-paste-empty {
+  padding: var(--space-sm);
+  color: var(--text3);
+  font-size: 12px;
+  font-style: italic;
+  text-align: center;
+}
+
+.cl-paste-item {
+  display: flex;
+  gap: var(--space-xs);
+  padding: 2px var(--space-sm);
+  padding-left: calc(var(--space-sm) + var(--space-md) * var(--cl-level, 0));
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.cl-paste-bullet {
+  color: var(--text3);
+  flex-shrink: 0;
+}
+
+.cl-paste-text {
+  color: var(--text);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.cl-paste-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 0.5px solid var(--border);
+}
+
+/* ── Checkliste: Actions-Zeile (Add, Snapshot) ───────────────────── */
+.cl-actions {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  padding: var(--space-xs) 13px;
+  flex-wrap: wrap;
+}
+
+.cl-snapshot-btn {
+  font-size: 12px;
+  margin-left: auto;
+}
+
+/* ── Checkliste: Historie-Sektion ────────────────────────────────── */
+.cl-history {
+  border-top: 0.5px solid var(--border);
+  padding: 0;
+}
+
+.cl-history-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  width: 100%;
+  padding: 6px 13px;
+  background: transparent;
+  border: none;
+  color: var(--text2);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cl-history-toggle:hover {
+  background: var(--bg2);
+}
+
+.cl-history-chev {
+  display: inline-block;
+  transition: transform var(--tr-std);
+  color: var(--text3);
+}
+
+.cl-history-chev.expanded {
+  transform: rotate(90deg);
+}
+
+.cl-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 var(--space-xs);
+  background: var(--bg2);
+}
+
+.cl-history-entry {
+  border-top: 0.5px solid var(--border);
+}
+
+.cl-history-details {
+  /* native <details>-Element */
+}
+
+.cl-history-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 5px 13px;
+  cursor: pointer;
+  font-size: 12px;
+  list-style: none;
+}
+
+.cl-history-summary::-webkit-details-marker {
+  display: none;
+}
+
+.cl-history-summary::marker {
+  content: '';
+}
+
+.cl-history-summary:hover {
+  background: var(--bg);
+}
+
+.cl-history-time {
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+
+.cl-history-count {
+  color: var(--text3);
+  font-size: 11px;
+  margin-left: auto;
+}
+
+.cl-history-del {
+  background: transparent;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.cl-history-del:hover {
+  color: var(--red);
+}
+
+.cl-history-items {
+  list-style: none;
+  margin: 0;
+  padding: 0 13px var(--space-xs);
+  background: var(--bg);
+}
+
+.cl-history-item {
+  display: flex;
+  gap: var(--space-xs);
+  padding: 2px 0;
+  padding-left: calc(var(--space-md) * var(--cl-level, 0));
+  font-size: 11px;
+}
+
+.cl-history-item.done .cl-history-text {
+  text-decoration: line-through;
+  color: var(--text3);
+}
+
+.cl-history-check {
+  color: var(--text3);
+  flex-shrink: 0;
+  font-family: ui-monospace, monospace;
+}
+
+.cl-history-text {
+  color: var(--text2);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* ── Transform-to-Card-Popup ──────────────────────────────────── */
+.cl2c-card {
+  max-width: 480px;
+  width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+}
+
+.cl2c-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.cl2c-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text3);
+  line-height: 1.4;
+}
+
+.cl2c-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cl2c-field-label {
+  font-size: 12px;
+  color: var(--text2);
+}
+
+.cl2c-input,
+.cl2c-select {
+  padding: var(--space-xs) var(--space-sm);
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.cl2c-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 0.5px solid var(--border);
+}
+
+.cl-to-card-btn,
+.cl-snapshot-btn {
+  font-size: 12px;
+}
+
+/* closeMode-Select im Checkliste-Header (Edit-Mode). Klein + unauffaellig. */
+.cl-recur-select,
+.cl-close-mode {
+  padding: 2px 6px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--bg);
+  color: var(--text2);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.cl-recur-select:hover,
+.cl-close-mode:hover {
+  border-color: var(--focus-color);
+}
+
+.cl-action-btn {
+  background: transparent;
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  color: var(--text2);
+  font-size: 13px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.cl-action-btn:hover {
+  background: var(--amberbg);
+  color: var(--amber);
+  border-color: var(--amber);
+}
+
+.cl-action-card {
+  max-width: 480px;
+  width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+}
+
+.cl-action-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.cl-action-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text3);
+  line-height: 1.4;
+}
+
+/* ── Info-Feld-Value View-Mode (Chips statt read-only textarea) ── */
+.info-val-view {
+  padding: var(--space-xs) var(--space-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+  min-height: 1.4em;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.info-val-view.info-val-empty {
+  color: var(--text3);
+  font-style: italic;
+}
+
+/* ── Card-Note View-Mode ──────────────────────────────────────── */
+.overlay-note-view {
+  padding: var(--space-sm);
+  border: 0.5px solid transparent;
+  border-radius: var(--rs);
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+  min-height: 4em;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  cursor: text;
+  transition: background var(--tr-std), border-color var(--tr-std);
+}
+
+.overlay-note-view:hover,
+.overlay-note-view:focus-visible {
+  border-color: var(--border);
+  background: var(--bg2);
+  outline: none;
+}
+
+.overlay-note-view.overlay-note-empty {
+  color: var(--text3);
+  font-style: italic;
 }

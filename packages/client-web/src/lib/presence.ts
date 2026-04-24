@@ -1,0 +1,175 @@
+// Realtime-Presence pro Workspace. Zeigt welche User gerade im selben
+// Workspace online sind. Jeder Client tracked (email, joinedAt) und
+// hoert 'sync' auf den ganzen Presence-State, der vom Supabase-Server
+// gebroadcastet wird.
+//
+// Design: eigener Channel `presence:<wsId>`, NICHT der postgres-
+// changes-Channel aus realtime.ts — beides am selben Channel zu
+// mischen geht zwar, macht das Debugging aber deutlich muehsamer.
+// Zwei Channels, zwei Verantwortlichkeiten.
+//
+// usePresence nimmt Accessors (nicht Strings) damit Workspace-Wechsel
+// den Channel teardownen + neu aufbauen. Der createEffect-Rebuild
+// haengt an den gelesenen Accessors; onCleanup im Effect entfernt
+// den alten Channel bevor der neue entsteht.
+
+import {
+  type Accessor,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+} from 'solid-js';
+import { supabase } from './supabase';
+
+export type PresenceUser = {
+  userId: string;
+  email: string;
+  joinedAt: string;
+};
+
+export function usePresence(
+  workspaceId: Accessor<string>,
+  selfUserId: Accessor<string>,
+  selfEmail: Accessor<string>,
+): Accessor<PresenceUser[]> {
+  const [users, setUsers] = createSignal<PresenceUser[]>([]);
+
+  // Supabase emittiert `onAuthStateChange` auch bei reinen Token-Refreshs
+  // (TOKEN_REFRESHED ohne Identity-Wechsel). Das produziert ein neues
+  // Session-Object → neue User-Reference → `user()` emittiert → unser
+  // Effect unten wuerde den Presence-Channel voellig abreissen und neu
+  // aufbauen — das fuehrt zu einem Avatar-Blink im Sekunden-/Minuten-
+  // Takt. Die createMemos stabilisieren die Effect-Deps auf String-
+  // Equality (createMemo default `equals:===`): solange ID, Email und
+  // WsId wirklich gleich sind, emittiert das Memo nicht und der Effect
+  // laeuft nicht erneut.
+  const wsIdMemo = createMemo(() => workspaceId());
+  const selfIdMemo = createMemo(() => selfUserId());
+  const emailMemo = createMemo(() => selfEmail());
+
+  createEffect(() => {
+    const wsId = wsIdMemo();
+    const selfId = selfIdMemo();
+    const email = emailMemo();
+    if (!wsId || !selfId) {
+      setUsers([]);
+      return;
+    }
+
+    // Ein einzelner joinedAt-Timestamp pro Channel-Lebenszeit. Bei
+    // Reconnects/Re-Subscribes wird track() erneut aufgerufen, aber
+    // mit demselben Timestamp — so aendert sich die Meta-Payload nicht
+    // und die Equality-Gate im rebuild() blockt unnoetige setUsers-
+    // Aufrufe.
+    const sessionJoinedAt = new Date().toISOString();
+
+    const channel = supabase.channel(`presence:${wsId}`, {
+      config: { presence: { key: selfId } },
+    });
+
+    const rebuild = () => {
+      const raw = channel.presenceState() as Record<
+        string,
+        Array<{ email?: string; joinedAt?: string }>
+      >;
+      // Stale-State-Filter: Auf Staging feuert der Realtime-Server
+      // periodisch CHANNEL_ERROR → SUBSCRIBED (~1 s-Takt). In dem Re-
+      // Subscribe-Fenster ist channel.presenceState() kurz leer, bevor
+      // unser eigener track() wieder durchkommt (~35 ms spaeter).
+      // Diesen Zwischenstand darf das UI nicht sehen — sonst unmountet/
+      // remountet der Avatar im Blink-Rhythmus. Solange wir subscribed
+      // sind, MUESSEN wir selbst im Presence-State sein. Fehlt self
+      // → stale, rebuild ignorieren, auf das naechste sync warten.
+      if (selfId && !(selfId in raw)) {
+        return;
+      }
+      const list: PresenceUser[] = [];
+      for (const [userId, metas] of Object.entries(raw)) {
+        const meta = metas[0];
+        if (!meta) continue;
+        list.push({
+          userId,
+          email: typeof meta.email === 'string' ? meta.email : '(unbekannt)',
+          joinedAt:
+            typeof meta.joinedAt === 'string'
+              ? meta.joinedAt
+              : sessionJoinedAt,
+        });
+      }
+      list.sort((a, b) => {
+        if (a.userId === selfId) return -1;
+        if (b.userId === selfId) return 1;
+        return a.email.localeCompare(b.email);
+      });
+      // Identitaets-Check: Supabase feuert 'sync' als Heartbeat alle
+      // ~30s im Normalbetrieb, aber bei Reconnect/Flaky-WS haeufiger.
+      // joinedAt ignorieren — wird nie gerendert, und Server-Payloads
+      // koennen es minimal anders serialisieren. Nur userId + email
+      // bestimmen die Identitaet fuer die UI.
+      const current = users();
+      if (current.length === list.length) {
+        let same = true;
+        for (let i = 0; i < list.length; i++) {
+          const a = current[i];
+          const b = list[i];
+          if (a.userId !== b.userId || a.email !== b.email) {
+            same = false;
+            break;
+          }
+        }
+        if (same) return;
+      }
+      setUsers(list);
+    };
+
+    channel
+      .on('presence', { event: 'sync' }, rebuild)
+      .on('presence', { event: 'join' }, rebuild)
+      .on('presence', { event: 'leave' }, rebuild)
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          void channel.track({
+            email,
+            joinedAt: sessionJoinedAt,
+          });
+        }
+      });
+
+    onCleanup(() => {
+      void channel.untrack();
+      void supabase.removeChannel(channel);
+      setUsers([]);
+    });
+  });
+
+  return users;
+}
+
+// Deterministische Avatar-Farbe aus der Email — gleiche Email bekommt
+// immer dieselbe Farbe, damit User in einer Session stabil wirken.
+// FNV-1a 32-bit hash, Modulo auf eine kleine Palette aus den Design-
+// Tokens.
+// Nur Token-Farben verwenden, die in styles.css :root definiert sind.
+// Pink/Green gibts nicht — einfach weglassen statt fehlschlagen.
+const AVATAR_COLORS = [
+  '--blue',
+  '--teal',
+  '--amber',
+  '--red',
+  '--purple',
+] as const;
+
+export function avatarColorFor(email: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < email.length; i++) {
+    hash ^= email.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  const idx = Math.abs(hash) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[idx];
+}
+
+export function avatarInitial(email: string): string {
+  return (email[0] ?? '?').toUpperCase();
+}
