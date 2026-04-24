@@ -614,11 +614,11 @@ const Workspace: Component = () => {
   return (
     <div class="ws-shell" data-sb-mode={sidebar.mode()}>
       <aside class="ws-sidebar" data-sb-mode={sidebar.mode()}>
+        {/* Schmale Top-Bar nur mit Collapse-Button — Pendant zur
+            ws-main-header (beide 44px hoch, gleiche Y-Linie). Der
+            WorkspaceSwitcher sitzt als normaler Sidebar-Content
+            darunter. */}
         <div class="ws-sidebar-head">
-          <WorkspaceSwitcher
-            workspaces={workspaces()}
-            currentWorkspaceId={params.workspaceId}
-          />
           <button
             type="button"
             class="ws-sidebar-mode-btn"
@@ -647,6 +647,10 @@ const Workspace: Component = () => {
             </Show>
           </button>
         </div>
+        <WorkspaceSwitcher
+          workspaces={workspaces()}
+          currentWorkspaceId={params.workspaceId}
+        />
         <Show when={params.workspaceId}>
           <NodeTree
             workspaceId={params.workspaceId as string}

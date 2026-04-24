@@ -255,10 +255,14 @@ p.ok {
      .btn-subtle     Ghost — kein Border, leicht getoent auf Hover
      .btn-danger     Red — destruktive Aktion
      .ico-btn        Icon-only, 28x28 square
-   Alle teilen dieselbe Base (Padding, Font, Radius, Transition). */
+   Alle teilen dieselbe Base (Padding, Font, Radius, Transition).
+
+   WICHTIG: Die Base-Regel gilt nur fuer .btn und submit. Plain
+   button[type='button'] ohne .btn-Klasse wird NICHT gestylt — sonst
+   uebernimmt jeder custom-styled Button (tree-chevron, overlay-close,
+   ico-btn, ws-sidebar-mode-btn, ...) unerwuenscht die Base. */
 .btn,
-button[type='submit'],
-button[type='button'] {
+button[type='submit'] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -285,8 +289,7 @@ button[type='submit']:hover:not(:disabled) {
 }
 
 .btn:focus-visible,
-button[type='submit']:focus-visible,
-button[type='button']:focus-visible {
+button[type='submit']:focus-visible {
   outline: 2px solid var(--focus-color);
   outline-offset: 2px;
 }
@@ -510,26 +513,29 @@ button[type='submit']:hover:not(:disabled) {
   display: none;
 }
 
-/* Sidebar-Head: WorkspaceSwitcher + Mode-Toggle-Button. Eigene Header-
-   Leiste mit border-bottom, negative Side-Margins damit sie bis an die
-   Sidebar-Rand-Kanten geht. Padding y + border matchen ws-main-header
-   damit Collapse-Chevron und User-Chip auf gleicher Zeile sitzen. */
+/* Sidebar-Head: schmale Top-Leiste nur fuer den Collapse-Button.
+   Pendant zur ws-main-header — beide 44px hoch, border-bottom, Surface-
+   Weiss. Negative Side-Margins ziehen die Leiste bis an die Sidebar-
+   Kanten. Justify-end: Button steht rechts wie der Avatar-Chip im Main-
+   Header links-zentriert sitzt. */
 .ws-sidebar-head {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--space-xs);
   padding: var(--space-sm) var(--space-md);
   margin: 0 calc(-1 * var(--space-sm));
   border-bottom: 0.5px solid var(--border);
   background: var(--surface);
   min-height: 44px;
+  height: 44px;
   box-sizing: border-box;
+  flex: 0 0 auto;
 }
 
-.ws-sidebar-head .ws-switcher {
-  flex: 1;
-  min-width: 0;
-}
+/* ws-switcher ist nicht mehr im Head — die alte flex:1-Regel ist
+   obsolet. Platzhalter behalten wir fuer den Fall dass andere Stellen
+   den Selector noch referenzieren. */
 
 .ws-sidebar-mode-btn {
   flex-shrink: 0;
