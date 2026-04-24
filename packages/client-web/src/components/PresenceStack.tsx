@@ -3,7 +3,7 @@
 // Self (erster Eintrag) traegt eine dezente zweite Border-Linie, damit
 // man sich selbst unter anderen wiederfindet.
 
-import { For, Show, type Component } from 'solid-js';
+import { Index, Show, type Component } from 'solid-js';
 import {
   avatarColorFor,
   avatarInitial,
@@ -19,17 +19,18 @@ type Props = {
 
 const MAX_VISIBLE = 4;
 
-const Avatar: Component<{ user: PresenceUser; isSelf: boolean }> = (p) => {
-  const colorVar = () => avatarColorFor(p.user.email);
+const Avatar: Component<{ user: () => PresenceUser; isSelf: () => boolean }> = (p) => {
+  const email = () => p.user().email;
+  const colorVar = () => avatarColorFor(email());
   return (
     <span
       class="presence-avatar"
-      classList={{ 'presence-avatar-self': p.isSelf }}
+      classList={{ 'presence-avatar-self': p.isSelf() }}
       style={{ '--avatar-color': `var(${colorVar()})` }}
-      title={p.isSelf ? `${p.user.email} (Du)` : p.user.email}
-      aria-label={p.user.email}
+      title={p.isSelf() ? `${email()} (Du)` : email()}
+      aria-label={email()}
     >
-      {avatarInitial(p.user.email)}
+      {avatarInitial(email())}
     </span>
   );
 };
@@ -45,9 +46,14 @@ const PresenceStack: Component<Props> = (p) => {
 
   return (
     <div class="presence-stack" aria-label="Online-Nutzer">
-      <For each={visible()}>
-        {(u) => <Avatar user={u} isSelf={u.userId === p.selfUserId} />}
-      </For>
+      {/* Index statt For: positionales Rendering, die <span>-Elemente
+          bleiben stabil gemountet. Selbst wenn das users()-Signal
+          irgendwann doch mal fluehig updated (Reconnect, Race), wird
+          der Avatar-DOM-Node nie ersetzt — nur sein Inhalt aktualisiert.
+          Damit bleibt das Layout frame-stable, kein Blink, kein Shift. */}
+      <Index each={visible()}>
+        {(u) => <Avatar user={u} isSelf={() => u().userId === p.selfUserId} />}
+      </Index>
       <Show when={overflow() > 0}>
         <span
           class="presence-avatar presence-avatar-overflow"

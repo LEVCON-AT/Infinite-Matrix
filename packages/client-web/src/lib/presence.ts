@@ -38,6 +38,13 @@ export function usePresence(
       return;
     }
 
+    // Ein einzelner joinedAt-Timestamp pro Channel-Lebenszeit. Bei
+    // Reconnects/Re-Subscribes wird track() erneut aufgerufen, aber
+    // mit demselben Timestamp — so aendert sich die Meta-Payload nicht
+    // und die Equality-Gate im rebuild() blockt unnoetige setUsers-
+    // Aufrufe.
+    const sessionJoinedAt = new Date().toISOString();
+
     const channel = supabase.channel(`presence:${wsId}`, {
       config: { presence: { key: selfId } },
     });
@@ -57,7 +64,7 @@ export function usePresence(
           joinedAt:
             typeof meta.joinedAt === 'string'
               ? meta.joinedAt
-              : new Date().toISOString(),
+              : sessionJoinedAt,
         });
       }
       list.sort((a, b) => {
@@ -65,23 +72,18 @@ export function usePresence(
         if (b.userId === selfId) return 1;
         return a.email.localeCompare(b.email);
       });
-      // Identitaets-Check: Supabase feuert 'sync' im Sekundentakt als
-      // Heartbeat, selbst wenn sich nichts geaendert hat. Jede neue
-      // Array-Referenz triggert Solid-<For>-Rerender → Avatar-Spans
-      // remounten → Layout-Shift → Nachbar-Elemente (z.B. die Header-
-      // SearchBar) wackeln. Setzen den Signal nur, wenn Inhalt wirklich
-      // abweicht (UserId-Liste + Email + joinedAt).
+      // Identitaets-Check: Supabase feuert 'sync' als Heartbeat alle
+      // ~30s im Normalbetrieb, aber bei Reconnect/Flaky-WS haeufiger.
+      // joinedAt ignorieren — wird nie gerendert, und Server-Payloads
+      // koennen es minimal anders serialisieren. Nur userId + email
+      // bestimmen die Identitaet fuer die UI.
       const current = users();
       if (current.length === list.length) {
         let same = true;
         for (let i = 0; i < list.length; i++) {
           const a = current[i];
           const b = list[i];
-          if (
-            a.userId !== b.userId ||
-            a.email !== b.email ||
-            a.joinedAt !== b.joinedAt
-          ) {
+          if (a.userId !== b.userId || a.email !== b.email) {
             same = false;
             break;
           }
@@ -99,7 +101,7 @@ export function usePresence(
         if (status === 'SUBSCRIBED') {
           void channel.track({
             email,
-            joinedAt: new Date().toISOString(),
+            joinedAt: sessionJoinedAt,
           });
         }
       });

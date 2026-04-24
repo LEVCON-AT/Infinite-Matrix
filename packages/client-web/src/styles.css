@@ -717,14 +717,16 @@ button[type='submit']:hover:not(:disabled) {
 }
 
 /* Presence-Avatar-Stack im Main-Header. Avatars ueberlappen leicht.
-   flex-shrink:0 damit die Breite stabil ist — sonst koennte ein Heartbeat-
-   getriggertes Re-Render der inneren For-Liste den Nachbar-Flex-Item
-   (HeaderSearchBar) fuer einen Frame stauchen. */
+   flex-shrink:0 damit die Breite stabil ist. contain:layout isoliert
+   jegliche interne Re-Renders (Reconnect/Heartbeat) vom Nachbar-Flex —
+   selbst wenn ein Avatar kurz remountet wuerde, shiften die Geschwister
+   (HeaderSearchBar) nicht mit. */
 .presence-stack {
   display: flex;
   align-items: center;
   padding-right: var(--space-xs);
   flex: 0 0 auto;
+  contain: layout;
 }
 
 .presence-avatar {
