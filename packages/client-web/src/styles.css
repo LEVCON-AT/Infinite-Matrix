@@ -4718,6 +4718,70 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   }
 }
 
+/* ── Progress-Overlay (Import / Bulk-Ops) ───────────────────────
+   Scrim blockiert Pointer-Events und macht die Oberflaeche grau,
+   zentrierte Karte zeigt Titel + aktuelle Phase + Progress-Bar.
+   z-index ueber Dialog (9500), damit das Overlay auch ueber einem
+   geschlossenen Dialog-Residual erscheint. */
+.progress-scrim {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg) 60%, transparent);
+  backdrop-filter: grayscale(0.4) blur(1px);
+  -webkit-backdrop-filter: grayscale(0.4) blur(1px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9500;
+  /* Keine Events durchlassen — UI ist waehrend Import un-klickbar. */
+  pointer-events: all;
+}
+
+.progress-card {
+  min-width: 320px;
+  max-width: 420px;
+  padding: var(--space-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--rl);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  font-size: 14px;
+}
+
+.progress-title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.progress-phase {
+  color: var(--text2);
+  font-size: 13px;
+}
+
+.progress-bar {
+  height: 8px;
+  background: var(--bg2);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--blue);
+  border-radius: 999px;
+  transition: width 180ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.progress-meta {
+  font-size: 12px;
+  color: var(--text3);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Settings-Modal ────────────────────────────────────────────── */
 .settings-card {
   max-width: 620px;

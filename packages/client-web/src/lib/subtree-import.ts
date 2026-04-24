@@ -25,6 +25,7 @@
 import { supabase } from './supabase';
 import type { ExportPayloadType, WorkspaceExport } from './export';
 import { WORKSPACE_EXPORT_VERSION } from './export';
+import { setProgressPhase } from './progress';
 
 export class ImportError extends Error {
   constructor(msg: string) {
@@ -522,15 +523,30 @@ export async function executeSubtreeImportIntoCell(args: {
     );
   }
 
+  // Progress-Tracking. Total haengt am Modus + am Payload-Typ
+  // (Container-Merge hat weniger Phasen als Subtree).
+  const hasSubtree = (payload.nodes as unknown[]).length > 0;
+  const phaseTotal =
+    (mode === 'export-overwrite' ? 1 : 0) +
+    (mode === 'overwrite' || mode === 'export-overwrite' ? 1 : 0) +
+    (hasSubtree ? 13 : 4);
+  let phaseIdx = 0;
+  const step = (label: string) => {
+    phaseIdx += 1;
+    setProgressPhase(label, phaseIdx, phaseTotal);
+  };
+
   // Ueberschreiben: zuerst optional exportieren, dann Ziel-Zelle
   // leerraeumen (Sub-Struktur + Info + Checklisten). Danach geht der
   // normale Import durch, das "Slot schon belegt"-Guard greift nicht.
   if (mode === 'export-overwrite') {
+    step('Sicherungs-Export…');
     const { exportCellSubtree, downloadSubtreeExport } = await import('./export');
     const current = await exportCellSubtree(targetCellId, workspaceId);
     downloadSubtreeExport(current, `backup-ziel-zelle`);
   }
   if (mode === 'overwrite' || mode === 'export-overwrite') {
+    step('Ziel-Zelle leeren…');
     await clearCellCompletely(targetCellId);
   }
 
@@ -539,16 +555,19 @@ export async function executeSubtreeImportIntoCell(args: {
   // listen). Wir leiten auf den Merge-Flow um — dort werden Felder,
   // Links und Checklisten in die Target-Zelle gemerged, ohne neuen
   // Node anzulegen.
-  if ((payload.nodes as unknown[]).length === 0) {
+  if (!hasSubtree) {
     await executeCellContainerMerge({
       payload,
       workspaceId,
       targetCellId,
+      step,
     });
     // rootNodeId gibt es hier nicht — wir retournieren die Target-
     // Cell-ID als Pseudo-Root fuer Caller-Kompatibilitaet.
     return { rootNodeId: targetCellId, aliasMap: new Map() };
   }
+
+  step('Vorbereitung…');
 
   // Root-Node finden: ein Node, dessen parent_cell_id NICHT in den
   // exportierten Cells liegt. Das deckt drei Faelle ab:
@@ -833,10 +852,15 @@ export async function executeSubtreeImportIntoCell(args: {
   //            (Target-Cell fuer Root, remapped cells fuer Sub-Nodes).
   //   Phase E: Board-interne Tabellen (kb_cols, kb_cards, links) +
   //            Checklisten + Items.
+  step('Nodes einfuegen…');
   await insertBatch('nodes', nodesOut);
+  step('Zeilen einfuegen…');
   await insertBatch('rows', rowsOut);
+  step('Spalten einfuegen…');
   await insertBatch('cols', colsOut);
+  step('Zellen einfuegen…');
   await insertBatch('cells', cellsOut);
+  step('Parent-Verknuepfungen…');
   // parent_cell_id UPDATE — sequenziell, um pro Fehler genau
   // identifizieren zu koennen welcher Node nicht durchging. Bei
   // grossen Imports koennen wir spaeter auf RPC umsteigen.
@@ -847,12 +871,19 @@ export async function executeSubtreeImportIntoCell(args: {
       .eq('id', up.id);
     if (upErr) throw upErr;
   }
+  step('Kanban-Spalten einfuegen…');
   await insertBatch('kb_cols', kbColsOut);
+  step('Karten einfuegen…');
   await insertBatch('kb_cards', kbCardsOut);
+  step('Checklisten einfuegen…');
   await insertBatch('checklists', checklistsOut);
+  step('Checklist-Eintraege einfuegen…');
   await insertBatch('checklist_items', checklistItemsOut);
+  step('Links einfuegen…');
   await insertBatch('links', linksOut);
+  step('Dokus einfuegen…');
   await insertBatch('docs', docsOut);
+  step('Ziel-Zelle anpassen…');
 
   // Target-Cell final patchen: FK-Slot auf neuen Root-Node, Feature-
   // Flag anheben. Wenn payload.sourceCell existiert (Cell-Subtree-
@@ -962,8 +993,13 @@ async function executeCellContainerMerge(args: {
   payload: WorkspaceExport;
   workspaceId: string;
   targetCellId: string;
+  // Optionaler Progress-Stepper vom aufrufenden Executor. Wenn
+  // gesetzt, stepen wir die drei Teilphasen (Info, Checklisten, Docs)
+  // durch.
+  step?: (label: string) => void;
 }): Promise<void> {
-  const { payload, workspaceId, targetCellId } = args;
+  const { payload, workspaceId, targetCellId, step } = args;
+  step?.('Vorbereitung…');
   // Primaere Quelle fuer Container-Infos: payload.sourceCell (neues
   // Cell-Subtree-Format). Fallback: payload.cells[0] (legacy-Format,
   // vor der SB.1f-Aenderung). Beides kann vorkommen — wir lesen
@@ -1041,6 +1077,7 @@ async function executeCellContainerMerge(args: {
     links: [...existingLinks, ...newLinks],
   };
 
+  step?.('Info-Felder mergen…');
   const { error: upErr } = await supabase
     .from('cells')
     .update({ data: nextData, features: Array.from(nextFeatures) })
@@ -1049,6 +1086,7 @@ async function executeCellContainerMerge(args: {
 
   // 2. Checklisten + Items aus dem Payload uebernehmen, alle mit
   //    neuer UUID, cell_id=target, board_id=null, position ans Ende.
+  step?.('Checklisten mergen…');
   const remapMap: RemapMap = new Map();
   for (const cl of payload.checklists)
     remap((cl as { id: string }).id, remapMap);
@@ -1105,6 +1143,7 @@ async function executeCellContainerMerge(args: {
   }
 
   // 3. Docs aus dem Payload auf die Ziel-Zelle umhaengen.
+  step?.('Dokus mergen…');
   if (payload.docs.length > 0) {
     const aliasMap = await reserveAliases(
       workspaceId,
@@ -1145,14 +1184,27 @@ export async function executeFeatureInfoImport(args: {
       'Das ist kein Info-Export. Bitte waehle eine Info-Datei (enthaelt Felder und Links).',
     );
   }
+  // Progress: je 1 Phase fuer backup/clear + 1 fuer Merge.
+  const phaseTotal =
+    1 +
+    (mode === 'overwrite' || mode === 'export-overwrite' ? 1 : 0) +
+    (mode === 'export-overwrite' ? 1 : 0);
+  let phaseIdx = 0;
+  const step = (label: string) => {
+    phaseIdx += 1;
+    setProgressPhase(label, phaseIdx, phaseTotal);
+  };
   if (mode === 'export-overwrite') {
+    step('Sicherungs-Export…');
     const { exportFeatureInfo, downloadSubtreeExport } = await import('./export');
     const current = await exportFeatureInfo(targetCellId, args.workspaceId);
     downloadSubtreeExport(current, `backup-info`);
   }
   if (mode === 'overwrite' || mode === 'export-overwrite') {
+    step('Bisherige Info-Daten leeren…');
     await clearCellInfoData(targetCellId);
   }
+  step('Info-Felder + Links mergen…');
   const sourceCell = payload.cells[0];
   if (!sourceCell) {
     throw new ImportError(
@@ -1240,7 +1292,18 @@ export async function executeFeatureChecklistsImport(args: {
       'Das ist kein Checklisten-Export. Bitte waehle eine Checklisten-Datei.',
     );
   }
+  // Progress: backup / clear / vorbereitung / listen / items.
+  const phaseTotal =
+    3 +
+    (mode === 'overwrite' || mode === 'export-overwrite' ? 1 : 0) +
+    (mode === 'export-overwrite' ? 1 : 0);
+  let phaseIdx = 0;
+  const step = (label: string) => {
+    phaseIdx += 1;
+    setProgressPhase(label, phaseIdx, phaseTotal);
+  };
   if (mode === 'export-overwrite') {
+    step('Sicherungs-Export…');
     const { exportFeatureChecklists, downloadSubtreeExport } = await import(
       './export'
     );
@@ -1248,8 +1311,10 @@ export async function executeFeatureChecklistsImport(args: {
     downloadSubtreeExport(current, `backup-checklists`);
   }
   if (mode === 'overwrite' || mode === 'export-overwrite') {
+    step('Bisherige Checklisten leeren…');
     await clearCellChecklistsData(targetCellId);
   }
+  step('Vorbereitung…');
   const aliasMap = await reserveAliases(workspaceId, collectAliases(payload));
   const remapMap: RemapMap = new Map();
   for (const cl of payload.checklists)
@@ -1299,7 +1364,9 @@ export async function executeFeatureChecklistsImport(args: {
     ),
   }));
 
+  step('Checklisten einfuegen…');
   await insertBatch('checklists', checklistsOut);
+  step('Checklist-Eintraege einfuegen…');
   await insertBatch('checklist_items', itemsOut);
 
   // Cell-Feature-Flag sicherstellen.
@@ -1375,12 +1442,26 @@ export async function executeSubtreeImportIntoMatrix(args: {
     );
   }
 
+  // Progress-Tracking: Gesamtzahl der Phasen haengt am Modus.
+  const phaseTotal =
+    13 + // Vorbereitung / Nodes / Rows / Cols / Cells / Parent-Updates /
+    //    kb_cols / kb_cards / checklists / items / links / docs / Patch
+    (mode === 'overwrite' || mode === 'export-overwrite' ? 1 : 0) +
+    (mode === 'export-overwrite' ? 1 : 0);
+  let phaseIdx = 0;
+  const step = (label: string) => {
+    phaseIdx += 1;
+    setProgressPhase(label, phaseIdx, phaseTotal);
+  };
+
   if (mode === 'export-overwrite') {
+    step('Sicherungs-Export…');
     const { exportSubtree, downloadSubtreeExport } = await import('./export');
     const current = await exportSubtree(targetMatrixId, workspaceId);
     downloadSubtreeExport(current, 'backup-ziel-matrix');
   }
   if (mode === 'overwrite' || mode === 'export-overwrite') {
+    step('Ziel-Matrix leeren…');
     await clearMatrixContents(targetMatrixId);
     // Target-Alias fuer die Dauer des Imports auf NULL setzen, damit
     // reserveAliases den alten Target-Alias nicht faelschlich als
@@ -1393,6 +1474,8 @@ export async function executeSubtreeImportIntoMatrix(args: {
       .eq('id', targetMatrixId);
     if (nullErr) throw nullErr;
   }
+
+  step('Vorbereitung…');
 
   // Positions-Offset: wo beginnen die neuen Rows/Cols? Nach dem Clear
   // ist die Matrix leer → Max-Query liefert nichts → Offset=0.
@@ -1628,10 +1711,15 @@ export async function executeSubtreeImportIntoMatrix(args: {
 
   // FK-Order wie bei Cell-Variante: Nodes (parent=null) → Rows → Cols →
   // Cells → UPDATE Nodes.parent_cell_id → kb/checklists/items/links/docs.
+  step('Nodes einfuegen…');
   await insertBatch('nodes', nodesOut);
+  step('Zeilen einfuegen…');
   await insertBatch('rows', rowsOut);
+  step('Spalten einfuegen…');
   await insertBatch('cols', colsOut);
+  step('Zellen einfuegen…');
   await insertBatch('cells', cellsOut);
+  step('Parent-Verknuepfungen…');
   for (const up of nodeParentUpdates) {
     const { error: upErr } = await supabase
       .from('nodes')
@@ -1639,13 +1727,20 @@ export async function executeSubtreeImportIntoMatrix(args: {
       .eq('id', up.id);
     if (upErr) throw upErr;
   }
+  step('Kanban-Spalten einfuegen…');
   await insertBatch('kb_cols', kbColsOut);
+  step('Karten einfuegen…');
   await insertBatch('kb_cards', kbCardsOut);
+  step('Checklisten einfuegen…');
   await insertBatch('checklists', checklistsOut);
+  step('Checklist-Eintraege einfuegen…');
   await insertBatch('checklist_items', checklistItemsOut);
+  step('Links einfuegen…');
   await insertBatch('links', linksOut);
+  step('Dokus einfuegen…');
   await insertBatch('docs', docsOut);
 
+  step('Ziel-Matrix anpassen…');
   // Bei Ersetzen: Target-Matrix uebernimmt Label/Alias/Data des
   // Payload-Roots. Alias via aliasMap (falls der neue Wert im
   // Workspace kollidiert, gibt's den "-2"-Suffix). Bei Add bleibt
@@ -1717,12 +1812,25 @@ export async function executeSubtreeImportIntoBoard(args: {
     );
   }
 
+  // Progress: Vorbereitung + Kanban-Cols + Karten + Checklisten + Items + Links + Patch = 7
+  const phaseTotal =
+    7 +
+    (mode === 'overwrite' || mode === 'export-overwrite' ? 1 : 0) +
+    (mode === 'export-overwrite' ? 1 : 0);
+  let phaseIdx = 0;
+  const step = (label: string) => {
+    phaseIdx += 1;
+    setProgressPhase(label, phaseIdx, phaseTotal);
+  };
+
   if (mode === 'export-overwrite') {
+    step('Sicherungs-Export…');
     const { exportSubtree, downloadSubtreeExport } = await import('./export');
     const current = await exportSubtree(targetBoardId, workspaceId);
     downloadSubtreeExport(current, 'backup-ziel-board');
   }
   if (mode === 'overwrite' || mode === 'export-overwrite') {
+    step('Ziel-Board leeren…');
     // Ziel-Board leeren: kb_cards, kb_cols, board-scoped checklists
     // (Cascade auf items), links.
     const { error: cardsErr } = await supabase
@@ -1779,6 +1887,7 @@ export async function executeSubtreeImportIntoBoard(args: {
       ? ((linksRes.data[0].position as number) ?? -1) + 1
       : 0;
 
+  step('Vorbereitung…');
   // Nur Tabellenzeilen des Root-Boards uebernehmen; Fremdinhalt (z.B.
   // verschachtelte Sub-Matrix) aus dem Payload ignorieren.
   const rootId = rootRow.id;
@@ -1875,11 +1984,17 @@ export async function executeSubtreeImportIntoBoard(args: {
 
   // Insert-Reihenfolge: kb_cols zuerst (kb_cards FK), dann cards,
   // dann checklists (items FK), dann items, dann links.
+  step('Kanban-Spalten einfuegen…');
   await insertBatch('kb_cols', kbColsOut);
+  step('Karten einfuegen…');
   await insertBatch('kb_cards', kbCardsOut);
+  step('Checklisten einfuegen…');
   await insertBatch('checklists', checklistsOut);
+  step('Checklist-Eintraege einfuegen…');
   await insertBatch('checklist_items', checklistItemsOut);
+  step('Links einfuegen…');
   await insertBatch('links', linksOut);
+  step('Ziel-Board anpassen…');
 
   // Bei Overwrite: Target-Board-Label/Alias/Data aus Payload-Root.
   if (mode === 'overwrite' || mode === 'export-overwrite') {

@@ -39,6 +39,7 @@ import {
   summarizeExport,
 } from '../lib/export';
 import { runResetScope } from '../lib/workspace-reset';
+import { endProgress, startProgress } from '../lib/progress';
 import {
   checkTypeCompatibility,
   executeFeatureChecklistsImport,
@@ -562,6 +563,10 @@ const NodeTree: Component<Props> = (props) => {
       if (!modeChoice) return;
       const mode = modeChoice as ImportMode;
 
+      // Progress-Overlay: Scrim + Card zeigen waehrend des Imports.
+      // Phase-Updates kommen aus den Executor-Funktionen selbst.
+      startProgress('Import laeuft…');
+      try {
       if (target.kind === 'matrix') {
         await runMenuMutation(
           () =>
@@ -642,7 +647,11 @@ const NodeTree: Component<Props> = (props) => {
           `Checklisten-Import: ${summary}`,
         );
       }
+      } finally {
+        endProgress();
+      }
     } catch (err) {
+      endProgress();
       if (err instanceof ImportError) {
         showToast(err.message, 'error');
       } else {

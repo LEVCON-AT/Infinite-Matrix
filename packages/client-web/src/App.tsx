@@ -5,6 +5,7 @@ import { useEditModeHotkey } from './lib/edit-mode';
 import { useThemeBootstrap } from './lib/theme';
 import Toasts from './components/Toasts';
 import DialogHost from './components/DialogHost';
+import ProgressOverlay from './components/ProgressOverlay';
 
 bootstrapAuth();
 
@@ -35,6 +36,7 @@ const App: ParentComponent = (props): JSX.Element => {
       </Show>
       <Toasts />
       <DialogHost />
+      <ProgressOverlay />
     </div>
   );
 };
