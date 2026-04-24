@@ -3818,6 +3818,86 @@ button[type='submit']:hover:not(:disabled) {
   font-weight: 500;
 }
 
+/* ── Overlay-Field-Layout ───────────────────────────────────────
+   Meta-Zeile (Alias/Deadline/Prio/Farbe) + Tag-Zeile (Tags/Wer)
+   nutzen dasselbe Field-Muster: Label darueber (kleiner Caption-
+   Stil), Input darunter. Im Grid stehen sie nebeneinander. */
+.overlay-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.overlay-field-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text3);
+  font-weight: 600;
+}
+
+.overlay-input {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--text);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--r);
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.overlay-input:focus-visible {
+  border-color: var(--focus-color);
+  outline: none;
+}
+
+/* Meta-Zeile: Alias, Deadline, Prioritaet, Farbe — 4 Spalten gleich-
+   breit auf Desktop, 2 auf Tablet, 1 auf Mobile. */
+.overlay-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-md);
+}
+
+@media (max-width: 900px) {
+  .overlay-edit-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .overlay-edit-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Deadline-Warnung neben dem Date-Input — klein, farbig je State. */
+.overlay-deadline-warning {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  align-self: flex-start;
+}
+
+.overlay-deadline-warning[data-deadline-state='overdue'] {
+  background: var(--redbg);
+  color: var(--red);
+}
+
+.overlay-deadline-warning[data-deadline-state='today'] {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+}
+
+.overlay-deadline-warning[data-deadline-state='soon'] {
+  background: var(--bg2);
+  color: var(--text2);
+}
+
 .overlay-section input[type='text'],
 .overlay-section input[type='date'],
 .overlay-section select,
@@ -3964,24 +4044,240 @@ button[type='submit']:hover:not(:disabled) {
   gap: var(--space-md);
 }
 
-/* Recur-Editor: Typ + Every + Startdatum nebeneinander. Alle drei
-   bei 1fr, damit das Layout ruhig bleibt wenn Every/Start auftauchen. */
-.overlay-recur-grid {
+@media (max-width: 600px) {
+  .overlay-tag-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Card-Overlay: Done-Toggle im Header ────────────────────────
+   Checkbox direkt links vom Titel, damit der User die primaere Aktion
+   ohne Scroll erreicht. Label ist reine Klick-Flaeche (visuell +
+   Touchtarget >= 32px). Ist die Karte erledigt, wird unter der Box
+   ein amber-haken sichtbar. */
+.card-overlay-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.card-overlay-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 6px;
+  margin: -6px 0;
+  cursor: pointer;
+  border-radius: var(--rs);
+  transition: background var(--tr-std);
+}
+
+.card-overlay-done:hover {
+  background: var(--bg2);
+}
+
+.card-overlay-done input {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--amber);
+}
+
+.card-overlay-title {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Card-Overlay: Recur-Block ──────────────────────────────────
+   Header mit Titel + aktueller Summary-Zeile. Rest unter dem Header
+   klappt je nach Typ: Type-Row (3 Felder), dann Weekly/Monthly/Yearly
+   spezifisch, dann End-Regel, dann Occurrences-Verlauf. */
+.card-recur {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.card-recur-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.card-recur-head h4 {
+  margin: 0;
+}
+
+.card-recur-summary {
+  font-size: 12px;
+  color: var(--text2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  padding: 2px 8px;
+  background: var(--amberbg);
+  color: var(--ambertxt);
+  border-radius: var(--rs);
+}
+
+.card-recur-end-hint {
+  opacity: 0.8;
+}
+
+.card-recur-type-row {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: var(--space-md);
 }
 
 @media (max-width: 600px) {
-  .overlay-recur-grid {
+  .card-recur-type-row {
     grid-template-columns: 1fr;
   }
 }
 
-@media (max-width: 600px) {
-  .overlay-tag-grid {
-    grid-template-columns: 1fr;
-  }
+.card-recur-every-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.card-recur-every {
+  width: 80px;
+  flex: 0 0 auto;
+}
+
+.card-recur-every-unit {
+  font-size: 13px;
+  color: var(--text2);
+}
+
+/* Generischer Block innerhalb der Recur-Sektion — Weekly-Grid, Monthly-
+   Choices, Yearly-Choices, End-Regel, Occurrences. Label links als
+   kleines Hint, Content darunter. */
+.card-recur-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-sm);
+  background: var(--bg2);
+  border-radius: var(--rs);
+  border: 0.5px solid var(--border);
+}
+
+.card-recur-block-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text3);
+  font-weight: 600;
+}
+
+.card-recur-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--ambertxt);
+}
+
+/* Weekly: 7 Toggle-Buttons in einer Reihe. Aktive Tage bekommen Amber-
+   Hintergrund (Feature-Farbe fuer Board/Cards). Inaktive sind
+   transparent mit Border. */
+.card-recur-weekday-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.card-recur-weekday {
+  padding: 8px 0;
+  font-size: 12px;
+  font-weight: 600;
+  background: transparent;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  color: var(--text2);
+  cursor: pointer;
+  transition: background var(--tr-std), color var(--tr-std), border-color var(--tr-std);
+}
+
+.card-recur-weekday:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.card-recur-weekday-on,
+.card-recur-weekday-on:hover {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+  border-color: var(--amber);
+}
+
+/* Monthly/Yearly: 2 Radio-Zeilen (day-Variante vs. weekday-Variante),
+   inline mit Input-/Select-Feldern zwischen den Span-Labels. */
+.card-recur-month-choices,
+.card-recur-end-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.card-recur-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.card-recur-radio input[type='radio'] {
+  accent-color: var(--amber);
+}
+
+.card-recur-radio input:disabled,
+.card-recur-radio select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.card-recur-inline-num {
+  width: 70px;
+  flex: 0 0 auto;
+  padding: 2px 4px !important;
+  font-size: 13px !important;
+}
+
+.card-recur-inline-select {
+  flex: 0 0 auto;
+  padding: 2px 4px !important;
+  font-size: 13px !important;
+}
+
+.card-recur-inline-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* Erledigt-Verlauf: Zaehler + letztes Datum + Clear-Button. Kompakt,
+   damit der Block nicht ueberfaellt wenn viele Occurrences existieren. */
+.card-recur-occ-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.card-recur-occ-count {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.card-recur-occ-clear {
+  margin-left: auto;
+  font-size: 12px;
 }
 
 .overlay-chip-row {

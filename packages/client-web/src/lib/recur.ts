@@ -238,6 +238,88 @@ export function recurFiresInRange(
   return false;
 }
 
+// Menschenlesbare Zusammenfassung fuer Badges + Modal-Header.
+// Port aus HTML recurLabel. Kompakt-Form ohne End-Regel (die steht
+// separat). Beispiele:
+//   daily, every=1             → "taeglich"
+//   daily, every=3             → "alle 3 Tage"
+//   weekly, weekdays=[0,2]     → "Mo, Mi"
+//   weekly, every=2 [0]        → "alle 2 Wochen (Mo)"
+//   monthly, day=15            → "monatlich am 15."
+//   monthly, weekday=0 ord=2   → "jeden 2. Mo im Monat"
+//   yearly, yearMonth=3 day=24 → "jaehrlich am 24. Apr"
+const WD_SHORT = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+const WD_LONG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+const MONTH_SHORT = ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+const ORD_LABEL: Record<number, string> = {
+  1: '1.',
+  2: '2.',
+  3: '3.',
+  4: '4.',
+  [-1]: 'letzten',
+};
+
+function weekdaysOf(r: RecurRule): number[] {
+  if (Array.isArray(r.weekdays) && r.weekdays.length > 0) return r.weekdays;
+  if (typeof r.weekday === 'number') return [r.weekday];
+  return [];
+}
+
+export function recurHumanLabel(r: RecurRule | null | undefined): string {
+  if (!r || !r.type || r.type === 'none') return '';
+  const every = r.every ?? 1;
+
+  if (r.type === 'daily') {
+    return every === 1 ? 'taeglich' : `alle ${every} Tage`;
+  }
+
+  if (r.type === 'weekly') {
+    const wd = weekdaysOf(r);
+    const days = wd.length > 0 ? wd.map((d) => WD_SHORT[d] ?? '?').join(', ') : 'keine Tage';
+    if (every === 1) return days;
+    return `alle ${every} Wochen (${days})`;
+  }
+
+  if (r.type === 'monthly') {
+    const intvl = every === 1 ? 'monatlich' : `alle ${every} Monate`;
+    if (r.monthType === 'weekday') {
+      const wd = typeof r.weekday === 'number' ? r.weekday : 0;
+      const ord = r.weekdayOrd ?? 1;
+      return `jeden ${ORD_LABEL[ord] ?? ord + '.'} ${WD_LONG[wd] ?? '?'} im Monat${every === 1 ? '' : ` (${intvl})`}`;
+    }
+    return `${intvl} am ${r.day ?? 1}.`;
+  }
+
+  if (r.type === 'yearly') {
+    const intvl = every === 1 ? 'jaehrlich' : `alle ${every} Jahre`;
+    const month = r.yearMonth !== undefined ? r.yearMonth : (r.anchorMonth ?? 0);
+    const monthLabel = MONTH_SHORT[month] ?? '?';
+    if (r.monthType === 'weekday') {
+      const wd = typeof r.weekday === 'number' ? r.weekday : 0;
+      const ord = r.weekdayOrd ?? 1;
+      return `${intvl}, ${ORD_LABEL[ord] ?? ord + '.'} ${WD_LONG[wd] ?? '?'} im ${monthLabel}`;
+    }
+    const day = r.yearDay ?? r.anchorDay ?? 1;
+    return `${intvl} am ${day}. ${monthLabel}`;
+  }
+
+  return '';
+}
+
+// Ende-Regel lesbar (separat, damit die Bubble ueber dem Badge klein
+// bleibt). "ohne Ende" wird weggelassen — nur date/count liefern Text.
+export function recurEndLabel(r: RecurRule | null | undefined): string {
+  if (!r || !r.type || r.type === 'none') return '';
+  if (r.endType === 'date' && r.endDate) {
+    const d = new Date(r.endDate);
+    return `bis ${d.toLocaleDateString('de-DE')}`;
+  }
+  if (r.endType === 'count' && r.endCount && r.endCount > 0) {
+    return `${r.endCount} Termine`;
+  }
+  return '';
+}
+
 // Liefert alle Datums-Strings (YYYY-MM-DD) im Range in denen
 // die Regel feuert. Fuer TaskOverview-allOccurrencesDoneInRange.
 export function getOccurrenceDatesInRange(

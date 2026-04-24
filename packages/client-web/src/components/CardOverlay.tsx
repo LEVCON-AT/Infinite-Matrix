@@ -40,6 +40,8 @@ import {
 import {
   isCardDone,
   isRecurCard,
+  recurEndLabel,
+  recurHumanLabel,
   todayIso,
   toggleOccurrence,
 } from '../lib/recur';
@@ -237,30 +239,86 @@ const CardOverlay: Component<Props> = (p) => {
     return null;
   }
 
-  // Recur: Dropdown + Intervall + Startdatum. Zusammen ein Objekt,
-  // weil die DB-Spalte ein JSONB ist und Teilupdates sonst per
-  // mutateCardRecur gehen muessten. Fuer V1 reicht setCardRecur(obj).
+  // Recur-State: die rohe Card.recur-JSONB-Spalte auf die typisierte
+  // CardRecur-Shape abbilden, mit sinnvollen Defaults pro Typ. Null/
+  // leer fuehrt zu `type:'none'`.
   function recurVal(): CardRecur {
     const r = p.card.recur as CardRecur | null | undefined;
+    if (!r || !r.type || r.type === 'none') {
+      return { type: 'none', every: 1 };
+    }
     return {
-      type: (r?.type ?? 'none') as CardRecurType,
-      every: typeof r?.every === 'number' ? r.every : 1,
-      startDate: typeof r?.startDate === 'string' ? r.startDate : '',
+      type: r.type,
+      every: typeof r.every === 'number' && r.every > 0 ? r.every : 1,
+      startDate: typeof r.startDate === 'string' ? r.startDate : '',
+      weekdays: Array.isArray(r.weekdays) ? r.weekdays : undefined,
+      weekday: typeof r.weekday === 'number' ? r.weekday : undefined,
+      monthType: r.monthType === 'weekday' ? 'weekday' : (r.monthType === 'day' ? 'day' : undefined),
+      weekdayOrd: typeof r.weekdayOrd === 'number' ? r.weekdayOrd : undefined,
+      day: typeof r.day === 'number' ? r.day : undefined,
+      yearMonth: typeof r.yearMonth === 'number' ? r.yearMonth : undefined,
+      yearDay: typeof r.yearDay === 'number' ? r.yearDay : undefined,
+      endType:
+        r.endType === 'date' || r.endType === 'count' || r.endType === 'never'
+          ? r.endType
+          : undefined,
+      endDate: typeof r.endDate === 'string' ? r.endDate : undefined,
+      endCount: typeof r.endCount === 'number' ? r.endCount : undefined,
     };
   }
 
-  async function onRecurType(val: string) {
-    const next: CardRecur | null = val === 'none' ? null : (() => {
-      const cur = recurVal();
-      return {
-        type: val as CardRecurType,
-        every: cur.every ?? 1,
-        startDate:
-          cur.startDate ||
-          new Date().toISOString().slice(0, 10),
-      };
-    })();
+  // Teil-Patch auf das Recur-Objekt: merged, filtert redundante Felder
+  // raus (unused default-Werte), schreibt als ganzes zurueck. Der Caller
+  // muss nicht selbst die existierenden Felder kopieren.
+  async function patchRecur(patch: Partial<CardRecur>) {
+    const cur = recurVal();
+    if (cur.type === 'none' && !patch.type) return;
+    const next: CardRecur = { ...cur, ...patch };
+    // Wenn weekdays per patch geleert wird (weekdays=[]), fallen wir
+    // NICHT auf legacy weekday zurueck — sondern speichern das leere
+    // Array (User meint "keine Wochentage ausgewaehlt"). recurFiresOn
+    // liefert dann nie true fuer weekly. UI zeigt Warn-Hint.
     await wrap(() => setCardRecur(p.card.id, next));
+  }
+
+  // Typ-Wechsel: neuen Default-Zustand fuer den Ziel-Typ bauen. Wir
+  // werfen alle nicht-mehr-relevanten Felder weg, damit das JSONB
+  // nicht muellt.
+  async function onRecurType(val: string) {
+    if (val === 'none') {
+      await wrap(() => setCardRecur(p.card.id, null));
+      return;
+    }
+    const cur = recurVal();
+    const base: CardRecur = {
+      type: val as CardRecurType,
+      every: cur.every && cur.every > 0 ? cur.every : 1,
+      startDate: cur.startDate || new Date().toISOString().slice(0, 10),
+      endType: cur.endType ?? 'never',
+    };
+    const today = new Date();
+    const dayStr = today.getDate();
+    const jsDay = today.getDay();
+    const mondayBased = jsDay === 0 ? 6 : jsDay - 1;
+    if (val === 'weekly') {
+      base.weekdays = cur.weekdays?.length
+        ? cur.weekdays
+        : cur.weekday !== undefined
+          ? [cur.weekday]
+          : [mondayBased];
+    } else if (val === 'monthly') {
+      base.monthType = cur.monthType ?? 'day';
+      base.day = cur.day ?? dayStr;
+      base.weekday = cur.weekday ?? mondayBased;
+      base.weekdayOrd = cur.weekdayOrd ?? 1;
+    } else if (val === 'yearly') {
+      base.monthType = cur.monthType ?? 'day';
+      base.yearMonth = cur.yearMonth ?? today.getMonth();
+      base.yearDay = cur.yearDay ?? dayStr;
+      base.weekday = cur.weekday ?? mondayBased;
+      base.weekdayOrd = cur.weekdayOrd ?? 1;
+    }
+    await wrap(() => setCardRecur(p.card.id, base));
   }
 
   async function onRecurEvery(val: string) {
@@ -269,9 +327,7 @@ const CardOverlay: Component<Props> = (p) => {
     const cur = recurVal();
     if (cur.type === 'none') return;
     if (cur.every === n) return;
-    await wrap(() =>
-      setCardRecur(p.card.id, { ...cur, every: n }),
-    );
+    await patchRecur({ every: n });
   }
 
   async function onRecurStart(val: string) {
@@ -279,35 +335,96 @@ const CardOverlay: Component<Props> = (p) => {
     if (cur.type === 'none') return;
     const next = val || '';
     if (cur.startDate === next) return;
-    await wrap(() =>
-      setCardRecur(p.card.id, { ...cur, startDate: next }),
-    );
+    await patchRecur({ startDate: next });
   }
 
-  function recurLabel(): string {
-    const r = recurVal();
-    if (r.type === 'none') return '';
-    const n = r.every ?? 1;
-    const phrase =
-      n === 1
-        ? {
-            daily: 'taeglich',
-            weekly: 'woechentlich',
-            monthly: 'monatlich',
-            yearly: 'jaehrlich',
-          }[r.type as Exclude<CardRecurType, 'none'>]
-        : `alle ${n} ${
-            {
-              daily: 'Tage',
-              weekly: 'Wochen',
-              monthly: 'Monate',
-              yearly: 'Jahre',
-            }[r.type as Exclude<CardRecurType, 'none'>]
-          }`;
-    const start = r.startDate
-      ? ` ab ${new Date(r.startDate).toLocaleDateString('de-DE')}`
-      : '';
-    return `${phrase}${start}`;
+  // Weekly: weekday toggeln (Mon=0..So=6). Wenn schon drin, raus; sonst
+  // rein. Sort damit die Reihenfolge beim Label kanonisch bleibt.
+  async function onRecurToggleWeekday(wd: number) {
+    const cur = recurVal();
+    if (cur.type !== 'weekly') return;
+    const set = new Set(cur.weekdays ?? []);
+    if (set.has(wd)) set.delete(wd);
+    else set.add(wd);
+    await patchRecur({ weekdays: [...set].sort((a, b) => a - b) });
+  }
+
+  async function onRecurMonthType(val: 'day' | 'weekday') {
+    const cur = recurVal();
+    if (cur.type !== 'monthly' && cur.type !== 'yearly') return;
+    if (cur.monthType === val) return;
+    await patchRecur({ monthType: val });
+  }
+
+  async function onRecurDay(val: string) {
+    const n = Number(val);
+    if (!Number.isFinite(n) || n < 1 || n > 31) return;
+    await patchRecur({ day: n });
+  }
+
+  async function onRecurWeekday(val: string) {
+    const n = Number(val);
+    if (!Number.isFinite(n) || n < 0 || n > 6) return;
+    await patchRecur({ weekday: n });
+  }
+
+  async function onRecurWeekdayOrd(val: string) {
+    const n = Number(val);
+    if (!Number.isFinite(n)) return;
+    await patchRecur({ weekdayOrd: n });
+  }
+
+  async function onRecurYearMonth(val: string) {
+    const n = Number(val);
+    if (!Number.isFinite(n) || n < 0 || n > 11) return;
+    await patchRecur({ yearMonth: n });
+  }
+
+  async function onRecurYearDay(val: string) {
+    const n = Number(val);
+    if (!Number.isFinite(n) || n < 1 || n > 31) return;
+    await patchRecur({ yearDay: n });
+  }
+
+  async function onRecurEndType(val: 'never' | 'date' | 'count') {
+    const cur = recurVal();
+    if (cur.endType === val) return;
+    const patch: Partial<CardRecur> = { endType: val };
+    if (val === 'date' && !cur.endDate) {
+      // Sinnvoller Default: 3 Monate ab Start.
+      const base = cur.startDate ? new Date(cur.startDate) : new Date();
+      base.setMonth(base.getMonth() + 3);
+      patch.endDate = base.toISOString().slice(0, 10);
+    }
+    if (val === 'count' && !cur.endCount) {
+      patch.endCount = 10;
+    }
+    await patchRecur(patch);
+  }
+
+  async function onRecurEndDate(val: string) {
+    if (!val) return;
+    await patchRecur({ endDate: val });
+  }
+
+  async function onRecurEndCount(val: string) {
+    const n = Number(val);
+    if (!Number.isFinite(n) || n < 1) return;
+    await patchRecur({ endCount: n });
+  }
+
+  // Verlauf zuruecksetzen: done_occurrences leeren. Nur Bestaetigung
+  // bei >3 Eintraegen — sonst zu strenges Friction.
+  async function onClearOccurrences() {
+    const occ = p.card.done_occurrences ?? [];
+    if (occ.length === 0) return;
+    if (occ.length > 3) {
+      const ok = window.confirm(
+        `${occ.length} erledigte Termine loeschen? Die Historie geht verloren.`,
+      );
+      if (!ok) return;
+    }
+    await wrap(() => setCardDoneOccurrences(p.card.id, []));
   }
 
   async function onToggleArchive() {
@@ -428,28 +545,37 @@ const CardOverlay: Component<Props> = (p) => {
         if (e.target === e.currentTarget) p.onClose();
       }}
     >
-      <div class="overlay-card" role="dialog" aria-modal="true">
-        <header class="overlay-head">
-          <div class="overlay-title">
-            <Show when={isCardDone(p.card)}>
-              <span class="kb-done-mark" aria-hidden>
-                ✓
-              </span>
-            </Show>
+      <div class="overlay-card card-overlay" role="dialog" aria-modal="true">
+        <header class="overlay-head card-overlay-head">
+          {/* Done-Toggle direkt links vom Namen — primaere Aktion auf
+              einer Karte, soll immer auffindbar sein. Bei Recur heisst
+              das Label "Heute erledigt", sonst "Erledigt". */}
+          <label
+            class="card-overlay-done"
+            title={isRecurCard(p.card) ? 'Heutiges Vorkommen abhaken' : 'Karte erledigt markieren'}
+          >
             <input
-              class="overlay-title-input"
-              type="text"
-              value={p.card.name}
-              placeholder="(ohne Titel)"
-              onBlur={(e) => onRename(e.currentTarget.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  (e.currentTarget as HTMLInputElement).blur();
-                }
-              }}
+              type="checkbox"
+              checked={isCardDone(p.card)}
+              onChange={(e) => onToggleDone(e.currentTarget.checked)}
             />
-          </div>
+            <Show when={isCardDone(p.card)}>
+              <span class="kb-done-mark" aria-hidden>✓</span>
+            </Show>
+          </label>
+          <input
+            class="overlay-title-input card-overlay-title"
+            type="text"
+            value={p.card.name}
+            placeholder="(ohne Titel)"
+            onBlur={(e) => onRename(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                (e.currentTarget as HTMLInputElement).blur();
+              }
+            }}
+          />
           <button
             type="button"
             class="overlay-close"
@@ -539,26 +665,7 @@ const CardOverlay: Component<Props> = (p) => {
                 </button>
               </div>
             </label>
-
-            <label class="overlay-field overlay-field-done">
-              <input
-                type="checkbox"
-                checked={isCardDone(p.card)}
-                onChange={(e) => onToggleDone(e.currentTarget.checked)}
-              />
-              <span>
-                {isRecurCard(p.card) ? 'Heute erledigt' : 'Erledigt'}
-              </span>
-            </label>
           </section>
-
-          <Show when={recurVal().type !== 'none'}>
-            <div class="overlay-meta">
-              <span class="kb-recur" title={recurLabel()}>
-                ↻ {recurLabel()}
-              </span>
-            </div>
-          </Show>
 
           <section class="overlay-section overlay-tag-grid">
             <label class="overlay-field">
@@ -609,48 +716,337 @@ const CardOverlay: Component<Props> = (p) => {
             </label>
           </section>
 
-          <section class="overlay-section overlay-recur-grid">
-            <label class="overlay-field">
-              <span class="overlay-field-label">Wiederholung</span>
-              <select
-                class="overlay-input"
-                value={recurVal().type}
-                onChange={(e) => onRecurType(e.currentTarget.value)}
-              >
-                <option value="none">keine</option>
-                <option value="daily">taeglich</option>
-                <option value="weekly">woechentlich</option>
-                <option value="monthly">monatlich</option>
-                <option value="yearly">jaehrlich</option>
-              </select>
-            </label>
+          {/* Recur-Block: Typ-Select + pro-Typ-spezifische Sub-UI +
+              End-Regel + Erledigt-Verlauf. Entspricht buildRecurrenceUI
+              aus matrix_tool_beta.html (Zeilen 4492-4726). */}
+          <section class="overlay-section card-recur">
+            <header class="card-recur-head">
+              <h4>Wiederholung</h4>
+              <Show when={recurVal().type !== 'none'}>
+                <span class="card-recur-summary" title={recurHumanLabel(recurVal()) + (recurEndLabel(recurVal()) ? ' · ' + recurEndLabel(recurVal()) : '')}>
+                  ↻ {recurHumanLabel(recurVal())}
+                  <Show when={recurEndLabel(recurVal())}>
+                    {' '}
+                    <span class="card-recur-end-hint">· {recurEndLabel(recurVal())}</span>
+                  </Show>
+                </span>
+              </Show>
+            </header>
+
+            <div class="card-recur-type-row">
+              <label class="overlay-field">
+                <span class="overlay-field-label">Typ</span>
+                <select
+                  class="overlay-input"
+                  value={recurVal().type}
+                  onChange={(e) => onRecurType(e.currentTarget.value)}
+                >
+                  <option value="none">keine</option>
+                  <option value="daily">taeglich</option>
+                  <option value="weekly">woechentlich</option>
+                  <option value="monthly">monatlich</option>
+                  <option value="yearly">jaehrlich</option>
+                </select>
+              </label>
+
+              <Show when={recurVal().type !== 'none'}>
+                <label class="overlay-field">
+                  <span class="overlay-field-label">Alle</span>
+                  <div class="card-recur-every-row">
+                    <input
+                      type="number"
+                      class="overlay-input card-recur-every"
+                      min="1"
+                      max="365"
+                      value={recurVal().every ?? 1}
+                      onBlur={(e) => onRecurEvery(e.currentTarget.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          (e.currentTarget as HTMLInputElement).blur();
+                        }
+                      }}
+                    />
+                    <span class="card-recur-every-unit">
+                      {
+                        {
+                          daily: 'Tage',
+                          weekly: 'Wochen',
+                          monthly: 'Monate',
+                          yearly: 'Jahre',
+                        }[recurVal().type as Exclude<CardRecurType, 'none'>]
+                      }
+                    </span>
+                  </div>
+                </label>
+
+                <label class="overlay-field">
+                  <span class="overlay-field-label">Start</span>
+                  <input
+                    type="date"
+                    class="overlay-input"
+                    value={recurVal().startDate ?? ''}
+                    onChange={(e) => onRecurStart(e.currentTarget.value)}
+                  />
+                </label>
+              </Show>
+            </div>
+
+            {/* Weekly: 7-Tage-Grid. Mo=0..So=6 (unser Schema). User
+                tickt mehrere Tage an; fire-Check prueft Membership. */}
+            <Show when={recurVal().type === 'weekly'}>
+              <div class="card-recur-block">
+                <span class="card-recur-block-label">Wochentage</span>
+                <div class="card-recur-weekday-grid" role="group" aria-label="Wochentage">
+                  <For each={['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']}>
+                    {(lbl, i) => {
+                      const wd = i();
+                      const isOn = () => (recurVal().weekdays ?? []).includes(wd);
+                      return (
+                        <button
+                          type="button"
+                          class="card-recur-weekday"
+                          classList={{ 'card-recur-weekday-on': isOn() }}
+                          onClick={() => onRecurToggleWeekday(wd)}
+                          aria-pressed={isOn()}
+                          title={['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'][wd]}
+                        >
+                          {lbl}
+                        </button>
+                      );
+                    }}
+                  </For>
+                </div>
+                <Show when={(recurVal().weekdays ?? []).length === 0}>
+                  <p class="card-recur-hint">Mindestens einen Wochentag waehlen, sonst feuert die Regel nie.</p>
+                </Show>
+              </div>
+            </Show>
+
+            {/* Monthly: Radio zwischen "Am Tag X" und "Am N-tem Wochentag".
+                Die jeweils aktive Variante hat ihre Eingabefelder aktiv,
+                die andere bleibt disabled (statt hide — vermeidet Layout-
+                Sprung beim Wechseln). */}
+            <Show when={recurVal().type === 'monthly'}>
+              <div class="card-recur-block">
+                <span class="card-recur-block-label">Regel</span>
+                <div class="card-recur-month-choices">
+                  <label class="card-recur-radio">
+                    <input
+                      type="radio"
+                      name="recur-monthtype"
+                      checked={recurVal().monthType !== 'weekday'}
+                      onChange={() => onRecurMonthType('day')}
+                    />
+                    <span>Am</span>
+                    <input
+                      type="number"
+                      class="overlay-input card-recur-inline-num"
+                      min="1"
+                      max="31"
+                      value={recurVal().day ?? 1}
+                      disabled={recurVal().monthType === 'weekday'}
+                      onBlur={(e) => onRecurDay(e.currentTarget.value)}
+                    />
+                    <span>. des Monats</span>
+                  </label>
+                  <label class="card-recur-radio">
+                    <input
+                      type="radio"
+                      name="recur-monthtype"
+                      checked={recurVal().monthType === 'weekday'}
+                      onChange={() => onRecurMonthType('weekday')}
+                    />
+                    <span>Am</span>
+                    <select
+                      class="overlay-input card-recur-inline-select"
+                      value={recurVal().weekdayOrd ?? 1}
+                      disabled={recurVal().monthType !== 'weekday'}
+                      onChange={(e) => onRecurWeekdayOrd(e.currentTarget.value)}
+                    >
+                      <option value="1">1.</option>
+                      <option value="2">2.</option>
+                      <option value="3">3.</option>
+                      <option value="4">4.</option>
+                      <option value="-1">letzten</option>
+                    </select>
+                    <select
+                      class="overlay-input card-recur-inline-select"
+                      value={recurVal().weekday ?? 0}
+                      disabled={recurVal().monthType !== 'weekday'}
+                      onChange={(e) => onRecurWeekday(e.currentTarget.value)}
+                    >
+                      <option value="0">Mo</option>
+                      <option value="1">Di</option>
+                      <option value="2">Mi</option>
+                      <option value="3">Do</option>
+                      <option value="4">Fr</option>
+                      <option value="5">Sa</option>
+                      <option value="6">So</option>
+                    </select>
+                    <span>des Monats</span>
+                  </label>
+                </div>
+              </div>
+            </Show>
+
+            {/* Yearly: Monat-Dropdown + dieselbe monthType-Logik wie bei
+                monthly. Der Monat gilt fuer beide Varianten. */}
+            <Show when={recurVal().type === 'yearly'}>
+              <div class="card-recur-block">
+                <span class="card-recur-block-label">Regel</span>
+                <label class="card-recur-inline-field">
+                  <span>Im Monat</span>
+                  <select
+                    class="overlay-input card-recur-inline-select"
+                    value={recurVal().yearMonth ?? 0}
+                    onChange={(e) => onRecurYearMonth(e.currentTarget.value)}
+                  >
+                    <For each={['Januar', 'Februar', 'Maerz', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']}>
+                      {(m, i) => <option value={i()}>{m}</option>}
+                    </For>
+                  </select>
+                </label>
+                <div class="card-recur-month-choices">
+                  <label class="card-recur-radio">
+                    <input
+                      type="radio"
+                      name="recur-yearmonthtype"
+                      checked={recurVal().monthType !== 'weekday'}
+                      onChange={() => onRecurMonthType('day')}
+                    />
+                    <span>Am</span>
+                    <input
+                      type="number"
+                      class="overlay-input card-recur-inline-num"
+                      min="1"
+                      max="31"
+                      value={recurVal().yearDay ?? 1}
+                      disabled={recurVal().monthType === 'weekday'}
+                      onBlur={(e) => onRecurYearDay(e.currentTarget.value)}
+                    />
+                    <span>.</span>
+                  </label>
+                  <label class="card-recur-radio">
+                    <input
+                      type="radio"
+                      name="recur-yearmonthtype"
+                      checked={recurVal().monthType === 'weekday'}
+                      onChange={() => onRecurMonthType('weekday')}
+                    />
+                    <span>Am</span>
+                    <select
+                      class="overlay-input card-recur-inline-select"
+                      value={recurVal().weekdayOrd ?? 1}
+                      disabled={recurVal().monthType !== 'weekday'}
+                      onChange={(e) => onRecurWeekdayOrd(e.currentTarget.value)}
+                    >
+                      <option value="1">1.</option>
+                      <option value="2">2.</option>
+                      <option value="3">3.</option>
+                      <option value="4">4.</option>
+                      <option value="-1">letzten</option>
+                    </select>
+                    <select
+                      class="overlay-input card-recur-inline-select"
+                      value={recurVal().weekday ?? 0}
+                      disabled={recurVal().monthType !== 'weekday'}
+                      onChange={(e) => onRecurWeekday(e.currentTarget.value)}
+                    >
+                      <option value="0">Mo</option>
+                      <option value="1">Di</option>
+                      <option value="2">Mi</option>
+                      <option value="3">Do</option>
+                      <option value="4">Fr</option>
+                      <option value="5">Sa</option>
+                      <option value="6">So</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+            </Show>
+
+            {/* Ende-Regel: bei jedem Typ ausser 'none' sichtbar. */}
             <Show when={recurVal().type !== 'none'}>
-              <label class="overlay-field">
-                <span class="overlay-field-label">Intervall</span>
-                <input
-                  type="number"
-                  class="overlay-input"
-                  min="1"
-                  max="365"
-                  value={recurVal().every ?? 1}
-                  onBlur={(e) => onRecurEvery(e.currentTarget.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      (e.currentTarget as HTMLInputElement).blur();
-                    }
-                  }}
-                />
-              </label>
-              <label class="overlay-field">
-                <span class="overlay-field-label">Start</span>
-                <input
-                  type="date"
-                  class="overlay-input"
-                  value={recurVal().startDate ?? ''}
-                  onChange={(e) => onRecurStart(e.currentTarget.value)}
-                />
-              </label>
+              <div class="card-recur-block">
+                <span class="card-recur-block-label">Endet</span>
+                <div class="card-recur-end-choices">
+                  <label class="card-recur-radio">
+                    <input
+                      type="radio"
+                      name="recur-endtype"
+                      checked={(recurVal().endType ?? 'never') === 'never'}
+                      onChange={() => onRecurEndType('never')}
+                    />
+                    <span>unbegrenzt</span>
+                  </label>
+                  <label class="card-recur-radio">
+                    <input
+                      type="radio"
+                      name="recur-endtype"
+                      checked={recurVal().endType === 'date'}
+                      onChange={() => onRecurEndType('date')}
+                    />
+                    <span>am</span>
+                    <input
+                      type="date"
+                      class="overlay-input card-recur-inline-num"
+                      value={recurVal().endDate ?? ''}
+                      disabled={recurVal().endType !== 'date'}
+                      onChange={(e) => onRecurEndDate(e.currentTarget.value)}
+                    />
+                  </label>
+                  <label class="card-recur-radio">
+                    <input
+                      type="radio"
+                      name="recur-endtype"
+                      checked={recurVal().endType === 'count'}
+                      onChange={() => onRecurEndType('count')}
+                    />
+                    <span>nach</span>
+                    <input
+                      type="number"
+                      class="overlay-input card-recur-inline-num"
+                      min="1"
+                      max="9999"
+                      value={recurVal().endCount ?? 10}
+                      disabled={recurVal().endType !== 'count'}
+                      onBlur={(e) => onRecurEndCount(e.currentTarget.value)}
+                    />
+                    <span>Terminen</span>
+                  </label>
+                </div>
+              </div>
+            </Show>
+
+            {/* Erledigt-Verlauf — nur bei vorhandenen Occurrences. */}
+            <Show when={recurVal().type !== 'none' && (p.card.done_occurrences ?? []).length > 0}>
+              <div class="card-recur-block card-recur-occ">
+                <span class="card-recur-block-label">Erledigt</span>
+                <div class="card-recur-occ-row">
+                  <span class="card-recur-occ-count">
+                    {(p.card.done_occurrences ?? []).length}
+                    <Show when={recurVal().endCount && recurVal().endType === 'count'}>
+                      /{recurVal().endCount}
+                    </Show>
+                    {' '}Termine
+                  </span>
+                  <span class="card-recur-occ-last hint">
+                    zuletzt {new Date(
+                      [...(p.card.done_occurrences ?? [])].sort().at(-1) as string,
+                    ).toLocaleDateString('de-DE')}
+                  </span>
+                  <button
+                    type="button"
+                    class="btn-subtle card-recur-occ-clear"
+                    onClick={onClearOccurrences}
+                    disabled={busy()}
+                    title="Alle erledigten Termine entfernen"
+                  >
+                    Verlauf zuruecksetzen
+                  </button>
+                </div>
+              </div>
             </Show>
           </section>
 

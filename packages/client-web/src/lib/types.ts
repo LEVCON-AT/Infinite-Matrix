@@ -112,10 +112,15 @@ export type InlineChecklistItem = {
 };
 
 // Wiederkehr-Konfiguration (kb_cards.recur jsonb, auch checklists.recur).
-// V1: nur type + every + startDate. V2 kommt weekday-Grid (weekly),
-// monthType (monthly), end-Rules (date/count). Alle Zusatzfelder sind
-// heute schon optional — spaetere Features duerfen sie befuellen, ohne
-// den V1-Typ zu brechen.
+// Volle Parity mit HTML-Vorbild + recur.ts:RecurRule. Alle Zusatzfelder
+// sind optional — pro type werden die passenden befuellt:
+//  - daily:   every, startDate
+//  - weekly:  every, startDate, weekdays[] (Mon=0..Sun=6)
+//  - monthly: every, startDate, monthType='day' → day
+//                               monthType='weekday' → weekday + weekdayOrd
+//  - yearly:  every, startDate, yearMonth, monthType='day' → yearDay
+//                                          monthType='weekday' → weekday + weekdayOrd
+// + endType: 'never' | 'date' → endDate | 'count' → endCount
 export type CardRecurType =
   | 'none'
   | 'daily'
@@ -127,9 +132,22 @@ export type CardRecur = {
   type: CardRecurType;
   every?: number;
   startDate?: string;
-  weekday?: boolean[];
+  // weekly: Array aus 0-6 (Mo=0..So=6). Legacy `weekday:number` bleibt
+  // im Datum als Fallback — wird beim naechsten Edit auf weekdays[]
+  // migriert.
+  weekdays?: number[];
+  weekday?: number; // legacy single
+  // monthly/yearly: Wochentag-Modus braucht weekday + weekdayOrd
+  //   ord = 1..4 (erster/zweiter/... Wochentag) oder -1 (letzter).
   monthType?: 'day' | 'weekday';
-  day?: number;
+  weekdayOrd?: number;
+  day?: number; // 1..31 fuer monthType='day'
+  // yearly spezifisch:
+  yearMonth?: number; // 0..11
+  yearDay?: number; // 1..31
+  anchorMonth?: number; // legacy
+  anchorDay?: number; // legacy
+  // End-Rules:
   endType?: 'never' | 'date' | 'count';
   endDate?: string;
   endCount?: number;
