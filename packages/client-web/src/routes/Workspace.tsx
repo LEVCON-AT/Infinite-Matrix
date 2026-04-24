@@ -34,7 +34,6 @@ import { toggleTheme, useTheme } from '../lib/theme';
 import { subscribeWorkspace } from '../lib/realtime';
 import { clearAliasIndex, fetchAliasIndex, scheduleAliasRefresh } from '../lib/alias-index';
 import { useTreeExpand } from '../lib/tree-expand';
-import { downloadWorkspaceExport, exportWorkspace } from '../lib/export';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
@@ -52,7 +51,6 @@ import { aliasChipMenuState, closeAliasChipMenu } from '../lib/alias-chip-menu';
 import CommandPalette from '../components/CommandPalette';
 import DocsPopup from '../components/DocsPopup';
 import GlobalSearch from '../components/GlobalSearch';
-import ImportDialog from '../components/ImportDialog';
 import KeyboardHelp from '../components/KeyboardHelp';
 import SettingsModal from '../components/SettingsModal';
 import { useSettingsBodyClassSync } from '../lib/settings';
@@ -136,7 +134,6 @@ const Workspace: Component = () => {
   });
 
   const [workspaces] = createResource(() => fetchMyWorkspaces());
-  const [showImport, setShowImport] = createSignal(false);
   const [showSearch, setShowSearch] = createSignal(false);
   // `^` bleibt Modal-Trigger fuer CommandPalette (DeadKey-Sicherheit auf
   // DE-Layouts). Die neue HeaderSearchBar (Focus via `f`) deckt Suche +
@@ -163,23 +160,6 @@ const Workspace: Component = () => {
     void req.tick; // dependency registrieren
     if (!showDocs()) setShowDocs(true);
   });
-  const [exporting, setExporting] = createSignal(false);
-
-  async function onExport() {
-    if (!params.workspaceId || exporting()) return;
-    setExporting(true);
-    try {
-      const data = await exportWorkspace(params.workspaceId);
-      const name = currentWs()?.name ?? 'workspace';
-      downloadWorkspaceExport(data, name);
-      showToast('Export heruntergeladen.', 'success');
-    } catch (err) {
-      showToast(translateDbError(err), 'error');
-    } finally {
-      setExporting(false);
-    }
-  }
-
   // Default-Workspace auswaehlen, wenn URL keinen fuehrt.
   createEffect(() => {
     if (params.workspaceId) return;
@@ -712,21 +692,6 @@ const Workspace: Component = () => {
     });
   });
 
-  async function onImported(rootNodeId: string) {
-    // Tree neu laden, damit der Import im Sidebar sichtbar wird,
-    // dann zur neuen Root-Node navigieren.
-    await Promise.all([
-      refetchNodes(),
-      refetchCells(),
-      refetchRows(),
-      refetchCols(),
-    ]);
-    setShowImport(false);
-    if (params.workspaceId) {
-      navigate(`/w/${params.workspaceId}/n/${rootNodeId}`);
-    }
-  }
-
   return (
     <div class="ws-shell" data-sb-mode={sidebar.mode()}>
       <aside class="ws-sidebar" data-sb-mode={sidebar.mode()}>
@@ -779,28 +744,10 @@ const Workspace: Component = () => {
             }}
           />
         </Show>
-        <div class="ws-actions">
-          <Show when={params.workspaceId}>
-            <button
-              type="button"
-              class="btn-subtle"
-              onClick={() => setShowImport(true)}
-            >
-              <Icon name="plus" size={14} />
-              JSON importieren
-            </button>
-            <button
-              type="button"
-              class="btn-subtle"
-              onClick={onExport}
-              disabled={exporting()}
-              title="Kompletten Workspace als JSON herunterladen"
-            >
-              <Icon name="arrow-down-tray" size={14} />
-              Export
-            </button>
-          </Show>
-        </div>
+        {/* Workspace-Level Import/Export haben wir entfernt — Import +
+            Export laufen ausschliesslich ueber das Sidebar-Kontextmenue
+            jeder Ebene (Matrix, Board, Zelle, Feature). Fuer komplette
+            Workspace-Operationen gibt es das `^reset -all`-Command. */}
 
         <div class="ws-user-block">
           <span class="ws-email">{user()?.email}</span>
@@ -820,14 +767,6 @@ const Workspace: Component = () => {
         >
           ›
         </button>
-      </Show>
-
-      <Show when={showImport() && params.workspaceId}>
-        <ImportDialog
-          workspaceId={params.workspaceId as string}
-          onClose={() => setShowImport(false)}
-          onImported={onImported}
-        />
       </Show>
 
       {/* Singleton-Dropdown fuer Alias-Autocomplete. Sichtbarkeit steuert
