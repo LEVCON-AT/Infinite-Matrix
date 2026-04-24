@@ -44,15 +44,19 @@ export function parseImportPayload(rawJson: string): WorkspaceExport {
   try {
     parsed = JSON.parse(rawJson);
   } catch {
-    throw new ImportError('Datei ist kein gueltiges JSON.');
+    throw new ImportError(
+      'Diese Datei ist keine gueltige JSON-Datei. Waehle einen Infinite-Matrix-Export.',
+    );
   }
   if (!parsed || typeof parsed !== 'object') {
-    throw new ImportError('Datei hat falsche Struktur.');
+    throw new ImportError(
+      'Diese Datei sieht nicht wie ein Infinite-Matrix-Export aus.',
+    );
   }
   const p = parsed as Record<string, unknown>;
   if (p.version !== WORKSPACE_EXPORT_VERSION) {
     throw new ImportError(
-      `Export-Version ${String(p.version)} wird nicht unterstuetzt (erwartet ${WORKSPACE_EXPORT_VERSION}).`,
+      `Diese Export-Datei kommt aus einer anderen Version (${String(p.version)}). Unterstuetzt wird aktuell nur Version ${WORKSPACE_EXPORT_VERSION}.`,
     );
   }
   const payloadType = p.payloadType as ExportPayloadType | undefined;
@@ -63,7 +67,7 @@ export function parseImportPayload(rawJson: string): WorkspaceExport {
     payloadType !== 'feature-checklists'
   ) {
     throw new ImportError(
-      `Export-Typ "${String(payloadType)}" wird nicht unterstuetzt.`,
+      'Diese Datei hat keinen erkennbaren Export-Typ. Vielleicht stammt sie aus einem anderen Tool?',
     );
   }
   // Minimale Struktur-Checks — fehlende Arrays werden auf [] ersetzt
@@ -102,7 +106,7 @@ export function checkTypeCompatibility(
   switch (target.kind) {
     case 'matrix':
       if (p !== 'subtree' && p !== 'workspace') {
-        return 'In eine Matrix kann nur ein Subtree-Export importiert werden, kein Feature.';
+        return 'In eine Matrix kannst du nur einen Bereichs-Export laden (eine komplette Matrix oder ein komplettes Board). Einzelne Info- oder Checklisten-Exporte gehoeren in eine Zelle.';
       }
       return null;
     case 'cell':
@@ -111,17 +115,17 @@ export function checkTypeCompatibility(
         p !== 'feature-info' &&
         p !== 'feature-checklists'
       ) {
-        return 'In eine Zelle kann nur ein Subtree- oder Feature-Export importiert werden.';
+        return 'In eine Zelle passt nur ein Bereichs-Export (Matrix/Board) oder ein Feature-Export (Info/Checklisten). Diese Datei hat einen anderen Typ.';
       }
       return null;
     case 'feature-info':
       if (p !== 'feature-info') {
-        return 'In ein Info-Feature kann nur ein Info-Feature-Export importiert werden.';
+        return 'Hier kannst du nur Info-Exporte einfuegen (Felder + Links). Bitte waehle eine passende Datei.';
       }
       return null;
     case 'feature-checklists':
       if (p !== 'feature-checklists') {
-        return 'In Checklisten kann nur ein Checklisten-Export importiert werden.';
+        return 'Hier kannst du nur Checklisten-Exporte einfuegen. Bitte waehle eine passende Datei.';
       }
       return null;
   }
@@ -260,7 +264,9 @@ export async function executeSubtreeImportIntoCell(args: {
 }): Promise<{ rootNodeId: string; aliasMap: Map<string, string> }> {
   const { payload, workspaceId, targetCellId } = args;
   if (payload.payloadType !== 'subtree' && payload.payloadType !== 'workspace') {
-    throw new ImportError('Nur Subtree-Exports koennen in eine Zelle geladen werden.');
+    throw new ImportError(
+      'In eine Zelle mit Sub-Struktur passt nur ein Bereichs-Export. Diese Datei ist ein anderer Typ.',
+    );
   }
 
   // Root-Node finden: der erste Node, dessen parent_cell_id NULL ist.
@@ -268,7 +274,9 @@ export async function executeSubtreeImportIntoCell(args: {
     (n) => !n.parent_cell_id,
   );
   if (!rootRow) {
-    throw new ImportError('Export enthaelt keinen Root-Node.');
+    throw new ImportError(
+      'Der Export ist unvollstaendig — es fehlt der Start-Punkt. Die Datei ist vermutlich beschaedigt.',
+    );
   }
 
   // Target-Cell einmal laden, damit wir FK-Slot (child_matrix_id /
@@ -279,15 +287,19 @@ export async function executeSubtreeImportIntoCell(args: {
     .eq('id', targetCellId)
     .single();
   if (tcErr || !targetCell) {
-    throw new ImportError('Ziel-Zelle nicht gefunden.');
+    throw new ImportError(
+      'Die Ziel-Zelle konnte nicht geladen werden — wurde sie gerade geloescht?',
+    );
   }
   if (rootRow.type === 'matrix' && targetCell.child_matrix_id) {
     throw new ImportError(
-      'Ziel-Zelle hat bereits eine Sub-Matrix. Bitte erst entfernen.',
+      'Diese Zelle hat schon eine Sub-Matrix. Entferne sie zuerst oder waehle eine leere Zelle.',
     );
   }
   if (rootRow.type === 'board' && targetCell.board_id) {
-    throw new ImportError('Ziel-Zelle hat bereits ein Sub-Board.');
+    throw new ImportError(
+      'Diese Zelle hat schon ein Sub-Board. Entferne es zuerst oder waehle eine leere Zelle.',
+    );
   }
 
   const remapMap: RemapMap = new Map();
@@ -517,11 +529,15 @@ export async function executeFeatureInfoImport(args: {
 }): Promise<{ fieldsAdded: number; linksAdded: number }> {
   const { payload, targetCellId } = args;
   if (payload.payloadType !== 'feature-info') {
-    throw new ImportError('Payload ist kein Info-Feature-Export.');
+    throw new ImportError(
+      'Das ist kein Info-Export. Bitte waehle eine Info-Datei (enthaelt Felder und Links).',
+    );
   }
   const sourceCell = payload.cells[0];
   if (!sourceCell) {
-    throw new ImportError('Export enthaelt keine Zelle.');
+    throw new ImportError(
+      'Die Info-Export-Datei ist leer — keine Felder oder Links drin.',
+    );
   }
   const sourceData =
     ((sourceCell as { data?: unknown }).data as Record<string, unknown>) ?? {};
@@ -543,7 +559,9 @@ export async function executeFeatureInfoImport(args: {
     .eq('id', targetCellId)
     .single();
   if (tcErr || !targetCell) {
-    throw new ImportError('Ziel-Zelle nicht gefunden.');
+    throw new ImportError(
+      'Die Ziel-Zelle konnte nicht geladen werden — wurde sie gerade geloescht?',
+    );
   }
   const targetData =
     ((targetCell.data as unknown) as Record<string, unknown>) ?? {};
@@ -596,7 +614,9 @@ export async function executeFeatureChecklistsImport(args: {
 }): Promise<{ checklistsAdded: number; itemsAdded: number }> {
   const { payload, workspaceId, targetCellId } = args;
   if (payload.payloadType !== 'feature-checklists') {
-    throw new ImportError('Payload ist kein Checklisten-Feature-Export.');
+    throw new ImportError(
+      'Das ist kein Checklisten-Export. Bitte waehle eine Checklisten-Datei.',
+    );
   }
   const aliasMap = await reserveAliases(workspaceId, collectAliases(payload));
   const remapMap: RemapMap = new Map();
@@ -684,7 +704,9 @@ export async function executeSubtreeImportIntoMatrix(args: {
 }): Promise<{ rootNodeId: string; cellId: string }> {
   const { payload, workspaceId, targetMatrixId } = args;
   if (payload.payloadType !== 'subtree' && payload.payloadType !== 'workspace') {
-    throw new ImportError('In eine Matrix laesst sich nur ein Subtree importieren.');
+    throw new ImportError(
+      'In eine Matrix kannst du nur einen Bereichs-Export einfuegen (Matrix oder Board).',
+    );
   }
 
   // 1. Neue Row + Col unten rechts anlegen.
@@ -714,7 +736,10 @@ export async function executeSubtreeImportIntoMatrix(args: {
   const rootRow = (payload.nodes as Array<{ id: string; type: string; parent_cell_id: string | null; label?: string }>).find(
     (n) => !n.parent_cell_id,
   );
-  if (!rootRow) throw new ImportError('Export enthaelt keinen Root-Node.');
+  if (!rootRow)
+    throw new ImportError(
+      'Der Export ist unvollstaendig — es fehlt der Start-Punkt. Die Datei ist vermutlich beschaedigt.',
+    );
   const label = typeof rootRow.label === 'string' ? rootRow.label : 'Import';
 
   const newRowId = newUuid();

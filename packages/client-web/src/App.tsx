@@ -4,6 +4,7 @@ import { bootstrapAuth, useAuthReady, useSession } from './lib/auth';
 import { useEditModeHotkey } from './lib/edit-mode';
 import { useThemeBootstrap } from './lib/theme';
 import Toasts from './components/Toasts';
+import DialogHost from './components/DialogHost';
 
 bootstrapAuth();
 
@@ -33,6 +34,7 @@ const App: ParentComponent = (props): JSX.Element => {
         {props.children}
       </Show>
       <Toasts />
+      <DialogHost />
     </div>
   );
 };

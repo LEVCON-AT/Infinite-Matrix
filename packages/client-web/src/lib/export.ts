@@ -401,7 +401,10 @@ export async function exportCellSubtree(
 ): Promise<WorkspaceExport> {
   const all = await fetchWorkspaceRowsForExport(workspaceId);
   const cell = all.cells.find((c) => c.id === cellId);
-  if (!cell) throw new Error('Zelle nicht gefunden.');
+  if (!cell)
+    throw new Error(
+      'Die Zelle konnte nicht geladen werden — wurde sie gerade geloescht?',
+    );
 
   // Sammle IDs aus Sub-Matrix UND Sub-Board als Roots. Dann Cell/Row/Col
   // manuell dazu, weil collectSubtreeIds bei Cell-Ebene ansetzt wuerde
@@ -512,7 +515,10 @@ export async function exportFeatureInfo(
 ): Promise<WorkspaceExport> {
   const all = await fetchWorkspaceRowsForExport(workspaceId);
   const cell = all.cells.find((c) => c.id === cellId);
-  if (!cell) throw new Error('Zelle nicht gefunden.');
+  if (!cell)
+    throw new Error(
+      'Die Zelle konnte nicht geladen werden — wurde sie gerade geloescht?',
+    );
   return {
     version: WORKSPACE_EXPORT_VERSION,
     payloadType: 'feature-info',
@@ -538,7 +544,10 @@ export async function exportFeatureChecklists(
 ): Promise<WorkspaceExport> {
   const all = await fetchWorkspaceRowsForExport(workspaceId);
   const cell = all.cells.find((c) => c.id === cellId);
-  if (!cell) throw new Error('Zelle nicht gefunden.');
+  if (!cell)
+    throw new Error(
+      'Die Zelle konnte nicht geladen werden — wurde sie gerade geloescht?',
+    );
   const cellChecklists = all.checklists.filter((cl) => cl.cell_id === cellId);
   const clIds = new Set(cellChecklists.map((cl) => cl.id));
   const items = all.checklist_items.filter((it) => clIds.has(it.checklist_id));

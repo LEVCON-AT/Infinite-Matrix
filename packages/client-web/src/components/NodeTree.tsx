@@ -24,6 +24,7 @@ import type { ParsedPasteItem } from '../lib/checklist-paste-parse';
 import { cellTarget } from '../lib/alias-dispatch';
 import { supabase } from '../lib/supabase';
 import { showToast } from '../lib/toasts';
+import { showChoice, showConfirm, showPrompt } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
 import { useVis } from '../lib/settings';
 import { useEditMode } from '../lib/edit-mode';
@@ -525,13 +526,13 @@ const NodeTree: Component<Props> = (props) => {
         return;
       }
       const summary = summarizeExport(payload);
-      if (
-        !window.confirm(
-          `Import: ${summary}. Unter dem gewaehlten Ziel einhaengen?`,
-        )
-      ) {
-        return;
-      }
+      const ok = await showConfirm({
+        title: 'Import einfuegen?',
+        message: `Dieser Export enthaelt: ${summary}.\n\nDie Daten werden unter dem gewaehlten Ziel angehaengt. Aliase mit gleichem Namen bekommen einen Suffix (z.B. "-2").`,
+        confirmLabel: 'Einfuegen',
+        cancelLabel: 'Abbrechen',
+      });
+      if (!ok) return;
       if (target.kind === 'matrix') {
         await runMenuMutation(
           () =>
@@ -604,34 +605,37 @@ const NodeTree: Component<Props> = (props) => {
     }
   }
 
-  // Delete-Flow mit Export-vor-Loeschen: zweistufig. Erst 'Vor dem
-  // Loeschen exportieren?' (OK / Cancel) — bei OK wird der Export
-  // ausgefuehrt; danach zweite Bestaetigung 'Jetzt wirklich loeschen?'.
-  // Cancel am ersten Prompt ist NICHT abort; der User kann loeschen
-  // ohne Export. Abort geht nur durch Cancel am zweiten Prompt.
+  // Delete-Flow mit Export-vor-Loeschen als Single-Choice-Dialog:
+  // 3 Optionen nebeneinander (Export+Loeschen, Nur Loeschen, Abbruch).
+  // Kein Doppelprompt mehr — die Daten sind in einem Schritt weg oder
+  // gesichert. Die Buttons tragen die Semantik, nicht die Reihenfolge.
   async function deleteWithExportPrompt(args: {
     label: string;
     exportFn: () => Promise<void>;
     deleteFn: () => Promise<void>;
     successMsg: string;
   }): Promise<void> {
-    const doExport = window.confirm(
-      `Vor dem Loeschen exportieren? "${args.label}"\n\nOK = Export + Loeschen\nAbbrechen = nur Loeschen`,
-    );
-    if (doExport) {
+    const choice = await showChoice({
+      title: 'Loeschen',
+      message: `"${args.label}" loeschen? Das laesst sich nicht rueckgaengig machen.\n\nWillst du vorher einen Export speichern, damit du die Daten spaeter wieder einspielen koenntest?`,
+      choices: [
+        {
+          id: 'export-delete',
+          label: 'Export speichern + Loeschen',
+          variant: 'danger',
+        },
+        { id: 'delete', label: 'Nur Loeschen', variant: 'danger' },
+        { id: 'cancel', label: 'Abbrechen', variant: 'default' },
+      ],
+    });
+    if (!choice || choice === 'cancel') return;
+    if (choice === 'export-delete') {
       try {
         await args.exportFn();
       } catch (err) {
         showToast(translateDbError(err), 'error');
-        return; // Export fehlgeschlagen → kein Loeschen
+        return; // Export fehlgeschlagen → kein Loeschen, Daten sind sicher
       }
-    }
-    if (
-      !window.confirm(
-        `Jetzt wirklich loeschen? "${args.label}"\n\nKann nicht rueckgaengig gemacht werden.`,
-      )
-    ) {
-      return;
     }
     try {
       await args.deleteFn();
@@ -956,17 +960,21 @@ const NodeTree: Component<Props> = (props) => {
         label: 'Umbenennen',
         icon: '✎',
         onClick: () => {
-          const next = window.prompt(
-            `Neuer Name fuer "${entry.node.label}":`,
-            entry.node.label,
-          );
-          if (next === null) return;
-          const trimmed = next.trim();
-          if (!trimmed || trimmed === entry.node.label) return;
           void (async () => {
+            const next = await showPrompt({
+              title: 'Umbenennen',
+              message: `Neuer Name fuer "${entry.node.label}":`,
+              initialValue: entry.node.label,
+              placeholder: 'Name…',
+              confirmLabel: 'Umbenennen',
+            });
+            if (next === null) return;
+            const trimmed = next.trim();
+            if (!trimmed || trimmed === entry.node.label) return;
             try {
               await renameNode(entry.id, trimmed);
               showToast(`Umbenannt in "${trimmed}".`, 'success');
+              props.onChanged?.();
             } catch (err) {
               showToast(translateDbError(err), 'error');
             }
@@ -1054,19 +1062,34 @@ const NodeTree: Component<Props> = (props) => {
           label: '+ Link (Info)',
           icon: '+',
           onClick: () => {
-            const url = window.prompt('URL oder E-Mail-Adresse:', 'https://');
-            if (!url) return;
-            const trimmed = url.trim();
-            if (!trimmed) return;
-            const label = window.prompt('Anzeigetext (optional):', '') ?? '';
-            void runMenuMutation(async () => {
-              await ensureCellFeature(cell, 'info');
-              await addCellLink({
-                cellId: cell.id,
-                label,
-                url: trimmed,
+            void (async () => {
+              const url = await showPrompt({
+                title: '+ Link',
+                message: 'URL oder E-Mail-Adresse:',
+                initialValue: 'https://',
+                placeholder: 'https://... oder name@firma.de',
+                confirmLabel: 'Weiter',
               });
-            }, 'Link angelegt.');
+              if (url === null) return;
+              const trimmed = url.trim();
+              if (!trimmed) return;
+              const label =
+                (await showPrompt({
+                  title: '+ Link',
+                  message: 'Anzeigetext (optional, sonst wird die URL gezeigt):',
+                  initialValue: '',
+                  placeholder: 'z.B. Dokumentation',
+                  confirmLabel: 'Anlegen',
+                })) ?? '';
+              await runMenuMutation(async () => {
+                await ensureCellFeature(cell, 'info');
+                await addCellLink({
+                  cellId: cell.id,
+                  label,
+                  url: trimmed,
+                });
+              }, 'Link angelegt.');
+            })();
           },
         });
         items.push({
@@ -1158,20 +1181,35 @@ const NodeTree: Component<Props> = (props) => {
           label: '+ Link',
           icon: '+',
           onClick: () => {
-            const url = window.prompt('URL oder E-Mail-Adresse:', 'https://');
-            if (!url) return;
-            const trimmed = url.trim();
-            if (!trimmed) return;
-            const label = window.prompt('Anzeigetext (optional):', '') ?? '';
-            void runMenuMutation(
-              () =>
-                addCellLink({
-                  cellId,
-                  label,
-                  url: trimmed,
-                }),
-              'Link angelegt.',
-            );
+            void (async () => {
+              const url = await showPrompt({
+                title: '+ Link',
+                message: 'URL oder E-Mail-Adresse:',
+                initialValue: 'https://',
+                placeholder: 'https://... oder name@firma.de',
+                confirmLabel: 'Weiter',
+              });
+              if (url === null) return;
+              const trimmed = url.trim();
+              if (!trimmed) return;
+              const label =
+                (await showPrompt({
+                  title: '+ Link',
+                  message: 'Anzeigetext (optional, sonst wird die URL gezeigt):',
+                  initialValue: '',
+                  placeholder: 'z.B. Dokumentation',
+                  confirmLabel: 'Anlegen',
+                })) ?? '';
+              await runMenuMutation(
+                () =>
+                  addCellLink({
+                    cellId,
+                    label,
+                    url: trimmed,
+                  }),
+                'Link angelegt.',
+              );
+            })();
           },
         });
       }
