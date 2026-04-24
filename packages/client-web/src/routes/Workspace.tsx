@@ -614,11 +614,15 @@ const Workspace: Component = () => {
   return (
     <div class="ws-shell" data-sb-mode={sidebar.mode()}>
       <aside class="ws-sidebar" data-sb-mode={sidebar.mode()}>
-        {/* Schmale Top-Bar nur mit Collapse-Button — Pendant zur
-            ws-main-header (beide 44px hoch, gleiche Y-Linie). Der
-            WorkspaceSwitcher sitzt als normaler Sidebar-Content
-            darunter. */}
+        {/* Schmale Top-Bar — Pendant zur ws-main-header. Workspace-
+            Switcher-Chip links (flex:1), Collapse-Button rechts.
+            Beide Seiten auf derselben Y-Linie mit dem Main-Header-
+            Content rechts. */}
         <div class="ws-sidebar-head">
+          <WorkspaceSwitcher
+            workspaces={workspaces()}
+            currentWorkspaceId={params.workspaceId}
+          />
           <button
             type="button"
             class="ws-sidebar-mode-btn"
@@ -647,10 +651,6 @@ const Workspace: Component = () => {
             </Show>
           </button>
         </div>
-        <WorkspaceSwitcher
-          workspaces={workspaces()}
-          currentWorkspaceId={params.workspaceId}
-        />
         <Show when={params.workspaceId}>
           <NodeTree
             workspaceId={params.workspaceId as string}
@@ -755,7 +755,9 @@ const Workspace: Component = () => {
         >
           <header class="ws-main-header">
             <nav class="ws-breadcrumb" aria-label="Breadcrumb">
-              <span class="ws-breadcrumb-ws">{currentWs()?.name}</span>
+              {/* Workspace-Ebene entfernt — der WorkspaceSwitcher-Chip
+                  oben links in der Sidebar zeigt den Workspace-Namen
+                  bereits auf gleicher Y-Linie. Doppelung raus. */}
               <For each={breadcrumb()}>
                 {(crumb, i) => {
                   // Wenn auf /c/:cellId — die Cell-Row/Col-Span folgt NACH
@@ -765,9 +767,14 @@ const Workspace: Component = () => {
                     !currentCell() && i() === breadcrumb().length - 1;
                   return (
                     <>
-                      <span class="ws-breadcrumb-sep" aria-hidden>
-                        <Icon name="chevron-right" size={14} />
-                      </span>
+                      {/* Kein Separator vor dem ersten Crumb — der
+                          Workspace-Eintrag ist aus dem Breadcrumb raus,
+                          der erste Matrix/Board-Eintrag startet sauber. */}
+                      <Show when={i() > 0}>
+                        <span class="ws-breadcrumb-sep" aria-hidden>
+                          <Icon name="chevron-right" size={14} />
+                        </span>
+                      </Show>
                       <Show
                         when={!isLast()}
                         fallback={

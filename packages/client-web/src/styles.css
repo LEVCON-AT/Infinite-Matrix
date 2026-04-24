@@ -513,17 +513,17 @@ button[type='submit']:hover:not(:disabled) {
   display: none;
 }
 
-/* Sidebar-Head: schmale Top-Leiste nur fuer den Collapse-Button.
-   Pendant zur ws-main-header — beide 44px hoch, border-bottom, Surface-
-   Weiss. Negative Side-Margins ziehen die Leiste bis an die Sidebar-
-   Kanten. Justify-end: Button steht rechts wie der Avatar-Chip im Main-
-   Header links-zentriert sitzt. */
+/* Sidebar-Head: schmale Top-Leiste mit WorkspaceSwitcher-Chip (links,
+   flex:1) + Collapse-Button (rechts, fix). Pendant zur ws-main-header
+   — beide 44px hoch, border-bottom, Surface-Weiss. Negative Side-
+   Margins ziehen die Leiste bis an die Sidebar-Kanten. Overflow-hidden
+   verhindert dass der Switcher-Chip die Hoehe aufblaeht wenn sein
+   Content (Name + Role-Badge) zu breit waere. */
 .ws-sidebar-head {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: var(--space-xs);
-  padding: var(--space-sm) var(--space-md);
+  padding: var(--space-xs) var(--space-sm);
   margin: 0 calc(-1 * var(--space-sm));
   border-bottom: 0.5px solid var(--border);
   background: var(--surface);
@@ -531,30 +531,38 @@ button[type='submit']:hover:not(:disabled) {
   height: 44px;
   box-sizing: border-box;
   flex: 0 0 auto;
+  overflow: hidden;
 }
 
-/* ws-switcher ist nicht mehr im Head — die alte flex:1-Regel ist
-   obsolet. Platzhalter behalten wir fuer den Fall dass andere Stellen
-   den Selector noch referenzieren. */
+.ws-sidebar-head .ws-switcher {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
 
 .ws-sidebar-mode-btn {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  border: 0.5px solid var(--border2);
+  border: 1px solid var(--border2);
   border-radius: var(--rs);
   background: transparent;
   color: var(--text2);
   cursor: pointer;
-  font-size: 14px;
-  line-height: 1;
-  transition: background var(--tr-std), color var(--tr-std);
+  /* Icon-Zentrierung: inline-flex + center/center. Ohne das sitzt
+     das SVG linksbuendig in der Button-Box. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--tr-std), color var(--tr-std),
+    border-color var(--tr-std);
 }
 
 .ws-sidebar-mode-btn:hover {
-  background: var(--bg);
+  background: var(--surface-hover);
   color: var(--text);
+  border-color: var(--text3);
 }
 
 /* Im Rails-Modus: Mode-Btn stackt unter den WorkspaceSwitcher-Platzhalter
@@ -876,22 +884,26 @@ button[type='submit']:hover:not(:disabled) {
 }
 
 .theme-toggle-btn {
-  width: 30px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  font-size: 14px;
-  line-height: 1;
-  border: 0.5px solid var(--border2);
-  background: transparent;
+  border: 1px solid var(--border2);
+  background: var(--surface);
   color: var(--text2);
-  border-radius: 999px;
+  border-radius: var(--rs);
   cursor: pointer;
-  transition: var(--tr-std);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  transition: background var(--tr-std), color var(--tr-std),
+    border-color var(--tr-std);
 }
 
 .theme-toggle-btn:hover {
-  background: var(--bg2);
+  background: var(--surface-hover);
   color: var(--text);
+  border-color: var(--text3);
 }
 
 .theme-toggle-btn:focus-visible {
@@ -2217,29 +2229,27 @@ button[type='submit']:hover:not(:disabled) {
   min-width: 0;
 }
 
-/* Chevron-Spalte: fixe 16x20-Box, deutlich sichtbar (text2 + 12px).
-   Chevron ist der PRIMAERE Klick-Affordance fuer Expand/Collapse —
-   darf nicht im Canvas-Grau verschwinden. Button-Padding/Border ist
-   aus (reiner Icon-Click), Hover bringt leichten Surface-Tone. */
+/* Chevron-Spalte: quadratische 20x20-Box damit die 90deg-Rotation
+   beim Expand nicht von overflow:hidden weggeschnitten wird. Vorher
+   war sie 16x20 (rechteckig) — die Rotation tauschte Breite/Hoehe
+   und Teile des SVG wurden abgeschnitten. Quadratisch + overflow
+   visible loest das. */
 .tree-chevron {
-  flex: 0 0 16px;
+  flex: 0 0 20px;
   box-sizing: border-box;
-  width: 16px;
-  min-width: 0;
-  max-width: 16px;
+  width: 20px;
   height: 20px;
   padding: 0;
   background: transparent;
   border: 0;
   border-radius: var(--rs);
   color: var(--text2);
-  font-size: 12px;
   line-height: 1;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  overflow: visible;
   transform: rotate(0deg);
   transition: transform var(--tr-std), color var(--tr-std), background var(--tr-std);
 }
@@ -2262,8 +2272,8 @@ button[type='submit']:hover:not(:disabled) {
 }
 
 .tree-chevron-empty {
-  flex: 0 0 16px;
-  width: 16px;
+  flex: 0 0 20px;
+  width: 20px;
   height: 20px;
   display: inline-block;
 }
@@ -2333,7 +2343,11 @@ button[type='submit']:hover:not(:disabled) {
 
 .tree-root {
   position: relative;
-  z-index: 1;
+  /* Tree-Content (Chevrons, Labels, Dots) ueber der SVG-Rail-Layer —
+     sonst ueberdecken die SVG-Kreise und -Pfade die Chevron-Icons und
+     der User sieht keine Klick-Affordance. SVG-Rail-Layer bleibt
+     dahinter, im Raum zwischen den Zeilen sichtbar. */
+  z-index: 2;
 }
 
 .tree-connections {
@@ -2342,7 +2356,7 @@ button[type='submit']:hover:not(:disabled) {
   left: 0;
   pointer-events: none;
   overflow: visible;
-  z-index: 2;
+  z-index: 1;
 }
 
 .tree-connections path {
@@ -4104,11 +4118,15 @@ button[type='submit']:hover:not(:disabled) {
   background: transparent;
   color: var(--text2);
   border: 0;
-  font-size: 14px;
   cursor: pointer;
-  padding: 2px 8px;
+  padding: 0;
+  width: 32px;
+  height: 32px;
   border-radius: var(--rs);
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
 }
 
 .overlay-close:hover {
