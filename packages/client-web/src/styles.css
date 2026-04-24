@@ -3212,28 +3212,32 @@ button[type='submit']:hover:not(:disabled) {
   max-width: 80px;
 }
 
-/* Kanban-Karte */
+/* Kanban-Karte — HyperUI-Paper-Look: weisse Surface, dezenter
+   Schatten (sm), klarer Border. Links Feature-Farb-Leiste (5px). */
 .kb-card {
-  background: var(--bg);
-  border: 0.5px solid var(--border2);
-  border-radius: var(--r);
-  padding: 9px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  padding: 10px 12px;
   cursor: pointer;
   transition: background var(--tr-std), border-color var(--tr-std),
-    box-shadow var(--tr-std);
-  border-left: 5px solid transparent;
+    box-shadow var(--tr-std), transform var(--tr-std);
+  border-left: 3px solid var(--border2);
+  box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
 }
 
 .kb-card:hover {
-  background: var(--bg2);
-  box-shadow: var(--shadow-sm);
+  border-color: var(--border2);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .kb-card:focus-visible {
   border-color: var(--focus-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-color) 20%, transparent);
 }
 
 .kb-card[data-prio='3'] { border-left-color: var(--red); }
@@ -4039,8 +4043,8 @@ button[type='submit']:hover:not(:disabled) {
 }
 
 .overlay-card {
-  background: var(--bg);
-  border: 0.5px solid var(--border2);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--rl);
   max-width: 640px;
   width: 100%;
