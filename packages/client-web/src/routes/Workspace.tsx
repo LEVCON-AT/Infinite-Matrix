@@ -49,6 +49,8 @@ import DocsPopup from '../components/DocsPopup';
 import GlobalSearch from '../components/GlobalSearch';
 import ImportDialog from '../components/ImportDialog';
 import KeyboardHelp from '../components/KeyboardHelp';
+import SettingsModal from '../components/SettingsModal';
+import { useSettingsBodyClassSync } from '../lib/settings';
 import NodeDescription from '../components/NodeDescription';
 import PresenceStack from '../components/PresenceStack';
 import { clearDocsRequest, openDocsPopup, useDocsRequest } from '../lib/docs-ui';
@@ -137,6 +139,8 @@ const Workspace: Component = () => {
   const [showCommand, setShowCommand] = createSignal(false);
   const [showDocs, setShowDocs] = createSignal(false);
   const [showHelp, setShowHelp] = createSignal(false);
+  const [showSettings, setShowSettings] = createSignal(false);
+  useSettingsBodyClassSync();
   // Callback, das die HeaderSearchBar beim Mount registriert — `f`-Keybind
   // benutzt es, um den Input zu fokussieren.
   let focusHeaderSearch: (() => void) | null = null;
@@ -750,6 +754,10 @@ const Workspace: Component = () => {
         <KeyboardHelp onClose={() => setShowHelp(false)} />
       </Show>
 
+      <Show when={showSettings()}>
+        <SettingsModal onClose={() => setShowSettings(false)} />
+      </Show>
+
       <main class="ws-main">
         <Show
           when={currentWs()}
@@ -838,6 +846,15 @@ const Workspace: Component = () => {
               aria-label="Tastatur-Shortcuts"
             >
               <Icon name="question-mark" size={18} />
+            </button>
+            <button
+              type="button"
+              class="theme-toggle-btn"
+              onClick={() => setShowSettings(true)}
+              title="Einstellungen"
+              aria-label="Einstellungen"
+            >
+              <Icon name="cog" size={18} />
             </button>
             <button
               type="button"

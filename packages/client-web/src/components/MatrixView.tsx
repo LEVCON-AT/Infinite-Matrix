@@ -11,6 +11,7 @@ import {
 import { useNavigate, useSearchParams } from '@solidjs/router';
 import type { CellFeature, CellRow, ColRow, MatrixContent, NodeRow, RowRow } from '../lib/types';
 import { useEditMode } from '../lib/edit-mode';
+import { useVis } from '../lib/settings';
 import { findFeatureByHotkey } from '../lib/features';
 import {
   addCol,
@@ -74,6 +75,19 @@ const MatrixView: Component<Props> = (p) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const editMode = useEditMode();
+
+  // Fein granulierte Sichtbarkeits-Flags — Default 'edit' verhaelt sich
+  // identisch zu editMode(), User kann aber per Settings-Modal einzeln
+  // auf 'always' / 'never' stellen.
+  const canAddRowCol = useVis('addRowCol');
+  const canDeleteRowCol = useVis('deleteRowCol');
+  const canRenameHeaders = useVis('renameHeaders');
+  const canMoveRowCol = useVis('moveArrows');
+  // Kombinierter Trigger fuer den Hover-Reveal-Parent (.mx-editable).
+  // Wenn mindestens eine Header-Aktion sichtbar ist, soll der Hover-Rahmen
+  // die Buttons zeigen; ohne bleibt der Header „nur-lesen".
+  const headerEditable = () =>
+    canDeleteRowCol() || canRenameHeaders() || canMoveRowCol();
 
   const [busy, setBusy] = createSignal(false);
   const [overlayTarget, setOverlayTarget] = createSignal<OverlayTarget | null>(null);
@@ -455,11 +469,11 @@ const MatrixView: Component<Props> = (p) => {
             >
               <p class="hint">
                 Leere Matrix.
-                <Show when={editMode()}>
+                <Show when={canAddRowCol()}>
                   {' '}Zeile und Spalte anlegen, um zu starten.
                 </Show>
               </p>
-              <Show when={editMode()}>
+              <Show when={canAddRowCol()}>
                 <div class="mx-toolbar">
                   <button type="button" onClick={onAddRow} disabled={busy()}>
                     + Zeile
@@ -480,7 +494,7 @@ const MatrixView: Component<Props> = (p) => {
           // Eine Extra-Spalte rechts fuer "+ Spalte"-Button im Edit-Mode.
           const gridStyle = () => {
             const colCount = cols().length;
-            const extra = editMode() ? ' minmax(60px, auto)' : '';
+            const extra = canAddRowCol() ? ' minmax(60px, auto)' : '';
             return `grid-template-columns: minmax(140px, max-content) repeat(${colCount}, minmax(160px, 1fr))${extra};`;
           };
 
@@ -491,7 +505,7 @@ const MatrixView: Component<Props> = (p) => {
 
               <For each={cols()}>
                 {(col, colIdx) => (
-                  <div class="mx-col-head" classList={{ 'mx-editable': editMode() }}>
+                  <div class="mx-col-head" classList={{ 'mx-editable': headerEditable() }}>
                     {/* IMMER Input: readOnly togglet statt span-swap — so
                         bleibt die Kopfzeile beim Edit-Toggle formstabil. */}
                     <input
@@ -499,14 +513,14 @@ const MatrixView: Component<Props> = (p) => {
                       type="text"
                       value={col.label}
                       placeholder="(Spalte)"
-                      readOnly={!editMode()}
-                      tabIndex={editMode() ? 0 : -1}
+                      readOnly={!canRenameHeaders()}
+                      tabIndex={canRenameHeaders() ? 0 : -1}
                       onBlur={(e) => {
-                        if (!editMode()) return;
+                        if (!canRenameHeaders()) return;
                         onRenameCol(col, e.currentTarget.value.trim());
                       }}
                       onKeyDown={(e) => {
-                        if (!editMode()) return;
+                        if (!canRenameHeaders()) return;
                         if (e.key === 'Enter') {
                           e.preventDefault();
                           (e.currentTarget as HTMLInputElement).blur();
@@ -518,9 +532,9 @@ const MatrixView: Component<Props> = (p) => {
                       class="mx-move-btn"
                       title="Spalte nach links"
                       aria-label="Spalte nach links"
-                      tabIndex={editMode() ? 0 : -1}
+                      tabIndex={canMoveRowCol() ? 0 : -1}
                       onClick={() => onMoveCol(col, 'left')}
-                      disabled={busy() || !editMode() || colIdx() === 0}
+                      disabled={busy() || !canMoveRowCol() || colIdx() === 0}
                     >
                       ‹
                     </button>
@@ -529,9 +543,9 @@ const MatrixView: Component<Props> = (p) => {
                       class="mx-move-btn"
                       title="Spalte nach rechts"
                       aria-label="Spalte nach rechts"
-                      tabIndex={editMode() ? 0 : -1}
+                      tabIndex={canMoveRowCol() ? 0 : -1}
                       onClick={() => onMoveCol(col, 'right')}
-                      disabled={busy() || !editMode() || colIdx() === cols().length - 1}
+                      disabled={busy() || !canMoveRowCol() || colIdx() === cols().length - 1}
                     >
                       ›
                     </button>
@@ -540,9 +554,9 @@ const MatrixView: Component<Props> = (p) => {
                       class="mx-del-btn"
                       title="Spalte loeschen"
                       aria-label="Spalte loeschen"
-                      tabIndex={editMode() ? 0 : -1}
+                      tabIndex={canDeleteRowCol() ? 0 : -1}
                       onClick={() => onDelCol(col)}
-                      disabled={busy() || !editMode()}
+                      disabled={busy() || !canDeleteRowCol()}
                     >
                       ✕
                     </button>
@@ -551,7 +565,7 @@ const MatrixView: Component<Props> = (p) => {
               </For>
 
               {/* Ecke rechts oben: "+ Spalte" */}
-              <Show when={editMode()}>
+              <Show when={canAddRowCol()}>
                 <div class="mx-add-col-cell">
                   <button
                     type="button"
@@ -569,20 +583,20 @@ const MatrixView: Component<Props> = (p) => {
               <For each={rows()}>
                 {(row, rowIdx) => (
                   <>
-                    <div class="mx-row-head" classList={{ 'mx-editable': editMode() }}>
+                    <div class="mx-row-head" classList={{ 'mx-editable': headerEditable() }}>
                       <input
                         class="mx-head-input"
                         type="text"
                         value={row.label}
                         placeholder="(Zeile)"
-                        readOnly={!editMode()}
-                        tabIndex={editMode() ? 0 : -1}
+                        readOnly={!canRenameHeaders()}
+                        tabIndex={canRenameHeaders() ? 0 : -1}
                         onBlur={(e) => {
-                          if (!editMode()) return;
+                          if (!canRenameHeaders()) return;
                           onRenameRow(row, e.currentTarget.value.trim());
                         }}
                         onKeyDown={(e) => {
-                          if (!editMode()) return;
+                          if (!canRenameHeaders()) return;
                           if (e.key === 'Enter') {
                             e.preventDefault();
                             (e.currentTarget as HTMLInputElement).blur();
@@ -594,9 +608,9 @@ const MatrixView: Component<Props> = (p) => {
                         class="mx-move-btn"
                         title="Zeile nach oben"
                         aria-label="Zeile nach oben"
-                        tabIndex={editMode() ? 0 : -1}
+                        tabIndex={canMoveRowCol() ? 0 : -1}
                         onClick={() => onMoveRow(row, 'up')}
-                        disabled={busy() || !editMode() || rowIdx() === 0}
+                        disabled={busy() || !canMoveRowCol() || rowIdx() === 0}
                       >
                         ↑
                       </button>
@@ -605,9 +619,9 @@ const MatrixView: Component<Props> = (p) => {
                         class="mx-move-btn"
                         title="Zeile nach unten"
                         aria-label="Zeile nach unten"
-                        tabIndex={editMode() ? 0 : -1}
+                        tabIndex={canMoveRowCol() ? 0 : -1}
                         onClick={() => onMoveRow(row, 'down')}
-                        disabled={busy() || !editMode() || rowIdx() === rows().length - 1}
+                        disabled={busy() || !canMoveRowCol() || rowIdx() === rows().length - 1}
                       >
                         ↓
                       </button>
@@ -616,9 +630,9 @@ const MatrixView: Component<Props> = (p) => {
                         class="mx-del-btn"
                         title="Zeile loeschen"
                         aria-label="Zeile loeschen"
-                        tabIndex={editMode() ? 0 : -1}
+                        tabIndex={canDeleteRowCol() ? 0 : -1}
                         onClick={() => onDelRow(row)}
-                        disabled={busy() || !editMode()}
+                        disabled={busy() || !canDeleteRowCol()}
                       >
                         ✕
                       </button>
@@ -733,7 +747,7 @@ const MatrixView: Component<Props> = (p) => {
                         );
                       }}
                     </For>
-                    <Show when={editMode()}>
+                    <Show when={canAddRowCol()}>
                       <div class="mx-row-tail" />
                     </Show>
                   </>
@@ -741,7 +755,7 @@ const MatrixView: Component<Props> = (p) => {
               </For>
 
               {/* Ecke unten links: "+ Zeile" */}
-              <Show when={editMode()}>
+              <Show when={canAddRowCol()}>
                 <div class="mx-add-row-cell">
                   <button
                     type="button"

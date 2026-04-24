@@ -2827,6 +2827,19 @@ button[type='submit']:hover:not(:disabled) {
   opacity: 1;
 }
 
+/* Settings: vis-<key>-always hebt die Hover-Bedingung auf — Buttons
+   sind permanent sichtbar, nicht erst beim Ueberfahren der Header-Row.
+   Kommt hier nach den Hover-Regeln, damit die Spezifitaet passt. */
+body.vis-deleteRowCol-always .mx-editable .mx-del-btn:not(:disabled) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .mx-move-btn:hover:not(:disabled) {
   color: var(--tealtxt);
   border-color: var(--teal);
@@ -4602,6 +4615,114 @@ button[type='submit']:hover:not(:disabled) {
   font-size: 13px;
   color: var(--text);
   align-self: center;
+}
+
+/* ── Settings-Modal ────────────────────────────────────────────── */
+.settings-card {
+  max-width: 620px;
+}
+
+.settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.settings-hint {
+  margin: 0;
+  font-size: 12px;
+}
+
+.settings-hint kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  background: var(--bg2);
+  border: 0.5px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: var(--rs);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--text);
+}
+
+.settings-group h4 {
+  margin: 0 0 var(--space-sm);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text3);
+}
+
+.settings-list {
+  display: grid;
+  grid-template-columns: 1fr minmax(160px, auto);
+  gap: 6px var(--space-md);
+  margin: 0;
+  align-items: center;
+}
+
+.settings-label {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.settings-label label {
+  cursor: pointer;
+}
+
+.settings-control {
+  margin: 0;
+}
+
+.settings-select {
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--space-sm);
+  font-size: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color var(--tr-std), box-shadow var(--tr-std);
+}
+
+.settings-select:hover {
+  border-color: var(--border2);
+}
+
+.settings-select:focus-visible {
+  border-color: var(--focus-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-color) 18%, transparent);
+  outline: none;
+}
+
+/* Generischer Overlay-Footer — auch fuer zukuenftige Modals nutzbar.
+   Rechtsbuendige Action-Buttons mit dezent abgesetzter Trennlinie. */
+.overlay-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
+}
+
+.settings-foot .btn-subtle {
+  color: var(--text2);
+}
+
+@media (max-width: 600px) {
+  .settings-list {
+    grid-template-columns: 1fr;
+  }
+  .settings-control {
+    margin-bottom: var(--space-xs);
+  }
 }
 
 /* Tag/Who-Editor: zwei gleichbreite Spalten auf Desktop, eine auf

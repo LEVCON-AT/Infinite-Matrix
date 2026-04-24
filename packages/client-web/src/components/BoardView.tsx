@@ -14,7 +14,7 @@ import type {
   LinkRow,
   LinkType,
 } from '../lib/types';
-import { useEditMode } from '../lib/edit-mode';
+import { useVis } from '../lib/settings';
 import { useBoardUi } from '../lib/board-ui-state';
 import {
   addBoardLink,
@@ -144,7 +144,21 @@ function sortComparator(
 }
 
 const BoardView: Component<Props> = (p) => {
-  const editMode = useEditMode();
+  // Kanban-Struktur: + Spalte / Link-Leiste / Checklisten-Anlage, Color-
+  // Picker, Spalte umbenennen, Spalte verschieben, Spalte loeschen.
+  // Karten-Aktionen (Move/Del) bleiben immer sichtbar — Karten sind kein
+  // Struktur-Level.
+  const canAddKbCol = useVis('addKbCol');
+  const canColorPicker = useVis('colorPicker');
+  const canRenameHeaders = useVis('renameHeaders');
+  const canMoveRowCol = useVis('moveArrows');
+  const canDeleteRowCol = useVis('deleteRowCol');
+  const canAddInfoField = useVis('addInfoField');
+  const colHeadEditable = () =>
+    canRenameHeaders() ||
+    canMoveRowCol() ||
+    canDeleteRowCol() ||
+    canColorPicker();
   const boardUi = useBoardUi(p.boardId);
 
   // Drag-State: welche Card wird gerade gezogen, welcher Col-Container
@@ -722,12 +736,12 @@ const BoardView: Component<Props> = (p) => {
 
           {/* Links-Leiste. Im View-Mode Chips als <a>, im Edit-Mode
               Inline-Edit: Typ, Label, URL + Delete. */}
-          <Show when={(p.content!.links ?? []).length > 0 || editMode()}>
+          <Show when={(p.content!.links ?? []).length > 0 || canAddInfoField()}>
             <div class="board-links">
               <For each={p.content!.links ?? []}>
                 {(link) => (
                   <Show
-                    when={editMode()}
+                    when={canAddInfoField()}
                     fallback={
                       <a
                         class="board-link-chip"
@@ -819,7 +833,7 @@ const BoardView: Component<Props> = (p) => {
                   </Show>
                 )}
               </For>
-              <Show when={editMode()}>
+              <Show when={canAddInfoField()}>
                 <button
                   type="button"
                   class="btn-subtle board-link-add-btn"
@@ -840,12 +854,12 @@ const BoardView: Component<Props> = (p) => {
               <div class="board-empty">
                 <p class="hint">
                   Board ohne Spalten.
-                  <Show when={editMode()}>
+                  <Show when={canAddKbCol()}>
                     {' '}
                     + Spalte, um zu starten.
                   </Show>
                 </p>
-                <Show when={editMode()}>
+                <Show when={canAddKbCol()}>
                   <button
                     type="button"
                     class="btn-subtle"
@@ -879,7 +893,7 @@ const BoardView: Component<Props> = (p) => {
                     >
                       <header
                         class="kb-col-head"
-                        classList={{ 'mx-editable': editMode() }}
+                        classList={{ 'mx-editable': colHeadEditable() }}
                       >
                         <button
                           type="button"
@@ -903,14 +917,14 @@ const BoardView: Component<Props> = (p) => {
                           type="text"
                           value={col.label}
                           placeholder="(Spalte)"
-                          readOnly={!editMode()}
-                          tabIndex={editMode() ? 0 : -1}
+                          readOnly={!canRenameHeaders()}
+                          tabIndex={canRenameHeaders() ? 0 : -1}
                           onBlur={(e) => {
-                            if (!editMode()) return;
+                            if (!canRenameHeaders()) return;
                             onRenameCol(col, e.currentTarget.value.trim());
                           }}
                           onKeyDown={(e) => {
-                            if (!editMode()) return;
+                            if (!canRenameHeaders()) return;
                             if (e.key === 'Enter') {
                               e.preventDefault();
                               (e.currentTarget as HTMLInputElement).blur();
@@ -922,8 +936,8 @@ const BoardView: Component<Props> = (p) => {
                           class="kb-col-color-picker"
                           value={col.color ?? '#888888'}
                           title="Spalten-Farbe"
-                          disabled={!editMode()}
-                          tabIndex={editMode() ? 0 : -1}
+                          disabled={!canColorPicker()}
+                          tabIndex={canColorPicker() ? 0 : -1}
                           onChange={(e) => onColorCol(col, e.currentTarget.value)}
                         />
                         <button
@@ -931,9 +945,9 @@ const BoardView: Component<Props> = (p) => {
                           class="mx-del-btn"
                           title="Farbe entfernen"
                           aria-label="Farbe entfernen"
-                          tabIndex={editMode() && col.color ? 0 : -1}
+                          tabIndex={canColorPicker() && col.color ? 0 : -1}
                           onClick={() => onColorCol(col, null)}
-                          disabled={!editMode() || !col.color}
+                          disabled={!canColorPicker() || !col.color}
                         >
                           <Icon name="no-symbol" size={12} />
                         </button>
@@ -942,9 +956,9 @@ const BoardView: Component<Props> = (p) => {
                           class="mx-move-btn"
                           title="Spalte nach links"
                           aria-label="Spalte nach links"
-                          tabIndex={editMode() ? 0 : -1}
+                          tabIndex={canMoveRowCol() ? 0 : -1}
                           onClick={() => onMoveCol(col, 'left')}
-                          disabled={busy() || !editMode() || colIdx() === 0}
+                          disabled={busy() || !canMoveRowCol() || colIdx() === 0}
                         >
                           <Icon name="chevron-left" size={12} />
                         </button>
@@ -953,9 +967,9 @@ const BoardView: Component<Props> = (p) => {
                           class="mx-move-btn"
                           title="Spalte nach rechts"
                           aria-label="Spalte nach rechts"
-                          tabIndex={editMode() ? 0 : -1}
+                          tabIndex={canMoveRowCol() ? 0 : -1}
                           onClick={() => onMoveCol(col, 'right')}
-                          disabled={busy() || !editMode() || colIdx() === visibleCols().length - 1}
+                          disabled={busy() || !canMoveRowCol() || colIdx() === visibleCols().length - 1}
                         >
                           <Icon name="chevron-right" size={12} />
                         </button>
@@ -964,9 +978,9 @@ const BoardView: Component<Props> = (p) => {
                           class="mx-del-btn"
                           title="Spalte loeschen"
                           aria-label="Spalte loeschen"
-                          tabIndex={editMode() ? 0 : -1}
+                          tabIndex={canDeleteRowCol() ? 0 : -1}
                           onClick={() => onDelCol(col)}
-                          disabled={busy() || !editMode()}
+                          disabled={busy() || !canDeleteRowCol()}
                         >
                           <Icon name="x" size={12} />
                         </button>
@@ -1198,7 +1212,7 @@ const BoardView: Component<Props> = (p) => {
               </For>
 
               {/* Letzte Spalte im Edit-Mode: "+ Spalte" */}
-              <Show when={editMode()}>
+              <Show when={canAddKbCol()}>
                 <div class="kb-col kb-col-add">
                   <button
                     type="button"
@@ -1220,7 +1234,7 @@ const BoardView: Component<Props> = (p) => {
               "+ Checkliste"-Button erreichbar bleibt). */}
           <Show
             when={
-              (p.content!.checklists ?? []).length > 0 || editMode()
+              (p.content!.checklists ?? []).length > 0 || canAddInfoField()
             }
           >
             <section class="board-checklists">
@@ -1245,7 +1259,7 @@ const BoardView: Component<Props> = (p) => {
                   </For>
                 </ul>
               </Show>
-              <Show when={editMode()}>
+              <Show when={canAddInfoField()}>
                 <button
                   type="button"
                   class="btn-subtle cl-add-btn"
