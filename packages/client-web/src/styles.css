@@ -2375,18 +2375,22 @@ button[type='submit']:hover:not(:disabled) {
   opacity: 0.55;
 }
 
-.tree-connections path.ln-split.ln-matrix { stroke: var(--blue); }
-.tree-connections path.ln-split.ln-board  { stroke: var(--teal); }
-.tree-connections path.ln-split.ln-cell   { stroke: var(--amber); }
+.tree-connections path.ln-split.ln-matrix     { stroke: var(--blue); }
+.tree-connections path.ln-split.ln-board      { stroke: var(--teal); }
+.tree-connections path.ln-split.ln-cell       { stroke: var(--amber); }
+.tree-connections path.ln-split.ln-info       { stroke: var(--amber); }
+.tree-connections path.ln-split.ln-checklists { stroke: var(--purple); }
 
 .tree-connections circle.tree-dot-svg {
   stroke: var(--bg2);
   stroke-width: 1.5;
   transition: r 120ms;
 }
-.tree-connections circle.dot-matrix { fill: var(--blue); }
-.tree-connections circle.dot-board  { fill: var(--teal); }
-.tree-connections circle.dot-cell   { fill: var(--amber); }
+.tree-connections circle.dot-matrix     { fill: var(--blue); }
+.tree-connections circle.dot-board      { fill: var(--teal); }
+.tree-connections circle.dot-cell       { fill: var(--amber); }
+.tree-connections circle.dot-info       { fill: var(--amber); }
+.tree-connections circle.dot-checklists { fill: var(--purple); }
 .tree-connections circle.dot-active { stroke-width: 2; }
 
 /* Inline `.tree-dot`-Span haelt die Layout-Reserve, der SVG-Dot

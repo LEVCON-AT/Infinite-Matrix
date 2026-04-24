@@ -275,6 +275,21 @@ export type TreeEntry =
       rowLabel: string;
       colLabel: string;
       children: TreeEntry[];
+    }
+  | {
+      // Feature-Row unter einer Cell. Nur fuer "flag"-Features, die
+      // keinen eigenen Sub-Node haben: info + checklists. Die Row
+      // repraesentiert die Feature-Page direkt.
+      // Structural Features (matrix/board) bekommen KEINE eigene
+      // Feature-Row — ihr Sub-Node haengt direkt unter der Cell,
+      // weil die Zwischen-Row ein Klick zu viel waere.
+      kind: 'feature';
+      id: string; // `feat-<cellId>-<feature>` — stable fuer expanded-Set
+      cellId: string;
+      feature: 'info' | 'checklists';
+      // In V1 keine Kinder. Mit SB.2-Chips kommen optional Docs/Links/
+      // Mails darunter.
+      children: TreeEntry[];
     };
 
 // Backward-compat alias — legacy code spricht TreeNode, entspricht einem

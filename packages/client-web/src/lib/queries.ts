@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import type {
   BoardContent,
   CellChecklistsContent,
+  CellFeature,
   CellRow,
   ChecklistItemRow,
   ChecklistRow,
@@ -371,10 +372,60 @@ export function buildSidebarTree(
       return ca - cb;
     });
 
+    // Feature-Reihenfolge bewusst fix: matrix -> info -> board -> checklists.
+    // So sieht jede Cell im Sidebar-Tree gleich strukturiert aus; User
+    // entwickelt eine stabile Ortserwartung.
+    const FEATURE_ORDER: CellFeature[] = [
+      'matrix',
+      'info',
+      'board',
+      'checklists',
+    ];
+
     for (const { cell, row, col } of decorated) {
       const kids = childNodesByCell.get(cell.id) ?? [];
-      const hasFeatures = (cell.features?.length ?? 0) > 0;
+      const features = (cell.features ?? []) as CellFeature[];
+      const hasFeatures = features.length > 0;
       if (!hasFeatures && kids.length === 0) continue;
+
+      // Pro Feature ein Child der Cell-Row aufbauen, in FEATURE_ORDER.
+      // Structural Features (matrix/board) haengen ihren Sub-Node
+      // DIREKT unter der Cell — keine Zwischen-Feature-Row, damit
+      // der User nicht einen Klick extra bis zur Sub-Matrix braucht.
+      // Flag-Features (info/checklists) bekommen eine Feature-Row,
+      // weil sie keinen eigenen Sub-Node haben und die Row die
+      // Feature-Seite repraesentiert.
+      const featureChildren: TreeEntry[] = [];
+      for (const feat of FEATURE_ORDER) {
+        if (!features.includes(feat)) continue;
+        if (feat === 'matrix' && cell.child_matrix_id) {
+          const childNode = kids.find((k) => k.id === cell.child_matrix_id);
+          if (childNode) featureChildren.push(buildNode(childNode));
+        } else if (feat === 'board' && cell.board_id) {
+          const childNode = kids.find((k) => k.id === cell.board_id);
+          if (childNode) featureChildren.push(buildNode(childNode));
+        } else if (feat === 'info' || feat === 'checklists') {
+          featureChildren.push({
+            kind: 'feature',
+            id: `feat-${cell.id}-${feat}`,
+            cellId: cell.id,
+            feature: feat,
+            children: [],
+          });
+        }
+      }
+
+      // Waisen-Child-Nodes, die keinen FK-Match gefunden haben
+      // (parent_cell_id zeigt auf diese Cell, aber weder cell.board_id
+      // noch cell.child_matrix_id verweist zurueck — Dateninkonsistenz).
+      // Trotzdem sichtbar als lose Children der Cell-Row, damit sie
+      // nicht verschwinden.
+      const attachedNodeIds = new Set<string>(
+        featureChildren
+          .filter((fc): fc is Extract<TreeEntry, { kind: 'node' }> => fc.kind === 'node')
+          .map((fc) => fc.id),
+      );
+      const orphanKids = kids.filter((k) => !attachedNodeIds.has(k.id));
 
       const cellEntry: TreeEntry = {
         kind: 'cell',
@@ -382,7 +433,7 @@ export function buildSidebarTree(
         cell,
         rowLabel: row!.label || '(Zeile)',
         colLabel: col!.label || '(Spalte)',
-        children: kids.map(buildNode),
+        children: [...featureChildren, ...orphanKids.map(buildNode)],
       };
       (entry.children as TreeEntry[]).push(cellEntry);
     }

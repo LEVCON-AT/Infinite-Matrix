@@ -222,6 +222,54 @@ const Workspace: Component = () => {
     buildSidebarTree(nodes() ?? [], cells() ?? [], rows() ?? [], colsData() ?? []),
   );
 
+  // Path-Focus Expand: bei jeder Route-Change den Weg vom aktuellen
+  // Target (Cell oder Node) bis zur Root-Matrix ins Expanded-Set
+  // injizieren. Additiv — nichts wird geschlossen, bestehende manuelle
+  // Expansionen bleiben. Browser-Back/Forward triggert die Effect
+  // genauso wie Sidebar-Clicks, weil params reaktiv sind.
+  createEffect(() => {
+    const wsId = params.workspaceId;
+    if (!wsId) return;
+    const nodesList = nodes();
+    const cellsList = cells();
+    if (!nodesList || !cellsList) return;
+    const byNodeId = new Map(nodesList.map((n) => [n.id, n]));
+    const byCellId = new Map(cellsList.map((c) => [c.id, c]));
+
+    const ids: string[] = [];
+    // Upward-Walk: Node → Parent-Cell → Parent-Matrix (= Node), jeweils
+    // deren IDs ins Expanded-Set. Structural Sub-Nodes haengen direkt
+    // unter der Cell (keine Zwischen-Feature-Row), daher nur Cell + Node.
+    // seen-Set verhindert Endlosschleifen bei Datenbug (Zyklus).
+    function walkUp(startNodeId: string): void {
+      const seen = new Set<string>();
+      let cursor = byNodeId.get(startNodeId);
+      while (cursor && !seen.has(cursor.id)) {
+        seen.add(cursor.id);
+        ids.push(cursor.id);
+        if (!cursor.parent_cell_id) break;
+        const pc = byCellId.get(cursor.parent_cell_id);
+        if (!pc) break;
+        ids.push(pc.id);
+        cursor = byNodeId.get(pc.matrix_id);
+      }
+    }
+
+    if (params.cellId) {
+      const c = byCellId.get(params.cellId);
+      if (c) {
+        ids.push(c.id);
+        walkUp(c.matrix_id);
+      }
+    } else if (params.nodeId) {
+      walkUp(params.nodeId);
+    }
+
+    if (ids.length > 0) {
+      useTreeExpand(wsId).addToExpanded(ids);
+    }
+  });
+
   const currentNode = createMemo(() => {
     if (!params.nodeId) return undefined;
     return (nodes() ?? []).find((n) => n.id === params.nodeId);
@@ -660,6 +708,7 @@ const Workspace: Component = () => {
             workspaceId={params.workspaceId as string}
             tree={tree()}
             currentNodeId={params.nodeId ?? params.cellId}
+            currentFeature={cellSection() ?? undefined}
           />
         </Show>
         <div class="ws-actions">

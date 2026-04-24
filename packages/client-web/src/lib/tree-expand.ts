@@ -75,6 +75,26 @@ export function useTreeExpand(workspaceId: string) {
     setState({ expanded: next, all: cur.all });
   }
 
+  // Path-Focus-Helper: fuegt mehrere IDs in einem Rutsch ins Set, ohne
+  // etwas zu entfernen. Gebraucht bei Navigation — der Weg zur aktuellen
+  // Zelle/Feature-Row wird aufgeklappt, vorherige Expansions bleiben
+  // unangetastet. Nur setState wenn sich wirklich etwas aendert, damit
+  // der persist-Effect nicht bei jedem Nav-Tick feuert.
+  function addToExpanded(ids: string[]): void {
+    if (ids.length === 0) return;
+    const cur = state();
+    const next = new Set(cur.expanded);
+    let changed = false;
+    for (const id of ids) {
+      if (!next.has(id)) {
+        next.add(id);
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    setState({ expanded: next, all: cur.all });
+  }
+
   function setExpandAll(v: boolean): void {
     const cur = state();
     setState({ expanded: cur.expanded, all: v });
@@ -107,6 +127,7 @@ export function useTreeExpand(workspaceId: string) {
     state,
     isExpanded,
     toggle,
+    addToExpanded,
     setExpandAll,
     toggleExpandAll,
     seedIfFresh,

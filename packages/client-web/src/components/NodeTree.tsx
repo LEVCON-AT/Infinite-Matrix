@@ -21,13 +21,21 @@ type Props = {
   workspaceId: string;
   tree: TreeEntry[];
   currentNodeId: string | undefined;
+  // Feature-Segment bei /c/:cellId/:feature-Routen. Nur gesetzt, wenn
+  // der User gerade auf einer Cell-Page mit konkretem Feature steht —
+  // damit markieren wir die passende Feature-Row als aktiv.
+  currentFeature?: 'info' | 'checklists' | 'docs';
 };
 
-// Icon-Lookup nach Entry-Kind / Node-Type. Portiert die Feature-Farben
-// aus dem HTML-Vorbild: matrix=blau, board=teal, cell=amber/grau.
+// Icon-Lookup nach Entry-Kind / Node-Type. Feature-Rows gibt es nur
+// fuer info/checklists — matrix/board-Sub-Strukturen haengen als Node-
+// Entry direkt unter der Cell, keine Zwischen-Row.
 function iconNameFor(entry: TreeEntry): IconName {
   if (entry.kind === 'node') {
     return entry.node.type === 'matrix' ? 'squares-2x2' : 'view-columns';
+  }
+  if (entry.kind === 'feature') {
+    return entry.feature === 'info' ? 'information-circle' : 'check-circle';
   }
   // Cells: kleiner ausgefuellter Punkt
   return 'dot-filled';
@@ -37,32 +45,50 @@ function dotColorFor(entry: TreeEntry): string {
   if (entry.kind === 'node') {
     return entry.node.type === 'matrix' ? 'var(--blue)' : 'var(--teal)';
   }
+  if (entry.kind === 'feature') {
+    return entry.feature === 'info' ? 'var(--amber)' : 'var(--purple)';
+  }
   return 'var(--amber)';
 }
 
 // Dot-Typ-Schluessel fuer die SVG-Verbindungslinien. Entspricht den
 // .ln-<type>/.dot-<type>-CSS-Klassen in der tree-connections-Schicht.
-// matrix=blau, board=teal, cell=amber. Erweiterungsfaehig um feature-
-// Ebene (info/checklists/cellbox) wenn die Sidebar-Extension kommt.
-function dotTypeFor(entry: TreeEntry): 'matrix' | 'board' | 'cell' {
+function dotTypeFor(
+  entry: TreeEntry,
+): 'matrix' | 'board' | 'cell' | 'info' | 'checklists' {
   if (entry.kind === 'node') {
     return entry.node.type === 'matrix' ? 'matrix' : 'board';
+  }
+  if (entry.kind === 'feature') {
+    return entry.feature;
   }
   return 'cell';
 }
 
+// Label fuer Feature-Rows. Deutsch + kurz — tree-label-text kann sie bei
+// Bedarf truncaten.
+const FEATURE_LABEL: Record<'info' | 'checklists', string> = {
+  info: 'Info',
+  checklists: 'Checklisten',
+};
+
 function labelOf(entry: TreeEntry): string {
   if (entry.kind === 'node') return entry.node.label || '(ohne Label)';
+  if (entry.kind === 'feature') return FEATURE_LABEL[entry.feature];
   return `${entry.rowLabel} / ${entry.colLabel}`;
 }
 
 function aliasOf(entry: TreeEntry): string | null {
   if (entry.kind === 'node') return entry.node.alias;
+  if (entry.kind === 'feature') return null;
   return entry.cell.alias;
 }
 
 function hrefOf(workspaceId: string, entry: TreeEntry): string {
   if (entry.kind === 'node') return `/w/${workspaceId}/n/${entry.id}`;
+  if (entry.kind === 'feature') {
+    return `/w/${workspaceId}/c/${entry.cellId}/${entry.feature}`;
+  }
   return cellTarget(workspaceId, {
     cellId: entry.cell.id,
     matrixId: entry.cell.matrix_id,
@@ -91,6 +117,13 @@ function filterTree(
 
   function entryKindKey(e: TreeEntry): FilterChip {
     if (e.kind === 'cell') return 'cell';
+    if (e.kind === 'feature') {
+      // Feature-Rows sind keine eigene Chip-Kategorie in V1 —
+      // in den bestehenden chip-Filter mappen wir auf 'cell', weil
+      // sie ja zur Zelle gehoeren (und die User die Feature-Filter
+      // erst mit SB.2-Chips bekommen).
+      return 'cell';
+    }
     return e.node.type === 'matrix' ? 'matrix' : 'board';
   }
 
@@ -135,6 +168,7 @@ const TreeItem: Component<{
   workspaceId: string;
   entry: TreeEntry;
   currentNodeId: string | undefined;
+  currentFeature?: 'info' | 'checklists' | 'docs';
   depth: number;
   parentId?: string;
   expand: ReturnType<typeof useTreeExpand>;
@@ -229,7 +263,19 @@ const TreeItem: Component<{
             // Active auf Node- UND Cell-Routen: currentNodeId kommt
             // entweder aus /n/:nodeId oder aus /c/:cellId. Beide matchen
             // auf entry.id (Nodes: node.id, Cells: cell.id).
-            active: p.entry.id === p.currentNodeId,
+            // Feature-Rows sind aktiv, wenn die Cell-Route die passende
+            // Section (info/checklists/docs) zeigt UND cellId matcht.
+            // Fuer docs/info faellt currentFeature=undefined auf die
+            // Cell-Row zurueck (old Behaviour).
+            active:
+              p.entry.kind === 'feature'
+                ? p.entry.cellId === p.currentNodeId &&
+                  (p.currentFeature as string | undefined) === p.entry.feature
+                : p.entry.id === p.currentNodeId &&
+                  // Wenn eine Feature-Row bereits die aktive Darstellung
+                  // beansprucht, soll die Cell-Row darueber NICHT doppelt
+                  // als active markiert werden.
+                  !p.currentFeature,
           }}
           data-tree-entry-id={p.entry.id}
           data-tree-has-children={hasChildren() ? 'yes' : 'no'}
@@ -272,6 +318,7 @@ const TreeItem: Component<{
                 workspaceId={p.workspaceId}
                 entry={child}
                 currentNodeId={p.currentNodeId}
+                currentFeature={p.currentFeature}
                 depth={p.depth + 1}
                 parentId={p.entry.id}
                 expand={p.expand}
@@ -606,10 +653,10 @@ const NodeTree: Component<Props> = (props) => {
           })();
         },
       });
-    } else {
+    } else if (entry.kind === 'cell') {
       // Cell-Entry. Delete + Feature-Anlage sind groesser (Undo-Pattern),
       // deshalb haengen wir hier nur Navigation + ein paar Hinweise dran.
-      // Volle Cell-Operationen kommen in einem spaeteren Sub-Sprint.
+      // Volle Cell-Operationen kommen in SB.1b (Menue-Ausbau).
       items.push({
         label: 'Zelle oeffnen',
         icon: '→',
@@ -623,13 +670,35 @@ const NodeTree: Component<Props> = (props) => {
           onClick: () => {},
         });
       }
+    } else {
+      // Feature-Entry (matrix/info/board/checklists). V1: Navigation +
+      // Ctrl+V-Hinweis bei Checklists. Volle Content-Anlage (+ Feld / +
+      // Checkliste / + Karte) kommt in SB.1b.
+      items.push({
+        label: 'Oeffnen',
+        icon: '→',
+        onClick: () => navigate(hrefOf(props.workspaceId, entry)),
+      });
+      if (entry.feature === 'checklists') {
+        items.push({
+          label: 'Strg+V auf der Row: Checkliste aus Zwischenablage',
+          icon: '⌨',
+          disabled: true,
+          onClick: () => {},
+        });
+      }
     }
 
-    const badge = entry.kind === 'node'
-      ? entry.node.type === 'matrix'
-        ? '▦'
-        : '▤'
-      : '·';
+    const badge =
+      entry.kind === 'node'
+        ? entry.node.type === 'matrix'
+          ? '▦'
+          : '▤'
+        : entry.kind === 'feature'
+          ? entry.feature === 'info'
+            ? 'i'
+            : '✓'
+          : '·';
 
     setCtxMenu({
       x,
@@ -802,6 +871,7 @@ const NodeTree: Component<Props> = (props) => {
                 workspaceId={props.workspaceId}
                 entry={entry}
                 currentNodeId={props.currentNodeId}
+                currentFeature={props.currentFeature}
                 depth={0}
                 expand={expand}
                 query={query().trim()}
