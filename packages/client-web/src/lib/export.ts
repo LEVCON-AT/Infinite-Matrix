@@ -9,6 +9,7 @@
 // Rows in Workspaces, in denen der User Mitglied ist.
 
 import { supabase } from './supabase';
+import { encryptPayload } from './crypto';
 
 export const WORKSPACE_EXPORT_VERSION = 1 as const;
 
@@ -217,12 +218,24 @@ export async function exportWorkspace(
 // Triggert den Browser-Download des Export-JSON. Blob + ObjectURL +
 // temporaerer Anchor. Filename mit Datum, damit Mehrfach-Exports
 // nicht ueberschrieben werden.
-export function downloadWorkspaceExport(
+//
+// encrypt.passphrase gesetzt -> AES-GCM-Ciphertext via crypto.ts,
+// Endung wird .imx statt .json. MIME bleibt application/json-ish;
+// application/octet-stream ist hier korrekter fuer die Ciphertext-
+// Rohdaten, aber wir halten Text-MIME fuer Editor-Kompat (User
+// kann .imx im Editor oeffnen und den Ciphertext sehen).
+export async function downloadWorkspaceExport(
   exportData: WorkspaceExport,
   workspaceName: string,
-): void {
+  encrypt?: { passphrase: string },
+): Promise<void> {
   const pretty = JSON.stringify(exportData, null, 2);
-  const blob = new Blob([pretty], { type: 'application/json' });
+  const content = encrypt
+    ? await encryptPayload(pretty, encrypt.passphrase)
+    : pretty;
+  const blob = new Blob([content], {
+    type: encrypt ? 'application/octet-stream' : 'application/json',
+  });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   const date = new Date().toISOString().slice(0, 10);
@@ -231,7 +244,7 @@ export function downloadWorkspaceExport(
     .replace(/^-+|-+$/g, '')
     .toLowerCase();
   a.href = url;
-  a.download = `${safeName}-${date}.json`;
+  a.download = `${safeName}-${date}.${encrypt ? 'imx' : 'json'}`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -562,12 +575,18 @@ export async function exportCellSubtree(
 // Subtree-Download mit automatischem Dateinamen-Präfix basierend auf
 // Label (Workspace-Name wird vom Workspace-Export-Download verwendet,
 // hier leiten wir Kontext aus dem Subtree-Root ab).
-export function downloadSubtreeExport(
+export async function downloadSubtreeExport(
   exportData: WorkspaceExport,
   filenameLabel: string,
-): void {
+  encrypt?: { passphrase: string },
+): Promise<void> {
   const pretty = JSON.stringify(exportData, null, 2);
-  const blob = new Blob([pretty], { type: 'application/json' });
+  const content = encrypt
+    ? await encryptPayload(pretty, encrypt.passphrase)
+    : pretty;
+  const blob = new Blob([content], {
+    type: encrypt ? 'application/octet-stream' : 'application/json',
+  });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   const date = new Date().toISOString().slice(0, 10);
@@ -584,7 +603,7 @@ export function downloadSubtreeExport(
         ? 'checklists'
         : 'subtree';
   a.href = url;
-  a.download = `${prefix}-${safeLabel}-${date}.json`;
+  a.download = `${prefix}-${safeLabel}-${date}.${encrypt ? 'imx' : 'json'}`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

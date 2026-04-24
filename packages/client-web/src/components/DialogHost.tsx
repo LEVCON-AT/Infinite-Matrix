@@ -128,17 +128,23 @@ const DialogHost: Component = () => {
               <div class="overlay-body dialog-body">
                 <p class="dialog-message">{d().message}</p>
                 <Show when={d().kind === 'prompt'}>
-                  <input
-                    ref={promptInputRef}
-                    type="text"
-                    class="dialog-input"
-                    value={promptValue()}
-                    placeholder={
-                      (d() as Extract<DialogRequest, { kind: 'prompt' }>)
-                        .placeholder
-                    }
-                    onInput={(e) => setPromptValue(e.currentTarget.value)}
-                  />
+                  {(() => {
+                    const dd = d() as Extract<DialogRequest, { kind: 'prompt' }>;
+                    return (
+                      <input
+                        ref={promptInputRef}
+                        type={dd.inputType}
+                        class="dialog-input"
+                        value={promptValue()}
+                        placeholder={dd.placeholder}
+                        autocomplete={
+                          dd.inputType === 'password' ? 'new-password' : 'off'
+                        }
+                        spellcheck={false}
+                        onInput={(e) => setPromptValue(e.currentTarget.value)}
+                      />
+                    );
+                  })()}
                 </Show>
               </div>
               <footer class="overlay-foot dialog-foot">

@@ -36,6 +36,43 @@ async function deriveKey(pw: string, salt: Uint8Array): Promise<CryptoKey> {
   );
 }
 
+// Gegenstueck zu decryptPayload: Klartext + Passphrase → IMATRIX_ENC:-
+// String. Salt + IV werden kryptographisch zufaellig erzeugt und an
+// den Ciphertext vorangestellt. Format:
+//   [salt:16B][iv:12B][ciphertext+authTag:*] → base64 → ENC_PREFIX + b64
+// Bit-identisch zum HTML-Client (matrix_tool_beta.html:1752 ff), damit
+// .imx-Dateien zwischen Standalone und SaaS round-trippen.
+export async function encryptPayload(plain: string, pw: string): Promise<string> {
+  if (typeof plain !== 'string') {
+    throw new Error('Klartext muss ein String sein.');
+  }
+  if (!pw) {
+    throw new Error('Passphrase darf nicht leer sein.');
+  }
+  const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
+  const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
+  const key = await deriveKey(pw, salt);
+  const ctBuf = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: iv as BufferSource },
+    key,
+    new TextEncoder().encode(plain),
+  );
+  const ct = new Uint8Array(ctBuf);
+  // salt | iv | ct zusammenfuegen und base64en.
+  const out = new Uint8Array(salt.length + iv.length + ct.length);
+  out.set(salt, 0);
+  out.set(iv, salt.length);
+  out.set(ct, salt.length + iv.length);
+  // btoa() erwartet Latin-1-String — chunked encoden, damit grosse
+  // Payloads nicht an Stack-Limits laufen.
+  let bin = '';
+  const CHUNK = 0x8000;
+  for (let i = 0; i < out.length; i += CHUNK) {
+    bin += String.fromCharCode(...out.subarray(i, i + CHUNK));
+  }
+  return ENC_PREFIX + btoa(bin);
+}
+
 export async function decryptPayload(encoded: string, pw: string): Promise<string> {
   if (!isEncrypted(encoded)) {
     throw new Error('Datei ist nicht verschluesselt (kein IMATRIX_ENC:-Prefix).');

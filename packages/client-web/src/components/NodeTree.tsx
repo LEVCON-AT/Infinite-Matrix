@@ -1044,7 +1044,7 @@ const NodeTree: Component<Props> = (props) => {
             void (async () => {
               try {
                 const data = await exportSubtree(entry.id, props.workspaceId);
-                downloadSubtreeExport(data, entry.node.label);
+                await downloadSubtreeExport(data,entry.node.label);
                 showToast(`Export geladen — ${summarizeExport(data)}`, 'success');
               } catch (err) {
                 showToast(translateDbError(err), 'error');
@@ -1110,7 +1110,7 @@ const NodeTree: Component<Props> = (props) => {
               label: entry.node.label,
               exportFn: async () => {
                 const data = await exportSubtree(entry.id, props.workspaceId);
-                downloadSubtreeExport(data, entry.node.label);
+                await downloadSubtreeExport(data,entry.node.label);
               },
               deleteFn: () => deleteNode(entry.id),
               successMsg: `"${entry.node.label}" geloescht.`,
@@ -1209,7 +1209,7 @@ const NodeTree: Component<Props> = (props) => {
                   cell.id,
                   props.workspaceId,
                 );
-                downloadSubtreeExport(data, labelGuess);
+                await downloadSubtreeExport(data,labelGuess);
                 showToast(
                   `Export geladen — ${summarizeExport(data)}`,
                   'success',
@@ -1365,7 +1365,7 @@ const NodeTree: Component<Props> = (props) => {
                         cellId,
                         props.workspaceId,
                       );
-                downloadSubtreeExport(data, entry.feature);
+                await downloadSubtreeExport(data,entry.feature);
                 showToast(
                   `Export geladen — ${summarizeExport(data)}`,
                   'success',

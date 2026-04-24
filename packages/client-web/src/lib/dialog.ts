@@ -42,6 +42,9 @@ type PromptRequest = {
   placeholder: string;
   confirmLabel: string;
   cancelLabel: string;
+  // 'password' maskiert die Eingabe + schaltet Autocomplete aus (fuer
+  // IMX-Passphrasen). 'text' ist der Standard fuer Umbenennen u.ae.
+  inputType: 'text' | 'password';
   resolve: (value: string | null) => void;
 };
 
@@ -118,6 +121,7 @@ export function showPrompt(opts: {
   placeholder?: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  inputType?: 'text' | 'password';
 }): Promise<string | null> {
   return pushDialog<string | null>({
     kind: 'prompt',
@@ -127,6 +131,7 @@ export function showPrompt(opts: {
     placeholder: opts.placeholder ?? '',
     confirmLabel: opts.confirmLabel ?? 'OK',
     cancelLabel: opts.cancelLabel ?? 'Abbrechen',
+    inputType: opts.inputType ?? 'text',
     resolve: () => {},
   });
 }
