@@ -4,6 +4,11 @@ import App from './App';
 import Login from './routes/Login';
 import Workspace from './routes/Workspace';
 import './styles.css';
+import { registerServiceWorker } from './lib/pwa';
+
+// Service-Worker fuer PWA-Install + Offline-Cache registrieren. Laeuft
+// nur im Prod-Build (Dev-Server bleibt SW-frei, siehe vite.config).
+registerServiceWorker();
 
 const root = document.getElementById('root');
 if (!root) throw new Error('#root not found');

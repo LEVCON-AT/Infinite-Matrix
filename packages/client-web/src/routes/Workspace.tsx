@@ -55,6 +55,7 @@ import { useSettingsBodyClassSync } from '../lib/settings';
 import NodeDescription from '../components/NodeDescription';
 import PresenceStack from '../components/PresenceStack';
 import { clearDocsRequest, openDocsPopup, useDocsRequest } from '../lib/docs-ui';
+import { installPromptSignal, triggerInstallPrompt } from '../lib/pwa';
 
 const Workspace: Component = () => {
   const user = useUser();
@@ -67,6 +68,11 @@ const Workspace: Component = () => {
   const location = useLocation();
   const editMode = useEditMode();
   const theme = useTheme();
+  // PWA-Install: deferredPrompt ist nur gesetzt, wenn der Browser die
+  // App fuer Install kandidiert (Chromium-/Edge-basierte Desktops +
+  // Android). Safari-iOS feuert das Event nicht — dort bleibt der
+  // Button unsichtbar und der User muss ueber Share-Menue installieren.
+  const { deferredPrompt, installed } = installPromptSignal();
 
   // Sidebar-Modus pro Workspace. Bei fehlendem workspaceId wird die
   // Registry mit einem leeren String angelegt — die Funktionen sind
@@ -914,6 +920,17 @@ const Workspace: Component = () => {
             >
               <Icon name="cog" size={18} />
             </button>
+            <Show when={deferredPrompt() && !installed()}>
+              <button
+                type="button"
+                class="theme-toggle-btn"
+                onClick={() => void triggerInstallPrompt()}
+                title="Als App installieren"
+                aria-label="Als App installieren"
+              >
+                <Icon name="arrow-down-tray" size={18} />
+              </button>
+            </Show>
             <button
               type="button"
               class="theme-toggle-btn"
