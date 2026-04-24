@@ -14,12 +14,13 @@
 import { For, Show, type Component } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import type { KbCardRow } from '../lib/types';
-import type { DailyCol } from '../lib/daily-cols';
+import type { DailyCol, DailyColType } from '../lib/daily-cols';
 import {
   allOccurrencesDoneInRange,
   cardFitsCol,
   DCTYPE_LABELS,
   getTimeRange,
+  useDailyCols,
 } from '../lib/daily-cols';
 import {
   isCardDone,
@@ -31,13 +32,13 @@ import {
   setCardDoneOccurrences,
   toggleCardDone,
 } from '../lib/mutations';
+import { useEditMode } from '../lib/edit-mode';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 
 type Props = {
   workspaceId: string;
   cards: KbCardRow[]; // bereits auf aktive Karten gefiltert
-  cols: DailyCol[];
 };
 
 function fmtDate(iso: string | null): string | null {
@@ -49,8 +50,22 @@ function fmtDate(iso: string | null): string | null {
 
 const TaskOverview: Component<Props> = (p) => {
   const navigate = useNavigate();
+  const editMode = useEditMode();
+  const dcs = useDailyCols(p.workspaceId);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+
+  const DCTYPE_ORDER: DailyColType[] = [
+    'today',
+    'thisweek',
+    'nextweek',
+    'thismonth',
+    'nextmonth',
+    'thisquarter',
+    'thisyear',
+    'nextyear',
+    'nodate',
+  ];
 
   function cardsForCol(col: DailyCol): KbCardRow[] {
     return p.cards.filter((c) => {
@@ -92,17 +107,102 @@ const TaskOverview: Component<Props> = (p) => {
 
   return (
     <div class="daily-cols">
-      <For each={p.cols}>
-        {(col) => {
+      <For each={dcs.cols()}>
+        {(col, idx) => {
           const items = () => cardsForCol(col);
+          const isFirst = () => idx() === 0;
+          const isLast = () => idx() === dcs.cols().length - 1;
           return (
             <div class="daily-col" data-dcol-id={col.id}>
-              <div class="daily-col-hd">
-                <div class="flex-fill">
-                  <span class="dcolh-name-span">{col.label}</span>
-                  <div class="dcolh-type">{DCTYPE_LABELS[col.type]}</div>
-                </div>
-                <span class="dcolh-count">{items().length}</span>
+              <div class="daily-col-hd" classList={{ 'daily-col-hd-edit': editMode() }}>
+                <Show
+                  when={editMode()}
+                  fallback={
+                    <>
+                      <div class="flex-fill">
+                        <span class="dcolh-name-span">{col.label}</span>
+                        <div class="dcolh-type">{DCTYPE_LABELS[col.type]}</div>
+                      </div>
+                      <span class="dcolh-count">{items().length}</span>
+                    </>
+                  }
+                >
+                  {/* Edit-Mode: Label-Input + Type-Select + Reorder + Delete.
+                      Layout stapelt vertikal, damit auch bei schmalen Spalten
+                      alle Controls erreichbar sind. */}
+                  <input
+                    class="dcolh-name-input"
+                    type="text"
+                    value={col.label}
+                    placeholder="(ohne Name)"
+                    onBlur={(e) => {
+                      const v = e.currentTarget.value.trim();
+                      if (v && v !== col.label) dcs.rename(col.id, v);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        (e.currentTarget as HTMLInputElement).blur();
+                      }
+                    }}
+                  />
+                  <div class="dcolh-edit-row">
+                    <select
+                      class="dcolh-type-select"
+                      value={col.type}
+                      onChange={(e) =>
+                        dcs.setType(col.id, e.currentTarget.value as DailyColType)
+                      }
+                      title="Zeitfenster"
+                    >
+                      <For each={DCTYPE_ORDER}>
+                        {(t) => <option value={t}>{DCTYPE_LABELS[t]}</option>}
+                      </For>
+                    </select>
+                    <button
+                      type="button"
+                      class="dcolh-move"
+                      onClick={() => dcs.move(col.id, 'left')}
+                      disabled={isFirst()}
+                      title="Nach links"
+                      aria-label="Nach links verschieben"
+                    >
+                      ‹
+                    </button>
+                    <button
+                      type="button"
+                      class="dcolh-move"
+                      onClick={() => dcs.move(col.id, 'right')}
+                      disabled={isLast()}
+                      title="Nach rechts"
+                      aria-label="Nach rechts verschieben"
+                    >
+                      ›
+                    </button>
+                    <button
+                      type="button"
+                      class="dcolh-del"
+                      onClick={() => {
+                        if (
+                          dcs.cols().length > 1 &&
+                          window.confirm(`Spalte "${col.label}" entfernen?`)
+                        ) {
+                          dcs.remove(col.id);
+                        }
+                      }}
+                      disabled={dcs.cols().length <= 1}
+                      title={
+                        dcs.cols().length <= 1
+                          ? 'Letzte Spalte kann nicht entfernt werden'
+                          : 'Spalte entfernen'
+                      }
+                      aria-label="Spalte entfernen"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <span class="dcolh-count dcolh-count-edit">{items().length}</span>
+                </Show>
               </div>
               <Show
                 when={items().length > 0}
@@ -162,6 +262,20 @@ const TaskOverview: Component<Props> = (p) => {
           );
         }}
       </For>
+      <Show when={editMode()}>
+        <button
+          type="button"
+          class="daily-col-add"
+          onClick={() => {
+            // Default = 'today' mit Standard-Label; der User kann
+            // danach Typ + Label ueber die Edit-Controls aendern.
+            dcs.add('today');
+          }}
+          title="Neue Spalte anlegen"
+        >
+          + Spalte
+        </button>
+      </Show>
     </div>
   );
 };

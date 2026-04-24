@@ -22,7 +22,6 @@ import {
   isFreqCardActive,
 } from '../lib/aggregate';
 import { useAggregateView } from '../lib/aggregate-view';
-import { loadDailyCols } from '../lib/daily-cols';
 import { fetchCardsForBoards } from '../lib/queries';
 import FrequencyMatrix from './FrequencyMatrix';
 import TaskOverview from './TaskOverview';
@@ -133,7 +132,6 @@ const MatrixAggregateSection: Component<Props> = (p) => {
           <TaskOverview
             workspaceId={p.workspaceId}
             cards={(cards() ?? []).filter(isFreqCardActive)}
-            cols={loadDailyCols(p.workspaceId)}
           />
         </Show>
       </section>

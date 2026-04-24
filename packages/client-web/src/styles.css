@@ -4729,6 +4729,108 @@ button[type='submit']:hover:not(:disabled) {
   flex-shrink: 0;
 }
 
+/* Edit-Mode: Header stapelt vertikal, damit Rename-Input + Type-Select +
+   Reorder/Delete-Buttons alle erreichbar sind (Spalten sind schmal).
+   Count-Badge landet am Ende der Column-Header. */
+.daily-col-hd-edit {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.dcolh-name-input {
+  width: 100%;
+  padding: 4px 6px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--bg);
+  color: var(--text);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.dcolh-name-input:focus-visible {
+  border-color: var(--focus-color);
+  outline: none;
+}
+
+.dcolh-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dcolh-type-select {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  font-size: 11px;
+  background: var(--bg);
+  color: var(--text);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+}
+
+.dcolh-move,
+.dcolh-del {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  color: var(--text2);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.dcolh-move:hover:not(:disabled),
+.dcolh-del:hover:not(:disabled) {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.dcolh-move:disabled,
+.dcolh-del:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.dcolh-del:hover:not(:disabled) {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.dcolh-count-edit {
+  align-self: flex-end;
+}
+
+/* "+ Spalte"-Button als eigene Column-Shape. Gleiche Breite wie eine
+   normale Spalte, damit das Grid sauber bleibt. Dashed-Border signali-
+   siert den Add-Slot. */
+.daily-col-add {
+  flex: 0 0 200px;
+  padding: var(--space-md);
+  background: transparent;
+  border: 1px dashed var(--border2);
+  border-radius: var(--rs);
+  color: var(--text3);
+  font-size: 13px;
+  cursor: pointer;
+  align-self: stretch;
+  transition: background var(--tr-std), border-color var(--tr-std), color var(--tr-std);
+}
+
+.daily-col-add:hover {
+  background: var(--bg2);
+  border-color: var(--text3);
+  color: var(--text2);
+}
+
 .daily-empty {
   color: var(--text3);
   font-size: 11px;

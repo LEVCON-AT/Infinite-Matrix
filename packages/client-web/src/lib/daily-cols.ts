@@ -1,4 +1,4 @@
-// Daily-Cols: Konfiguration fuer die Aufgabenuebersicht-Spalten.
+﻿// Daily-Cols: Konfiguration fuer die Aufgabenuebersicht-Spalten.
 // Portiert aus dem HTML-Vorbild (matrix_tool_beta.html:6471+ -
 // getTimeRange + DCTYPE_LABELS). Im HTML in appSettings gespeichert;
 // hier pro Workspace in localStorage, weil es keinen Settings-Layer
@@ -8,6 +8,7 @@
 // der DailyColType-Optionen, definiert das Zeit-Fenster). Der User
 // kann Spalten anlegen/umbenennen/loeschen (im Edit-Mode).
 
+import { createSignal } from 'solid-js';
 import type { KbCardRow } from './types';
 import {
   getOccurrenceDatesInRange,
@@ -74,6 +75,93 @@ export function saveDailyCols(workspaceId: string, cols: DailyCol[]): void {
   } catch {
     /* ignore */
   }
+}
+
+// Reaktiver Hook fuer die Daily-Col-Liste. Eine Registry pro Workspace
+// â€” alle TaskOverview-Instanzen teilen denselben Store, damit eine
+// Mutation (add/rename/...) sofort ueberall ankommt. Persistiert nach
+// jedem Mutate.
+const REGISTRY = new Map<string, {
+  cols: () => DailyCol[];
+  setCols: (next: DailyCol[]) => void;
+}>();
+
+function uid(): string {
+  return `dc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function useDailyCols(workspaceId: string) {
+  let entry = REGISTRY.get(workspaceId);
+  if (!entry) {
+    const [cols, setCols] = createSignal<DailyCol[]>(loadDailyCols(workspaceId));
+    entry = {
+      cols,
+      setCols: (next) => {
+        setCols(next);
+        saveDailyCols(workspaceId, next);
+      },
+    };
+    REGISTRY.set(workspaceId, entry);
+  }
+  const { cols, setCols } = entry;
+
+  function add(type: DailyColType = 'today', label?: string): string {
+    const id = uid();
+    const newCol: DailyCol = {
+      id,
+      label: label ?? DCTYPE_LABELS[type],
+      type,
+    };
+    setCols([...cols(), newCol]);
+    return id;
+  }
+
+  function rename(id: string, label: string): void {
+    setCols(cols().map((c) => (c.id === id ? { ...c, label } : c)));
+  }
+
+  function setType(id: string, type: DailyColType): void {
+    setCols(
+      cols().map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              type,
+              // Label nur dann automatisch anpassen, wenn er noch der
+              // Default-Label des alten Typs war. So behaelt ein User-
+              // custom-Label "Heute erledigt" beim Typ-Wechsel seinen
+              // Custom-Text; der Default-Fall bekommt das frische Label.
+              label:
+                c.label === DCTYPE_LABELS[c.type]
+                  ? DCTYPE_LABELS[type]
+                  : c.label,
+            }
+          : c,
+      ),
+    );
+  }
+
+  function remove(id: string): void {
+    setCols(cols().filter((c) => c.id !== id));
+  }
+
+  function move(id: string, dir: 'left' | 'right'): void {
+    const list = cols();
+    const idx = list.findIndex((c) => c.id === id);
+    if (idx < 0) return;
+    const target = dir === 'left' ? idx - 1 : idx + 1;
+    if (target < 0 || target >= list.length) return;
+    const next = list.slice();
+    const [it] = next.splice(idx, 1);
+    next.splice(target, 0, it);
+    setCols(next);
+  }
+
+  function reset(): void {
+    setCols(DEFAULT_COLS.slice());
+  }
+
+  return { cols, add, rename, setType, remove, move, reset };
 }
 
 function day0(d: Date): Date {
