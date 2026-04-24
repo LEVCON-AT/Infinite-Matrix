@@ -27,6 +27,7 @@ import {
   setChecklistAlias,
   setChecklistCloseMode,
   setChecklistItemLevel,
+  setChecklistRecur,
   toggleChecklistItemDone,
 } from '../lib/mutations';
 import { showToast, showUndoToast } from '../lib/toasts';
@@ -285,6 +286,33 @@ const ChecklistPanel: Component<Props> = (p) => {
     await wrap(() => setChecklistCloseMode(p.checklist.id, mode));
   }
 
+  // Recur-Value als Type-String. 'none' = null (einmalige Liste),
+  // sonst der jsonb-Type daraus. Default daily wenn der User von
+  // 'none' auf recurring wechselt.
+  function recurType(): 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly' {
+    const r = p.checklist.recur;
+    if (!r || typeof r !== 'object') return 'none';
+    const t = (r as { type?: unknown }).type;
+    if (t === 'daily' || t === 'weekly' || t === 'monthly' || t === 'yearly') {
+      return t;
+    }
+    // Objekt ohne klaren Type (legacy) → als 'daily' zeigen, damit der
+    // User beim Select sieht was gerade gilt und korrigieren kann.
+    return 'daily';
+  }
+  async function onRecurChange(val: string) {
+    const next =
+      val === 'none'
+        ? null
+        : { type: val };
+    await wrap(() =>
+      setChecklistRecur(
+        p.checklist.id,
+        next as Record<string, unknown> | null,
+      ),
+    );
+  }
+
   // Auto-Close-Detection: feuert bei Zustandsuebergang von "nicht alle done"
   // zu "alle done". Verhalten je nach close_mode:
   //   - 'manual'       — nichts automatisch; User klickt Button.
@@ -381,6 +409,20 @@ const ChecklistPanel: Component<Props> = (p) => {
           }}
         />
         <Show when={editMode()}>
+          <select
+            class="cl-recur-select"
+            value={recurType()}
+            onChange={(e) => void onRecurChange(e.currentTarget.value)}
+            disabled={busy()}
+            title="Wiederkehrend — Items werden beim Abschliessen nur zurueckgesetzt statt geloescht."
+            aria-label="Wiederkehr-Intervall"
+          >
+            <option value="none">einmalig</option>
+            <option value="daily">taeglich</option>
+            <option value="weekly">woechentlich</option>
+            <option value="monthly">monatlich</option>
+            <option value="yearly">jaehrlich</option>
+          </select>
           <select
             class="cl-close-mode"
             value={p.checklist.close_mode}

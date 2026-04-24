@@ -5315,7 +5315,8 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
     min-width: 44px;
     min-height: 44px;
   }
-  .cl-close-mode {
+  .cl-close-mode,
+  .cl-recur-select {
     min-height: 36px;
   }
 }
@@ -6203,6 +6204,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 }
 
 /* closeMode-Select im Checkliste-Header (Edit-Mode). Klein + unauffaellig. */
+.cl-recur-select,
 .cl-close-mode {
   padding: 2px 6px;
   border: 0.5px solid var(--border);
@@ -6214,6 +6216,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   cursor: pointer;
 }
 
+.cl-recur-select:hover,
 .cl-close-mode:hover {
   border-color: var(--focus-color);
 }

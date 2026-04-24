@@ -825,6 +825,21 @@ export async function setChecklistAction(
   if (error) throw error;
 }
 
+// checklist.recur als jsonb setzen (oder NULL fuer Einmal-Checkliste).
+// Das Close-Verhalten (Items reset vs delete) liest dieses Feld via
+// isRecurring() — sobald recur ein Objekt mit Type ist, gilt die Liste
+// als wiederkehrend.
+export async function setChecklistRecur(
+  checklistId: string,
+  recur: Record<string, unknown> | null,
+): Promise<void> {
+  const { error } = await supabase
+    .from('checklists')
+    .update({ recur })
+    .eq('id', checklistId);
+  if (error) throw error;
+}
+
 // Close-Action auf der Checkliste anwenden, abhaengig vom recur-Feld:
 //   - non-recurring: alle Items loeschen (ein DELETE);
 //   - recurring:     alle Items auf done=false zuruecksetzen.
