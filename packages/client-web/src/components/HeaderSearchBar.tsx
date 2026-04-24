@@ -677,6 +677,12 @@ const HeaderSearchBar: Component<Props> = (p) => {
           // auch nach Tags oder Anführungszeichen. Bewusst minimal.
           setQuery(raw);
           if (error()) setError(null);
+          // Defensive: wenn der User tippt, ist der Input per definitionem
+          // fokussiert. Manche Edge-Cases (Navigation hat kurz Focus auf
+          // Board/Matrix gezogen, onFocus-Flanke fuer die Rueckkehr ist
+          // verloren) koennen focused() stale auf false stehen lassen —
+          // das setFocused(true) hier heilt den Fall ohne weitere Logik.
+          if (!focused()) setFocused(true);
         }}
         onKeyDown={onInputKeyDown}
       />
@@ -848,9 +854,19 @@ const HeaderSearchBar: Component<Props> = (p) => {
               <Show
                 when={groupedResults().length > 0 || aliasMatches().length > 0}
                 fallback={
-                  <Show when={!busy() && query().trim().length >= 2}>
-                    <p class="header-search-hint">Keine Treffer.</p>
-                  </Show>
+                  <Switch>
+                    <Match when={query().trim().length < 2}>
+                      <p class="header-search-hint">
+                        Mindestens 2 Zeichen fuer Suche — oder Alias-Token direkt.
+                      </p>
+                    </Match>
+                    <Match when={busy()}>
+                      <p class="header-search-hint">Suche laeuft…</p>
+                    </Match>
+                    <Match when>
+                      <p class="header-search-hint">Keine Treffer.</p>
+                    </Match>
+                  </Switch>
                 }
               >
                 {/* Haupt-Results in Gruppen. */}

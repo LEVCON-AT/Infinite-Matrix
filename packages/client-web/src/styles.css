@@ -716,11 +716,15 @@ button[type='submit']:hover:not(:disabled) {
   color: var(--ambertxt);
 }
 
-/* Presence-Avatar-Stack im Main-Header. Avatars ueberlappen leicht. */
+/* Presence-Avatar-Stack im Main-Header. Avatars ueberlappen leicht.
+   flex-shrink:0 damit die Breite stabil ist — sonst koennte ein Heartbeat-
+   getriggertes Re-Render der inneren For-Liste den Nachbar-Flex-Item
+   (HeaderSearchBar) fuer einen Frame stauchen. */
 .presence-stack {
   display: flex;
   align-items: center;
   padding-right: var(--space-xs);
+  flex: 0 0 auto;
 }
 
 .presence-avatar {

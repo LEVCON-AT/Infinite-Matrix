@@ -65,6 +65,29 @@ export function usePresence(
         if (b.userId === selfId) return 1;
         return a.email.localeCompare(b.email);
       });
+      // Identitaets-Check: Supabase feuert 'sync' im Sekundentakt als
+      // Heartbeat, selbst wenn sich nichts geaendert hat. Jede neue
+      // Array-Referenz triggert Solid-<For>-Rerender → Avatar-Spans
+      // remounten → Layout-Shift → Nachbar-Elemente (z.B. die Header-
+      // SearchBar) wackeln. Setzen den Signal nur, wenn Inhalt wirklich
+      // abweicht (UserId-Liste + Email + joinedAt).
+      const current = users();
+      if (current.length === list.length) {
+        let same = true;
+        for (let i = 0; i < list.length; i++) {
+          const a = current[i];
+          const b = list[i];
+          if (
+            a.userId !== b.userId ||
+            a.email !== b.email ||
+            a.joinedAt !== b.joinedAt
+          ) {
+            same = false;
+            break;
+          }
+        }
+        if (same) return;
+      }
       setUsers(list);
     };
 
