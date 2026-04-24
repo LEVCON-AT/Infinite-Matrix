@@ -1010,32 +1010,32 @@ const NodeTree: Component<Props> = (props) => {
         icon: '→',
         onClick: () => navigate(hrefOf(props.workspaceId, entry)),
       });
-      items.push({
-        label: 'Umbenennen',
-        icon: '✎',
-        onClick: () => {
-          void (async () => {
-            const next = await showPrompt({
-              title: 'Umbenennen',
-              message: `Neuer Name fuer "${entry.node.label}":`,
-              initialValue: entry.node.label,
-              placeholder: 'Name…',
-              confirmLabel: 'Umbenennen',
-            });
-            if (next === null) return;
-            const trimmed = next.trim();
-            if (!trimmed || trimmed === entry.node.label) return;
-            try {
-              await renameNode(entry.id, trimmed);
-              showToast(`Umbenannt in "${trimmed}".`, 'success');
-              props.onChanged?.();
-            } catch (err) {
-              showToast(translateDbError(err), 'error');
-            }
-          })();
-        },
-      });
       if (editMode()) {
+        items.push({
+          label: 'Umbenennen',
+          icon: '✎',
+          onClick: () => {
+            void (async () => {
+              const next = await showPrompt({
+                title: 'Umbenennen',
+                message: `Neuer Name fuer "${entry.node.label}":`,
+                initialValue: entry.node.label,
+                placeholder: 'Name…',
+                confirmLabel: 'Umbenennen',
+              });
+              if (next === null) return;
+              const trimmed = next.trim();
+              if (!trimmed || trimmed === entry.node.label) return;
+              try {
+                await renameNode(entry.id, trimmed);
+                showToast(`Umbenannt in "${trimmed}".`, 'success');
+                props.onChanged?.();
+              } catch (err) {
+                showToast(translateDbError(err), 'error');
+              }
+            })();
+          },
+        });
         items.push({ label: '', onClick: () => {}, divider: true });
         items.push({
           label: 'Exportieren (mit Unterstruktur)',
@@ -1100,8 +1100,6 @@ const NodeTree: Component<Props> = (props) => {
             })();
           },
         });
-      }
-      if (editMode()) {
         items.push({ label: '', onClick: () => {}, divider: true });
         items.push({
           label: 'Loeschen',

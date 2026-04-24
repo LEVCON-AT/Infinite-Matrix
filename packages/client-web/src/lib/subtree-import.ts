@@ -296,6 +296,33 @@ async function insertBatch(
   }
 }
 
+// Best-effort Cleanup nach Partial-Insert. Faellt waehrend der Phase-
+// Sequenz eine Insert um (Netz weg, RLS-Fehler, FK-Kollision), bleiben
+// sonst Nodes/Rows/Cols/Cells als Waisen zurueck. Per Cascade-Delete
+// auf nodes raeumen wir rows/cols/cells/kb_cols/kb_cards/checklists/
+// items/links mit auf. Docs haengen ON DELETE SET NULL und werden
+// daher separat geloescht — sonst bleiben sie mit attached_cell_id=
+// NULL freischwebend im Workspace liegen.
+//
+// Fehler innerhalb des Cleanups werden bewusst geschluckt: der
+// Original-Fehler aus der Phase-Sequenz hat Prioritaet und muss den
+// Caller erreichen.
+async function cleanupPartialImport(
+  insertedNodeIds: string[],
+  insertedDocIds: string[],
+): Promise<void> {
+  try {
+    if (insertedNodeIds.length > 0) {
+      await supabase.from('nodes').delete().in('id', insertedNodeIds);
+    }
+    if (insertedDocIds.length > 0) {
+      await supabase.from('docs').delete().in('id', insertedDocIds);
+    }
+  } catch {
+    // Original-Error bleibt im Vordergrund.
+  }
+}
+
 // ─── Clear-Helpers (fuer Overwrite-Modus) ──────────────────────
 
 // Loescht Sub-Matrix / Sub-Board einer Zelle. Cascades via DB-FK
@@ -852,37 +879,50 @@ export async function executeSubtreeImportIntoCell(args: {
   //            (Target-Cell fuer Root, remapped cells fuer Sub-Nodes).
   //   Phase E: Board-interne Tabellen (kb_cols, kb_cards, links) +
   //            Checklisten + Items.
-  step('Nodes einfuegen…');
-  await insertBatch('nodes', nodesOut);
-  step('Zeilen einfuegen…');
-  await insertBatch('rows', rowsOut);
-  step('Spalten einfuegen…');
-  await insertBatch('cols', colsOut);
-  step('Zellen einfuegen…');
-  await insertBatch('cells', cellsOut);
-  step('Parent-Verknuepfungen…');
-  // parent_cell_id UPDATE — sequenziell, um pro Fehler genau
-  // identifizieren zu koennen welcher Node nicht durchging. Bei
-  // grossen Imports koennen wir spaeter auf RPC umsteigen.
-  for (const up of nodeParentUpdates) {
-    const { error: upErr } = await supabase
-      .from('nodes')
-      .update({ parent_cell_id: up.parent_cell_id })
-      .eq('id', up.id);
-    if (upErr) throw upErr;
+  //
+  // Failure-Mode: faellt irgendeine Phase um, raeumt cleanupPartial-
+  // Import die schon angelegten Nodes + Docs wieder ab (Cascade
+  // entfernt rows/cols/cells/kb_*/checklists/items/links). Der
+  // Original-Fehler wird weitergereicht, damit der Caller ihn sauber
+  // toastet.
+  const insertedNodeIds = nodesOut.map((n) => (n as { id: string }).id);
+  const insertedDocIds = docsOut.map((d) => (d as { id: string }).id);
+  try {
+    step('Nodes einfuegen…');
+    await insertBatch('nodes', nodesOut);
+    step('Zeilen einfuegen…');
+    await insertBatch('rows', rowsOut);
+    step('Spalten einfuegen…');
+    await insertBatch('cols', colsOut);
+    step('Zellen einfuegen…');
+    await insertBatch('cells', cellsOut);
+    step('Parent-Verknuepfungen…');
+    // parent_cell_id UPDATE — sequenziell, um pro Fehler genau
+    // identifizieren zu koennen welcher Node nicht durchging. Bei
+    // grossen Imports koennen wir spaeter auf RPC umsteigen.
+    for (const up of nodeParentUpdates) {
+      const { error: upErr } = await supabase
+        .from('nodes')
+        .update({ parent_cell_id: up.parent_cell_id })
+        .eq('id', up.id);
+      if (upErr) throw upErr;
+    }
+    step('Kanban-Spalten einfuegen…');
+    await insertBatch('kb_cols', kbColsOut);
+    step('Karten einfuegen…');
+    await insertBatch('kb_cards', kbCardsOut);
+    step('Checklisten einfuegen…');
+    await insertBatch('checklists', checklistsOut);
+    step('Checklist-Eintraege einfuegen…');
+    await insertBatch('checklist_items', checklistItemsOut);
+    step('Links einfuegen…');
+    await insertBatch('links', linksOut);
+    step('Dokus einfuegen…');
+    await insertBatch('docs', docsOut);
+  } catch (err) {
+    await cleanupPartialImport(insertedNodeIds, insertedDocIds);
+    throw err;
   }
-  step('Kanban-Spalten einfuegen…');
-  await insertBatch('kb_cols', kbColsOut);
-  step('Karten einfuegen…');
-  await insertBatch('kb_cards', kbCardsOut);
-  step('Checklisten einfuegen…');
-  await insertBatch('checklists', checklistsOut);
-  step('Checklist-Eintraege einfuegen…');
-  await insertBatch('checklist_items', checklistItemsOut);
-  step('Links einfuegen…');
-  await insertBatch('links', linksOut);
-  step('Dokus einfuegen…');
-  await insertBatch('docs', docsOut);
   step('Ziel-Zelle anpassen…');
 
   // Target-Cell final patchen: FK-Slot auf neuen Root-Node, Feature-
@@ -978,7 +1018,13 @@ export async function executeSubtreeImportIntoCell(args: {
     .from('cells')
     .update(patch)
     .eq('id', targetCellId);
-  if (patchErr) throw patchErr;
+  if (patchErr) {
+    // Ziel-Zelle-Patch hat geworfen — Nodes + Docs wurden schon
+    // eingefuegt. Cleanup nachziehen, damit der Workspace nicht mit
+    // freischwebenden Inserts zurueckbleibt.
+    await cleanupPartialImport(insertedNodeIds, insertedDocIds);
+    throw patchErr;
+  }
 
   return { rootNodeId: rootNewId, aliasMap };
 }
@@ -1711,34 +1757,42 @@ export async function executeSubtreeImportIntoMatrix(args: {
 
   // FK-Order wie bei Cell-Variante: Nodes (parent=null) → Rows → Cols →
   // Cells → UPDATE Nodes.parent_cell_id → kb/checklists/items/links/docs.
-  step('Nodes einfuegen…');
-  await insertBatch('nodes', nodesOut);
-  step('Zeilen einfuegen…');
-  await insertBatch('rows', rowsOut);
-  step('Spalten einfuegen…');
-  await insertBatch('cols', colsOut);
-  step('Zellen einfuegen…');
-  await insertBatch('cells', cellsOut);
-  step('Parent-Verknuepfungen…');
-  for (const up of nodeParentUpdates) {
-    const { error: upErr } = await supabase
-      .from('nodes')
-      .update({ parent_cell_id: up.parent_cell_id })
-      .eq('id', up.id);
-    if (upErr) throw upErr;
+  // Bei Failure raeumt cleanupPartialImport angelegte Nodes + Docs auf.
+  const insertedNodeIds = nodesOut.map((n) => (n as { id: string }).id);
+  const insertedDocIds = docsOut.map((d) => (d as { id: string }).id);
+  try {
+    step('Nodes einfuegen…');
+    await insertBatch('nodes', nodesOut);
+    step('Zeilen einfuegen…');
+    await insertBatch('rows', rowsOut);
+    step('Spalten einfuegen…');
+    await insertBatch('cols', colsOut);
+    step('Zellen einfuegen…');
+    await insertBatch('cells', cellsOut);
+    step('Parent-Verknuepfungen…');
+    for (const up of nodeParentUpdates) {
+      const { error: upErr } = await supabase
+        .from('nodes')
+        .update({ parent_cell_id: up.parent_cell_id })
+        .eq('id', up.id);
+      if (upErr) throw upErr;
+    }
+    step('Kanban-Spalten einfuegen…');
+    await insertBatch('kb_cols', kbColsOut);
+    step('Karten einfuegen…');
+    await insertBatch('kb_cards', kbCardsOut);
+    step('Checklisten einfuegen…');
+    await insertBatch('checklists', checklistsOut);
+    step('Checklist-Eintraege einfuegen…');
+    await insertBatch('checklist_items', checklistItemsOut);
+    step('Links einfuegen…');
+    await insertBatch('links', linksOut);
+    step('Dokus einfuegen…');
+    await insertBatch('docs', docsOut);
+  } catch (err) {
+    await cleanupPartialImport(insertedNodeIds, insertedDocIds);
+    throw err;
   }
-  step('Kanban-Spalten einfuegen…');
-  await insertBatch('kb_cols', kbColsOut);
-  step('Karten einfuegen…');
-  await insertBatch('kb_cards', kbCardsOut);
-  step('Checklisten einfuegen…');
-  await insertBatch('checklists', checklistsOut);
-  step('Checklist-Eintraege einfuegen…');
-  await insertBatch('checklist_items', checklistItemsOut);
-  step('Links einfuegen…');
-  await insertBatch('links', linksOut);
-  step('Dokus einfuegen…');
-  await insertBatch('docs', docsOut);
 
   step('Ziel-Matrix anpassen…');
   // Bei Ersetzen: Target-Matrix uebernimmt Label/Alias/Data des
@@ -1760,7 +1814,13 @@ export async function executeSubtreeImportIntoMatrix(args: {
         .from('nodes')
         .update(patch)
         .eq('id', targetMatrixId);
-      if (nupErr) throw nupErr;
+      if (nupErr) {
+        // Matrix-Label-/Alias-Patch hat geworfen — Inserts stehen,
+        // Workspace ist inkonsistent. Cleanup, damit die zuvor ange-
+        // legten Nodes/Docs nicht als Waisen stehen bleiben.
+        await cleanupPartialImport(insertedNodeIds, insertedDocIds);
+        throw nupErr;
+      }
     }
   }
 
