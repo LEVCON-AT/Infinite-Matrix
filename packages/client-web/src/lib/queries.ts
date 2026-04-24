@@ -18,6 +18,8 @@ import type {
   TreeNode,
   WorkspaceWithRole,
 } from './types';
+import { withCache } from './offline-cache';
+import { markCacheFallback, markLiveSuccess } from './offline-state';
 
 // ─── Workspaces ──────────────────────────────────────────────────
 // Gibt alle Workspaces zurueck, in denen der aktuelle User Mitglied ist.
@@ -46,43 +48,65 @@ export async function fetchMyWorkspaces(): Promise<WorkspaceWithRole[]> {
 }
 
 // ─── Nodes + Cells fuer Tree-Aufbau ──────────────────────────────
-export async function fetchNodesForWorkspace(workspaceId: string): Promise<NodeRow[]> {
-  const { data, error } = await supabase
-    .from('nodes')
-    .select('*')
-    .eq('workspace_id', workspaceId)
-    .order('created_at', { ascending: true });
+//
+// Alle vier workspace-weiten Fetches laufen durch withCache: bei
+// Erfolg wandern die Rows in den IDB-Store, bei Netz-Fehler liefert
+// der Cache die zuletzt bekannten Daten. Das hebt den Sidebar-Tree +
+// Stack-Navigation auch offline.
+async function cachedList<T extends { id: string; workspace_id: string }>(
+  table: 'nodes' | 'cells' | 'rows' | 'cols',
+  workspaceId: string,
+  fetch: () => Promise<T[]>,
+): Promise<T[]> {
+  const res = await withCache<T>(table, workspaceId, fetch);
+  if (res.fromCache) markCacheFallback();
+  else markLiveSuccess();
+  return res.rows;
+}
 
-  if (error) throw error;
-  return (data ?? []) as NodeRow[];
+export async function fetchNodesForWorkspace(workspaceId: string): Promise<NodeRow[]> {
+  return cachedList<NodeRow>('nodes', workspaceId, async () => {
+    const { data, error } = await supabase
+      .from('nodes')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as NodeRow[];
+  });
 }
 
 export async function fetchCellsForWorkspace(workspaceId: string): Promise<CellRow[]> {
-  const { data, error } = await supabase
-    .from('cells')
-    .select('*')
-    .eq('workspace_id', workspaceId);
-
-  if (error) throw error;
-  return (data ?? []) as CellRow[];
+  return cachedList<CellRow>('cells', workspaceId, async () => {
+    const { data, error } = await supabase
+      .from('cells')
+      .select('*')
+      .eq('workspace_id', workspaceId);
+    if (error) throw error;
+    return (data ?? []) as CellRow[];
+  });
 }
 
 export async function fetchRowsForWorkspace(workspaceId: string): Promise<RowRow[]> {
-  const { data, error } = await supabase
-    .from('rows')
-    .select('*')
-    .eq('workspace_id', workspaceId);
-  if (error) throw error;
-  return (data ?? []) as RowRow[];
+  return cachedList<RowRow>('rows', workspaceId, async () => {
+    const { data, error } = await supabase
+      .from('rows')
+      .select('*')
+      .eq('workspace_id', workspaceId);
+    if (error) throw error;
+    return (data ?? []) as RowRow[];
+  });
 }
 
 export async function fetchColsForWorkspace(workspaceId: string): Promise<ColRow[]> {
-  const { data, error } = await supabase
-    .from('cols')
-    .select('*')
-    .eq('workspace_id', workspaceId);
-  if (error) throw error;
-  return (data ?? []) as ColRow[];
+  return cachedList<ColRow>('cols', workspaceId, async () => {
+    const { data, error } = await supabase
+      .from('cols')
+      .select('*')
+      .eq('workspace_id', workspaceId);
+    if (error) throw error;
+    return (data ?? []) as ColRow[];
+  });
 }
 
 // Laedt alle Karten der angegebenen Boards in einem Query. Genutzt

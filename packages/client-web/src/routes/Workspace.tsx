@@ -56,6 +56,7 @@ import NodeDescription from '../components/NodeDescription';
 import PresenceStack from '../components/PresenceStack';
 import { clearDocsRequest, openDocsPopup, useDocsRequest } from '../lib/docs-ui';
 import { installPromptSignal, triggerInstallPrompt } from '../lib/pwa';
+import { offlineState } from '../lib/offline-state';
 
 const Workspace: Component = () => {
   const user = useUser();
@@ -901,6 +902,15 @@ const Workspace: Component = () => {
                 selfUserId={user()!.id}
                 selfEmail={user()!.email ?? '(anon)'}
               />
+            </Show>
+            <Show when={offlineState()}>
+              <span
+                class="offline-badge"
+                title="Offline — Daten kommen aus dem lokalen Cache und sind evtl. nicht aktuell."
+              >
+                <Icon name="no-symbol" size={14} />
+                <span>Offline</span>
+              </span>
             </Show>
             <button
               type="button"

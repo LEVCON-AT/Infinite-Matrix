@@ -883,6 +883,24 @@ button[type='submit']:hover:not(:disabled) {
   border-color: var(--blue);
 }
 
+/* Offline-Badge in der ws-main-header — zeigt an, dass die aktuell
+   sichtbaren Daten aus dem IndexedDB-Cache stammen, nicht vom Server.
+   Dezent in Amber, damit man's wahrnimmt ohne dass es schreit. */
+.offline-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 2px var(--space-sm);
+  border: 1px solid var(--amber);
+  background: var(--amberbg);
+  color: var(--ambertxt);
+  border-radius: var(--rs);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 .theme-toggle-btn {
   width: 28px;
   height: 28px;

@@ -14,6 +14,11 @@ import {
   useSettings,
   type VisKey,
 } from '../lib/settings';
+import { clearAll as clearOfflineCache } from '../lib/offline-cache';
+import { resetOfflineState } from '../lib/offline-state';
+import { showChoice } from '../lib/dialog';
+import { showToast } from '../lib/toasts';
+import { translateDbError } from '../lib/errors';
 
 type Props = {
   onClose: () => void;
@@ -116,13 +121,50 @@ const SettingsModal: Component<Props> = (p) => {
             type="button"
             class="btn-subtle"
             onClick={() => {
-              if (window.confirm('Alle Einstellungen auf Default zuruecksetzen?')) {
-                resetSettings();
-              }
+              void (async () => {
+                const ok = await showChoice({
+                  title: 'Einstellungen zuruecksetzen',
+                  message: 'Alle Sichtbarkeits-Einstellungen auf Default setzen?',
+                  choices: [
+                    { id: 'reset', label: 'Zuruecksetzen', variant: 'danger' },
+                    { id: 'cancel', label: 'Abbrechen', variant: 'default' },
+                  ],
+                });
+                if (ok === 'reset') resetSettings();
+              })();
             }}
           >
             <Icon name="arrow-uturn-left" size={14} />
             <span>Zuruecksetzen</span>
+          </button>
+          <button
+            type="button"
+            class="btn-subtle"
+            title="Offline-Cache (IndexedDB) leeren — beim naechsten Read werden die Daten frisch vom Server geladen."
+            onClick={() => {
+              void (async () => {
+                const ok = await showChoice({
+                  title: 'Offline-Cache leeren',
+                  message:
+                    'Loescht alle gespeicherten Workspace-Daten aus dem lokalen IndexedDB-Cache. Beim naechsten Reload werden alle Daten frisch vom Server gezogen — beim Online-Stand kein Datenverlust, offline aber leere Sicht.',
+                  choices: [
+                    { id: 'clear', label: 'Cache leeren', variant: 'danger' },
+                    { id: 'cancel', label: 'Abbrechen', variant: 'default' },
+                  ],
+                });
+                if (ok !== 'clear') return;
+                try {
+                  await clearOfflineCache();
+                  resetOfflineState();
+                  showToast('Offline-Cache geleert.', 'success');
+                } catch (err) {
+                  showToast(translateDbError(err), 'error');
+                }
+              })();
+            }}
+          >
+            <Icon name="trash" size={14} />
+            <span>Cache leeren</span>
           </button>
           <button type="button" class="btn-c" onClick={p.onClose}>
             Schliessen
