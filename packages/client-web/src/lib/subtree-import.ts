@@ -404,16 +404,61 @@ async function clearCellCompletely(cellId: string): Promise<void> {
   await clearCellDocs(cellId);
 }
 
-// Leert eine Matrix komplett: alle ihre Cells (inkl. deren Docs +
-// Cascades auf Sub-Nodes ueber nodes.parent_cell_id FK), dann die
-// Rows + Cols. Der Matrix-Node selbst (mit Label/Alias/Notizen)
-// bleibt unberuehrt.
+// Sammelt rekursiv alle descendant-Node-IDs (Sub-Matrizen + Sub-
+// Boards + deren Subs). Start ist matrixId, die Root selbst wird NICHT
+// ins Ergebnis aufgenommen (Caller will die Target-Matrix behalten).
+// Walking ueber cells.child_matrix_id + cells.board_id. Board-Nodes
+// sind Blaetter (keine cells) und beenden den Branch.
+async function collectDescendantNodeIds(
+  rootMatrixId: string,
+): Promise<string[]> {
+  const descendants: string[] = [];
+  const seen = new Set<string>([rootMatrixId]);
+  const stack: string[] = [rootMatrixId];
+  while (stack.length > 0) {
+    const id = stack.pop()!;
+    const { data: cells, error } = await supabase
+      .from('cells')
+      .select('child_matrix_id, board_id')
+      .eq('matrix_id', id);
+    if (error) throw error;
+    for (const c of (cells ?? []) as Array<{
+      child_matrix_id: string | null;
+      board_id: string | null;
+    }>) {
+      if (c.child_matrix_id && !seen.has(c.child_matrix_id)) {
+        seen.add(c.child_matrix_id);
+        descendants.push(c.child_matrix_id);
+        stack.push(c.child_matrix_id);
+      }
+      if (c.board_id && !seen.has(c.board_id)) {
+        seen.add(c.board_id);
+        descendants.push(c.board_id);
+        stack.push(c.board_id);
+      }
+    }
+  }
+  return descendants;
+}
+
+// Leert eine Matrix komplett: descendant-Nodes rekursiv loeschen
+// (sonst werden sie beim Cell-Delete orphan wegen nodes.parent_cell_id
+// ON DELETE SET NULL), dann Docs, dann Cells/Rows/Cols der Matrix.
+// Der Matrix-Node selbst (mit Label/Alias/Notizen) bleibt unberuehrt.
 async function clearMatrixContents(matrixId: string): Promise<void> {
-  // Alle Cell-IDs der Matrix sammeln, um Docs vorher aufzuraeumen.
+  // 1. Alle descendant-Nodes sammeln (sub-Matrizen / sub-Boards
+  //    rekursiv). Diese muessen explizit geloescht werden — das
+  //    Schema hat nodes.parent_cell_id ON DELETE SET NULL, nicht
+  //    CASCADE, sonst wuerden Sub-Matrizen zu Root-Nodes "promovieren".
+  const descendants = await collectDescendantNodeIds(matrixId);
+
+  // 2. Alle Cell-IDs (Target-Matrix + alle descendant-Matrizen) fuer
+  //    Doc-Cleanup einsammeln.
+  const matrixIdsForCells = [matrixId, ...descendants];
   const { data: cells, error: cellsQueryErr } = await supabase
     .from('cells')
     .select('id')
-    .eq('matrix_id', matrixId);
+    .in('matrix_id', matrixIdsForCells);
   if (cellsQueryErr) throw cellsQueryErr;
   const cellIds = ((cells ?? []) as Array<{ id: string }>).map((c) => c.id);
   if (cellIds.length > 0) {
@@ -423,15 +468,26 @@ async function clearMatrixContents(matrixId: string): Promise<void> {
       .in('attached_cell_id', cellIds);
     if (dErr) throw dErr;
   }
-  // Cells loeschen — Cascade via nodes.parent_cell_id FK (ON DELETE
-  // CASCADE) entfernt alle Sub-Nodes (Sub-Matrizen / Sub-Boards) +
-  // deren rows/cols/cells/kb_cols/kb_cards/checklists/items/links.
+
+  // 3. Descendant-Nodes loeschen. Cascade via FK raeumt ihre rows /
+  //    cols / cells / kb_cols / kb_cards / checklists / items / links
+  //    mit auf (matrix_id / board_id FKs sind ON DELETE CASCADE).
+  if (descendants.length > 0) {
+    const { error: dnErr } = await supabase
+      .from('nodes')
+      .delete()
+      .in('id', descendants);
+    if (dnErr) throw dnErr;
+  }
+
+  // 4. Target-Matrix eigene Cells/Rows/Cols loeschen — Matrix-Node
+  //    selbst bleibt stehen, damit Label/Alias erhalten bleiben
+  //    (bzw. separat vom Caller ersetzt werden koennen).
   const { error: cErr } = await supabase
     .from('cells')
     .delete()
     .eq('matrix_id', matrixId);
   if (cErr) throw cErr;
-  // Rows + Cols der Matrix.
   const { error: rErr } = await supabase
     .from('rows')
     .delete()
@@ -1320,6 +1376,16 @@ export async function executeSubtreeImportIntoMatrix(args: {
   }
   if (mode === 'overwrite' || mode === 'export-overwrite') {
     await clearMatrixContents(targetMatrixId);
+    // Target-Alias fuer die Dauer des Imports auf NULL setzen, damit
+    // reserveAliases den alten Target-Alias nicht faelschlich als
+    // "belegt" zaehlt und den payload-Root zu "-2" dedupt. Die finale
+    // Zuweisung (Label/Alias/Data aus rootRow) passiert nach den
+    // Inserts weiter unten.
+    const { error: nullErr } = await supabase
+      .from('nodes')
+      .update({ alias: null })
+      .eq('id', targetMatrixId);
+    if (nullErr) throw nullErr;
   }
 
   // Positions-Offset: wo beginnen die neuen Rows/Cols? Nach dem Clear
@@ -1573,6 +1639,29 @@ export async function executeSubtreeImportIntoMatrix(args: {
   await insertBatch('checklist_items', checklistItemsOut);
   await insertBatch('links', linksOut);
   await insertBatch('docs', docsOut);
+
+  // Bei Ersetzen: Target-Matrix uebernimmt Label/Alias/Data des
+  // Payload-Roots. Alias via aliasMap (falls der neue Wert im
+  // Workspace kollidiert, gibt's den "-2"-Suffix). Bei Add bleibt
+  // der Target-Node unveraendert.
+  if (mode === 'overwrite' || mode === 'export-overwrite') {
+    const rootLabel = (rootRow as { label?: unknown }).label;
+    const rootAlias = (rootRow as { alias?: unknown }).alias;
+    const rootData = (rootRow as { data?: unknown }).data;
+    const patch: Record<string, unknown> = {};
+    if (typeof rootLabel === 'string' && rootLabel) patch.label = rootLabel;
+    if (typeof rootAlias === 'string' && rootAlias) {
+      patch.alias = aliasMap.get(rootAlias) ?? rootAlias;
+    }
+    if (rootData && typeof rootData === 'object') patch.data = rootData;
+    if (Object.keys(patch).length > 0) {
+      const { error: nupErr } = await supabase
+        .from('nodes')
+        .update(patch)
+        .eq('id', targetMatrixId);
+      if (nupErr) throw nupErr;
+    }
+  }
 
   return { targetMatrixId };
 }
