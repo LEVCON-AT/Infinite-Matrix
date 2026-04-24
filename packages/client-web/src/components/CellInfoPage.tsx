@@ -35,6 +35,7 @@ import CellDocsSection from './CellDocsSection';
 import { openDocsPopup } from '../lib/docs-ui';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 import AliasText from './AliasText';
+import { useNavigate } from '@solidjs/router';
 
 type Props = {
   workspaceId: string;
@@ -72,6 +73,7 @@ function readLinksFromCell(cell: CellRow): InfoLink[] {
 }
 
 const CellInfoPage: Component<Props> = (p) => {
+  const navigate = useNavigate();
   const editMode = useEditMode();
   const [busy, setBusy] = createSignal(false);
 
@@ -165,13 +167,24 @@ const CellInfoPage: Component<Props> = (p) => {
     const c = p.col?.label || '(Spalte)';
     return `${r} × ${c}`;
   };
+  const matrixHref = () => `/w/${p.workspaceId}/n/${p.cell.matrix_id}`;
 
   return (
     <div class="cell-info-page">
       <header class="cell-page-head">
         <div class="cell-page-head-text">
           <h3>Info</h3>
-          <span class="cell-page-sub">{breadcrumb()}</span>
+          <a
+            class="cell-page-sub cell-page-sub-link"
+            href={matrixHref()}
+            onClick={(e) => {
+              e.preventDefault();
+              navigate(matrixHref());
+            }}
+            title="Zur Matrix"
+          >
+            {breadcrumb()}
+          </a>
           <Show when={p.cell.alias}>
             <span class="node-alias">^{p.cell.alias}</span>
           </Show>

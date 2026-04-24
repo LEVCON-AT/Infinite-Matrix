@@ -3297,6 +3297,20 @@ button[type='submit']:hover:not(:disabled) {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+/* Verlinktes Breadcrumb (Cell-Page → Parent-Matrix). Hover: unterstrichen. */
+.cell-page-sub-link {
+  text-decoration: none;
+  cursor: pointer;
+  transition: color var(--tr-std);
+}
+
+.cell-page-sub-link:hover,
+.cell-page-sub-link:focus-visible {
+  color: var(--text);
+  text-decoration: underline;
+  outline: none;
+}
+
 /* ── Cell-Info-Page ───────────────────────────────────────────── */
 .cell-info-page {
   display: flex;

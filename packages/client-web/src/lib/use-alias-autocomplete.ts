@@ -43,6 +43,29 @@ const [uiState, setUiState] = createSignal<AaUiState>(EMPTY);
 // Read-only Accessor fuer das Singleton-Dropdown.
 export const aliasAutocompleteState = uiState;
 
+// Singleton-Document-ESC-Handler in Capture-Phase. Laeuft beim Modul-Load
+// einmalig — noch bevor irgendein Overlay (CardOverlay, DocsPopup, …)
+// seinen eigenen Capture-Handler registriert. Dadurch bekommt der
+// Autocomplete-Dropdown ESC-Vorrang: schluckt das Event und schliesst
+// sich selbst, der dahinter liegende Overlay bleibt offen. Ohne diesen
+// Listener landete ESC erst beim Overlay-Handler (stopImmediate), und
+// der Element-Level-Handler des Inputs sah es nie → Overlay schloss
+// statt Dropdown.
+if (typeof document !== 'undefined') {
+  document.addEventListener(
+    'keydown',
+    (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const s = uiState();
+      if (!s.open) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      setUiState(EMPTY);
+    },
+    true,
+  );
+}
+
 // Findet das `^token`-Pattern rueckwaerts vom Cursor im Input-Wert.
 // Liefert {start, end, query} oder null, wenn kein offenes Token aktiv ist.
 // Gueltige Query-Chars: a-zA-Z0-9. Alles andere beendet den Scan.
@@ -131,16 +154,9 @@ export function bindAliasAutocomplete(el: Target, wsId: string): () => void {
   const onKeyDown = (e: KeyboardEvent) => {
     const s = uiState();
     if (!s.open || s.anchor !== el) return;
-    if (e.key === 'Escape') {
-      // Capture-Niveau nicht noetig — Element-Listener feuert vor dem
-      // globalen Overlay-Back-Handler nur dann, wenn kein Overlay aktiv
-      // ist. Sollte ein aeusseres Overlay (Card-Modal) ESC schlucken,
-      // bleibt die Palette trotzdem lokal reagierend.
-      e.preventDefault();
-      e.stopPropagation();
-      close();
-      return;
-    }
+    // ESC behandelt der Singleton-Capture-Listener am document (oben) —
+    // der bekommt das Event auch, wenn ein umliegendes Overlay (Card-
+    // Modal) in seiner eigenen Capture-Phase stopImmediate ruft.
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setUiState({

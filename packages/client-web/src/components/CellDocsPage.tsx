@@ -14,6 +14,7 @@ import { Show, type Component } from 'solid-js';
 import type { CellRow, ColRow, RowRow } from '../lib/types';
 import CellDocsSection from './CellDocsSection';
 import { openDocsPopup } from '../lib/docs-ui';
+import { useNavigate } from '@solidjs/router';
 
 type Props = {
   workspaceId: string;
@@ -24,18 +25,30 @@ type Props = {
 };
 
 const CellDocsPage: Component<Props> = (p) => {
+  const navigate = useNavigate();
   const breadcrumb = () => {
     const r = p.row?.label || '(Zeile)';
     const c = p.col?.label || '(Spalte)';
     return `${r} × ${c}`;
   };
+  const matrixHref = () => `/w/${p.workspaceId}/n/${p.cell.matrix_id}`;
 
   return (
     <div class="cell-docs-page">
       <header class="cell-page-head">
         <div class="cell-page-head-text">
           <h3>Dokumentation</h3>
-          <span class="cell-page-sub">{breadcrumb()}</span>
+          <a
+            class="cell-page-sub cell-page-sub-link"
+            href={matrixHref()}
+            onClick={(e) => {
+              e.preventDefault();
+              navigate(matrixHref());
+            }}
+            title="Zur Matrix"
+          >
+            {breadcrumb()}
+          </a>
           <Show when={p.cell.alias}>
             <span class="node-alias">^{p.cell.alias}</span>
           </Show>
