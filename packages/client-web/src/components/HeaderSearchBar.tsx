@@ -657,7 +657,7 @@ const HeaderSearchBar: Component<Props> = (p) => {
       }}
     >
       <span class="header-search-icon" aria-hidden="true">
-        <Show when={mode() === 'command'} fallback="⌕">
+        <Show when={mode() === 'command'} fallback="✨">
           ^
         </Show>
       </span>

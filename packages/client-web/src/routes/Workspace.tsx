@@ -749,7 +749,7 @@ const Workspace: Component = () => {
                   return (
                     <>
                       <span class="ws-breadcrumb-sep" aria-hidden>
-                        /
+                        ›
                       </span>
                       <Show
                         when={!isLast()}
@@ -780,7 +780,7 @@ const Workspace: Component = () => {
               </For>
               <Show when={currentCell()}>
                 <span class="ws-breadcrumb-sep" aria-hidden>
-                  /
+                  ›
                 </span>
                 <span class="ws-breadcrumb-current" data-type="cell">
                   {cellRow()?.label || '(Zeile)'} × {cellCol()?.label || '(Spalte)'}

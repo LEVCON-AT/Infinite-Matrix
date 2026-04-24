@@ -7,15 +7,25 @@
 
 /* ── Tokens ──────────────────────────────────────────────────── */
 :root {
-  /* Hintergrund & Text */
-  --bg: #fff;
-  --bg2: #f7f7f5;
-  --bg3: #f0efe9;
-  --text: #1a1a1a;
-  --text2: #66665f;
-  --text3: #bbb;
-  --border: rgba(0, 0, 0, 0.09);
-  --border2: rgba(0, 0, 0, 0.16);
+  /* Surface / Canvas — HyperUI-/Tailwind-inspirierte Skala:
+     Canvas ist der leicht getoente Gesamt-Hintergrund (gray-50),
+     Surface ist reinweiss (Paper — Sidebar, Header, Cards, Inputs),
+     Surface-Hover ist die naechst-leicht-dunklere Stufe (gray-100).
+     Die Legacy-Aliase --bg / --bg2 / --bg3 zeigen auf die neuen Tokens,
+     damit alle bestehenden Regeln ohne Rewrite mitziehen. */
+  --canvas: #f6f7f9;
+  --surface: #ffffff;
+  --surface-hover: #f3f4f6;
+
+  --bg: var(--canvas);
+  --bg2: var(--surface);
+  --bg3: var(--surface-hover);
+
+  --text: #111827;
+  --text2: #4b5563;
+  --text3: #9ca3af;
+  --border: rgba(15, 23, 42, 0.08);
+  --border2: rgba(15, 23, 42, 0.16);
 
   /* Feature-Farben — 4-Säulen-System */
   --blue: #378add;
@@ -53,10 +63,11 @@
   --focus-width: 2px;
   --focus-offset: 2px;
 
-  /* Shadows */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.16);
+  /* Shadows — HyperUI/Tailwind-Parity. Subtil gehalten, damit die
+     Oberflaeche clean wirkt; tiefere Shadows nur fuer Modal-Overlays. */
+  --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.1), 0 4px 6px -4px rgba(15, 23, 42, 0.05);
 
   /* Overlays */
   --overlay-soft: rgba(0, 0, 0, 0.28);
@@ -83,12 +94,17 @@
 }
 
 [data-theme='dark'] {
-  --bg: #1e1e1e;
-  --bg2: #252525;
-  --bg3: #181818;
-  --text: #e0e0e0;
-  --text2: #999;
-  --text3: #555;
+  /* Dark-Pendant zur gleichen Surface/Canvas-Semantik: Canvas ist das
+     dunklere Gesamt-Flaechenbild, Surface ist das etwas hellere Paper. */
+  --canvas: #0f1115;
+  --surface: #1a1d23;
+  --surface-hover: #232730;
+  --bg: var(--canvas);
+  --bg2: var(--surface);
+  --bg3: var(--surface-hover);
+  --text: #e5e7eb;
+  --text2: #9ca3af;
+  --text3: #6b7280;
   --border: rgba(255, 255, 255, 0.08);
   --border2: rgba(255, 255, 255, 0.14);
   --overlay-soft: rgba(0, 0, 0, 0.45);
@@ -218,7 +234,7 @@ p.ok {
 .login input {
   padding: 8px 10px;
   font-size: 14px;
-  background: var(--bg);
+  background: var(--surface);
   color: var(--text);
   border: 0.5px solid var(--border2);
   border-radius: var(--r);
@@ -238,7 +254,7 @@ button[type='button'] {
   font-size: 12px;
   border-radius: var(--r);
   border: 0.5px solid var(--border2);
-  background: var(--bg);
+  background: var(--surface);
   color: var(--text);
   cursor: pointer;
   font-family: inherit;
@@ -249,7 +265,7 @@ button[type='button'] {
 
 .btn:hover:not(:disabled),
 button[type='submit']:hover:not(:disabled) {
-  background: var(--bg2);
+  background: var(--surface-hover);
 }
 
 /* Disabled-Look NUR auf echten .btn*-Klassen + Submit.
@@ -623,7 +639,9 @@ button[type='submit']:hover:not(:disabled) {
 }
 
 .ws-main {
-  padding: var(--space-xl) var(--space-xl);
+  /* Kein top-Padding — die sticky Header-Bar sitzt buendig oben.
+     Content-Abstand zum Header kommt aus dem Header-margin-bottom. */
+  padding: 0 var(--space-xl) var(--space-xl);
   overflow: auto;
   background: var(--bg);
 }
@@ -633,8 +651,18 @@ button[type='submit']:hover:not(:disabled) {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-md);
-  margin-bottom: var(--space-lg);
   flex-wrap: wrap;
+  /* Weisse Paper-Leiste ueber dem getoenten Canvas — HyperUI-Look.
+     Horizontaler negativer Margin zieht sie bis an den Canvas-Rand
+     (Parent .ws-main hat --space-xl Side-Padding). Sticky top:0 haelt
+     sie beim Scrollen oben. */
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--border);
+  padding: var(--space-sm) var(--space-xl);
+  margin: 0 calc(-1 * var(--space-xl)) var(--space-lg);
 }
 
 @media (max-width: 900px) {
@@ -655,16 +683,20 @@ button[type='submit']:hover:not(:disabled) {
 }
 
 /* Breadcrumb ersetzt den nackten Workspace-Namen im Main-Header.
-   Workspace selbst leicht gedimmt, Kette im normalen Text, letztes
-   Segment (current) farbig nach node-type (blue=matrix, teal=board). */
+   HyperUI-Look: gleichmaessig gegraute Kette (text2), Separator als
+   dezenter Chevron in text3, keine Sonderfarbe fuer das current-
+   Segment (nur Weight). Feature-Farben gibt's woanders (Icon-Chips). */
 .ws-breadcrumb {
   flex: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px var(--space-xs);
-  font-size: var(--fs-title);
+  gap: 2px 6px;
+  font-size: 14px;
+  font-weight: 500;
   min-width: 0;
+  color: var(--text2);
+  line-height: 1.4;
 }
 
 .ws-breadcrumb-ws {
@@ -674,7 +706,9 @@ button[type='submit']:hover:not(:disabled) {
 
 .ws-breadcrumb-sep {
   color: var(--text3);
-  font-weight: 300;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 1;
 }
 
 .ws-breadcrumb-link {
@@ -686,7 +720,7 @@ button[type='submit']:hover:not(:disabled) {
 }
 
 .ws-breadcrumb-link:hover {
-  background: var(--bg2);
+  background: var(--surface-hover);
   color: var(--text);
 }
 
@@ -696,25 +730,10 @@ button[type='submit']:hover:not(:disabled) {
   padding: 2px 4px;
 }
 
-.ws-breadcrumb-current[data-type='matrix'] {
-  color: var(--bluetxt);
-}
-
-.ws-breadcrumb-current[data-type='board'] {
-  color: var(--tealtxt);
-}
-
-.ws-breadcrumb-link[data-type='matrix'] {
-  color: var(--blue);
-}
-
-.ws-breadcrumb-link[data-type='board'] {
-  color: var(--teal);
-}
-
-.ws-breadcrumb-current[data-type='cell'] {
-  color: var(--ambertxt);
-}
+/* Feature-Farben nur als subtile Tinting auf Hover bei Links — das
+   Current-Segment bleibt neutral text-color (HyperUI-Look). Die
+   Matrix/Board/Cell-Unterscheidung wird durch Icons/Badges im Content
+   kommuniziert, nicht ueber Breadcrumb-Farbhierarchie. */
 
 /* Presence-Avatar-Stack im Main-Header. Avatars ueberlappen leicht.
    flex-shrink:0 damit die Breite stabil ist. contain:layout isoliert
@@ -1152,7 +1171,10 @@ button[type='submit']:hover:not(:disabled) {
   align-items: center;
   gap: var(--space-xs);
   padding: 4px 10px;
-  background: var(--bg);
+  /* Leicht abgesetzt vom weissen Header-Parent — HyperUI-Search-Look:
+     Grey Tray (gray-100) + Border. Im fokussierten Zustand wird der
+     Background weiss und der Border faerbt sich an den Focus-Akzent. */
+  background: var(--surface-hover);
   border: 0.5px solid var(--border2);
   border-radius: var(--rs);
   transition: border-color var(--tr-std), box-shadow var(--tr-std), background var(--tr-std);
@@ -1189,10 +1211,18 @@ button[type='submit']:hover:not(:disabled) {
 }
 
 .header-search-icon {
-  font-size: 14px;
+  /* Fixe 16x16 Box damit Icons (^/✨) exakt zentriert sitzen und nicht
+     je nach Glyphe unten abgeschnitten werden. Line-height:1 verhindert
+     Font-internal Padding. */
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  line-height: 1;
   color: var(--text3);
-  font-weight: 600;
-  flex: 0 0 auto;
   user-select: none;
 }
 
@@ -1234,7 +1264,7 @@ button[type='submit']:hover:not(:disabled) {
   max-width: min(560px, 92vw);
   max-height: 420px;
   overflow-y: auto;
-  background: var(--bg);
+  background: var(--surface);
   border: 0.5px solid var(--border);
   border-radius: var(--rs);
   box-shadow: var(--shadow-md);
