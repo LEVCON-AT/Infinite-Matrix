@@ -2760,12 +2760,18 @@ button[type='submit']:hover:not(:disabled) {
 }
 
 .mx-del-btn {
-  padding: 2px 6px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   color: var(--text3);
-  border: 0.5px solid transparent;
+  border: 1px solid transparent;
   border-radius: var(--rs);
   font-size: 12px;
+  line-height: 1;
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
@@ -2793,10 +2799,15 @@ button[type='submit']:hover:not(:disabled) {
 /* Move-Pfeile: analog zu mx-del-btn, aber in Tealtxt beim Hover.
    Unsichtbar bis Edit + Hover/Focus, wie Del. */
 .mx-move-btn {
-  padding: 2px 5px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   color: var(--text3);
-  border: 0.5px solid transparent;
+  border: 1px solid transparent;
   border-radius: var(--rs);
   font-size: 12px;
   line-height: 1;
@@ -2963,21 +2974,21 @@ button[type='submit']:hover:not(:disabled) {
   flex-wrap: wrap;
   gap: var(--space-xs);
   padding: var(--space-sm);
-  background: var(--bg2);
-  border: 0.5px solid var(--border);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--r);
 }
 
 .board-link-chip {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-xs);
-  padding: 3px 9px;
-  font-size: 11px;
-  background: var(--bg);
-  border: 0.5px solid var(--border2);
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 999px;
-  color: var(--text);
+  color: var(--text2);
   text-decoration: none;
   transition: var(--tr-std);
 }
@@ -2985,17 +2996,24 @@ button[type='submit']:hover:not(:disabled) {
 .board-link-chip:hover {
   background: var(--bluebg);
   color: var(--bluetxt);
-  border-color: var(--blue);
+  border-color: color-mix(in srgb, var(--blue) 40%, var(--border));
 }
 
 .board-link-chip[data-link-type='mail']:hover {
   background: var(--amberbg);
   color: var(--ambertxt);
-  border-color: var(--amber);
+  border-color: color-mix(in srgb, var(--amber) 40%, var(--border));
 }
 
 .link-ico {
-  color: var(--text2);
+  color: var(--text3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.board-link-chip:hover .link-ico {
+  color: currentColor;
 }
 
 .link-alias {
@@ -3157,21 +3175,25 @@ button[type='submit']:hover:not(:disabled) {
 }
 
 .kb-col-collapse-btn {
-  width: 18px;
+  width: 22px;
   height: 22px;
   padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: 0;
   color: var(--text3);
-  font-size: 11px;
   line-height: 1;
   cursor: pointer;
   flex-shrink: 0;
-  transition: color var(--tr-std);
+  border-radius: var(--rs);
+  transition: color var(--tr-std), background var(--tr-std);
 }
 
 .kb-col-collapse-btn:hover {
   color: var(--text);
+  background: var(--surface-hover);
 }
 
 .kb-col[data-has-color='yes'] {
@@ -3304,40 +3326,84 @@ button[type='submit']:hover:not(:disabled) {
   align-items: center;
   gap: var(--space-sm);
   padding: 0 var(--space-md) var(--space-sm);
+  flex-wrap: wrap;
+}
+
+/* Filter-Wrapper mit Such-Icon links im Input — HyperUI-Look. */
+.board-filter-wrap {
+  flex: 1 1 240px;
+  max-width: 420px;
+  min-width: 200px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.board-filter-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--text3);
+  pointer-events: none;
 }
 
 .board-filter-input {
   flex: 1;
-  max-width: 360px;
-  padding: 4px 10px;
+  min-width: 0;
+  height: 32px;
+  padding: 0 var(--space-sm) 0 32px;
   font-size: 13px;
-  background: var(--bg);
-  border: 0.5px solid var(--border);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--rs);
   color: var(--text);
-  transition: var(--tr-std);
+  transition: border-color var(--tr-std), box-shadow var(--tr-std),
+    background var(--tr-std);
+}
+
+.board-filter-input::placeholder {
+  color: var(--text3);
 }
 
 .board-filter-input:focus-visible {
-  border-color: var(--blue);
-  background: var(--bg2);
+  border-color: var(--focus-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-color) 18%, transparent);
   outline: none;
 }
 
 .board-filter-count {
+  position: absolute;
+  right: 34px;
+  top: 50%;
+  transform: translateY(-50%);
   font-variant-numeric: tabular-nums;
   font-size: 11px;
+  color: var(--text3);
+  pointer-events: none;
 }
 
 .board-filter-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
   width: 22px;
   height: 22px;
   padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
-  border: 0.5px solid transparent;
+  border: 1px solid transparent;
   border-radius: var(--rs);
   color: var(--text3);
-  font-size: 11px;
   cursor: pointer;
   transition: var(--tr-std);
 }
@@ -3350,28 +3416,38 @@ button[type='submit']:hover:not(:disabled) {
 
 .board-sort-select {
   margin-left: auto;
-  padding: 3px 6px;
-  font-size: 11px;
-  background: var(--bg2);
-  border: 0.5px solid var(--border);
+  height: 32px;
+  padding: 0 var(--space-sm);
+  font-size: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--rs);
   color: var(--text);
   cursor: pointer;
+  transition: border-color var(--tr-std), box-shadow var(--tr-std);
+}
+
+.board-sort-select:hover {
+  border-color: var(--border2);
 }
 
 .board-sort-select:focus-visible {
-  border-color: var(--blue);
+  border-color: var(--focus-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-color) 18%, transparent);
   outline: none;
 }
 
 .board-archive-toggle {
-  /* sort-select schiebt per margin-left:auto ans Ende; archive
-     folgt direkt dahinter. */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
 }
 
 .board-archive-toggle.active {
   background: var(--tealbg);
   color: var(--tealtxt);
+  border-color: color-mix(in srgb, var(--teal) 40%, var(--border));
 }
 
 .kb-card-name {
@@ -3385,7 +3461,9 @@ button[type='submit']:hover:not(:disabled) {
 
 .kb-done-mark {
   color: var(--teal);
-  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Done-Checkbox direkt am Board-Karten-Titel. Klein, teal, klickbar
@@ -3436,13 +3514,14 @@ button[type='submit']:hover:not(:disabled) {
 }
 
 .kb-deadline {
-  padding: 1px 6px;
+  padding: 2px 8px;
   border-radius: 999px;
   background: var(--bg2);
   color: var(--text2);
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
+  line-height: 1.2;
 }
 
 /* Faerbung nach Dringlichkeit — ueberfaellig rot, heute/bald amber,
@@ -3483,25 +3562,36 @@ button[type='submit']:hover:not(:disabled) {
 }
 
 .kb-prio {
-  padding: 1px 6px;
+  padding: 2px 8px;
   border-radius: 999px;
   background: var(--redbg);
   color: var(--redtxt);
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1.2;
 }
 
 .kb-recur {
-  padding: 1px 6px;
+  padding: 2px 6px;
   border-radius: 999px;
   background: var(--tealbg);
   color: var(--tealtxt);
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.2;
 }
 
 .kb-cl-progress {
-  padding: 1px 6px;
+  padding: 2px 8px;
   border-radius: 999px;
   background: var(--purplebg);
   color: var(--purpletxt);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1.2;
 }
 
 /* Karten-Edit-Bar */

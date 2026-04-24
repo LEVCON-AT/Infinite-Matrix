@@ -53,7 +53,13 @@ export type IconName =
   | 'view-columns'
   | 'information-circle'
   | 'dot-filled'
-  | 'arrow-down-tray';
+  | 'arrow-down-tray'
+  | 'clock'
+  | 'envelope'
+  | 'arrow-top-right-on-square'
+  | 'funnel'
+  | 'flag'
+  | 'no-symbol';
 
 // Heroicons v2 outline path-data. 24x24 viewBox. Factory-Functions
 // wichtig: sonst shared Solid dieselben DOM-Nodes zwischen mehreren
@@ -283,6 +289,48 @@ const ICONS: Record<IconName, () => JSX.Element> = {
       <path d="M12 4v12" />
       <path d="m7 11 5 5 5-5" />
       <path d="M4 20h16" />
+    </>
+  ),
+  // Deadline: Uhr-Icon
+  clock: () => (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </>
+  ),
+  // Mail: Briefumschlag
+  envelope: () => (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3 7 9 6 9-6" />
+    </>
+  ),
+  // Externer Link: Pfeil nach oben-rechts + Rahmen
+  'arrow-top-right-on-square': () => (
+    <>
+      <path d="M14 4h6v6" />
+      <path d="M20 4 10 14" />
+      <path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" />
+    </>
+  ),
+  // Filter: Trichter
+  funnel: () => (
+    <>
+      <path d="M4 5h16l-6 8v6l-4-2v-4Z" />
+    </>
+  ),
+  // Prioritaet: Flagge
+  flag: () => (
+    <>
+      <path d="M5 20V5" />
+      <path d="M5 5h11l-1.5 3L16 11H5" />
+    </>
+  ),
+  // Verboten / loeschen Farbe: durchgestrichener Kreis
+  'no-symbol': () => (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m6 6 12 12" />
     </>
   ),
 };

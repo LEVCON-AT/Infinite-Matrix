@@ -643,38 +643,43 @@ const BoardView: Component<Props> = (p) => {
               Boards. */}
           <Show when={(p.content!.kbCards ?? []).length > 0}>
             <div class="board-header-bar">
-              <input
-                ref={filterInputRef}
-                type="text"
-                class="board-filter-input"
-                placeholder="Suche (Name, Alias, #Tag, @Person)…"
-                value={filter()}
-                onInput={(e) => setFilter(e.currentTarget.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape' && filter()) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setFilter('');
-                  }
-                }}
-              />
-              <Show when={filter()}>
-                <span class="board-filter-count hint">
-                  {totalCardsShown()}/{totalCardsAll()}
+              <div class="board-filter-wrap">
+                <span class="board-filter-icon" aria-hidden="true">
+                  <Icon name="search" size={14} />
                 </span>
-                <button
-                  type="button"
-                  class="board-filter-clear"
-                  onClick={() => {
-                    setFilter('');
-                    filterInputRef?.focus();
+                <input
+                  ref={filterInputRef}
+                  type="text"
+                  class="board-filter-input"
+                  placeholder="Suche (Name, Alias, #Tag, @Person)…"
+                  value={filter()}
+                  onInput={(e) => setFilter(e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape' && filter()) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setFilter('');
+                    }
                   }}
-                  title="Filter loeschen"
-                  aria-label="Filter loeschen"
-                >
-                  ✕
-                </button>
-              </Show>
+                />
+                <Show when={filter()}>
+                  <span class="board-filter-count hint">
+                    {totalCardsShown()}/{totalCardsAll()}
+                  </span>
+                  <button
+                    type="button"
+                    class="board-filter-clear"
+                    onClick={() => {
+                      setFilter('');
+                      filterInputRef?.focus();
+                    }}
+                    title="Filter loeschen"
+                    aria-label="Filter loeschen"
+                  >
+                    <Icon name="x" size={14} />
+                  </button>
+                </Show>
+              </div>
               <select
                 class="board-sort-select"
                 value={boardUi.sort()}
@@ -707,7 +712,8 @@ const BoardView: Component<Props> = (p) => {
                       : 'Archivierte Karten anzeigen'
                   }
                 >
-                  {showArchived() ? 'Archiv: an' : 'Archiv: aus'}{' '}
+                  <Icon name="archive-box" size={14} />
+                  <span>{showArchived() ? 'Archiv: an' : 'Archiv: aus'}</span>
                   <span class="hint">({archivedCount()})</span>
                 </button>
               </Show>
@@ -736,7 +742,10 @@ const BoardView: Component<Props> = (p) => {
                         title={link.url}
                       >
                         <span class="link-ico">
-                          {link.type === 'mail' ? '✉' : '↗'}
+                          <Icon
+                            name={link.type === 'mail' ? 'envelope' : 'arrow-top-right-on-square'}
+                            size={12}
+                          />
                         </span>
                         <span>{link.label || link.url}</span>
                         <Show when={link.alias}>
@@ -804,7 +813,7 @@ const BoardView: Component<Props> = (p) => {
                         onClick={() => onDelLink(link)}
                         disabled={busy()}
                       >
-                        ✕
+                        <Icon name="x" size={12} />
                       </button>
                     </div>
                   </Show>
@@ -817,7 +826,8 @@ const BoardView: Component<Props> = (p) => {
                   onClick={onAddLink}
                   disabled={busy()}
                 >
-                  + Link
+                  <Icon name="plus" size={14} />
+                  <span>Link</span>
                 </button>
               </Show>
             </div>
@@ -842,7 +852,8 @@ const BoardView: Component<Props> = (p) => {
                     onClick={onAddCol}
                     disabled={busy()}
                   >
-                    + Spalte
+                    <Icon name="plus" size={14} />
+                    <span>Spalte</span>
                   </button>
                 </Show>
               </div>
@@ -882,7 +893,10 @@ const BoardView: Component<Props> = (p) => {
                           aria-expanded={!collapsed()}
                           onClick={() => boardUi.toggleCol(col.id)}
                         >
-                          {collapsed() ? '▸' : '▾'}
+                          <Icon
+                            name={collapsed() ? 'chevron-right' : 'chevron-down'}
+                            size={14}
+                          />
                         </button>
                         <input
                           class="mx-head-input"
@@ -921,7 +935,7 @@ const BoardView: Component<Props> = (p) => {
                           onClick={() => onColorCol(col, null)}
                           disabled={!editMode() || !col.color}
                         >
-                          ○
+                          <Icon name="no-symbol" size={12} />
                         </button>
                         <button
                           type="button"
@@ -932,7 +946,7 @@ const BoardView: Component<Props> = (p) => {
                           onClick={() => onMoveCol(col, 'left')}
                           disabled={busy() || !editMode() || colIdx() === 0}
                         >
-                          ‹
+                          <Icon name="chevron-left" size={12} />
                         </button>
                         <button
                           type="button"
@@ -943,7 +957,7 @@ const BoardView: Component<Props> = (p) => {
                           onClick={() => onMoveCol(col, 'right')}
                           disabled={busy() || !editMode() || colIdx() === visibleCols().length - 1}
                         >
-                          ›
+                          <Icon name="chevron-right" size={12} />
                         </button>
                         <button
                           type="button"
@@ -954,7 +968,7 @@ const BoardView: Component<Props> = (p) => {
                           onClick={() => onDelCol(col)}
                           disabled={busy() || !editMode()}
                         >
-                          ✕
+                          <Icon name="x" size={12} />
                         </button>
                         <span class="kb-col-count">{list().length}</span>
                       </header>
@@ -1060,12 +1074,14 @@ const BoardView: Component<Props> = (p) => {
                                             deadlineState(card.deadline, isCardDone(card)) ?? 'none'
                                           }
                                         >
-                                          ⏱ {deadline}
+                                          <Icon name="clock" size={11} />
+                                          <span>{deadline}</span>
                                         </span>
                                       </Show>
                                       <Show when={card.priority != null}>
                                         <span class="kb-prio">
-                                          P{card.priority}
+                                          <Icon name="flag" size={11} />
+                                          <span>P{card.priority}</span>
                                         </span>
                                       </Show>
                                       <Show when={card.recur != null}>
@@ -1075,8 +1091,10 @@ const BoardView: Component<Props> = (p) => {
                                       </Show>
                                       <Show when={progress()}>
                                         <span class="kb-cl-progress">
-                                          ✓ {progress()!.done}/
-                                          {progress()!.total}
+                                          <Icon name="check-circle" size={11} />
+                                          <span>
+                                            {progress()!.done}/{progress()!.total}
+                                          </span>
                                         </span>
                                       </Show>
                                     </div>
@@ -1104,7 +1122,7 @@ const BoardView: Component<Props> = (p) => {
                                         boardUi.sort() !== 'manual'
                                       }
                                     >
-                                      ↑
+                                      <Icon name="arrow-up" size={12} />
                                     </button>
                                     <button
                                       type="button"
@@ -1122,7 +1140,7 @@ const BoardView: Component<Props> = (p) => {
                                         boardUi.sort() !== 'manual'
                                       }
                                     >
-                                      ↓
+                                      <Icon name="arrow-down" size={12} />
                                     </button>
                                     <select
                                       class="kb-card-move"
@@ -1151,7 +1169,7 @@ const BoardView: Component<Props> = (p) => {
                                       onClick={() => onDelCard(card)}
                                       disabled={busy()}
                                     >
-                                      ✕
+                                      <Icon name="x" size={12} />
                                     </button>
                                   </div>
                                 </li>
@@ -1170,7 +1188,8 @@ const BoardView: Component<Props> = (p) => {
                           disabled={busy()}
                           title="Karte hinzufuegen"
                         >
-                          + Karte
+                          <Icon name="plus" size={14} />
+                          <span>Karte</span>
                         </button>
                       </Show>
                     </div>
@@ -1188,7 +1207,8 @@ const BoardView: Component<Props> = (p) => {
                     disabled={busy()}
                     title="Spalte hinzufuegen"
                   >
-                    + Spalte
+                    <Icon name="plus" size={14} />
+                    <span>Spalte</span>
                   </button>
                 </div>
               </Show>
@@ -1232,7 +1252,8 @@ const BoardView: Component<Props> = (p) => {
                   onClick={onAddChecklist}
                   disabled={busy()}
                 >
-                  + Checkliste
+                  <Icon name="plus" size={14} />
+                  <span>Checkliste</span>
                 </button>
               </Show>
             </section>

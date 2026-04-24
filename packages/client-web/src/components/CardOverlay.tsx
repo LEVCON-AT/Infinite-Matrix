@@ -561,7 +561,9 @@ const CardOverlay: Component<Props> = (p) => {
               onChange={(e) => onToggleDone(e.currentTarget.checked)}
             />
             <Show when={isCardDone(p.card)}>
-              <span class="kb-done-mark" aria-hidden>✓</span>
+              <span class="kb-done-mark" aria-hidden="true">
+                <Icon name="check" size={12} />
+              </span>
             </Show>
           </label>
           <input
