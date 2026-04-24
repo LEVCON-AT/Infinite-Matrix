@@ -41,6 +41,7 @@ import CellDocsPage from '../components/CellDocsPage';
 import CellInfoPage from '../components/CellInfoPage';
 import AliasAutocomplete from '../components/AliasAutocomplete';
 import ContextMenu from '../components/ContextMenu';
+import HeaderSearchBar from '../components/HeaderSearchBar';
 import { aliasChipMenuState, closeAliasChipMenu } from '../lib/alias-chip-menu';
 import CommandPalette from '../components/CommandPalette';
 import DocsPopup from '../components/DocsPopup';
@@ -129,12 +130,15 @@ const Workspace: Component = () => {
   const [workspaces] = createResource(() => fetchMyWorkspaces());
   const [showImport, setShowImport] = createSignal(false);
   const [showSearch, setShowSearch] = createSignal(false);
-  // Einheitliche `^`-Palette — frueher getrennt als Quicknav (Ctrl+K)
-  // und Command-Palette (Shift+P). Benutzer-Entscheidung 2026-04-24:
-  // alles ueber `^`; Ctrl+K / Shift+P entfernt.
+  // `^` bleibt Modal-Trigger fuer CommandPalette (DeadKey-Sicherheit auf
+  // DE-Layouts). Die neue HeaderSearchBar (Focus via `f`) deckt Suche +
+  // Commands + Alias-Navigation in einem persistenten Input-Feld ab.
   const [showCommand, setShowCommand] = createSignal(false);
   const [showDocs, setShowDocs] = createSignal(false);
   const [showHelp, setShowHelp] = createSignal(false);
+  // Callback, das die HeaderSearchBar beim Mount registriert — `f`-Keybind
+  // benutzt es, um den Input zu fokussieren.
+  let focusHeaderSearch: (() => void) | null = null;
   const docsRequest = useDocsRequest();
 
   // Docs-Popup wird ueber die shared Request-Signal gesteuert. Jede
@@ -386,9 +390,9 @@ const Workspace: Component = () => {
       if (!params.workspaceId) return;
       if (showSearch() || showCommand()) return;
 
-      // "/" oeffnet Global-Search. Auf DE-Layout ist "/" = Shift+7, auf
-      // US direkt — e.key ist '/' in beiden Faellen. In Inputs ignorieren
-      // (User will dann wirklich einen Slash tippen).
+      // "/" oeffnet Global-Search-Modal. Parallel zur HeaderSearchBar
+      // erreichbar. Auf DE-Layout ist "/" = Shift+7; e.key ist '/' in
+      // beiden Faellen. In Inputs ignorieren.
       if (
         e.key === '/' &&
         !e.ctrlKey &&
@@ -398,6 +402,24 @@ const Workspace: Component = () => {
         if (isTextInput(e.target)) return;
         e.preventDefault();
         setShowSearch(true);
+        return;
+      }
+
+      // "f" fokussiert die HeaderSearchBar (zentrales Such-/Steuerfeld).
+      // Primaerer Weg seit 2026-04-24 — `/` + `^` bleiben als Modal-
+      // Alternativen. In Inputs ignorieren, sonst kann User kein "f"
+      // tippen.
+      if (
+        e.key === 'f' &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        !e.shiftKey
+      ) {
+        if (isTextInput(e.target)) return;
+        if (!focusHeaderSearch) return;
+        e.preventDefault();
+        focusHeaderSearch();
         return;
       }
 
@@ -765,6 +787,16 @@ const Workspace: Component = () => {
                 </span>
               </Show>
             </nav>
+            <Show when={params.workspaceId}>
+              <HeaderSearchBar
+                workspaceId={params.workspaceId as string}
+                currentNode={currentNode()}
+                onShowHelp={() => setShowHelp(true)}
+                registerFocus={(fn) => {
+                  focusHeaderSearch = fn;
+                }}
+              />
+            </Show>
             <Show when={params.workspaceId && user()}>
               <PresenceStack
                 workspaceId={params.workspaceId as string}

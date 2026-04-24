@@ -634,6 +634,18 @@ button[type='submit']:hover:not(:disabled) {
   justify-content: space-between;
   gap: var(--space-md);
   margin-bottom: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 900px) {
+  /* Header-Bar bricht auf schmalen Screens in die zweite Zeile —
+     ws-breadcrumb bleibt oben, HeaderSearchBar wird full-width. */
+  .ws-main-header .header-search-wrap {
+    order: 99;
+    width: 100%;
+    margin-top: var(--space-sm);
+    max-width: none;
+  }
 }
 
 .ws-main-header h1 {
@@ -1121,6 +1133,333 @@ button[type='submit']:hover:not(:disabled) {
   color: var(--ambertxt);
   padding: 0 2px;
   border-radius: 3px;
+}
+
+/* ── Header-SearchBar ─────────────────────────────────────────────
+   Zentrales Such-/Steuerfeld im ws-main-header. Vereint Text-Suche,
+   Command-Execution und Alias-Navigation. Dropdown oeffnet nach unten. */
+.header-search-wrap {
+  position: relative;
+  flex: 0 0 240px;
+  max-width: 320px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 4px 10px;
+  background: var(--bg);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  transition: border-color var(--tr-std), box-shadow var(--tr-std), background var(--tr-std);
+}
+
+.header-search-wrap.is-focused {
+  border-color: var(--focus-color);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus-color) 25%, transparent);
+}
+
+/* Success-Flash (600ms teal-pulse) nach Command/Nav-Success. */
+@keyframes headerSearchPulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--teal) 70%, transparent); }
+  70% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--teal) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--teal) 0%, transparent); }
+}
+
+.header-search-wrap.is-success {
+  animation: headerSearchPulse 600ms ease-out;
+  border-color: var(--teal);
+}
+
+/* Error-Flash (300ms shake + rote Border). */
+@keyframes headerSearchShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  50% { transform: translateX(4px); }
+  75% { transform: translateX(-2px); }
+}
+
+.header-search-wrap.is-error {
+  animation: headerSearchShake 300ms ease-in-out;
+  border-color: var(--red);
+}
+
+.header-search-icon {
+  font-size: 14px;
+  color: var(--text3);
+  font-weight: 600;
+  flex: 0 0 auto;
+  user-select: none;
+}
+
+.header-search-wrap.is-focused .header-search-icon {
+  color: var(--amber);
+}
+
+.header-search-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  padding: 2px 0;
+  outline: none;
+}
+
+.header-search-input::placeholder {
+  color: var(--text3);
+}
+
+.header-search-busy {
+  color: var(--text3);
+  font-size: 14px;
+  flex: 0 0 auto;
+}
+
+/* Dropdown unter dem Input — absolut positioniert, floatet ueber dem
+   Content. Right-aligned relativ zum Wrap, aber breit genug fuer die
+   Result-Items. */
+.header-search-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 100%;
+  width: 420px;
+  max-width: min(560px, 92vw);
+  max-height: 420px;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  box-shadow: var(--shadow-md);
+  z-index: 40;
+  padding: 4px;
+  animation: headerSearchPopIn 160ms ease-out;
+}
+
+@keyframes headerSearchPopIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.header-search-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 0;
+}
+
+.header-search-section-head {
+  margin: 0 0 4px 0;
+  padding: 0 8px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text3);
+  font-weight: 600;
+}
+
+.header-search-divider {
+  margin: 4px 8px;
+  height: 0;
+  border: 0;
+  border-top: 0.5px solid var(--border);
+}
+
+.header-search-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--rs);
+  text-align: left;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--tr-std);
+}
+
+.header-search-row:hover,
+.header-search-row.is-selected {
+  background: var(--bg2);
+}
+
+.header-search-row.is-stub {
+  opacity: 0.5;
+}
+
+.header-search-row-badge {
+  flex: 0 0 auto;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--bg2);
+  color: var(--text2);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.header-search-row-badge[data-type='matrix'] {
+  background: var(--bluebg);
+  color: var(--bluetxt);
+}
+
+.header-search-row-badge[data-type='board'] {
+  background: var(--tealbg);
+  color: var(--tealtxt);
+}
+
+.header-search-row-badge[data-type='card'] {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+}
+
+.header-search-row-badge[data-type='cell'] {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+}
+
+.header-search-row-badge[data-type='checklist'] {
+  background: color-mix(in srgb, var(--purple, #a78bfa) 20%, transparent);
+  color: var(--purple, #7c3aed);
+}
+
+.header-search-row-badge[data-type='doc'] {
+  background: var(--bluebg);
+  color: var(--bluetxt);
+}
+
+.header-search-row-badge[data-alias-kind='node'] {
+  background: var(--bluebg);
+  color: var(--bluetxt);
+}
+
+.header-search-row-badge[data-alias-kind='card'] {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+}
+
+.header-search-row-badge[data-alias-kind='cell'] {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+}
+
+.header-search-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.header-search-row-title {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header-search-row-sub {
+  font-size: 11px;
+  color: var(--text3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header-search-alias-token {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--ambertxt);
+  font-weight: 600;
+}
+
+.header-search-alias-inline {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--text3);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.header-search-verb-syntax {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--amber);
+  font-size: 12px;
+  padding: 0 4px;
+  flex: 0 0 auto;
+}
+
+.header-search-stub-tag {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--bg2);
+  color: var(--text3);
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.header-search-error {
+  margin: 0;
+  padding: 6px 10px;
+  background: var(--redbg);
+  color: var(--red);
+  font-size: 11px;
+  border-radius: var(--rs);
+}
+
+.header-search-hint {
+  margin: 0;
+  padding: 8px 10px;
+  color: var(--text3);
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* History-Row-Variante: kleineres Icon-Badge, monospace Raw-Text. */
+.header-search-row-history .header-search-row-badge {
+  background: var(--bg2);
+  color: var(--text3);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  padding: 1px 5px;
+}
+
+.header-search-row-history[data-hist-kind='command'] .header-search-row-badge {
+  color: var(--ambertxt);
+}
+
+.header-search-row-history .header-search-row-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+/* ColPick-Sub-UI innerhalb des Dropdown. */
+.header-search-colpick {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: 8px;
+}
+
+.header-search-colpick-title {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.header-search-colpick-select {
+  width: 100%;
+  padding: 4px 6px;
+  background: var(--bg);
+  color: var(--text);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  font-size: 13px;
+  font-family: inherit;
 }
 
 .global-search-badge[data-type='doc'] {

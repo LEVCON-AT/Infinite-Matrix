@@ -22,8 +22,10 @@ const SECTIONS: ShortcutSection[] = [
     title: 'Global',
     entries: [
       { keys: ['?'], desc: 'Diese Hilfe oeffnen/schliessen' },
-      { keys: ['^'], desc: 'Palette — Alias springen + Commands (n/copy/del/ren/nd/help)' },
-      { keys: ['/'], desc: 'Suche in Matrizen, Boards, Karten, Checklisten' },
+      { keys: ['f'], desc: 'Zentrales Such-/Steuerfeld im Header fokussieren' },
+      { keys: ['^'], desc: 'Command-Palette (Modal) — Alias springen + Commands' },
+      { keys: ['/'], desc: 'Suche (Modal) in Matrizen, Boards, Karten, Checklisten' },
+      { keys: ['Alt+↑', 'Alt+↓'], desc: 'Letzte Eingaben im Header-Feld durchblaettern' },
       { keys: ['Shift+D'], desc: 'Dokumentations-Popup oeffnen' },
       { keys: ['Shift+N'], desc: 'Sidebar-Modus zyklen (full → rails → aus)' },
       { keys: ['s'], desc: 'Fokus Sidebar ↔ Canvas swappen' },

@@ -64,6 +64,8 @@ export type ParsedCommand =
 
 // Liste aller Verben — fuer Parser-Dispatch und fuer die Help-Uebersicht.
 // Eintraege werden in der Reihenfolge im ^help-Dropdown gezeigt.
+// Unsupported-Verben werden auch angezeigt (gedimmt) — der User sieht
+// das komplette Vokabular + weiss welche "noch nicht ready" sind.
 export const COMMAND_VERBS: Array<{
   verb: string;
   syntax: string;
@@ -83,6 +85,19 @@ export const COMMAND_VERBS: Array<{
   { verb: 'nd', syntax: 'nd', description: 'Neue Doku (Docs-Popup oeffnen)', supported: true },
   { verb: 'help', syntax: 'help', description: 'Diese Uebersicht zeigen', supported: true },
   { verb: '<alias>', syntax: '<alias>', description: 'Zum Alias springen (Navigation)', supported: true },
+  // Stubs — parseCommand liefert {kind:'unsupported'}, die Bar zeigt sie
+  // gedimmt. Reihenfolge grob nach Haeufigkeit im HTML-Vorbild.
+  { verb: 'w', syntax: 'w [alias]', description: 'Intervallmatrix (Wiederkehr-Ansicht)', supported: false },
+  { verb: 's', syntax: 's', description: 'Einstellungen oeffnen', supported: false },
+  { verb: 'sc', syntax: 'sc', description: 'Sidebar-Scroll-Modus togglen', supported: false },
+  { verb: 'c', syntax: 'c [tab] [alias] [-all]', description: 'Cleanup — Labels zuruecksetzen', supported: false },
+  { verb: 'move', syntax: 'move <alias> ...', description: 'Node verschieben (Alt-Variante)', supported: false },
+  { verb: 'delete', syntax: 'delete <alias>', description: 'Alias aufloesen + loeschen (Alt-Variante)', supported: false },
+  { verb: 'cl-to-card', syntax: 'cl-to-card <alias>', description: 'Checkliste in Karten umwandeln', supported: false },
+  { verb: 'fa', syntax: 'fa <term>', description: 'Scope-Suche nur Karten', supported: false },
+  { verb: 'fi', syntax: 'fi <term>', description: 'Scope-Suche nur Info-Felder', supported: false },
+  { verb: 'fh', syntax: 'fh <term>', description: 'Scope-Suche nur Links', supported: false },
+  { verb: 'fc', syntax: 'fc <term>', description: 'Scope-Suche nur Checklisten', supported: false },
 ];
 
 export function parseCommand(raw: string): ParsedCommand | null {
