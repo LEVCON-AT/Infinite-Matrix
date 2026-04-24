@@ -32,9 +32,11 @@ import {
   setCardDoneOccurrences,
   toggleCardDone,
 } from '../lib/mutations';
-import { useEditMode } from '../lib/edit-mode';
+import { useVis } from '../lib/settings';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
+import { showChoice } from '../lib/dialog';
+import Icon from './Icon';
 
 type Props = {
   workspaceId: string;
@@ -50,7 +52,10 @@ function fmtDate(iso: string | null): string | null {
 
 const TaskOverview: Component<Props> = (p) => {
   const navigate = useNavigate();
-  const editMode = useEditMode();
+  // Daily-Col-CRUD wird ueber den `dailyColEdit`-Vis-Key gesteuert —
+  // User kann im Settings-Modal zwischen "Nur Edit-Mode" / "Immer
+  // sichtbar" / "Ausgeblendet" waehlen. Default: Edit-Mode.
+  const canEditCols = useVis('dailyColEdit');
   const dcs = useDailyCols(p.workspaceId);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -114,9 +119,9 @@ const TaskOverview: Component<Props> = (p) => {
           const isLast = () => idx() === dcs.cols().length - 1;
           return (
             <div class="daily-col" data-dcol-id={col.id}>
-              <div class="daily-col-hd" classList={{ 'daily-col-hd-edit': editMode() }}>
+              <div class="daily-col-hd" classList={{ 'daily-col-hd-edit': canEditCols() }}>
                 <Show
-                  when={editMode()}
+                  when={canEditCols()}
                   fallback={
                     <>
                       <div class="flex-fill">
@@ -167,7 +172,7 @@ const TaskOverview: Component<Props> = (p) => {
                       title="Nach links"
                       aria-label="Nach links verschieben"
                     >
-                      ‹
+                      <Icon name="chevron-left" size={12} />
                     </button>
                     <button
                       type="button"
@@ -177,18 +182,24 @@ const TaskOverview: Component<Props> = (p) => {
                       title="Nach rechts"
                       aria-label="Nach rechts verschieben"
                     >
-                      ›
+                      <Icon name="chevron-right" size={12} />
                     </button>
                     <button
                       type="button"
                       class="dcolh-del"
                       onClick={() => {
-                        if (
-                          dcs.cols().length > 1 &&
-                          window.confirm(`Spalte "${col.label}" entfernen?`)
-                        ) {
-                          dcs.remove(col.id);
-                        }
+                        if (dcs.cols().length <= 1) return;
+                        void (async () => {
+                          const choice = await showChoice({
+                            title: 'Spalte entfernen',
+                            message: `Spalte "${col.label}" aus der Aufgabenuebersicht entfernen? Die Karten bleiben erhalten, nur die Spalten-Sicht verschwindet.`,
+                            choices: [
+                              { id: 'del', label: 'Entfernen', variant: 'danger' },
+                              { id: 'cancel', label: 'Abbrechen', variant: 'default' },
+                            ],
+                          });
+                          if (choice === 'del') dcs.remove(col.id);
+                        })();
                       }}
                       disabled={dcs.cols().length <= 1}
                       title={
@@ -198,7 +209,7 @@ const TaskOverview: Component<Props> = (p) => {
                       }
                       aria-label="Spalte entfernen"
                     >
-                      ✕
+                      <Icon name="x" size={12} />
                     </button>
                   </div>
                   <span class="dcolh-count dcolh-count-edit">{items().length}</span>
@@ -249,7 +260,10 @@ const TaskOverview: Component<Props> = (p) => {
                               <span class="di-overdue-text"> · ueberfaellig</span>
                             )}
                             {isRecurCard(card) && (
-                              <span class="di-recur-badge"> · ↻</span>
+                              <span class="di-recur-badge">
+                                {' · '}
+                                <Icon name="arrow-path" size={10} />
+                              </span>
                             )}
                           </div>
                         </div>
@@ -262,19 +276,47 @@ const TaskOverview: Component<Props> = (p) => {
           );
         }}
       </For>
-      <Show when={editMode()}>
-        <button
-          type="button"
-          class="daily-col-add"
-          onClick={() => {
-            // Default = 'today' mit Standard-Label; der User kann
-            // danach Typ + Label ueber die Edit-Controls aendern.
-            dcs.add('today');
-          }}
-          title="Neue Spalte anlegen"
-        >
-          + Spalte
-        </button>
+      <Show when={canEditCols()}>
+        <div class="daily-col-add-wrap">
+          <button
+            type="button"
+            class="daily-col-add"
+            onClick={() => {
+              // Default = 'today' mit Standard-Label; der User kann
+              // danach Typ + Label ueber die Edit-Controls aendern.
+              dcs.add('today');
+            }}
+            title="Neue Spalte anlegen"
+          >
+            <Icon name="plus" size={14} />
+            <span>Spalte</span>
+          </button>
+          <button
+            type="button"
+            class="daily-col-reset"
+            onClick={() => {
+              void (async () => {
+                const choice = await showChoice({
+                  title: 'Spalten zuruecksetzen',
+                  message:
+                    'Alle eigenen Spalten entfernen und die Standard-Sicht wiederherstellen (Heute · Diese Woche · Dieser Monat · Ohne Datum)?',
+                  choices: [
+                    {
+                      id: 'reset',
+                      label: 'Zuruecksetzen',
+                      variant: 'danger',
+                    },
+                    { id: 'cancel', label: 'Abbrechen', variant: 'default' },
+                  ],
+                });
+                if (choice === 'reset') dcs.reset();
+              })();
+            }}
+            title="Auf Standard-Spalten zuruecksetzen"
+          >
+            <Icon name="arrow-uturn-left" size={14} />
+          </button>
+        </div>
       </Show>
     </div>
   );

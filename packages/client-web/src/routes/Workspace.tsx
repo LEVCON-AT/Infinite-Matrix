@@ -34,8 +34,6 @@ import { toggleTheme, useTheme } from '../lib/theme';
 import { subscribeWorkspace } from '../lib/realtime';
 import { clearAliasIndex, fetchAliasIndex, scheduleAliasRefresh } from '../lib/alias-index';
 import { useTreeExpand } from '../lib/tree-expand';
-import { showToast } from '../lib/toasts';
-import { translateDbError } from '../lib/errors';
 import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
 import NodeTree from '../components/NodeTree';
 import MatrixView from '../components/MatrixView';

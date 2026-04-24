@@ -5693,11 +5693,24 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   align-self: flex-end;
 }
 
-/* "+ Spalte"-Button als eigene Column-Shape. Gleiche Breite wie eine
-   normale Spalte, damit das Grid sauber bleibt. Dashed-Border signali-
-   siert den Add-Slot. */
-.daily-col-add {
+/* Wrap haelt Add- + Reset-Button beieinander und nimmt die gleiche
+   Slot-Breite wie eine normale Daily-Col ein (200px), damit das Grid
+   nicht aus dem Tritt geraet. */
+.daily-col-add-wrap {
   flex: 0 0 200px;
+  display: flex;
+  gap: var(--space-xs);
+  align-self: stretch;
+}
+
+/* "+ Spalte"-Button als eigene Column-Shape. Fuellt den Slot bis auf
+   den Reset-Knopf-Rest, Dashed-Border signalisiert den Add-Slot. */
+.daily-col-add {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
   padding: var(--space-md);
   background: transparent;
   border: 1px dashed var(--border2);
@@ -5705,11 +5718,32 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   color: var(--text3);
   font-size: 13px;
   cursor: pointer;
-  align-self: stretch;
   transition: background var(--tr-std), border-color var(--tr-std), color var(--tr-std);
 }
 
 .daily-col-add:hover {
+  background: var(--bg2);
+  border-color: var(--text3);
+  color: var(--text2);
+}
+
+/* Reset-Button daneben — schmal, gleiche Hoehe, dezenter. Icon-only. */
+.daily-col-reset {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  padding: 0;
+  background: transparent;
+  border: 1px dashed var(--border2);
+  border-radius: var(--rs);
+  color: var(--text3);
+  cursor: pointer;
+  transition: background var(--tr-std), border-color var(--tr-std), color var(--tr-std);
+}
+
+.daily-col-reset:hover {
   background: var(--bg2);
   border-color: var(--text3);
   color: var(--text2);

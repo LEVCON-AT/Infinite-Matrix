@@ -467,7 +467,6 @@ const NodeTree: Component<Props> = (props) => {
   // Edit-Mode + vis-Key — so greifen die Menu-Items automatisch, wenn
   // der User per Settings-Modal toggelt.
   const canAddInfoField = useVis('addInfoField');
-  const canAddFeature = useVis('addFeature');
   // Export/Import/Loeschen ignorieren vis-Settings und haengen nur am
   // editMode — Ausnahme-Regel aus der Kontextmenue-Spec.
   const editMode = useEditMode();
