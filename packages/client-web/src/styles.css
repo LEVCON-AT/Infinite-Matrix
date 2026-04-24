@@ -430,13 +430,17 @@ button[type='submit']:hover:not(:disabled) {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
-  padding: var(--space-md) var(--space-sm);
+  /* Kein top-Padding — ws-sidebar-head ist eine eigene Header-Leiste
+     mit border-bottom und sitzt bündig oben (Pendant zur ws-main-header
+     im Main-Column). So sind Collapse-Chevron links und User-Chip
+     rechts auf derselben Y-Position. */
+  padding: 0 var(--space-sm) var(--space-md);
   overflow: hidden;
   transition: padding var(--tr-std);
 }
 
 .ws-sidebar[data-sb-mode='rails'] {
-  padding: var(--space-md) var(--space-xs);
+  padding: 0 var(--space-xs) var(--space-sm);
   gap: var(--space-sm);
 }
 
@@ -464,11 +468,20 @@ button[type='submit']:hover:not(:disabled) {
   display: none;
 }
 
-/* Sidebar-Head: WorkspaceSwitcher + Mode-Toggle-Button. Flex-Row. */
+/* Sidebar-Head: WorkspaceSwitcher + Mode-Toggle-Button. Eigene Header-
+   Leiste mit border-bottom, negative Side-Margins damit sie bis an die
+   Sidebar-Rand-Kanten geht. Padding y + border matchen ws-main-header
+   damit Collapse-Chevron und User-Chip auf gleicher Zeile sitzen. */
 .ws-sidebar-head {
   display: flex;
   align-items: center;
   gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  margin: 0 calc(-1 * var(--space-sm));
+  border-bottom: 0.5px solid var(--border);
+  background: var(--surface);
+  min-height: 44px;
+  box-sizing: border-box;
 }
 
 .ws-sidebar-head .ws-switcher {
@@ -655,7 +668,8 @@ button[type='submit']:hover:not(:disabled) {
   /* Weisse Paper-Leiste ueber dem getoenten Canvas — HyperUI-Look.
      Horizontaler negativer Margin zieht sie bis an den Canvas-Rand
      (Parent .ws-main hat --space-xl Side-Padding). Sticky top:0 haelt
-     sie beim Scrollen oben. */
+     sie beim Scrollen oben. min-height matcht .ws-sidebar-head, damit
+     beide Header-Leisten (Sidebar + Main) auf derselben Y-Linie sitzen. */
   position: sticky;
   top: 0;
   z-index: 20;
@@ -663,6 +677,8 @@ button[type='submit']:hover:not(:disabled) {
   border-bottom: 0.5px solid var(--border);
   padding: var(--space-sm) var(--space-xl);
   margin: 0 calc(-1 * var(--space-xl)) var(--space-lg);
+  min-height: 44px;
+  box-sizing: border-box;
 }
 
 @media (max-width: 900px) {
@@ -2153,37 +2169,35 @@ button[type='submit']:hover:not(:disabled) {
   min-width: 0;
 }
 
+/* Chevron-Spalte: fixe 16x20-Box, deutlich sichtbar (text2 + 12px).
+   Chevron ist der PRIMAERE Klick-Affordance fuer Expand/Collapse —
+   darf nicht im Canvas-Grau verschwinden. Button-Padding/Border ist
+   aus (reiner Icon-Click), Hover bringt leichten Surface-Tone. */
 .tree-chevron {
-  width: 16px;
-  height: 20px;
-  padding: 0;
-  background: transparent;
-  border: 0;
-  padding: 0;
-  color: var(--text3);
-  font-size: 10px;
-  line-height: 1;
-  cursor: pointer;
-  /* Feste Box 16×20. min-width:0 schaltet das Flex-Item-Default
-     `min-width:auto` aus — sonst laesst der Browser den intrinsischen
-     Content-Width (Pfeil-Glyphe) durch und der Button wird 20-23 px
-     breit. Die Tree-Dots sollen pro Depth gleichmaessig versetzt sein;
-     inkonsistente Chevron-Widths brechen die SVG-Rails-Geometrie. */
   flex: 0 0 16px;
   box-sizing: border-box;
   width: 16px;
   min-width: 0;
   max-width: 16px;
-  overflow: hidden;
   height: 20px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--rs);
+  color: var(--text2);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   transform: rotate(0deg);
-  transition: transform var(--tr-std);
+  transition: transform var(--tr-std), color var(--tr-std), background var(--tr-std);
 }
 
 .tree-chevron:hover {
+  background: var(--surface-hover);
   color: var(--text);
 }
 
@@ -2193,6 +2207,7 @@ button[type='submit']:hover:not(:disabled) {
 
 .tree-chevron-empty {
   flex: 0 0 16px;
+  width: 16px;
   height: 20px;
   display: inline-block;
 }

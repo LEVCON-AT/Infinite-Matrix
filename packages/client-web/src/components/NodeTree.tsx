@@ -182,7 +182,9 @@ const TreeItem: Component<{
         data-tree-depth={p.depth}
         data-dot-type={dotTypeFor(p.entry)}
         style={{
-          'padding-left': `${p.depth * 12 + 4}px`,
+          /* 16px pro Depth-Level. Base-Offset 4px damit das Chevron
+             nicht ganz am Rand klebt. */
+          'padding-left': `${p.depth * 16 + 4}px`,
           '--tree-depth': p.depth,
         }}
         onContextMenu={(e) => {
@@ -346,13 +348,15 @@ const NodeTree: Component<Props> = (props) => {
     };
     const meta = new Map<string, Meta>();
     const byParent = new Map<string, string[]>();
-    // cx pro Depth LINEAR berechnen — nicht aus dem inline-Dot messen.
-    // Der inline-Dot sitzt je nach Chevron-Typ und Link-Padding an
-    // leicht anderer x-Position, was die Split-Curves optisch
-    // asymmetrisch macht (manche Kurven lang, manche gequetscht).
-    // Mit festem INDENT=14 sind alle Kurven identisch breit.
-    const INDENT = 14;
-    const ORIGIN_X = 14;
+    // cx pro Depth LINEAR berechnen — muss exakt mit dem Tree-Row-
+    // Layout synchron sein:
+    //   row.padding-left = depth * 16 + 4
+    //   chevron-col:      16px (absolute x: padding-left .. padding-left+16)
+    //   tree-dot-inline:  nach chevron (cx ≈ padding-left + 16 + 4 = depth*16 + 24)
+    // INDENT=16 damit die vertikale Rail-Linie auf dem Parent-Dot-Center
+    // sitzt UND der Split-Curve endet auf dem Child-Dot-Center.
+    const INDENT = 16;
+    const ORIGIN_X = 24;
     rows.forEach((el) => {
       const id = el.dataset.treeId;
       if (!id) return;
