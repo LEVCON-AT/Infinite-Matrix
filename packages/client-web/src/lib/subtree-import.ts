@@ -35,6 +35,7 @@ export class ImportError extends Error {
 
 export type ImportTarget =
   | { kind: 'matrix'; matrixNodeId: string }
+  | { kind: 'board'; boardNodeId: string }
   | { kind: 'cell'; cellId: string }
   | { kind: 'feature-info'; cellId: string }
   | { kind: 'feature-checklists'; cellId: string };
@@ -137,6 +138,11 @@ export function checkTypeCompatibility(
     case 'matrix':
       if (p !== 'subtree' && p !== 'workspace') {
         return 'In eine Matrix kannst du nur einen Bereichs-Export laden (eine komplette Matrix oder ein komplettes Board). Einzelne Info- oder Checklisten-Exporte gehoeren in eine Zelle.';
+      }
+      return null;
+    case 'board':
+      if (p !== 'subtree' && p !== 'workspace') {
+        return 'In ein Board passt nur ein anderer Board-Export. Matrix- oder Feature-Exporte sind nicht passend.';
       }
       return null;
     case 'cell':
@@ -1664,4 +1670,236 @@ export async function executeSubtreeImportIntoMatrix(args: {
   }
 
   return { targetMatrixId };
+}
+
+// Board-Merge-Import: kb_cols + kb_cards + links + board-scoped
+// checklists + items werden aus dem Payload in das Ziel-Board
+// integriert. Die Root-Board-ID wird auf targetBoardId remapped —
+// der Board-Node selbst bleibt (Label/Alias/Notizen ggf. uebernommen
+// bei Overwrite).
+//
+// Sub-Strukturen unter Cells (Matrix/Board-Subs) sind fuer Board-
+// Imports nicht relevant — Boards sind Blaetter. Wir filtern den
+// Payload entsprechend auf Rows/Items, deren board_id === rootBoardId
+// ist, und ignorieren Fremdnodes.
+export async function executeSubtreeImportIntoBoard(args: {
+  payload: WorkspaceExport;
+  workspaceId: string;
+  targetBoardId: string;
+  mode?: ImportMode;
+}): Promise<{ targetBoardId: string }> {
+  const { payload, workspaceId, targetBoardId } = args;
+  const mode = args.mode ?? 'add';
+  if (payload.payloadType !== 'subtree' && payload.payloadType !== 'workspace') {
+    throw new ImportError(
+      'In ein Board kannst du nur einen Board-Export einfuegen.',
+    );
+  }
+
+  const exportedCellIds = new Set(
+    (payload.cells as Array<{ id: string }>).map((c) => c.id),
+  );
+  const rootRow = (
+    payload.nodes as Array<{
+      id: string;
+      type: string;
+      parent_cell_id: string | null;
+    }>
+  ).find((n) => !n.parent_cell_id || !exportedCellIds.has(n.parent_cell_id));
+  if (!rootRow) {
+    throw new ImportError(
+      'Der Export ist unvollstaendig — es fehlt der Start-Punkt. Die Datei ist vermutlich beschaedigt.',
+    );
+  }
+  if (rootRow.type !== 'board') {
+    throw new ImportError(
+      'In ein Board passt nur ein anderer Board-Export — Matrix-Exporte gehen in eine Matrix oder Zelle.',
+    );
+  }
+
+  if (mode === 'export-overwrite') {
+    const { exportSubtree, downloadSubtreeExport } = await import('./export');
+    const current = await exportSubtree(targetBoardId, workspaceId);
+    downloadSubtreeExport(current, 'backup-ziel-board');
+  }
+  if (mode === 'overwrite' || mode === 'export-overwrite') {
+    // Ziel-Board leeren: kb_cards, kb_cols, board-scoped checklists
+    // (Cascade auf items), links.
+    const { error: cardsErr } = await supabase
+      .from('kb_cards')
+      .delete()
+      .eq('board_id', targetBoardId);
+    if (cardsErr) throw cardsErr;
+    const { error: colsErr } = await supabase
+      .from('kb_cols')
+      .delete()
+      .eq('board_id', targetBoardId);
+    if (colsErr) throw colsErr;
+    const { error: clErr } = await supabase
+      .from('checklists')
+      .delete()
+      .eq('board_id', targetBoardId);
+    if (clErr) throw clErr;
+    const { error: linksErr } = await supabase
+      .from('links')
+      .delete()
+      .eq('board_id', targetBoardId);
+    if (linksErr) throw linksErr;
+    // Target-Alias auf NULL, damit reserveAliases kollisionsfrei die
+    // Payload-Root-Alias verwenden kann.
+    const { error: nullErr } = await supabase
+      .from('nodes')
+      .update({ alias: null })
+      .eq('id', targetBoardId);
+    if (nullErr) throw nullErr;
+  }
+
+  // Position-Offset nach Clear automatisch 0; bei Add an bestehende
+  // kb_cols + links anhaengen.
+  const [kbColsRes, linksRes] = await Promise.all([
+    supabase
+      .from('kb_cols')
+      .select('position')
+      .eq('board_id', targetBoardId)
+      .order('position', { ascending: false })
+      .limit(1),
+    supabase
+      .from('links')
+      .select('position')
+      .eq('board_id', targetBoardId)
+      .order('position', { ascending: false })
+      .limit(1),
+  ]);
+  const colOffset =
+    Array.isArray(kbColsRes.data) && kbColsRes.data.length > 0
+      ? ((kbColsRes.data[0].position as number) ?? -1) + 1
+      : 0;
+  const linkOffset =
+    Array.isArray(linksRes.data) && linksRes.data.length > 0
+      ? ((linksRes.data[0].position as number) ?? -1) + 1
+      : 0;
+
+  // Nur Tabellenzeilen des Root-Boards uebernehmen; Fremdinhalt (z.B.
+  // verschachtelte Sub-Matrix) aus dem Payload ignorieren.
+  const rootId = rootRow.id;
+  const kbColsSrc = (
+    payload.kb_cols as Array<{ id: string; board_id: string; position?: number }>
+  ).filter((k) => k.board_id === rootId);
+  const kbCardsSrc = (
+    payload.kb_cards as Array<{
+      id: string;
+      board_id: string;
+      col_id: string;
+      checklist_ref: string | null;
+      source_cl_id: string | null;
+    }>
+  ).filter((k) => k.board_id === rootId);
+  const checklistsSrc = (
+    payload.checklists as Array<{ id: string; board_id: string | null }>
+  ).filter((cl) => cl.board_id === rootId);
+  const checklistIdsSrc = new Set(checklistsSrc.map((cl) => cl.id));
+  const itemsSrc = (
+    payload.checklist_items as Array<{ id: string; checklist_id: string }>
+  ).filter((it) => checklistIdsSrc.has(it.checklist_id));
+  const linksSrc = (
+    payload.links as Array<{ id: string; board_id: string; position?: number }>
+  ).filter((l) => l.board_id === rootId);
+
+  const remapMap: RemapMap = new Map();
+  remapMap.set(rootId, targetBoardId);
+  const aliasMap = await reserveAliases(workspaceId, collectAliases(payload));
+
+  for (const k of kbColsSrc) remap(k.id, remapMap);
+  for (const k of kbCardsSrc) remap(k.id, remapMap);
+  for (const cl of checklistsSrc) remap(cl.id, remapMap);
+  for (const it of itemsSrc) remap(it.id, remapMap);
+  for (const l of linksSrc) remap(l.id, remapMap);
+
+  const kbColsOut = kbColsSrc.map((k, idx) => ({
+    ...(k as unknown as Record<string, unknown>),
+    id: remapMap.get(k.id)!,
+    workspace_id: workspaceId,
+    board_id: targetBoardId,
+    position: colOffset + (k.position ?? idx),
+  }));
+  const kbCardsOut = kbCardsSrc.map((k) =>
+    applyAliasMap(
+      {
+        ...(k as unknown as Record<string, unknown>),
+        id: remapMap.get(k.id)!,
+        workspace_id: workspaceId,
+        board_id: targetBoardId,
+        col_id: remap(k.col_id, remapMap),
+        checklist_ref:
+          k.checklist_ref && remapMap.has(k.checklist_ref)
+            ? remapMap.get(k.checklist_ref)!
+            : null,
+        source_cl_id:
+          k.source_cl_id && remapMap.has(k.source_cl_id)
+            ? remapMap.get(k.source_cl_id)!
+            : null,
+      },
+      aliasMap,
+    ),
+  );
+  const checklistsOut = checklistsSrc.map((cl) =>
+    applyAliasMap(
+      {
+        ...(cl as unknown as Record<string, unknown>),
+        id: remapMap.get(cl.id)!,
+        workspace_id: workspaceId,
+        board_id: targetBoardId,
+        cell_id: null,
+      },
+      aliasMap,
+    ),
+  );
+  const checklistItemsOut = itemsSrc.map((it) => ({
+    ...(it as unknown as Record<string, unknown>),
+    id: remapMap.get(it.id)!,
+    workspace_id: workspaceId,
+    checklist_id: remap(it.checklist_id, remapMap),
+  }));
+  const linksOut = linksSrc.map((l, idx) =>
+    applyAliasMap(
+      {
+        ...(l as unknown as Record<string, unknown>),
+        id: remapMap.get(l.id)!,
+        workspace_id: workspaceId,
+        board_id: targetBoardId,
+        position: linkOffset + (l.position ?? idx),
+      },
+      aliasMap,
+    ),
+  );
+
+  // Insert-Reihenfolge: kb_cols zuerst (kb_cards FK), dann cards,
+  // dann checklists (items FK), dann items, dann links.
+  await insertBatch('kb_cols', kbColsOut);
+  await insertBatch('kb_cards', kbCardsOut);
+  await insertBatch('checklists', checklistsOut);
+  await insertBatch('checklist_items', checklistItemsOut);
+  await insertBatch('links', linksOut);
+
+  // Bei Overwrite: Target-Board-Label/Alias/Data aus Payload-Root.
+  if (mode === 'overwrite' || mode === 'export-overwrite') {
+    const rootLabel = (rootRow as { label?: unknown }).label;
+    const rootAlias = (rootRow as { alias?: unknown }).alias;
+    const rootData = (rootRow as { data?: unknown }).data;
+    const patch: Record<string, unknown> = {};
+    if (typeof rootLabel === 'string' && rootLabel) patch.label = rootLabel;
+    if (typeof rootAlias === 'string' && rootAlias) {
+      patch.alias = aliasMap.get(rootAlias) ?? rootAlias;
+    }
+    if (rootData && typeof rootData === 'object') patch.data = rootData;
+    if (Object.keys(patch).length > 0) {
+      const { error: nupErr } = await supabase
+        .from('nodes')
+        .update(patch)
+        .eq('id', targetBoardId);
+      if (nupErr) throw nupErr;
+    }
+  }
+
+  return { targetBoardId };
 }

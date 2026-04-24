@@ -43,6 +43,7 @@ import {
   checkTypeCompatibility,
   executeFeatureChecklistsImport,
   executeFeatureInfoImport,
+  executeSubtreeImportIntoBoard,
   executeSubtreeImportIntoCell,
   executeSubtreeImportIntoMatrix,
   ImportError,
@@ -534,7 +535,9 @@ const NodeTree: Component<Props> = (props) => {
       const messageSuffix =
         target.kind === 'matrix'
           ? '\n\nSoll er an die bestehenden Zeilen/Spalten angehaengt werden, oder die Matrix ersetzen? Beim Ersetzen kannst du optional vorher einen Sicherungs-Export speichern.'
-          : '\n\nSoll er an die bestehenden Daten angehaengt werden, oder bestehende Daten ersetzen? Beim Ersetzen kannst du optional vorher einen Sicherungs-Export speichern.';
+          : target.kind === 'board'
+            ? '\n\nSoll er an die bestehenden Karten/Spalten/Checklisten/Links angehaengt werden, oder das Board ersetzen? Beim Ersetzen kannst du optional vorher einen Sicherungs-Export speichern.'
+            : '\n\nSoll er an die bestehenden Daten angehaengt werden, oder bestehende Daten ersetzen? Beim Ersetzen kannst du optional vorher einen Sicherungs-Export speichern.';
       const modeChoice = await showChoice({
         title: 'Wie einfuegen?',
         message: messagePrefix + messageSuffix,
@@ -569,6 +572,17 @@ const NodeTree: Component<Props> = (props) => {
               mode,
             }).then(() => undefined),
           `Matrix-Import: ${summary}`,
+        );
+      } else if (target.kind === 'board') {
+        await runMenuMutation(
+          () =>
+            executeSubtreeImportIntoBoard({
+              payload,
+              workspaceId: props.workspaceId,
+              targetBoardId: target.boardNodeId,
+              mode,
+            }).then(() => undefined),
+          `Board-Import: ${summary}`,
         );
       } else if (target.kind === 'cell') {
         if (payload.payloadType === 'feature-info') {
@@ -1040,6 +1054,14 @@ const NodeTree: Component<Props> = (props) => {
             icon: '↑',
             onClick: () => {
               triggerImport({ kind: 'matrix', matrixNodeId: entry.id });
+            },
+          });
+        } else if (entry.node.type === 'board') {
+          items.push({
+            label: 'Importieren',
+            icon: '↑',
+            onClick: () => {
+              triggerImport({ kind: 'board', boardNodeId: entry.id });
             },
           });
         }
