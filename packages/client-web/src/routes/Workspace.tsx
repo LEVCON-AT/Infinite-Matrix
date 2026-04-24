@@ -26,6 +26,7 @@ import {
   type SidebarChipData,
 } from '../lib/queries';
 import { useSidebarChips } from '../lib/sidebar-chips';
+import type { DocRow, LinkRow } from '../lib/types';
 import { toggleEditMode, useEditMode } from '../lib/edit-mode';
 import { useSidebarMode } from '../lib/sidebar-mode';
 import { useAggregateView } from '../lib/aggregate-view';
@@ -254,13 +255,13 @@ const Workspace: Component = () => {
     const showDocs = chips.isOn('docs');
     if (linkTypes.size === 0 && !showDocs) return undefined;
 
-    const linksByBoardId = new Map<string, (typeof (wsLinks() ?? [])[number])[]>();
+    const linksByBoardId = new Map<string, LinkRow[]>();
     for (const l of wsLinks() ?? []) {
       const arr = linksByBoardId.get(l.board_id) ?? [];
       arr.push(l);
       linksByBoardId.set(l.board_id, arr);
     }
-    const docsByCellId = new Map<string, (typeof (wsDocs() ?? [])[number])[]>();
+    const docsByCellId = new Map<string, DocRow[]>();
     for (const d of wsDocs() ?? []) {
       if (!d.attached_cell_id) continue;
       const arr = docsByCellId.get(d.attached_cell_id) ?? [];
