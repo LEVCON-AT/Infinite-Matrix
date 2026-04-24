@@ -709,6 +709,10 @@ const Workspace: Component = () => {
             tree={tree()}
             currentNodeId={params.nodeId ?? params.cellId}
             currentFeature={cellSection() ?? undefined}
+            onChanged={() => {
+              void refetchCells();
+              void refetchCellsWithDocs();
+            }}
           />
         </Show>
         <div class="ws-actions">

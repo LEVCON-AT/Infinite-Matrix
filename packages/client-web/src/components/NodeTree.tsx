@@ -7,14 +7,26 @@ import {
   type Component,
 } from 'solid-js';
 import { A, useNavigate } from '@solidjs/router';
-import type { TreeEntry } from '../lib/types';
+import type { CellFeature, CellRow, TreeEntry } from '../lib/types';
 import { useTreeExpand } from '../lib/tree-expand';
-import { deleteNode, moveCardToBoard, renameNode } from '../lib/mutations';
+import {
+  addCellChecklist,
+  addCellInfoField,
+  addCellLink,
+  bulkAddChecklistItems,
+  deleteNode,
+  moveCardToBoard,
+  renameNode,
+  updateCell,
+} from '../lib/mutations';
+import type { ParsedPasteItem } from '../lib/checklist-paste-parse';
 import { cellTarget } from '../lib/alias-dispatch';
 import { supabase } from '../lib/supabase';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
+import { useVis } from '../lib/settings';
 import ContextMenu, { type CtxMenuState } from './ContextMenu';
+import ChecklistPastePopup from './ChecklistPastePopup';
 import Icon, { type IconName } from './Icon';
 
 type Props = {
@@ -25,6 +37,10 @@ type Props = {
   // der User gerade auf einer Cell-Page mit konkretem Feature steht —
   // damit markieren wir die passende Feature-Row als aktiv.
   currentFeature?: 'info' | 'checklists' | 'docs';
+  // Trigger fuer Parent-Refetch nach Mutationen aus dem Sidebar-
+  // Kontextmenue (neue Felder, Checklisten, Feature-Flags). Parent
+  // weiss, welche Queries invalidiert werden muessen.
+  onChanged?: () => void;
 };
 
 // Icon-Lookup nach Entry-Kind / Node-Type. Feature-Rows gibt es nur
@@ -175,6 +191,7 @@ const TreeItem: Component<{
   query: string;
   activePath: Set<string>;
   openMenu: (entry: TreeEntry, rowEl: HTMLElement, x: number, y: number) => void;
+  onPasteChecklist: (cellId: string) => void;
   dragOverBoardId: () => string | null;
   onCardDragOver: (boardId: string, e: DragEvent) => void;
   onCardDragLeave: (boardId: string) => void;
@@ -287,6 +304,22 @@ const TreeItem: Component<{
                 const r = rowRef.getBoundingClientRect();
                 p.openMenu(p.entry, rowRef, r.right - 16, r.bottom);
               }
+              return;
+            }
+            // Ctrl+V auf einer checklists-Feature-Row → Paste-Flow fuer
+            // neue Checkliste. Nur einfangen, wenn das Event auf dem
+            // Link selbst ist (kein Input-Fokus, das ist die einzige
+            // A-Tag-Variante im Tree).
+            if (
+              (e.ctrlKey || e.metaKey) &&
+              !e.shiftKey &&
+              !e.altKey &&
+              (e.key === 'v' || e.key === 'V') &&
+              p.entry.kind === 'feature' &&
+              p.entry.feature === 'checklists'
+            ) {
+              e.preventDefault();
+              p.onPasteChecklist(p.entry.cellId);
             }
           }}
         >
@@ -325,6 +358,7 @@ const TreeItem: Component<{
                 query={p.query}
                 activePath={p.activePath}
                 openMenu={p.openMenu}
+                onPasteChecklist={p.onPasteChecklist}
                 dragOverBoardId={p.dragOverBoardId}
                 onCardDragOver={p.onCardDragOver}
                 onCardDragLeave={p.onCardDragLeave}
@@ -345,6 +379,92 @@ const NodeTree: Component<Props> = (props) => {
   const [chips, setChips] = createSignal<Set<FilterChip>>(new Set());
   const [ctxMenu, setCtxMenu] = createSignal<CtxMenuState | null>(null);
   const [dragOverBoardId, setDragOverBoardId] = createSignal<string | null>(null);
+  // Paste-Dialog-State: wenn gesetzt, wird ChecklistPastePopup fuer das
+  // Anlegen einer neuen Checkliste geoeffnet. Ausgeloest durch Ctrl+V
+  // auf einer Checklists-Feature-Row.
+  const [pasteTarget, setPasteTarget] = createSignal<
+    { cellId: string; text: string } | null
+  >(null);
+  // Settings-Gates fuer Kontextmenue-Eintraege. useVis reagiert auf
+  // Edit-Mode + vis-Key — so greifen die Menu-Items automatisch, wenn
+  // der User per Settings-Modal toggelt.
+  const canAddInfoField = useVis('addInfoField');
+  const canAddFeature = useVis('addFeature');
+
+  // Zentraler Mutation-Wrapper: Toast bei Erfolg/Fehler, onChanged-
+  // Propagation, optionales success-Label. Kapselt die 4-Zeilen-try-
+  // catch-Idiom, die in jedem Menu-Onclick auftauchen wuerde.
+  async function runMenuMutation<T>(
+    fn: () => Promise<T>,
+    successMsg?: string,
+  ): Promise<void> {
+    try {
+      await fn();
+      if (successMsg) showToast(successMsg, 'success');
+      props.onChanged?.();
+    } catch (err) {
+      showToast(translateDbError(err), 'error');
+    }
+  }
+
+  // Feature-Flag auf der Cell anheben, falls nicht schon gesetzt.
+  // Wird vom + Feld / + Checkliste / + Link-Flow benutzt, damit der
+  // User nicht vorher separat das Feature einschalten muss.
+  async function ensureCellFeature(
+    cell: CellRow,
+    feature: CellFeature,
+  ): Promise<void> {
+    const current = (cell.features ?? []) as CellFeature[];
+    if (current.includes(feature)) return;
+    await updateCell(cell.id, { features: [...current, feature] });
+  }
+
+  // Clipboard-gesteuerter Paste-Flow fuer neue Checkliste.
+  // Liest navigator.clipboard (User-Gesture vorausgesetzt), oeffnet
+  // PastePopup mit Preview; onCommit legt Checkliste an und haengt die
+  // geparsten Items per bulkAdd dran.
+  async function triggerPasteForCell(cellId: string): Promise<void> {
+    // Clipboard-API braucht User-Gesture. Ctrl+V-Tastendruck oder
+    // Menu-Klick zaehlen als Gesture — in sicheren Kontexten (HTTPS /
+    // localhost) klappt das ohne Prompt.
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text || !text.trim()) {
+        showToast('Zwischenablage ist leer.', 'info');
+        return;
+      }
+      setPasteTarget({ cellId, text });
+    } catch {
+      showToast(
+        'Zwischenablage kann nicht gelesen werden. Klick ins Fenster und versuch es erneut.',
+        'error',
+      );
+    }
+  }
+
+  async function commitPastedChecklist(
+    cellId: string,
+    parsed: ParsedPasteItem[],
+  ): Promise<void> {
+    if (parsed.length === 0) {
+      setPasteTarget(null);
+      return;
+    }
+    await runMenuMutation(async () => {
+      const label = parsed[0]?.text?.slice(0, 60) || 'Aus Zwischenablage';
+      const cl = await addCellChecklist({
+        workspaceId: props.workspaceId,
+        cellId,
+        label,
+      });
+      await bulkAddChecklistItems({
+        workspaceId: props.workspaceId,
+        checklistId: cl.id,
+        items: parsed.map((it) => ({ text: it.text, level: it.level })),
+      });
+    }, `Checkliste mit ${parsed.length} ${parsed.length === 1 ? 'Punkt' : 'Punkten'} angelegt.`);
+    setPasteTarget(null);
+  }
   let inputRef: HTMLInputElement | undefined;
   let scrollRef: HTMLDivElement | undefined;
   let svgRef: SVGSVGElement | undefined;
@@ -654,9 +774,10 @@ const NodeTree: Component<Props> = (props) => {
         },
       });
     } else if (entry.kind === 'cell') {
-      // Cell-Entry. Delete + Feature-Anlage sind groesser (Undo-Pattern),
-      // deshalb haengen wir hier nur Navigation + ein paar Hinweise dran.
-      // Volle Cell-Operationen kommen in SB.1b (Menue-Ausbau).
+      // Cell-Entry: Navigation + Quick-Anlage. Die Quick-Add-Entries
+      // aktivieren bei Bedarf das passende Feature (info/checklists)
+      // implicit, damit der User nicht zweistufig klicken muss.
+      const cell = entry.cell;
       items.push({
         label: 'Zelle oeffnen',
         icon: '→',
@@ -670,21 +791,116 @@ const NodeTree: Component<Props> = (props) => {
           onClick: () => {},
         });
       }
+      if (canAddInfoField()) {
+        items.push({ label: '', onClick: () => {}, divider: true });
+        items.push({
+          label: '+ Feld (Info)',
+          icon: '+',
+          onClick: () => {
+            void runMenuMutation(async () => {
+              await ensureCellFeature(cell, 'info');
+              await addCellInfoField({ cellId: cell.id });
+            }, 'Feld angelegt.');
+          },
+        });
+        items.push({
+          label: '+ Link (Info)',
+          icon: '+',
+          onClick: () => {
+            const url = window.prompt('URL oder E-Mail-Adresse:', 'https://');
+            if (!url) return;
+            const trimmed = url.trim();
+            if (!trimmed) return;
+            const label = window.prompt('Anzeigetext (optional):', '') ?? '';
+            void runMenuMutation(async () => {
+              await ensureCellFeature(cell, 'info');
+              await addCellLink({
+                cellId: cell.id,
+                label,
+                url: trimmed,
+              });
+            }, 'Link angelegt.');
+          },
+        });
+        items.push({
+          label: '+ Checkliste',
+          icon: '+',
+          onClick: () => {
+            void runMenuMutation(async () => {
+              await ensureCellFeature(cell, 'checklists');
+              await addCellChecklist({
+                workspaceId: props.workspaceId,
+                cellId: cell.id,
+              });
+            }, 'Checkliste angelegt.');
+          },
+        });
+      }
     } else {
-      // Feature-Entry (matrix/info/board/checklists). V1: Navigation +
-      // Ctrl+V-Hinweis bei Checklists. Volle Content-Anlage (+ Feld / +
-      // Checkliste / + Karte) kommt in SB.1b.
+      // Feature-Entry (info/checklists). Navigation + Feature-spezifische
+      // Quick-Adds. Ctrl+V-Hinweis bei Checklists — der eigentliche
+      // Handler sitzt am TreeLink (braucht den DOM-Focus).
       items.push({
         label: 'Oeffnen',
         icon: '→',
         onClick: () => navigate(hrefOf(props.workspaceId, entry)),
       });
-      if (entry.feature === 'checklists') {
+      const cellId = entry.cellId;
+      if (entry.feature === 'info' && canAddInfoField()) {
+        items.push({ label: '', onClick: () => {}, divider: true });
         items.push({
-          label: 'Strg+V auf der Row: Checkliste aus Zwischenablage',
+          label: '+ Feld',
+          icon: '+',
+          onClick: () => {
+            void runMenuMutation(
+              () => addCellInfoField({ cellId }),
+              'Feld angelegt.',
+            );
+          },
+        });
+        items.push({
+          label: '+ Link',
+          icon: '+',
+          onClick: () => {
+            const url = window.prompt('URL oder E-Mail-Adresse:', 'https://');
+            if (!url) return;
+            const trimmed = url.trim();
+            if (!trimmed) return;
+            const label = window.prompt('Anzeigetext (optional):', '') ?? '';
+            void runMenuMutation(
+              () =>
+                addCellLink({
+                  cellId,
+                  label,
+                  url: trimmed,
+                }),
+              'Link angelegt.',
+            );
+          },
+        });
+      }
+      if (entry.feature === 'checklists' && canAddInfoField()) {
+        items.push({ label: '', onClick: () => {}, divider: true });
+        items.push({
+          label: '+ Checkliste',
+          icon: '+',
+          onClick: () => {
+            void runMenuMutation(
+              () =>
+                addCellChecklist({
+                  workspaceId: props.workspaceId,
+                  cellId,
+                }),
+              'Checkliste angelegt.',
+            );
+          },
+        });
+        items.push({
+          label: 'Aus Zwischenablage (Strg+V)',
           icon: '⌨',
-          disabled: true,
-          onClick: () => {},
+          onClick: () => {
+            void triggerPasteForCell(cellId);
+          },
         });
       }
     }
@@ -877,6 +1093,7 @@ const NodeTree: Component<Props> = (props) => {
                 query={query().trim()}
                 activePath={activePath()}
                 openMenu={openMenu}
+                onPasteChecklist={triggerPasteForCell}
                 dragOverBoardId={dragOverBoardId}
                 onCardDragOver={onCardDragOver}
                 onCardDragLeave={onCardDragLeave}
@@ -888,6 +1105,17 @@ const NodeTree: Component<Props> = (props) => {
       </Show>
       </div>
       <ContextMenu state={ctxMenu()} onClose={() => setCtxMenu(null)} />
+      <Show when={pasteTarget()}>
+        <ChecklistPastePopup
+          initialText={pasteTarget()!.text}
+          checklistLabel="Neue Checkliste"
+          onClose={() => setPasteTarget(null)}
+          onCommit={async (parsed) => {
+            const t = pasteTarget();
+            if (!t) return;
+            await commitPastedChecklist(t.cellId, parsed);
+          }}
+        /></Show>
     </div>
   );
 };
