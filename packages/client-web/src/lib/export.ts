@@ -37,11 +37,22 @@ export type WorkspaceExport = {
   checklists: Record<string, unknown>[];
   checklist_items: Record<string, unknown>[];
   links: Record<string, unknown>[];
+  // Nur bei Cell-Subtree-Exports gesetzt: Meta-Info zur Quell-Zelle,
+  // damit der Importer ihre info-Felder/Links und Feature-Flags in
+  // die Ziel-Zelle mergen kann — ohne die Zelle selbst in cells[]
+  // zu duplizieren.
+  sourceCell?: {
+    data: Record<string, unknown>;
+    features: string[];
+  };
 };
 
-// Zahlen fuer den Sanity-Toast nach Export.
+// Zahlen fuer den Sanity-Toast nach Export. "nodes" wird bewusst in
+// matrixCount + boardCount aufgeteilt, damit die UI-Zusammenfassung
+// ohne Fachbegriff ("Nodes") auskommt.
 export type ExportStats = {
-  nodes: number;
+  matrixCount: number;
+  boardCount: number;
   cells: number;
   cards: number;
   checklists: number;
@@ -63,8 +74,16 @@ function statsOf(e: WorkspaceExport): ExportStats {
       if (Array.isArray(l)) infoLinks += l.length;
     }
   }
+  let matrixCount = 0;
+  let boardCount = 0;
+  for (const n of e.nodes) {
+    const t = (n as { type?: unknown }).type;
+    if (t === 'matrix') matrixCount += 1;
+    else if (t === 'board') boardCount += 1;
+  }
   return {
-    nodes: e.nodes.length,
+    matrixCount,
+    boardCount,
     cells: e.cells.length,
     cards: e.kb_cards.length,
     checklists: e.checklists.length,
@@ -77,9 +96,14 @@ function statsOf(e: WorkspaceExport): ExportStats {
 
 export function formatExportStats(s: ExportStats): string {
   // Nur Zahlen > 0 anzeigen — ein Feature-Export zeigt sonst nutzlose
-  // "0 Nodes · 0 Karten"-Zeilen.
+  // 0-Zeilen.
   const parts: string[] = [];
-  if (s.nodes) parts.push(`${s.nodes} ${s.nodes === 1 ? 'Node' : 'Nodes'}`);
+  if (s.matrixCount)
+    parts.push(
+      `${s.matrixCount} ${s.matrixCount === 1 ? 'Matrix' : 'Matrizen'}`,
+    );
+  if (s.boardCount)
+    parts.push(`${s.boardCount} ${s.boardCount === 1 ? 'Board' : 'Boards'}`);
   if (s.cells) parts.push(`${s.cells} ${s.cells === 1 ? 'Zelle' : 'Zellen'}`);
   if (s.cards) parts.push(`${s.cards} ${s.cards === 1 ? 'Karte' : 'Karten'}`);
   if (s.checklists)
@@ -273,6 +297,8 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
       col_id: string;
       child_matrix_id: string | null;
       board_id: string | null;
+      data: Record<string, unknown>;
+      features: string[];
     }>,
     kb_cols: (kbColsRes.data ?? []) as Array<{ id: string; board_id: string }>,
     kb_cards: (kbCardsRes.data ?? []) as Array<{ id: string; board_id: string }>,
@@ -392,9 +418,22 @@ export async function exportSubtree(
   };
 }
 
-// Cell-Subtree: die Cell selbst + eventuelle Sub-Matrix + Sub-Board.
-// Rekursion greift automatisch, weil collectSubtreeIds die FKs folgt
-// — hier wird nur die Root-Liste bestimmt.
+// Cell-Subtree: die Sub-Matrix/Sub-Board-Struktur der Zelle + ihre
+// Info-Daten + Checklisten als "Paket" — so dass der Importer bei
+// einer Ziel-Zelle mergen kann (Info-Felder/Links/Checklisten
+// uebernehmen, Sub-Struktur anhaengen).
+//
+// Gestaltung:
+// - Die Quell-Zelle selbst ist NICHT in payload.cells — sie ist der
+//   Container, ihre Daten leben in payload.sourceCell.
+// - Die Quell-Row/Col werden ebenfalls NICHT exportiert (sie gehoeren
+//   zur Parent-Matrix, wuerden den Import verwirren).
+// - Der Top-Sub-Node (sub_matrix bzw. sub_board) bekommt im Payload
+//   parent_cell_id=null, damit der Importer ihn als neuen Root
+//   erkennt.
+// - Checklisten mit cell_id === sourceCellId werden mit-exportiert
+//   (ihr cell_id bleibt stehen; der Importer faengt den "fremden"
+//   cell_id ab und haengt sie an die Ziel-Zelle).
 export async function exportCellSubtree(
   cellId: string,
   workspaceId: string,
@@ -406,14 +445,13 @@ export async function exportCellSubtree(
       'Die Zelle konnte nicht geladen werden — wurde sie gerade geloescht?',
     );
 
-  // Sammle IDs aus Sub-Matrix UND Sub-Board als Roots. Dann Cell/Row/Col
-  // manuell dazu, weil collectSubtreeIds bei Cell-Ebene ansetzt wuerde
-  // (wir wollen nur DIESE eine Cell, nicht alle Cells der Parent-Matrix).
+  // Sub-Struktur sammeln (nur was unter der Cell haengt, ohne die
+  // Cell/Row/Col selbst).
   const sub: SubtreeRowSet = {
     nodeIds: new Set(),
-    cellIds: new Set([cellId]),
-    rowIds: new Set([cell.row_id]),
-    colIds: new Set([cell.col_id]),
+    cellIds: new Set(),
+    rowIds: new Set(),
+    colIds: new Set(),
   };
   for (const rootId of [cell.child_matrix_id, cell.board_id].filter(
     (x): x is string => !!x,
@@ -434,15 +472,24 @@ export async function exportCellSubtree(
   const inNodes = (id: string) => sub.nodeIds.has(id);
   const inCells = (id: string) => sub.cellIds.has(id);
 
-  const filteredNodes = all.nodes.filter((n) => inNodes(n.id));
+  // Nodes: die, deren parent_cell_id == sourceCellId ist, werden im
+  // Export zu Roots (parent_cell_id=null). Der Importer entscheidet
+  // dann, wo sie hingehaengt werden.
+  const filteredNodes = all.nodes
+    .filter((n) => inNodes(n.id))
+    .map((n) => (n.parent_cell_id === cellId ? { ...n, parent_cell_id: null } : n));
+
   const filteredRows = all.rows.filter((r) => sub.rowIds.has(r.id));
   const filteredCols = all.cols.filter((c) => sub.colIds.has(c.id));
   const filteredCells = all.cells.filter((c) => inCells(c.id));
   const filteredKbCols = all.kb_cols.filter((k) => inNodes(k.board_id));
   const filteredKbCards = all.kb_cards.filter((k) => inNodes(k.board_id));
+  // Checklisten: board-scoped (in exportierten Boards) UND solche,
+  // die direkt an der Quell-Zelle haengen (cell_id === cellId).
   const filteredChecklists = all.checklists.filter(
     (cl) =>
       (cl.board_id && inNodes(cl.board_id)) ||
+      cl.cell_id === cellId ||
       (cl.cell_id && inCells(cl.cell_id)),
   );
   const filteredChecklistIds = new Set(filteredChecklists.map((cl) => cl.id));
@@ -466,6 +513,10 @@ export async function exportCellSubtree(
     checklist_items:
       filteredChecklistItems as unknown as Record<string, unknown>[],
     links: filteredLinks as unknown as Record<string, unknown>[],
+    sourceCell: {
+      data: cell.data ?? {},
+      features: Array.isArray(cell.features) ? cell.features : [],
+    },
   };
 }
 

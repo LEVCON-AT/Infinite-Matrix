@@ -76,6 +76,24 @@ export function parseImportPayload(rawJson: string): WorkspaceExport {
     const v = p[key];
     return Array.isArray(v) ? (v as Record<string, unknown>[]) : [];
   };
+  // sourceCell kann bei Cell-Subtree-Exports vorhanden sein — optional
+  // uebernehmen, sonst weglassen.
+  let sourceCell: { data: Record<string, unknown>; features: string[] } | undefined;
+  if (p.sourceCell && typeof p.sourceCell === 'object') {
+    const sc = p.sourceCell as Record<string, unknown>;
+    sourceCell = {
+      data:
+        sc.data && typeof sc.data === 'object'
+          ? (sc.data as Record<string, unknown>)
+          : {},
+      features: Array.isArray(sc.features)
+        ? (sc.features as unknown[]).filter(
+            (x): x is string => typeof x === 'string',
+          )
+        : [],
+    };
+  }
+
   return {
     version: WORKSPACE_EXPORT_VERSION,
     payloadType,
@@ -93,6 +111,7 @@ export function parseImportPayload(rawJson: string): WorkspaceExport {
     checklists: arr('checklists'),
     checklist_items: arr('checklist_items'),
     links: arr('links'),
+    sourceCell,
   };
 }
 
@@ -269,7 +288,25 @@ export async function executeSubtreeImportIntoCell(args: {
     );
   }
 
+  // Sonderfall: Cell-Export ohne Sub-Matrix/Sub-Board. Dann enthaelt
+  // der Payload nur die eine Cell als Container (Info-Daten + Check-
+  // listen). Wir leiten auf den Merge-Flow um — dort werden Felder,
+  // Links und Checklisten in die Target-Zelle gemerged, ohne neuen
+  // Node anzulegen.
+  if ((payload.nodes as unknown[]).length === 0) {
+    await executeCellContainerMerge({
+      payload,
+      workspaceId,
+      targetCellId,
+    });
+    // rootNodeId gibt es hier nicht — wir retournieren die Target-
+    // Cell-ID als Pseudo-Root fuer Caller-Kompatibilitaet.
+    return { rootNodeId: targetCellId, aliasMap: new Map() };
+  }
+
   // Root-Node finden: der erste Node, dessen parent_cell_id NULL ist.
+  // Bei Cell-Subtree-Exports haben wir parent_cell_id=null auf dem
+  // Top-Sub-Node gesetzt (damit er als Root erkennbar ist).
   const rootRow = (payload.nodes as Array<{ id: string; type: string; parent_cell_id: string | null }>).find(
     (n) => !n.parent_cell_id,
   );
@@ -319,22 +356,40 @@ export async function executeSubtreeImportIntoCell(args: {
   for (const l of payload.links) remap((l as { id: string }).id, remapMap);
 
   // Rows mappen + FKs auf neue IDs umbiegen + workspace_id setzen.
+  // Wichtig: nodes.parent_cell_id wird IM INSERT auf NULL gesetzt,
+  // weil die gezielten cells erst in einer spaeteren Phase existieren
+  // (FK-Schleife: nodes -> cells -> nodes). Die korrekten Parent-
+  // Verweise werden nach den cells per UPDATE nachgezogen.
+  const rootNewId = remapMap.get(rootRow.id)!;
   const nodesOut = (payload.nodes as Array<Record<string, unknown>>).map((n) => {
     const id = (n as { id: string }).id;
-    const parent = (n as { parent_cell_id: string | null }).parent_cell_id;
     return applyAliasMap(
       {
         ...n,
         id: remapMap.get(id)!,
         workspace_id: workspaceId,
-        // Root-Node haengt an targetCell, alle anderen behalten ihren
-        // Parent-Link (remapped).
-        parent_cell_id:
-          id === rootRow.id ? targetCellId : parent ? remap(parent, remapMap) : null,
+        // Im Insert zunaechst NULL. Root-Node und alle Sub-Nodes
+        // bekommen ihren parent_cell_id erst im UPDATE-Schritt
+        // (siehe Phase D unten).
+        parent_cell_id: null,
       },
       aliasMap,
     );
   });
+  // Mapping Old-Node-ID -> gewuenschter finaler parent_cell_id
+  // (Target-Cell fuer Root, remapped cell-id fuer Sub-Nodes).
+  const nodeParentUpdates: Array<{ id: string; parent_cell_id: string }> = [];
+  for (const n of payload.nodes as Array<{ id: string; parent_cell_id: string | null }>) {
+    const newId = remapMap.get(n.id)!;
+    if (n.id === rootRow.id) {
+      nodeParentUpdates.push({ id: newId, parent_cell_id: targetCellId });
+    } else if (n.parent_cell_id) {
+      const mappedParent = remapMap.get(n.parent_cell_id);
+      if (mappedParent) {
+        nodeParentUpdates.push({ id: newId, parent_cell_id: mappedParent });
+      }
+    }
+  }
 
   const rowsOut = (payload.rows as Array<Record<string, unknown>>).map((r) => ({
     ...r,
@@ -399,6 +454,10 @@ export async function executeSubtreeImportIntoCell(args: {
     },
   );
 
+  // Checklisten-cell_id: wenn eine Liste im Export cell_id gesetzt
+  // hat, aber diese Cell NICHT unter den remappten Cells ist, dann
+  // kam sie vom Quell-Container (Cell-Subtree-Export). Wir haengen
+  // sie an die Ziel-Zelle.
   const checklistsOut = (
     payload.checklists as Array<Record<string, unknown>>
   ).map((cl) => {
@@ -407,13 +466,23 @@ export async function executeSubtreeImportIntoCell(args: {
       board_id: string | null;
       cell_id: string | null;
     };
+    let mappedCellId: string | null = null;
+    if (raw.cell_id) {
+      if (remapMap.has(raw.cell_id)) {
+        mappedCellId = remapMap.get(raw.cell_id)!;
+      } else {
+        // cell_id gehoert zu einer Cell, die nicht im Export drin ist —
+        // das ist die Container-Zelle des Exports. Ziel-Zelle nehmen.
+        mappedCellId = targetCellId;
+      }
+    }
     return applyAliasMap(
       {
         ...cl,
         id: remapMap.get(raw.id)!,
         workspace_id: workspaceId,
         board_id: remap(raw.board_id, remapMap),
-        cell_id: remap(raw.cell_id, remapMap),
+        cell_id: mappedCellId,
       },
       aliasMap,
     );
@@ -446,52 +515,29 @@ export async function executeSubtreeImportIntoCell(args: {
     },
   );
 
-  // Insert in FK-sicherer Reihenfolge. Nodes zuerst (ohne
-  // parent_cell_id bei Sub-Nodes — das ist ein FK auf cells, die noch
-  // nicht existieren). Wir teilen in zwei Phasen: erst Root-Node +
-  // Top-Level ohne parent_cell_id, dann Cells, dann Sub-Nodes mit
-  // parent_cell_id. Einfacher: Pfad in zwei Schritten via
-  // parent_cell_id=null-Insert + spaeterem Update ist aber komplex.
-  //
-  // Statdessen: wir schieben alle Nodes ohne parent_cell_id zuerst
-  // rein, dann rows/cols, dann cells, dann die verbleibenden Nodes
-  // (die parent_cell_id setzen, und die ist jetzt bekannt).
-
-  const nodesRootless: Record<string, unknown>[] = [];
-  const nodesWithParent: Record<string, unknown>[] = [];
-  for (const n of nodesOut) {
-    if ((n as { parent_cell_id: string | null }).parent_cell_id) {
-      nodesWithParent.push(n);
-    } else {
-      nodesRootless.push(n);
-    }
-  }
-
-  // Root-Node haengt an targetCell — das ist aber eine *existierende*
-  // Cell im Zielsystem, kein Import. Root-Node geht daher in Phase 1.
-  // Also: Root-Node unterscheidet sich von rootless (parent_cell_id
-  // ist gesetzt, aber auf externe Cell). Wir reklassifizieren:
-  const rootNewId = remapMap.get(rootRow.id)!;
-  const nodesPhase1: Record<string, unknown>[] = [];
-  const nodesPhase2: Record<string, unknown>[] = [];
-  for (const n of nodesOut) {
-    if ((n as { id: string }).id === rootNewId) {
-      // Root: parent zeigt auf targetCell (existiert bereits) → Phase 1
-      nodesPhase1.push(n);
-    } else if ((n as { parent_cell_id: string | null }).parent_cell_id) {
-      nodesPhase2.push(n);
-    } else {
-      // Waise ohne parent — kann vorkommen, wenn der Export kaputt
-      // ist. Wir lassen's durch, Phase 1.
-      nodesPhase1.push(n);
-    }
-  }
-
-  await insertBatch('nodes', nodesPhase1);
+  // Insert-Reihenfolge loest die FK-Schleife nodes<->cells so auf:
+  //   Phase A: alle Nodes mit parent_cell_id=NULL einfuegen.
+  //   Phase B: Rows + Cols (haengen an Matrix-Nodes, existieren).
+  //   Phase C: Cells inkl. child_matrix_id / board_id — die
+  //            referenzierten Sub-Nodes wurden in Phase A angelegt.
+  //   Phase D: UPDATE nodes.parent_cell_id aus nodeParentUpdates
+  //            (Target-Cell fuer Root, remapped cells fuer Sub-Nodes).
+  //   Phase E: Board-interne Tabellen (kb_cols, kb_cards, links) +
+  //            Checklisten + Items.
+  await insertBatch('nodes', nodesOut);
   await insertBatch('rows', rowsOut);
   await insertBatch('cols', colsOut);
   await insertBatch('cells', cellsOut);
-  await insertBatch('nodes', nodesPhase2);
+  // parent_cell_id UPDATE — sequenziell, um pro Fehler genau
+  // identifizieren zu koennen welcher Node nicht durchging. Bei
+  // grossen Imports koennen wir spaeter auf RPC umsteigen.
+  for (const up of nodeParentUpdates) {
+    const { error: upErr } = await supabase
+      .from('nodes')
+      .update({ parent_cell_id: up.parent_cell_id })
+      .eq('id', up.id);
+    if (upErr) throw upErr;
+  }
   await insertBatch('kb_cols', kbColsOut);
   await insertBatch('kb_cards', kbCardsOut);
   await insertBatch('checklists', checklistsOut);
@@ -499,16 +545,94 @@ export async function executeSubtreeImportIntoCell(args: {
   await insertBatch('links', linksOut);
 
   // Target-Cell final patchen: FK-Slot auf neuen Root-Node, Feature-
-  // Flag anheben.
+  // Flag anheben. Wenn payload.sourceCell existiert (Cell-Subtree-
+  // Export), mergen wir zusaetzlich info-Felder/Links + aktivieren die
+  // passenden Flags (info / checklists).
   const featKey = rootRow.type === 'matrix' ? 'matrix' : 'board';
-  const curFeatures = (targetCell.features ?? []) as string[];
-  const nextFeatures = curFeatures.includes(featKey)
-    ? curFeatures
-    : [...curFeatures, featKey];
-  const patch =
+  const nextFeatures = new Set<string>(
+    (targetCell.features ?? []) as string[],
+  );
+  nextFeatures.add(featKey);
+
+  const targetDataBase =
+    ((targetCell as { data?: unknown }).data as Record<string, unknown> | null) ??
+    {};
+  let mergedData: Record<string, unknown> = { ...targetDataBase };
+
+  if (payload.sourceCell) {
+    // Info-Felder + Links mergen — neue UUIDs, damit keine
+    // Kollisionen mit bestehenden Feldern auftreten.
+    const scData = payload.sourceCell.data ?? {};
+    const scFeatures = payload.sourceCell.features ?? [];
+    for (const f of scFeatures) {
+      if (f === 'info' || f === 'checklists') nextFeatures.add(f);
+    }
+    const srcFields = Array.isArray(
+      (scData as { infoFields?: unknown }).infoFields,
+    )
+      ? ((scData as { infoFields: unknown[] }).infoFields as Array<{
+          id?: unknown;
+          label?: unknown;
+          value?: unknown;
+        }>)
+      : [];
+    const srcLinks = Array.isArray((scData as { links?: unknown }).links)
+      ? ((scData as { links: unknown[] }).links as Array<{
+          id?: unknown;
+          label?: unknown;
+          url?: unknown;
+        }>)
+      : [];
+    const existingFields = Array.isArray(mergedData.infoFields)
+      ? (mergedData.infoFields as unknown[])
+      : [];
+    const existingLinks = Array.isArray(mergedData.links)
+      ? (mergedData.links as unknown[])
+      : [];
+    const newFields = srcFields
+      .filter(
+        (f) => typeof f.label === 'string' && typeof f.value === 'string',
+      )
+      .map((f) => ({
+        id: newUuid(),
+        label: f.label as string,
+        value: f.value as string,
+      }));
+    const newLinks = srcLinks
+      .filter((l) => typeof l.url === 'string')
+      .map((l) => ({
+        id: newUuid(),
+        label: typeof l.label === 'string' ? l.label : '',
+        url: l.url as string,
+      }));
+    if (newFields.length > 0 || newLinks.length > 0) {
+      nextFeatures.add('info');
+      mergedData = {
+        ...mergedData,
+        infoFields: [...existingFields, ...newFields],
+        links: [...existingLinks, ...newLinks],
+      };
+    }
+    // Checklisten-Feature aktivieren, wenn die Quell-Zelle eine hatte
+    // und wir jetzt neue Listen unter Target-Cell haengen.
+    const hasRetargetedChecklists = checklistsOut.some(
+      (cl) => (cl as { cell_id: string | null }).cell_id === targetCellId,
+    );
+    if (hasRetargetedChecklists) nextFeatures.add('checklists');
+  }
+
+  const patch: Record<string, unknown> =
     rootRow.type === 'matrix'
-      ? { child_matrix_id: rootNewId, features: nextFeatures }
-      : { board_id: rootNewId, features: nextFeatures };
+      ? {
+          child_matrix_id: rootNewId,
+          features: Array.from(nextFeatures),
+          data: mergedData,
+        }
+      : {
+          board_id: rootNewId,
+          features: Array.from(nextFeatures),
+          data: mergedData,
+        };
   const { error: patchErr } = await supabase
     .from('cells')
     .update(patch)
@@ -516,6 +640,159 @@ export async function executeSubtreeImportIntoCell(args: {
   if (patchErr) throw patchErr;
 
   return { rootNodeId: rootNewId, aliasMap };
+}
+
+// Cell-Container-Merge: wird aufgerufen, wenn ein Cell-Subtree-Export
+// KEINE Sub-Matrix/Sub-Board enthaelt — dann ist der Payload nur eine
+// Cell-Zeile plus evtl. Checklisten + Items (die an dieser Cell
+// haengen). Wir mergen Felder, Links und Checklisten in die Target-
+// Cell, ohne einen Node anzulegen. Features-Flags werden entsprechend
+// uebernommen.
+async function executeCellContainerMerge(args: {
+  payload: WorkspaceExport;
+  workspaceId: string;
+  targetCellId: string;
+}): Promise<void> {
+  const { payload, workspaceId, targetCellId } = args;
+  // Primaere Quelle fuer Container-Infos: payload.sourceCell (neues
+  // Cell-Subtree-Format). Fallback: payload.cells[0] (legacy-Format,
+  // vor der SB.1f-Aenderung). Beides kann vorkommen — wir lesen
+  // tolerant.
+  const sourceData =
+    payload.sourceCell?.data ??
+    ((payload.cells[0] as { data?: unknown } | undefined)?.data as
+      | Record<string, unknown>
+      | null
+      | undefined) ??
+    {};
+  const sourceFeatures =
+    payload.sourceCell?.features ??
+    ((payload.cells[0] as { features?: unknown } | undefined)
+      ?.features as string[] | undefined) ??
+    [];
+  const sourceFields = (
+    Array.isArray((sourceData as { infoFields?: unknown }).infoFields)
+      ? (sourceData as { infoFields: unknown[] }).infoFields
+      : []
+  ) as Array<{ id?: unknown; label?: unknown; value?: unknown }>;
+  const sourceLinks = (
+    Array.isArray((sourceData as { links?: unknown }).links)
+      ? (sourceData as { links: unknown[] }).links
+      : []
+  ) as Array<{ id?: unknown; label?: unknown; url?: unknown }>;
+
+  const { data: targetCell, error: tcErr } = await supabase
+    .from('cells')
+    .select('id, data, features')
+    .eq('id', targetCellId)
+    .single();
+  if (tcErr || !targetCell) {
+    throw new ImportError(
+      'Die Ziel-Zelle konnte nicht geladen werden — wurde sie gerade geloescht?',
+    );
+  }
+  const targetData =
+    ((targetCell.data as unknown) as Record<string, unknown>) ?? {};
+  const existingFields = Array.isArray(targetData.infoFields)
+    ? (targetData.infoFields as unknown[])
+    : [];
+  const existingLinks = Array.isArray(targetData.links)
+    ? (targetData.links as unknown[])
+    : [];
+
+  const newFields = sourceFields
+    .filter((f) => typeof f.label === 'string' && typeof f.value === 'string')
+    .map((f) => ({
+      id: newUuid(),
+      label: f.label as string,
+      value: f.value as string,
+    }));
+  const newLinks = sourceLinks
+    .filter((l) => typeof l.url === 'string')
+    .map((l) => ({
+      id: newUuid(),
+      label: typeof l.label === 'string' ? l.label : '',
+      url: l.url as string,
+    }));
+
+  // Features mergen: Source-Features (nur info/checklists relevant —
+  // matrix/board kommen nicht hier an) + bestehende Target-Features.
+  const nextFeatures = new Set<string>(
+    (targetCell.features ?? []) as string[],
+  );
+  for (const f of sourceFeatures) {
+    if (f === 'info' || f === 'checklists') nextFeatures.add(f);
+  }
+  if (newFields.length > 0 || newLinks.length > 0) nextFeatures.add('info');
+
+  const nextData = {
+    ...targetData,
+    infoFields: [...existingFields, ...newFields],
+    links: [...existingLinks, ...newLinks],
+  };
+
+  const { error: upErr } = await supabase
+    .from('cells')
+    .update({ data: nextData, features: Array.from(nextFeatures) })
+    .eq('id', targetCellId);
+  if (upErr) throw upErr;
+
+  // 2. Checklisten + Items aus dem Payload uebernehmen, alle mit
+  //    neuer UUID, cell_id=target, board_id=null, position ans Ende.
+  const remapMap: RemapMap = new Map();
+  for (const cl of payload.checklists)
+    remap((cl as { id: string }).id, remapMap);
+  for (const it of payload.checklist_items)
+    remap((it as { id: string }).id, remapMap);
+
+  if (payload.checklists.length > 0) {
+    const aliasMap = await reserveAliases(
+      workspaceId,
+      (payload.checklists as Array<{ alias?: unknown }>).flatMap((cl) =>
+        typeof cl.alias === 'string' && cl.alias ? [cl.alias] : [],
+      ),
+    );
+    const { data: existingLists } = await supabase
+      .from('checklists')
+      .select('position')
+      .eq('cell_id', targetCellId)
+      .order('position', { ascending: false })
+      .limit(1);
+    const offset =
+      Array.isArray(existingLists) && existingLists.length > 0
+        ? ((existingLists[0].position as number) ?? 0) + 1
+        : 0;
+
+    const checklistsOut = (
+      payload.checklists as Array<Record<string, unknown>>
+    ).map((cl, idx) => {
+      const raw = cl as { id: string };
+      return applyAliasMap(
+        {
+          ...cl,
+          id: remapMap.get(raw.id)!,
+          workspace_id: workspaceId,
+          board_id: null,
+          cell_id: targetCellId,
+          position: offset + idx,
+        },
+        aliasMap,
+      );
+    });
+    const itemsOut = (
+      payload.checklist_items as Array<Record<string, unknown>>
+    ).map((it) => ({
+      ...it,
+      id: remapMap.get((it as { id: string }).id)!,
+      workspace_id: workspaceId,
+      checklist_id: remap(
+        (it as { checklist_id: string }).checklist_id,
+        remapMap,
+      ),
+    }));
+    await insertBatch('checklists', checklistsOut);
+    await insertBatch('checklist_items', itemsOut);
+  }
 }
 
 // Feature-Info-Merge: Felder + Links aus Source.cells[0].data an
