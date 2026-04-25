@@ -850,6 +850,11 @@ type CardPatch = Partial<
   >
 > & {
   recur?: CardRecur | null;
+  // Inline-Checkliste (kb_cards.checklist jsonb) wird ueber denselben
+  // Wrapper geschrieben — sonst muesste mutateCardChecklist seinen
+  // eigenen runOptimisticUpdate-Aufruf bauen, was die Queue-Spec-Form
+  // dupliziert.
+  checklist?: InlineChecklistItem[];
 };
 
 async function updateCard(cardId: string, patch: CardPatch): Promise<KbCardRow> {
@@ -1373,46 +1378,51 @@ export async function saveChecklistSnapshot(args: {
 
 // checklist.action als jsonb setzen (oder NULL bei type='none'). Der
 // Wert ist generisch Record<string, unknown> — die typisierte Form lebt
-// in lib/checklist-action.ts.
+// in lib/checklist-action.ts. Geht durch updateChecklist → safe-mutation,
+// damit Offline-Edits (Close-Action umkonfigurieren ohne Netz) als Spec
+// in die Queue landen statt silent zu scheitern.
 export async function setChecklistAction(
   checklistId: string,
   action: Record<string, unknown> | null,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('checklists')
-    .update({ action })
-    .eq('id', checklistId);
-  if (error) throw error;
+  await updateChecklist(checklistId, {
+    action: action as ChecklistRow['action'],
+  });
 }
 
 // checklist.recur als jsonb setzen (oder NULL fuer Einmal-Checkliste).
 // Das Close-Verhalten (Items reset vs delete) liest dieses Feld via
 // isRecurring() — sobald recur ein Objekt mit Type ist, gilt die Liste
-// als wiederkehrend.
+// als wiederkehrend. Wrapper-gewrappt analog setChecklistAction.
 export async function setChecklistRecur(
   checklistId: string,
   recur: Record<string, unknown> | null,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('checklists')
-    .update({ recur })
-    .eq('id', checklistId);
-  if (error) throw error;
+  await updateChecklist(checklistId, {
+    recur: recur as ChecklistRow['recur'],
+  });
 }
 
 // Close-Action auf der Checkliste anwenden, abhaengig vom recur-Feld:
 //   - non-recurring: alle Items loeschen (ein DELETE);
 //   - recurring:     alle Items auf done=false zuruecksetzen.
 // Wird nach dem saveChecklistSnapshot aus dem ChecklistPanel gerufen.
+//
+// Konformitaets-Notiz zu Arbeitsprinzip 17 (`docs/audit/A1`):
+// Der Online-Pfad ist ein bewusster Bulk-Shortcut ausserhalb von
+// safe-mutation.ts — analog zu `workspace-reset.ts:clearBoardContents`.
+// Begruendung: bei einer Checkliste mit 100 Items waeren 100 einzelne
+// PATCH/DELETE-Requests ein realer Perf-Hit. Sicherheit kommt durch
+// Idempotenz: bricht das Netz waehrend des Bulk-Calls, faellt der
+// catch auf den Item-fuer-Item-Wrapper-Pfad — beim Reconnect-Replay
+// werden bereits durchgefuehrte Operationen erneut ausgefuehrt
+// (`updateItem(id, {done:false})` und `delChecklistItem` sind beide
+// idempotent). Konsistenz kann nicht brechen.
 export async function applyChecklistClose(args: {
   workspaceId: string;
   checklistId: string;
   recurring: boolean;
 }): Promise<void> {
-  // Online: ein einziger Bulk-Update / -Delete. Offline: pro-Item
-  // ueber den gewrappten updateItem / runOptimisticDelete — damit
-  // landet jede Aenderung als eigene Spec in der Queue. Etwas mehr
-  // Roundtrips, dafuer komplett offline-tauglich.
   try {
     if (args.recurring) {
       const { error } = await supabase
@@ -1813,22 +1823,31 @@ async function mutateCardChecklist<T>(
     result: T;
   },
 ): Promise<T> {
-  const { data: cur, error: readErr } = await supabase
-    .from('kb_cards')
-    .select('checklist')
-    .eq('id', cardId)
-    .single();
-  if (readErr) throw readErr;
-  const raw = (cur as { checklist: unknown } | null)?.checklist;
-  const current: InlineChecklistItem[] = Array.isArray(raw)
-    ? (raw as InlineChecklistItem[])
-    : [];
+  // Read-Step analog mutateCellData: live lesen, bei NetworkError aus
+  // dem IDB-Cache nachladen. Sonst waeren Inline-Checklist-Edits
+  // offline blockiert vor dem Write.
+  let current: InlineChecklistItem[] = [];
+  try {
+    const { data: cur, error: readErr } = await supabase
+      .from('kb_cards')
+      .select('checklist')
+      .eq('id', cardId)
+      .single();
+    if (readErr) throw readErr;
+    const raw = (cur as { checklist: unknown } | null)?.checklist;
+    current = Array.isArray(raw) ? (raw as InlineChecklistItem[]) : [];
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const cached = await getById<KbCardRow>('kb_cards', cardId);
+    if (!cached) throw err;
+    const raw = (cached as { checklist?: unknown }).checklist;
+    current = Array.isArray(raw) ? (raw as InlineChecklistItem[]) : [];
+  }
   const { items, result } = mutator(current);
-  const { error: writeErr } = await supabase
-    .from('kb_cards')
-    .update({ checklist: items })
-    .eq('id', cardId);
-  if (writeErr) throw writeErr;
+  // Write-Step ueber updateCard → safe-mutation-Wrapper. Bei
+  // NetworkError landet die Card-Patch-Spec in der Queue + Cache wird
+  // gepatcht, damit der naechste Read den frischen Stand sieht.
+  await updateCard(cardId, { checklist: items });
   return result;
 }
 
