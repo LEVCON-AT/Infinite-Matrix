@@ -72,6 +72,110 @@ export async function fetchAliasIndex(wsId: string): Promise<void> {
   }
 }
 
+// Eingangs-Shape fuer buildAliasEntries — strukturelles Subtyping deckt
+// sowohl die Live-Select-Slices ({id, alias, label, type, ...}) als auch
+// die kompletten *Row-Types aus dem IDB-Cache ab.
+type AliasInput = {
+  nodes: ReadonlyArray<{
+    id: string;
+    alias: string | null;
+    label: string | null;
+    type: 'matrix' | 'board';
+  }>;
+  cells: ReadonlyArray<{ id: string; alias: string | null }>;
+  cards: ReadonlyArray<{
+    id: string;
+    alias: string | null;
+    name: string | null;
+  }>;
+  checklists: ReadonlyArray<{
+    id: string;
+    alias: string | null;
+    label: string | null;
+  }>;
+  links: ReadonlyArray<{
+    id: string;
+    alias: string | null;
+    label: string | null;
+    url: string | null;
+  }>;
+  docs: ReadonlyArray<{
+    id: string;
+    alias: string | null;
+    title: string | null;
+  }>;
+};
+
+// Baut aus den 6 Workspace-Tabellen-Slices den flachen Alias-Index.
+// Single source of truth fuer Live- + Offline-Pfad — beide rufen das
+// hier auf, nur die Datenquelle (Supabase vs IDB) unterscheidet sich.
+// Sort am Ende fuer stabile Dropdown-Reihenfolge.
+function buildAliasEntries(input: AliasInput): AliasEntry[] {
+  const out: AliasEntry[] = [];
+  for (const r of input.nodes) {
+    if (!r.alias) continue;
+    out.push({
+      alias: r.alias.toLowerCase(),
+      kind: 'node',
+      id: r.id,
+      label: r.label ?? '',
+      subLabel: r.type === 'matrix' ? 'Matrix' : 'Board',
+    });
+  }
+  for (const r of input.cells) {
+    if (!r.alias) continue;
+    out.push({
+      alias: r.alias.toLowerCase(),
+      kind: 'cell',
+      id: r.id,
+      label: '',
+      subLabel: 'Zelle',
+    });
+  }
+  for (const r of input.cards) {
+    if (!r.alias) continue;
+    out.push({
+      alias: r.alias.toLowerCase(),
+      kind: 'card',
+      id: r.id,
+      label: r.name ?? '',
+      subLabel: 'Karte',
+    });
+  }
+  for (const r of input.checklists) {
+    if (!r.alias) continue;
+    out.push({
+      alias: r.alias.toLowerCase(),
+      kind: 'checklist',
+      id: r.id,
+      label: r.label ?? '',
+      subLabel: 'Checkliste',
+    });
+  }
+  for (const r of input.links) {
+    if (!r.alias) continue;
+    out.push({
+      alias: r.alias.toLowerCase(),
+      kind: 'link',
+      id: r.id,
+      label: r.label || r.url || '',
+      subLabel: 'Link',
+    });
+  }
+  for (const r of input.docs) {
+    if (!r.alias) continue;
+    out.push({
+      alias: r.alias.toLowerCase(),
+      kind: 'doc',
+      id: r.id,
+      label: r.title ?? '',
+      subLabel: 'Doku',
+    });
+  }
+  out.sort((a, b) => a.alias.localeCompare(b.alias));
+  return out;
+}
+
 async function fetchAliasIndexLive(wsId: string, s: WsState): Promise<void> {
   const [nodes, cells, cards, checklists, links, docs] = await Promise.all([
     supabase
@@ -106,101 +210,21 @@ async function fetchAliasIndexLive(wsId: string, s: WsState): Promise<void> {
       .not('alias', 'is', null),
   ]);
 
-  const out: AliasEntry[] = [];
-
-  for (const r of (nodes.data ?? []) as Array<{
-    id: string;
-    alias: string;
-    label: string;
-    type: 'matrix' | 'board';
-  }>) {
-    if (!r.alias) continue;
-    out.push({
-      alias: r.alias.toLowerCase(),
-      kind: 'node',
-      id: r.id,
-      label: r.label ?? '',
-      subLabel: r.type === 'matrix' ? 'Matrix' : 'Board',
-    });
-  }
-  for (const r of (cells.data ?? []) as Array<{ id: string; alias: string }>) {
-    if (!r.alias) continue;
-    out.push({
-      alias: r.alias.toLowerCase(),
-      kind: 'cell',
-      id: r.id,
-      label: '',
-      subLabel: 'Zelle',
-    });
-  }
-  for (const r of (cards.data ?? []) as Array<{
-    id: string;
-    alias: string;
-    name: string;
-  }>) {
-    if (!r.alias) continue;
-    out.push({
-      alias: r.alias.toLowerCase(),
-      kind: 'card',
-      id: r.id,
-      label: r.name ?? '',
-      subLabel: 'Karte',
-    });
-  }
-  for (const r of (checklists.data ?? []) as Array<{
-    id: string;
-    alias: string;
-    label: string;
-  }>) {
-    if (!r.alias) continue;
-    out.push({
-      alias: r.alias.toLowerCase(),
-      kind: 'checklist',
-      id: r.id,
-      label: r.label ?? '',
-      subLabel: 'Checkliste',
-    });
-  }
-  for (const r of (links.data ?? []) as Array<{
-    id: string;
-    alias: string;
-    label: string;
-    url: string;
-  }>) {
-    if (!r.alias) continue;
-    out.push({
-      alias: r.alias.toLowerCase(),
-      kind: 'link',
-      id: r.id,
-      label: r.label || r.url || '',
-      subLabel: 'Link',
-    });
-  }
-  for (const r of (docs.data ?? []) as Array<{
-    id: string;
-    alias: string;
-    title: string;
-  }>) {
-    if (!r.alias) continue;
-    out.push({
-      alias: r.alias.toLowerCase(),
-      kind: 'doc',
-      id: r.id,
-      label: r.title ?? '',
-      subLabel: 'Doku',
-    });
-  }
-
-  // Sort alphabetisch fuer stabile Dropdown-Reihenfolge. Dropdown-Konsumenten
-  // koennen eigene Sortierung anwenden, aber der Default ist vorhersehbar.
-  out.sort((a, b) => a.alias.localeCompare(b.alias));
-  s.setEntries(out);
+  s.setEntries(
+    buildAliasEntries({
+      nodes: (nodes.data ?? []) as AliasInput['nodes'],
+      cells: (cells.data ?? []) as AliasInput['cells'],
+      cards: (cards.data ?? []) as AliasInput['cards'],
+      checklists: (checklists.data ?? []) as AliasInput['checklists'],
+      links: (links.data ?? []) as AliasInput['links'],
+      docs: (docs.data ?? []) as AliasInput['docs'],
+    }),
+  );
 }
 
 // Offline-Variante: liest die sechs Tabellen aus dem IDB-Workspace-
-// Cache, filtert auf rows mit alias != null und baut dieselbe
-// Index-Shape wie der Live-Pfad zusammen. Wenn der Cache leer ist
-// (frische Tab-Sitzung, noch nie online), bleibt der Index leer.
+// Cache. Wenn der Cache leer ist (frische Tab-Sitzung, noch nie
+// online), bleibt der Index leer.
 async function fetchAliasIndexFromCache(wsId: string, s: WsState): Promise<void> {
   const [nodes, cells, cards, checklists, links, docs] = await Promise.all([
     getByWorkspace<NodeRow>('nodes', wsId),
@@ -210,69 +234,7 @@ async function fetchAliasIndexFromCache(wsId: string, s: WsState): Promise<void>
     getByWorkspace<LinkRow>('links', wsId),
     getByWorkspace<DocRow>('docs', wsId),
   ]);
-  const out: AliasEntry[] = [];
-  for (const r of nodes) {
-    if (!r.alias) continue;
-    out.push({
-      alias: r.alias.toLowerCase(),
-      kind: 'node',
-      id: r.id,
-      label: r.label ?? '',
-      subLabel: r.type === 'matrix' ? 'Matrix' : 'Board',
-    });
-  }
-  for (const r of cells) {
-    if (!r.alias) continue;
-    out.push({
-      alias: r.alias.toLowerCase(),
-      kind: 'cell',
-      id: r.id,
-      label: '',
-      subLabel: 'Zelle',
-    });
-  }
-  for (const r of cards) {
-    if (!r.alias) continue;
-    out.push({
-      alias: r.alias.toLowerCase(),
-      kind: 'card',
-      id: r.id,
-      label: r.name ?? '',
-      subLabel: 'Karte',
-    });
-  }
-  for (const r of checklists) {
-    if (!r.alias) continue;
-    out.push({
-      alias: r.alias.toLowerCase(),
-      kind: 'checklist',
-      id: r.id,
-      label: r.label ?? '',
-      subLabel: 'Checkliste',
-    });
-  }
-  for (const r of links) {
-    if (!r.alias) continue;
-    out.push({
-      alias: r.alias.toLowerCase(),
-      kind: 'link',
-      id: r.id,
-      label: r.label || r.url || '',
-      subLabel: 'Link',
-    });
-  }
-  for (const r of docs) {
-    if (!r.alias) continue;
-    out.push({
-      alias: r.alias.toLowerCase(),
-      kind: 'doc',
-      id: r.id,
-      label: r.title ?? '',
-      subLabel: 'Doku',
-    });
-  }
-  out.sort((a, b) => a.alias.localeCompare(b.alias));
-  s.setEntries(out);
+  s.setEntries(buildAliasEntries({ nodes, cells, cards, checklists, links, docs }));
 }
 
 // Reactive Accessor — Komponenten koennen direkt auf Aenderungen reagieren.

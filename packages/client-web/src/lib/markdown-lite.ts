@@ -15,7 +15,7 @@
 // URL-Sanitization laeuft durch sanitizeUrl() (lehnt javascript:/
 // data:/vbscript: ab) — Paranoia.
 
-import { ALIAS_REF_RE } from './alias';
+import { tokenizeAliasText } from './alias-tokenizer';
 import { sanitizeUrl } from './url';
 
 export type MdText = { type: 'text'; value: string };
@@ -27,9 +27,9 @@ export type MdAlias = { type: 'alias'; alias: string };
 export type MdInline = MdText | MdBold | MdItalic | MdCode | MdLink | MdAlias;
 
 const URL_RE = /https?:\/\/[^\s<>"'`]+/g;
-// Alias-Token im Fliesstext: `^` gefolgt von a-z/0-9. Wir splitten erst
-// nach URLs, damit ein Alias-Muster innerhalb einer URL nicht falsch
-// erkannt wird. Regex-Definition zentral in lib/alias (ALIAS_REF_RE).
+// Alias-Tokenization erfolgt durch tokenizeAliasText (lib/alias-tokenizer);
+// wir splitten Text erst nach URLs, damit ein Alias-Muster innerhalb einer
+// URL nicht faelschlich erkannt wird, und fuettern die Reststuecke dort rein.
 
 // Erst Inline-Code ausschneiden (damit ** und * darin nicht greifen),
 // dann bold, dann italic, dann URLs.
@@ -39,15 +39,10 @@ function parseInline(input: string): MdInline[] {
 
   function pushAliasOrText(s: string) {
     if (!s) return;
-    let last = 0;
-    ALIAS_REF_RE.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = ALIAS_REF_RE.exec(s)) !== null) {
-      if (m.index > last) out.push({ type: 'text', value: s.slice(last, m.index) });
-      out.push({ type: 'alias', alias: m[1].toLowerCase() });
-      last = m.index + m[0].length;
+    for (const t of tokenizeAliasText(s)) {
+      if (t.kind === 'text') out.push({ type: 'text', value: t.value });
+      else out.push({ type: 'alias', alias: t.alias });
     }
-    if (last < s.length) out.push({ type: 'text', value: s.slice(last) });
   }
 
   function pushText(s: string) {
