@@ -28,6 +28,10 @@ import {
   setCellLinkLabel,
   setCellLinkUrl,
 } from '../lib/mutations';
+import {
+  readCellLinksFromCell,
+  readInfoFieldsFromCell,
+} from '../lib/cell-data';
 import { sanitizeUrl } from '../lib/url';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
@@ -46,39 +50,13 @@ type Props = {
   onChanged: () => void;
 };
 
-function readInfoFieldsFromCell(cell: CellRow): InfoField[] {
-  const raw = (cell.data as { infoFields?: unknown })?.infoFields;
-  if (!Array.isArray(raw)) return [];
-  return raw.filter(
-    (f): f is InfoField =>
-      !!f &&
-      typeof f === 'object' &&
-      typeof (f as InfoField).id === 'string' &&
-      typeof (f as InfoField).label === 'string' &&
-      typeof (f as InfoField).value === 'string',
-  );
-}
-
-function readLinksFromCell(cell: CellRow): InfoLink[] {
-  const raw = (cell.data as { links?: unknown })?.links;
-  if (!Array.isArray(raw)) return [];
-  return raw.filter(
-    (l): l is InfoLink =>
-      !!l &&
-      typeof l === 'object' &&
-      typeof (l as InfoLink).id === 'string' &&
-      typeof (l as InfoLink).label === 'string' &&
-      typeof (l as InfoLink).url === 'string',
-  );
-}
-
 const CellInfoPage: Component<Props> = (p) => {
   const navigate = useNavigate();
   const editMode = useEditMode();
   const [busy, setBusy] = createSignal(false);
 
   const fields = () => readInfoFieldsFromCell(p.cell);
-  const links = () => readLinksFromCell(p.cell);
+  const links = () => readCellLinksFromCell(p.cell);
 
   async function wrap<T>(fn: () => Promise<T>, successMsg?: string) {
     if (busy()) return;

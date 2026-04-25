@@ -83,6 +83,10 @@ import type {
   NodeRow,
   RowRow,
 } from './types';
+import {
+  readCellLinksFromData as readInfoLinks,
+  readInfoFieldsFromData as readInfoFields,
+} from './cell-data';
 import { sanitizeUrl } from './url';
 
 // ─── Helpers ───────────────────────────────────────────────────
@@ -1628,19 +1632,6 @@ async function mutateCellData<T>(
   return result;
 }
 
-function readInfoFields(data: Record<string, unknown>): InfoField[] {
-  const raw = (data as { infoFields?: unknown }).infoFields;
-  if (!Array.isArray(raw)) return [];
-  return raw.filter(
-    (f): f is InfoField =>
-      !!f &&
-      typeof f === 'object' &&
-      typeof (f as InfoField).id === 'string' &&
-      typeof (f as InfoField).label === 'string' &&
-      typeof (f as InfoField).value === 'string',
-  );
-}
-
 function genInfoFieldId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
   return 'if_' + Math.random().toString(36).slice(2, 10);
@@ -1720,19 +1711,8 @@ export async function delCellInfoField(
 // Analog zu infoFields: JSONB-Array auf cell.data. URL wird per
 // sanitizeUrl gefiltert (javascript:/data:/vbscript: werden abgelehnt).
 // Kein DB-Unique-Constraint auf Alias — JSONB-Links fuehren (vorerst)
-// keinen Alias; siehe types.ts/InfoLink-Kommentar.
-function readInfoLinks(data: Record<string, unknown>): InfoLink[] {
-  const raw = (data as { links?: unknown }).links;
-  if (!Array.isArray(raw)) return [];
-  return raw.filter(
-    (l): l is InfoLink =>
-      !!l &&
-      typeof l === 'object' &&
-      typeof (l as InfoLink).id === 'string' &&
-      typeof (l as InfoLink).label === 'string' &&
-      typeof (l as InfoLink).url === 'string',
-  );
-}
+// keinen Alias; siehe types.ts/InfoLink-Kommentar. Reader-Helper liegt
+// in lib/cell-data (oben als readInfoLinks importiert).
 
 function genInfoLinkId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
