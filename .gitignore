@@ -62,3 +62,8 @@ infra/supabase/volumes/functions/
 # misc
 Secrets_aus_claude_chat.txt
 .playwright-mcp/
+
+# --- Debug-Screenshots (Root-only) ---
+# Agent-Artefakte (hyperui-*.png, tree-*.png, card-overlay-*.png, etc.).
+# /*.png matcht nur das Repo-Root — Asset-PNGs in packages/ bleiben tracked.
+/*.png
