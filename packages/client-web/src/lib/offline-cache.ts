@@ -71,7 +71,12 @@ interface MatrixCacheSchema extends DBSchema {
 }
 
 const DB_NAME = 'matrix-cache';
-const DB_VERSION = 1;
+// V2 ergaenzt den `docs`-Store, der mit Migration 007 ins Schema kam.
+// V1-Installs (alle Browser-Tabs vor 0g.2c) haben den Store nie angelegt
+// — ohne Version-Bump bekommt das `upgrade()`-Callback nie wieder Aufruf,
+// und `putAll('docs', ...)` faellt mit "ObjectStore not found" silent.
+// Der idempotente `contains(t)`-Guard im Loop legt nur Fehlendes an.
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase<MatrixCacheSchema>> | null = null;
 
