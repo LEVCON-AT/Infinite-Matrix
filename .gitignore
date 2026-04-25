@@ -48,6 +48,14 @@ logs/
 !infra/supabase/volumes/logs/
 !infra/supabase/volumes/logs/**
 
+# --- Supabase Runtime-Volumes (Bind-Mounts mit Live-Daten) ---
+# CRITICAL: enthaelt Postgres-Datendateien + Storage-Uploads. Niemals
+# committen, niemals durch `git clean` wegputzen. .gitignore + die
+# zielgerichtete Cleanup-Logik im deploy.yml halten das.
+infra/supabase/volumes/db/data/
+infra/supabase/volumes/storage/
+infra/supabase/volumes/functions/
+
 # --- Runtime ---
 .pids/
 

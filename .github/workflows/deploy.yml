@@ -139,17 +139,18 @@ jobs:
           # idempotent anwenden. Der Script ueberlebt leere migrations/.
           # Seeds bleiben manuell (bewusst nicht automatisiert).
           #
-          # reset --hard + clean -fd statt merge --ff-only: der Mirror
-          # ist Deploy-only, nicht Dev-Repo. Untracked Files (z.B.
-          # historische Migrations, die mal manuell hingelegt wurden)
-          # werden weggeraeumt, damit ff-merge nicht ueber sie stolpert.
-          # Schutz: -e gegen --skip-worktree-Eintraege (sollte hier nie
-          # relevant sein, defense in depth).
+          # reset --hard bringt das Repo auf den origin-Stand. clean
+          # NICHT global — sonst werden Bind-Mount-Volumes (Postgres-
+          # Daten, Storage) weggeputzt, die im Working-Tree liegen
+          # aber nicht im Repo. Stattdessen gezielt nur untracked
+          # Migrations-Files raeumen, die hier ueblicherweise stoeren.
           ssh -i ~/.ssh/id_ed25519 "$USER@$HOST" bash -s <<'REMOTE'
             set -euo pipefail
             sudo git -C /opt/matrix-repo fetch --quiet origin main
             sudo git -C /opt/matrix-repo reset --hard origin/main
-            sudo git -C /opt/matrix-repo clean -fd
+            # Gezielt nur untracked SQL-Files in migrations/ raeumen.
+            # KEIN globales clean — sonst sind Postgres-Volumes weg.
+            sudo git -C /opt/matrix-repo clean -fd -- infra/supabase/migrations/
             sudo env SUPABASE_DIR=/opt/matrix-repo/infra/supabase \
               bash /opt/matrix-repo/infra/scripts/supabase-migrate.sh
           REMOTE
