@@ -142,6 +142,37 @@ export async function getByWorkspace<T extends CacheRow = CacheRow>(
   return rows as T[];
 }
 
+export async function getById<T extends CacheRow = CacheRow>(
+  table: CacheTable,
+  id: string,
+): Promise<T | null> {
+  const inst = await db();
+  const row = (await inst.get(table, id)) as T | undefined;
+  return row ?? null;
+}
+
+// Patcht eine einzelne Row im Cache. Gemerged wird flach (Object.
+// assign-Stil). Liefert die fertige Row zurueck — Aufrufer kann sie
+// als Optimistic-Result an die UI durchreichen. Wenn die Row noch
+// nicht im Cache ist, passiert nichts (kein Insert ohne workspace_id).
+export async function patchRow<T extends CacheRow = CacheRow>(
+  table: CacheTable,
+  id: string,
+  patch: Record<string, unknown>,
+): Promise<T | null> {
+  const inst = await db();
+  const tx = inst.transaction(table, 'readwrite');
+  const existing = (await tx.store.get(id)) as T | undefined;
+  if (!existing) {
+    await tx.done;
+    return null;
+  }
+  const next = { ...existing, ...patch } as T;
+  await tx.store.put(next);
+  await tx.done;
+  return next;
+}
+
 export async function clearWorkspace(workspaceId: string): Promise<void> {
   const inst = await db();
   const tx = inst.transaction(TABLES, 'readwrite');

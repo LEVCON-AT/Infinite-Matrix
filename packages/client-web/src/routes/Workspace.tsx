@@ -57,6 +57,12 @@ import PresenceStack from '../components/PresenceStack';
 import { clearDocsRequest, openDocsPopup, useDocsRequest } from '../lib/docs-ui';
 import { installPromptSignal, triggerInstallPrompt } from '../lib/pwa';
 import { offlineState } from '../lib/offline-state';
+import {
+  pendingMutationCount,
+  refreshCountForWorkspace,
+  replayQueue,
+} from '../lib/mutation-queue';
+import { showToast } from '../lib/toasts';
 
 const Workspace: Component = () => {
   const user = useUser();
@@ -74,6 +80,10 @@ const Workspace: Component = () => {
   // Android). Safari-iOS feuert das Event nicht — dort bleibt der
   // Button unsichtbar und der User muss ueber Share-Menue installieren.
   const { deferredPrompt, installed } = installPromptSignal();
+  // Mutation-Queue: pendingCount-Signal fuer das Header-Badge,
+  // online-Event triggert Auto-Replay. Initial-Hydration der Count-
+  // Anzeige passiert per refreshCountForWorkspace im Effect unten.
+  const pendingMuts = pendingMutationCount;
 
   // Sidebar-Modus pro Workspace. Bei fehlendem workspaceId wird die
   // Registry mit einem leeren String angelegt — die Funktionen sind
@@ -172,6 +182,42 @@ const Workspace: Component = () => {
     if (list && list.length > 0) {
       navigate(`/w/${list[0].id}`, { replace: true });
     }
+  });
+
+  // Mutation-Queue-Lifecycle: pro Workspace einmal das Pending-Count-
+  // Signal hydrieren + 'online'-Event abonnieren. Beim Wechsel werden
+  // alte Listener via onCleanup entfernt — sonst replay'n wir bei
+  // mehreren Workspace-Wechseln das alte Pending-Set.
+  createEffect(() => {
+    const wsId = params.workspaceId;
+    if (!wsId) return;
+    void refreshCountForWorkspace(wsId);
+    const onOnline = () => {
+      void (async () => {
+        const res = await replayQueue(wsId);
+        if (res.skippedBusy) return;
+        if (res.succeeded > 0) {
+          showToast(
+            `${res.succeeded} ${res.succeeded === 1 ? 'Aenderung' : 'Aenderungen'} synchronisiert.`,
+            'success',
+          );
+        }
+        if (res.staled > 0) {
+          showToast(
+            `${res.staled} ${res.staled === 1 ? 'Eintrag' : 'Eintraege'} veraltet — bitte pruefen (Einstellungen / Cache leeren).`,
+            'error',
+          );
+        }
+        if (res.failed > 0) {
+          showToast(
+            `${res.failed} ${res.failed === 1 ? 'Sync-Fehler' : 'Sync-Fehler'} — siehe Einstellungen.`,
+            'error',
+          );
+        }
+      })();
+    };
+    window.addEventListener('online', onOnline);
+    onCleanup(() => window.removeEventListener('online', onOnline));
   });
 
   const currentWs = createMemo(() => {
@@ -911,6 +957,30 @@ const Workspace: Component = () => {
                 <Icon name="no-symbol" size={14} />
                 <span>Offline</span>
               </span>
+            </Show>
+            <Show when={pendingMuts() > 0 && params.workspaceId}>
+              <button
+                type="button"
+                class="pending-badge"
+                title={`${pendingMuts()} Aenderungen warten auf Synchronisation. Klick: jetzt versuchen.`}
+                onClick={() => {
+                  void (async () => {
+                    const res = await replayQueue(params.workspaceId as string);
+                    if (res.skippedBusy) {
+                      showToast('Sync laeuft bereits.', 'info');
+                      return;
+                    }
+                    if (res.succeeded === 0 && res.staled === 0 && res.failed === 0) {
+                      showToast('Keine Aenderungen synchronisierbar — wahrscheinlich offline.', 'info');
+                    } else if (res.succeeded > 0) {
+                      showToast(`${res.succeeded} Aenderungen synchronisiert.`, 'success');
+                    }
+                  })();
+                }}
+              >
+                <Icon name="arrow-path" size={14} />
+                <span>{pendingMuts()} pending</span>
+              </button>
             </Show>
             <button
               type="button"

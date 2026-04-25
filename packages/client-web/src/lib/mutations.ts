@@ -2,11 +2,15 @@
 //   - Rueckgabe: die frische DB-Row (via .select().single())
 //   - Fehler: Original-PostgrestError wird weitergeworfen, der Caller
 //     uebersetzt mit translateDbError() + showToast().
-//   - Kein Optimistic-Update; Caller ruft refetch() nach Success.
+//   - Hot-Path-Mutationen (updateCard, setCardDoneOccurrences,
+//     toggleChecklistItemDone) gehen durch runOptimisticUpdate aus
+//     safe-mutation.ts: online-Path identisch, offline patcht der
+//     Wrapper den IDB-Cache + queued die Spec fuer Replay.
 //
 // Wird 0e.1 inkrementell fuer alle Tabellen erweitert.
 
 import { supabase } from './supabase';
+import { runOptimisticUpdate } from './safe-mutation';
 import type {
   CardRecur,
   CellRow,
@@ -468,14 +472,49 @@ type CardPatch = Partial<
 };
 
 async function updateCard(cardId: string, patch: CardPatch): Promise<KbCardRow> {
-  const { data, error } = await supabase
-    .from('kb_cards')
-    .update(patch)
-    .eq('id', cardId)
-    .select()
-    .single();
-  if (error) throw error;
-  return data as KbCardRow;
+  // Geht durch runOptimisticUpdate: online-Path identisch zu vorher,
+  // bei NetworkError wird die Mutation in die Queue gelegt + die
+  // gecachte Row gepatcht, sodass die UI eine sinnvolle Antwort
+  // bekommt. 14 Setter (renameCard, toggleCardDone, setCardNote,
+  // setCardAlias, setCardDeadline, setCardPriority, setCardTags,
+  // setCardWho, setCardRecur, setCardArchived, setCardColor,
+  // setCardDoneOccurrences via separater Funktion) profitieren
+  // davon ohne weitere Aenderungen.
+  return runOptimisticUpdate<KbCardRow>({
+    table: 'kb_cards',
+    id: cardId,
+    patch: patch as Record<string, unknown>,
+    label: cardLabelFromPatch(patch),
+    run: async () => {
+      const { data, error } = await supabase
+        .from('kb_cards')
+        .update(patch)
+        .eq('id', cardId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as KbCardRow;
+    },
+  });
+}
+
+// Liefert ein User-lesbares Label fuer den Offline-Toast je nach
+// Patch-Inhalt — fokussiert auf die haeufigsten Felder, der Rest
+// faellt auf "Karte aktualisieren" zurueck.
+function cardLabelFromPatch(patch: CardPatch): string {
+  if ('done' in patch) return patch.done ? 'Karte erledigen' : 'Karte oeffnen';
+  if ('archived' in patch)
+    return patch.archived ? 'Karte archivieren' : 'Karte zurueckholen';
+  if ('name' in patch) return 'Karte umbenennen';
+  if ('note' in patch) return 'Notiz speichern';
+  if ('alias' in patch) return 'Alias setzen';
+  if ('deadline' in patch) return 'Deadline setzen';
+  if ('priority' in patch) return 'Prioritaet setzen';
+  if ('tags' in patch) return 'Tags setzen';
+  if ('who' in patch) return 'Verantwortliche setzen';
+  if ('recur' in patch) return 'Wiederholung setzen';
+  if ('color' in patch) return 'Karten-Farbe setzen';
+  return 'Karte aktualisieren';
 }
 
 export function renameCard(cardId: string, name: string): Promise<KbCardRow> {
@@ -544,14 +583,22 @@ export async function setCardDoneOccurrences(
   cardId: string,
   occurrences: string[],
 ): Promise<KbCardRow> {
-  const { data, error } = await supabase
-    .from('kb_cards')
-    .update({ done_occurrences: occurrences })
-    .eq('id', cardId)
-    .select()
-    .single();
-  if (error) throw error;
-  return data as KbCardRow;
+  return runOptimisticUpdate<KbCardRow>({
+    table: 'kb_cards',
+    id: cardId,
+    patch: { done_occurrences: occurrences },
+    label: 'Karte erledigen',
+    run: async () => {
+      const { data, error } = await supabase
+        .from('kb_cards')
+        .update({ done_occurrences: occurrences })
+        .eq('id', cardId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as KbCardRow;
+    },
+  });
 }
 
 // Move: innerhalb derselben Spalte oder cross-column. Bei cross-column
@@ -950,14 +997,24 @@ export async function bulkAddChecklistItems(args: {
 type ItemPatch = Partial<Pick<ChecklistItemRow, 'text' | 'done' | 'level' | 'position'>>;
 
 async function updateItem(itemId: string, patch: ItemPatch): Promise<ChecklistItemRow> {
-  const { data, error } = await supabase
-    .from('checklist_items')
-    .update(patch)
-    .eq('id', itemId)
-    .select()
-    .single();
-  if (error) throw error;
-  return data as ChecklistItemRow;
+  // Geht durch runOptimisticUpdate — toggleChecklistItemDone ist eine
+  // der haeufigsten Klick-Aktionen, die soll auch offline durchgehen.
+  return runOptimisticUpdate<ChecklistItemRow>({
+    table: 'checklist_items',
+    id: itemId,
+    patch: patch as Record<string, unknown>,
+    label: 'done' in patch ? 'Eintrag abhaken' : 'Eintrag aktualisieren',
+    run: async () => {
+      const { data, error } = await supabase
+        .from('checklist_items')
+        .update(patch)
+        .eq('id', itemId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as ChecklistItemRow;
+    },
+  });
 }
 
 export function renameChecklistItem(
