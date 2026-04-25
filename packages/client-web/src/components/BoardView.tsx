@@ -362,7 +362,7 @@ const BoardView: Component<Props> = (p) => {
     if (!q) return all;
     return all.filter((c) => {
       if (c.name.toLowerCase().includes(q)) return true;
-      if (c.alias && c.alias.toLowerCase().includes(q)) return true;
+      if (c.alias?.toLowerCase().includes(q)) return true;
       if ((c.tags ?? []).some((t) => t.toLowerCase().includes(q))) return true;
       if ((c.who ?? []).some((w) => w.toLowerCase().includes(q))) return true;
       return false;

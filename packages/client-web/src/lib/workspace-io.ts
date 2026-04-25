@@ -130,7 +130,7 @@ export async function importWorkspaceWithUi(args: {
       return false;
     }
   }
-  let payload;
+  let payload: ReturnType<typeof parseImportPayload>;
   try {
     payload = parseImportPayload(text);
   } catch (err) {

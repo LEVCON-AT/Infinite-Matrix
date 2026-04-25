@@ -88,7 +88,13 @@ const SettingsModal: Component<Props> = (p) => {
                             <select
                               id={`settings-vis-${key}`}
                               class="settings-select"
-                              ref={isFirst ? (el) => (firstSelect = el) : undefined}
+                              ref={
+                                isFirst
+                                  ? (el) => {
+                                      firstSelect = el;
+                                    }
+                                  : undefined
+                              }
                               value={settings().vis[key]}
                               onChange={(e) =>
                                 setVis(

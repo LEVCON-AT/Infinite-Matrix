@@ -293,7 +293,7 @@ export function recurHumanLabel(r: RecurRule | null | undefined): string {
     if (r.monthType === 'weekday') {
       const wd = typeof r.weekday === 'number' ? r.weekday : 0;
       const ord = r.weekdayOrd ?? 1;
-      return `jeden ${ORD_LABEL[ord] ?? ord + '.'} ${WD_LONG[wd] ?? '?'} im Monat${every === 1 ? '' : ` (${intvl})`}`;
+      return `jeden ${ORD_LABEL[ord] ?? `${ord}.`} ${WD_LONG[wd] ?? '?'} im Monat${every === 1 ? '' : ` (${intvl})`}`;
     }
     return `${intvl} am ${r.day ?? 1}.`;
   }
@@ -305,7 +305,7 @@ export function recurHumanLabel(r: RecurRule | null | undefined): string {
     if (r.monthType === 'weekday') {
       const wd = typeof r.weekday === 'number' ? r.weekday : 0;
       const ord = r.weekdayOrd ?? 1;
-      return `${intvl}, ${ORD_LABEL[ord] ?? ord + '.'} ${WD_LONG[wd] ?? '?'} im ${monthLabel}`;
+      return `${intvl}, ${ORD_LABEL[ord] ?? `${ord}.`} ${WD_LONG[wd] ?? '?'} im ${monthLabel}`;
     }
     const day = r.yearDay ?? r.anchorDay ?? 1;
     return `${intvl} am ${day}. ${monthLabel}`;

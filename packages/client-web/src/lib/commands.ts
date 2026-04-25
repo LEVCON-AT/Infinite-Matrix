@@ -568,7 +568,7 @@ async function execMoveCard(
   }
 
   // Ziel-Spalten laden.
-  let content;
+  let content: Awaited<ReturnType<typeof fetchBoardContent>>;
   try {
     content = await fetchBoardContent(board.nodeId, ctx.workspaceId);
   } catch (err) {

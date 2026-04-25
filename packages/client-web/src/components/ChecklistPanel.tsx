@@ -161,7 +161,7 @@ const ChecklistPanel: Component<Props> = (p) => {
   async function onDelItem(item: ChecklistItemRow) {
     const snap = { ...item };
     await wrap(() => delChecklistItem(item.id));
-    showUndoToast(`Punkt geloescht.`, () => {
+    showUndoToast('Punkt geloescht.', () => {
       void (async () => {
         try {
           await restoreChecklistItem(snap);
@@ -194,10 +194,7 @@ const ChecklistPanel: Component<Props> = (p) => {
     if (!recur && p.items.length > 0 && confirmIfDestructive) {
       const ok = await showConfirm({
         title: 'Checkliste abschliessen?',
-        message:
-          `Checkliste "${p.checklist.label || '(Liste)'}" abschliessen? ` +
-          `Alle ${p.items.length} Punkte werden entfernt — ein Snapshot ` +
-          `bleibt in der Historie.`,
+        message: `Checkliste "${p.checklist.label || '(Liste)'}" abschliessen? Alle ${p.items.length} Punkte werden entfernt — ein Snapshot bleibt in der Historie.`,
         variant: 'warning',
         confirmLabel: 'Abschliessen',
       });

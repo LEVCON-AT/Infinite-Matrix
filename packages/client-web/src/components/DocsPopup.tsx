@@ -694,7 +694,7 @@ const DocsPopup: Component<Props> = (p) => {
       return;
     }
     // Resolve
-    let res;
+    let res: Awaited<ReturnType<typeof resolveAlias>>;
     try {
       res = await resolveAlias(cleaned, p.workspaceId);
     } catch (err) {

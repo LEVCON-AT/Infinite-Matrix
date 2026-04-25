@@ -86,7 +86,7 @@ function quoteForOr(pattern: string): string {
 export function clip(s: string, max = 120): string {
   if (!s) return '';
   if (s.length <= max) return s;
-  return s.slice(0, max - 1).trimEnd() + '…';
+  return `${s.slice(0, max - 1).trimEnd()}…`;
 }
 
 // Extrahiert einen Kontext-Fenster um das erste Match des Terms im Text.
@@ -104,8 +104,8 @@ export function matchExcerpt(text: string, term: string, window = 140): string {
   const start = Math.max(0, idx - halfWin);
   const end = Math.min(text.length, idx + term.length + halfWin);
   let out = text.slice(start, end);
-  if (start > 0) out = '… ' + out;
-  if (end < text.length) out = out + ' …';
+  if (start > 0) out = `… ${out}`;
+  if (end < text.length) out = `${out} …`;
   return out;
 }
 

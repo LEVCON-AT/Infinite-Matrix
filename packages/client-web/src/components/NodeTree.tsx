@@ -836,9 +836,9 @@ const NodeTree: Component<Props> = (props) => {
     // sitzt UND der Split-Curve endet auf dem Child-Dot-Center.
     const INDENT = 16;
     const ORIGIN_X = 24;
-    rows.forEach((el) => {
+    for (const el of rows) {
       const id = el.dataset.treeId;
-      if (!id) return;
+      if (!id) continue;
       const parent = el.dataset.treeParent || '';
       const depth = Number.parseInt(el.dataset.treeDepth || '0', 10);
       const dotType = el.dataset.dotType || 'matrix';
@@ -850,7 +850,7 @@ const NodeTree: Component<Props> = (props) => {
         if (!byParent.has(parent)) byParent.set(parent, []);
         byParent.get(parent)!.push(id);
       }
-    });
+    }
 
     function lastDescendantCy(nodeId: string): number {
       const kids = byParent.get(nodeId);

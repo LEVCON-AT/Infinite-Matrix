@@ -10,7 +10,7 @@ import { supabase } from './supabase';
 // im Prod-Build sollte VITE_SITE_URL immer gesetzt sein.
 const SITE_URL = (() => {
   const fromEnv = import.meta.env.VITE_SITE_URL as string | undefined;
-  if (fromEnv && fromEnv.trim()) return fromEnv;
+  if (fromEnv?.trim()) return fromEnv;
   if (typeof window !== 'undefined') {
     console.warn(
       '[auth] VITE_SITE_URL nicht gesetzt — Magic-Link-Redirect nutzt window.location.origin als Fallback. Im Prod-Build .env-Eintrag pflegen.',

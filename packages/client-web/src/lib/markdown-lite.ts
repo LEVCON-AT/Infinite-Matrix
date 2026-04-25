@@ -51,8 +51,9 @@ function parseInline(input: string): MdInline[] {
     // Alias-Tokens suchen. So ueberlappen sich URL- und Alias-Muster nicht.
     let last = 0;
     URL_RE.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = URL_RE.exec(s)) !== null) {
+    while (true) {
+      const m = URL_RE.exec(s);
+      if (m === null) break;
       if (m.index > last) pushAliasOrText(s.slice(last, m.index));
       const safe = sanitizeUrl(m[0]);
       if (safe) {

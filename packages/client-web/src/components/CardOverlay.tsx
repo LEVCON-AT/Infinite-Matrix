@@ -728,10 +728,7 @@ const CardOverlay: Component<Props> = (p) => {
               <Show when={recurVal().type !== 'none'}>
                 <span
                   class="card-recur-summary"
-                  title={
-                    recurHumanLabel(recurVal()) +
-                    (recurEndLabel(recurVal()) ? ' · ' + recurEndLabel(recurVal()) : '')
-                  }
+                  title={`${recurHumanLabel(recurVal())}${recurEndLabel(recurVal()) ? ` · ${recurEndLabel(recurVal())}` : ''}`}
                 >
                   <Icon name="arrow-path" size={12} /> {recurHumanLabel(recurVal())}
                   <Show when={recurEndLabel(recurVal())}>

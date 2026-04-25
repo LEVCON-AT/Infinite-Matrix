@@ -1524,7 +1524,7 @@ async function mutateCellData<T>(
 
 function genInfoFieldId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  return 'if_' + Math.random().toString(36).slice(2, 10);
+  return `if_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export async function addCellInfoField(args: {
@@ -1599,7 +1599,7 @@ export async function delCellInfoField(cellId: string, fieldId: string): Promise
 
 function genInfoLinkId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  return 'il_' + Math.random().toString(36).slice(2, 10);
+  return `il_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export class InvalidUrlError extends Error {
@@ -1713,7 +1713,7 @@ async function mutateCardChecklist<T>(
 
 function genInlineItemId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  return 'ii_' + Math.random().toString(36).slice(2, 10);
+  return `ii_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function ensureItemId(it: InlineChecklistItem): InlineChecklistItem {
@@ -1904,9 +1904,7 @@ async function restoreRow(
     | 'docs',
   row: AnyRow,
 ): Promise<void> {
-  const clean = { ...row };
-  delete clean.created_at;
-  delete clean.updated_at;
+  const { created_at: _ca, updated_at: _ua, ...clean } = row;
   const wsId = (clean.workspace_id as string) ?? '';
   if (!wsId) {
     // Snapshot ohne workspace_id (sollte nicht vorkommen) — direkt

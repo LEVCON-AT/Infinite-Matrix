@@ -16,8 +16,9 @@ export function tokenizeAliasText(input: string): AliasToken[] {
   if (!input) return out;
   let last = 0;
   ALIAS_REF_RE.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = ALIAS_REF_RE.exec(input)) !== null) {
+  while (true) {
+    const m = ALIAS_REF_RE.exec(input);
+    if (m === null) break;
     if (m.index > last) {
       out.push({ kind: 'text', value: input.slice(last, m.index) });
     }

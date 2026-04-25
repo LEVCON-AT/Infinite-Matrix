@@ -53,7 +53,7 @@ export function subscribeWorkspace(workspaceId: string, bumps: RealtimeBumps): v
 
   for (const table of TABLES) {
     channel.on(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // biome-ignore lint/suspicious/noExplicitAny: Supabase-Realtime-Event-Type ist generisch typisiert; das `as any` ist die offizielle Workaround-Form aus den Supabase-JS-Docs (postgres_changes ist ein Literal-Typ-String, der TS nicht automatisch akzeptiert).
       'postgres_changes' as any,
       {
         event: '*',
