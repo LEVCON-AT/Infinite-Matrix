@@ -74,6 +74,7 @@ Daneben: SolidJS-basierter `packages/client-web/` (Supabase-Backend, Multi-Tenan
 - **Keine `*:focus{outline:none}`-Regel.** Zu breit, tötet Accessibility. Scope: siehe [docs/claude/styles.md](docs/claude/styles.md).
 - **Keine destruktive Aktion ohne `pushUndo` + `showUndoToast`.** Wenn die Aktion Daten löscht und nicht reversibel ist, gehört sie nicht ausgeliefert.
 - **Keine neue `client-web`-Mutation ohne Offline-Pfad.** Jede schreibende Funktion fließt durch `safe-mutation.ts` oder einen bereits gewrappten Helper (`updateCard`/`updateCell`/`updateRow`/`updateCol`/`updateKbCol`/`updateChecklist`/`updateItem`/`updateBoardLink`/`updateDoc`/`mutateCellData`/`mutateNodeData`/`readChecklistHistory`). Direkte `supabase.from(...).insert/update/delete()` ohne Wrapper sind ein Review-Stop, analog zu `alert()`-Aufrufen.
+- **Kein `git clean` im Deploy-Mirror.** Auf `/opt/matrix-repo` (VPS) liegen Bind-Mount-Volumes (`infra/supabase/volumes/db/data/`, `volumes/storage/`, …) im Working-Tree, aber nicht im Repo. Ein globales `git clean -fd` wischt die ganze Postgres-DB. Wenn untracked-Files den ff-merge blockieren: gezielter `git clean -fd -- <pfad>` ODER manuelles Aufraeumen — niemals Pauschal-Clean. `.gitignore` schuetzt nicht gegen `git clean -fd`, nur gegen `git add` — das ist die teuer gelernte Regel von 2026-04-25.
 
 ## Praktischer Ablauf pro Task
 
