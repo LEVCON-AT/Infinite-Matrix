@@ -2,7 +2,13 @@ import { defineConfig } from 'vite';
 import solid from 'vite-plugin-solid';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// Base-Pfad fuer den Vite-Build. VITE_BASE_PATH ueberschreibt das
+// (z.B. '/app/' fuer staging.matrix.levcon.at/app/-Deploy). Default
+// '/' fuer lokales dev + matrix.levcon.at-Root-Deploy spaeter.
+const BASE = process.env.VITE_BASE_PATH ?? '/';
+
 export default defineConfig({
+  base: BASE,
   plugins: [
     solid(),
     // PWA-Foundation (0g.2a). autoUpdate: neue Version wird still im
@@ -17,8 +23,8 @@ export default defineConfig({
         short_name: 'Matrix',
         description: 'Rekursive Matrix-Struktur zum strukturierten Denken.',
         lang: 'de',
-        start_url: '/',
-        scope: '/',
+        start_url: BASE,
+        scope: BASE,
         display: 'standalone',
         background_color: '#0f172a',
         theme_color: '#0f172a',
