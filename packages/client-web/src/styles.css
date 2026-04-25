@@ -2229,13 +2229,13 @@ button[type='submit']:hover:not(:disabled) {
   color: var(--text3);
 }
 
-/* Dropdown-Menu — absolute, ueber der Sidebar-Head ueberlappend. Der
-   z-index liegt ueber der Sidebar selbst aber unter Modals. */
+/* Dropdown-Menu — gerendert via Portal nach <body>. position:fixed
+   weil parent (body) und gewuenschter Ueberlappungs-Rahmen einfach
+   viewport-relativ sind. left/top kommen als inline-style aus dem
+   Component (anchor.getBoundingClientRect). z-index ueber Sidebar +
+   Header, unter Modals (Dialog-Host nutzt 1000+). */
 .ws-switcher-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
+  position: fixed;
   margin: 0;
   padding: 4px;
   list-style: none;
@@ -2243,7 +2243,7 @@ button[type='submit']:hover:not(:disabled) {
   border: 0.5px solid var(--border2);
   border-radius: var(--rs);
   box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.12));
-  z-index: 50;
+  z-index: 500;
   display: flex;
   flex-direction: column;
   gap: 2px;

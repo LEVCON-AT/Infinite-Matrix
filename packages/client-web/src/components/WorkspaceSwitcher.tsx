@@ -7,6 +7,7 @@ import {
   onMount,
   type Component,
 } from 'solid-js';
+import { Portal } from 'solid-js/web';
 import { useNavigate } from '@solidjs/router';
 import type { WorkspaceWithRole } from '../lib/types';
 import Icon from './Icon';
@@ -34,7 +35,16 @@ const roleLabel: Record<WorkspaceWithRole['role'], string> = {
 const WorkspaceSwitcher: Component<Props> = (props) => {
   const navigate = useNavigate();
   const [open, setOpen] = createSignal(false);
+  // Portal-Render-Pos: gemessen vom Anchor-Button via getBoundingClientRect.
+  // Wird beim Open-Trigger gesetzt + bei resize/scroll aktualisiert.
+  const [pos, setPos] = createSignal<{
+    left: number;
+    top: number;
+    width: number;
+  } | null>(null);
   let rootEl: HTMLDivElement | undefined;
+  let anchorEl: HTMLButtonElement | undefined;
+  let menuEl: HTMLUListElement | undefined;
 
   const current = createMemo(() =>
     props.workspaces?.find((w) => w.id === props.currentWorkspaceId),
@@ -42,11 +52,23 @@ const WorkspaceSwitcher: Component<Props> = (props) => {
 
   function close(): void {
     setOpen(false);
+    setPos(null);
+  }
+
+  function measure(): void {
+    if (!anchorEl) return;
+    const r = anchorEl.getBoundingClientRect();
+    setPos({ left: r.left, top: r.bottom + 4, width: r.width });
   }
 
   function toggle(e: MouseEvent): void {
     e.stopPropagation();
-    setOpen((v) => !v);
+    if (open()) {
+      close();
+    } else {
+      measure();
+      setOpen(true);
+    }
   }
 
   function pick(id: string): void {
@@ -58,7 +80,12 @@ const WorkspaceSwitcher: Component<Props> = (props) => {
     const onDocClick = (e: MouseEvent) => {
       if (!open()) return;
       const target = e.target as Node | null;
-      if (rootEl && target && !rootEl.contains(target)) close();
+      // Click muss ausserhalb von Anchor UND Menu sein. Menu liegt im
+      // Portal, also nicht in rootEl-contains-Reichweite — daher
+      // separater Check auf menuEl.
+      const insideAnchor = !!(rootEl && target && rootEl.contains(target));
+      const insideMenu = !!(menuEl && target && menuEl.contains(target));
+      if (!insideAnchor && !insideMenu) close();
     };
     const onKey = (e: KeyboardEvent) => {
       if (!open()) return;
@@ -67,11 +94,18 @@ const WorkspaceSwitcher: Component<Props> = (props) => {
         close();
       }
     };
+    const onResize = () => {
+      if (open()) measure();
+    };
     document.addEventListener('click', onDocClick);
     document.addEventListener('keydown', onKey, true);
+    window.addEventListener('resize', onResize);
+    window.addEventListener('scroll', onResize, true);
     onCleanup(() => {
       document.removeEventListener('click', onDocClick);
       document.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('scroll', onResize, true);
     });
   });
 
@@ -83,6 +117,7 @@ const WorkspaceSwitcher: Component<Props> = (props) => {
       >
         <button
           type="button"
+          ref={anchorEl}
           class="ws-switcher-anchor"
           aria-haspopup="listbox"
           aria-expanded={open()}
@@ -98,25 +133,36 @@ const WorkspaceSwitcher: Component<Props> = (props) => {
             class="ws-switcher-chev"
           />
         </button>
-        <Show when={open()}>
-          <ul class="ws-switcher-menu" role="listbox">
-            <For each={props.workspaces}>
-              {(ws) => (
-                <li>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={ws.id === props.currentWorkspaceId}
-                    classList={{ active: ws.id === props.currentWorkspaceId }}
-                    onClick={() => pick(ws.id)}
-                  >
-                    <span class="ws-name">{ws.name}</span>
-                    <span class="ws-role">{roleLabel[ws.role]}</span>
-                  </button>
-                </li>
-              )}
-            </For>
-          </ul>
+        <Show when={open() && pos()}>
+          <Portal mount={document.body}>
+            <ul
+              class="ws-switcher-menu"
+              role="listbox"
+              ref={menuEl}
+              style={{
+                left: `${pos()!.left}px`,
+                top: `${pos()!.top}px`,
+                'min-width': `${pos()!.width}px`,
+              }}
+            >
+              <For each={props.workspaces}>
+                {(ws) => (
+                  <li>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={ws.id === props.currentWorkspaceId}
+                      classList={{ active: ws.id === props.currentWorkspaceId }}
+                      onClick={() => pick(ws.id)}
+                    >
+                      <span class="ws-name">{ws.name}</span>
+                      <span class="ws-role">{roleLabel[ws.role]}</span>
+                    </button>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </Portal>
         </Show>
       </Show>
     </div>
