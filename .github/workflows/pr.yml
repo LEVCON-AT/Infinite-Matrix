@@ -7,6 +7,7 @@ on:
       - 'packages/bridge/**'
       - 'packages/client-web/**'
       - 'packages/shared/**'
+      - 'infra/**'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - '.github/workflows/**'
@@ -36,6 +37,13 @@ jobs:
 
   client-web:
     runs-on: ubuntu-latest
+    env:
+      # Live-Deploy laeuft unter staging.matrix.levcon.at/app/. Vite muss
+      # die Asset-URLs mit /app/ praefixen, sonst zieht der Browser sie
+      # absolut von / und nginx serviert die Landing-Page als Asset.
+      # (Memory feedback_spa_subpath_router — vite.base + Solid-Router-base
+      # muessen synchron.)
+      VITE_BASE_PATH: /app/
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -50,3 +58,48 @@ jobs:
         run: |
           pnpm typecheck
           pnpm build
+
+  migrations:
+    # Smoke fuer SQL-Migrations: Postgres-Service-Container, Bootstrap-
+    # Stubs (auth.users, _realtime.*) ziehen, dann alle Migrations 2x
+    # gegen plain Postgres laufen lassen. 1. Pass = Schema-Aufbau,
+    # 2. Pass = Idempotenz (jede Migration muss IF NOT EXISTS / ON
+    # CONFLICT etc. korrekt fuehren). Bricht bei psql-Exit != 0.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_USER: postgres
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: ci
+      PGDATABASE: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bootstrap (auth + _realtime stubs + roles)
+        run: psql -v ON_ERROR_STOP=1 -f infra/scripts/ci-migrations-bootstrap.sql
+      - name: Apply migrations — pass 1 (build schema)
+        run: |
+          shopt -s nullglob
+          for f in infra/supabase/migrations/*.sql; do
+            echo "=== $f (pass 1) ==="
+            psql -v ON_ERROR_STOP=1 -f "$f"
+          done
+      - name: Apply migrations — pass 2 (idempotency)
+        run: |
+          shopt -s nullglob
+          for f in infra/supabase/migrations/*.sql; do
+            echo "=== $f (pass 2) ==="
+            psql -v ON_ERROR_STOP=1 -f "$f"
+          done
