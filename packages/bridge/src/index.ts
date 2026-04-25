@@ -25,16 +25,15 @@ const app = Fastify({
 // Test (localhost:3848) nicht laeuft. Prod: CORS_ORIGINS muss gesetzt
 // sein.
 const corsOrigins = config.CORS_ORIGINS
-  ? config.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean)
+  ? config.CORS_ORIGINS.split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
   : null;
-await app.register(cors, {
-  origin:
-    corsOrigins && corsOrigins.length > 0
-      ? corsOrigins
-      : config.NODE_ENV === 'production'
-        ? false // Prod ohne Allowlist: kein Cross-Origin erlaubt.
-        : true, // Dev: reflektiv (localhost-Workflow).
-});
+// origin-Logik: Allowlist wenn gepflegt; sonst Prod=false (Lockdown),
+// Dev=true (reflektiv fuer localhost-Workflow).
+const corsOrigin =
+  corsOrigins && corsOrigins.length > 0 ? corsOrigins : config.NODE_ENV !== 'production';
+await app.register(cors, { origin: corsOrigin });
 if (!corsOrigins && config.NODE_ENV === 'production') {
   app.log.warn(
     'CORS_ORIGINS nicht gesetzt — CORS in Prod auf false. Wenn der Browser-Client unter einer anderen Origin laeuft, Allowlist explizit pflegen.',
