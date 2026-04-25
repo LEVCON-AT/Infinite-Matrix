@@ -2,12 +2,39 @@
 //   - Rueckgabe: die frische DB-Row (via .select().single())
 //   - Fehler: Original-PostgrestError wird weitergeworfen, der Caller
 //     uebersetzt mit translateDbError() + showToast().
-//   - Hot-Path-Mutationen (updateCard, setCardDoneOccurrences,
-//     toggleChecklistItemDone) gehen durch runOptimisticUpdate aus
-//     safe-mutation.ts: online-Path identisch, offline patcht der
-//     Wrapper den IDB-Cache + queued die Spec fuer Replay.
 //
-// Wird 0e.1 inkrementell fuer alle Tabellen erweitert.
+// Offline-Verhalten (Plan 0g.2d/e):
+//   - Simple update/insert/delete-Operationen gehen durch run-
+//     OptimisticUpdate / -Insert / -Delete aus safe-mutation.ts. Online-
+//     Path identisch zu vorher, offline patcht der Wrapper den IDB-
+//     Cache + queued die Spec fuer Replay.
+//   - mutateCellData / mutateNodeData lesen offline aus dem Cache und
+//     schreiben ueber updateCell/runOptimisticUpdate — JSONB-Mutationen
+//     (info-Fields, cell-links, card-inline-checklist-items, node.data
+//     fuer Beschreibungen) sind damit ebenfalls offline-tauglich.
+//
+// Bewusst NICHT offline-tauglich (V1):
+//   - createCardFromChecklist (Multi-Step Read+Insert mit FK-Beziehung)
+//   - addCellChecklist (Cell-Feature-Patch + Insert in einer Atomic-
+//     Erwartung)
+//   - createChildMatrix / createChildBoard (insert nodes + update cell-
+//     features in einem Schritt)
+//   - insertCell (Cell wird typisch lazy server-seitig angelegt)
+//   - delCellRow (Cascade-Side-Effects nicht client-seitig replay-fest)
+//   - saveChecklistSnapshot / applyChecklistClose / restore-
+//     ChecklistSnapshot / delChecklistSnapshot / bulkAddChecklistItems
+//     (JSONB-history-Mutationen — Read-Modify-Write mit Concurrency-
+//     Risiko offline + bei Replay)
+//   - restore*-Pfade (Undo-Helfer): re-INSERT von Snapshots, das
+//     Cascade-Replay ist nicht garantierbar offline
+//   - moveCard / moveCardToBoard (cross-Board): nutzen nextBoardPosition
+//     auf Server — beim Reconnect koennen Positionen kollidieren. Bleibt
+//     fail-fast offline; cross-column Drag innerhalb Board geht ueber
+//     setCardColAndPosition durch updateCard und ist offline ok.
+//
+// Diese Funktionen werfen offline NetworkError. Der Caller fängt
+// translateDbError() + Toast — der User sieht "offline, nicht
+// verfügbar" und kann es online erneut versuchen.
 
 import { supabase } from './supabase';
 import {
@@ -400,19 +427,44 @@ async function mutateNodeData<T>(
   nodeId: string,
   mutator: (data: Record<string, unknown>) => { data: Record<string, unknown>; result: T },
 ): Promise<T> {
-  const { data: cur, error: readErr } = await supabase
-    .from('nodes')
-    .select('data')
-    .eq('id', nodeId)
-    .single();
-  if (readErr) throw readErr;
-  const nodeData = (cur?.data ?? {}) as Record<string, unknown>;
+  // Read mit Offline-Fallback aus dem Cache, analog zu mutateCellData.
+  let nodeData: Record<string, unknown> = {};
+  try {
+    const { data: cur, error: readErr } = await supabase
+      .from('nodes')
+      .select('data')
+      .eq('id', nodeId)
+      .single();
+    if (readErr) throw readErr;
+    nodeData = (cur?.data ?? {}) as Record<string, unknown>;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const cached = await getById<NodeRow>('nodes', nodeId);
+    if (!cached) throw err;
+    nodeData = ((cached as { data?: unknown }).data ?? {}) as Record<
+      string,
+      unknown
+    >;
+  }
   const { data: nextData, result } = mutator(nodeData);
-  const { error: writeErr } = await supabase
-    .from('nodes')
-    .update({ data: nextData })
-    .eq('id', nodeId);
-  if (writeErr) throw writeErr;
+  // Write geht ueber den Wrapper, indem wir runOptimisticUpdate
+  // aufrufen — damit funktioniert auch setNodeDescription offline.
+  await runOptimisticUpdate<NodeRow>({
+    table: 'nodes',
+    id: nodeId,
+    patch: { data: nextData },
+    label: 'Beschreibung speichern',
+    run: async () => {
+      const { data: updated, error: writeErr } = await supabase
+        .from('nodes')
+        .update({ data: nextData })
+        .eq('id', nodeId)
+        .select()
+        .single();
+      if (writeErr) throw writeErr;
+      return updated as NodeRow;
+    },
+  });
   return result;
 }
 
@@ -427,22 +479,45 @@ export async function setNodeDescription(
 }
 
 export async function deleteNode(nodeId: string): Promise<void> {
-  const { error } = await supabase.from('nodes').delete().eq('id', nodeId);
-  if (error) throw error;
+  // Cascade-Side-Effects (rows/cols/cells/kb_*/checklists/items/links)
+  // sind beim DB-Server. Wir queue'n nur den Top-Level-Delete; bei
+  // Replay raeumt der Server cascadiert. Cache-seitig entfernen wir
+  // primaer den Node — orphane Sub-Rows bleiben im Cache liegen, bis
+  // beim naechsten online-Refetch sauberer Stand zurueckkommt.
+  await runOptimisticDelete({
+    table: 'nodes',
+    id: nodeId,
+    label: 'Element loeschen',
+    run: async () => {
+      const { error } = await supabase
+        .from('nodes')
+        .delete()
+        .eq('id', nodeId);
+      if (error) throw error;
+    },
+  });
 }
 
 export async function renameNode(
   nodeId: string,
   label: string,
 ): Promise<NodeRow> {
-  const { data, error } = await supabase
-    .from('nodes')
-    .update({ label })
-    .eq('id', nodeId)
-    .select()
-    .single();
-  if (error) throw error;
-  return data as NodeRow;
+  return runOptimisticUpdate<NodeRow>({
+    table: 'nodes',
+    id: nodeId,
+    patch: { label },
+    label: 'Element umbenennen',
+    run: async () => {
+      const { data, error } = await supabase
+        .from('nodes')
+        .update({ label })
+        .eq('id', nodeId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as NodeRow;
+    },
+  });
 }
 
 // ─── Kanban-Spalten ────────────────────────────────────────────

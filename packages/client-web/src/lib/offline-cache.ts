@@ -162,6 +162,24 @@ export async function putOne<T extends CacheRow = CacheRow>(
   await inst.put(table, row);
 }
 
+// Merge-Variante zu putAll: schreibt die uebergebenen Rows ohne den
+// bestehenden Workspace-Anteil zu loeschen. Brauchen wir fuer board-/
+// cell-scoped Reads, die nur einen Teil des Workspaces laden — sonst
+// wuerde jeder Board-Refetch die kb_cards anderer Boards aus dem
+// Cache werfen.
+export async function mergeRows<T extends CacheRow>(
+  table: CacheTable,
+  rows: readonly T[],
+): Promise<void> {
+  if (rows.length === 0) return;
+  const inst = await db();
+  const tx = inst.transaction(table, 'readwrite');
+  for (const r of rows) {
+    await tx.store.put(r);
+  }
+  await tx.done;
+}
+
 // Loescht eine Row aus dem Cache. Verwendet von runOptimisticDelete.
 // No-op wenn die Row nicht existiert.
 export async function deleteOne(
