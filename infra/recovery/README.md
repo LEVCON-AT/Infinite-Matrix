@@ -34,18 +34,27 @@ sudo useradd -m -G sudo,adm rescue
 sudo passwd rescue                       # Passwort aus: pwgen -s 32 1
                                          # → in Bitwarden ablegen + offline-Print
 
-# 2. SSH 2-Faktor für rescue (publickey + password beide nötig)
+# 2. SSH-Auth für rescue (Pubkey ODER Passwort — entweder reicht)
+#
+# Hinweis: globale Defaults (PasswordAuthentication, PermitRootLogin)
+# werden hier NICHT angefasst, weil das die laufende root-SSH-Session
+# während des Setups gefährden würde. Globale Härtung (PasswordAuth-
+# entication no global + PermitRootLogin prohibit-password) ist als
+# separater Mini-Sprint geplant — siehe TODO am Ende.
 sudo tee /etc/ssh/sshd_config.d/10-matrix.conf <<'EOF'
-PasswordAuthentication no
-PermitRootLogin no
-KbdInteractiveAuthentication no
+# Phase 1 — VPS Emergency Access (P1.0)
+# Match-Block fuer rescue-User: pubkey ODER password (beide Listen einzeln,
+# Leerzeichen = ODER). Erlaubt Recovery von beliebigem Rechner mit Passwort,
+# vom eigenen Dev-PC mit Pubkey (komfortabel, kein Passwort-Prompt).
 
 Match User rescue
     PasswordAuthentication yes
+    PubkeyAuthentication yes
     AuthenticationMethods publickey password
+    KbdInteractiveAuthentication no
     MaxAuthTries 3
 EOF
-sudo sshd -t && sudo systemctl restart sshd
+sudo sshd -t && sudo systemctl reload sshd  # reload, nicht restart — bestehende Sessions bleiben
 
 # 3. sudoers — strict scope, nur Recovery-Skripte ohne Passwort
 sudo tee /etc/sudoers.d/rescue-emergency <<'EOF'
@@ -129,3 +138,10 @@ sudo /opt/recovery/scripts/status.sh
 ## Off-VPS-Backup (Phase-1.5)
 
 Geplant für nach Abschluss Phase 1: Hetzner Storage Box + age-encryption + restic. Daily-Push der Snapshots, Retention 7 daily / 4 weekly / 12 monthly. Eigener Sub-Plan, eigener Sprint.
+
+## TODO — Folge-Sprints
+
+- **Globale sshd-Härtung** (eigener Mini-Sprint nach P1.0b): `PasswordAuthentication no` global + `PermitRootLogin prohibit-password`. Macht Standard-User-Zugang strikt Pubkey-only, root nur per Pubkey, rescue bleibt mit OR-Modell für Recovery. Voraussetzung: rescue-Login von externem Standort verifiziert (gemacht).
+- **IONOS-Snapshot aktivieren** (manuell vom User): Cloud-Panel → Server → Backups → Daily.
+- **P1.0b — Service-Role-Key-Rotation**: rotate-Skript in `infra/scripts/` + LoadCredential-Pattern in `matrix-bridge.service`.
+- **Phase-1.5 — Off-VPS-Backup**: siehe oben.
