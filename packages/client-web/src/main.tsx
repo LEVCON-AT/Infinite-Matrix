@@ -1,8 +1,16 @@
 import { Route, Router } from '@solidjs/router';
 import { render } from 'solid-js/web';
 import App from './App';
+import Invite from './routes/Invite';
 import Login from './routes/Login';
+import Settings from './routes/Settings';
 import Workspace from './routes/Workspace';
+import AccountProfile from './routes/settings/AccountProfile';
+import AccountSecurity from './routes/settings/AccountSecurity';
+import AccountVisibility from './routes/settings/AccountVisibility';
+import WorkspaceAuditLog from './routes/settings/WorkspaceAuditLog';
+import WorkspaceGeneral from './routes/settings/WorkspaceGeneral';
+import WorkspaceMembers from './routes/settings/WorkspaceMembers';
 import './styles.css';
 import { registerServiceWorker } from './lib/pwa';
 
@@ -30,11 +38,21 @@ render(
     <Router root={App} base={ROUTER_BASE}>
       <Route path="/" component={Workspace} />
       <Route path="/login" component={Login} />
+      <Route path="/invite/:token" component={Invite} />
       <Route path="/w/:workspaceId" component={Workspace} />
       <Route path="/w/:workspaceId/n/:nodeId" component={Workspace} />
       <Route path="/w/:workspaceId/c/:cellId/checklists" component={Workspace} />
       <Route path="/w/:workspaceId/c/:cellId/info" component={Workspace} />
       <Route path="/w/:workspaceId/c/:cellId/docs" component={Workspace} />
+      <Route path="/w/:workspaceId/settings" component={Settings}>
+        <Route path="/" component={AccountProfile} />
+        <Route path="/account/profile" component={AccountProfile} />
+        <Route path="/account/security" component={AccountSecurity} />
+        <Route path="/account/visibility" component={AccountVisibility} />
+        <Route path="/workspace/general" component={WorkspaceGeneral} />
+        <Route path="/workspace/members" component={WorkspaceMembers} />
+        <Route path="/workspace/audit" component={WorkspaceAuditLog} />
+      </Route>
     </Router>
   ),
   root,

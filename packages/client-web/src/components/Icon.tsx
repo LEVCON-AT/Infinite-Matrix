@@ -59,7 +59,13 @@ export type IconName =
   | 'arrow-top-right-on-square'
   | 'funnel'
   | 'flag'
-  | 'no-symbol';
+  | 'no-symbol'
+  | 'arrow-left'
+  | 'lock-closed'
+  | 'eye'
+  | 'users'
+  | 'list-bullet'
+  | 'shield-check';
 
 // Heroicons v2 outline path-data. 24x24 viewBox. Factory-Functions
 // wichtig: sonst shared Solid dieselben DOM-Nodes zwischen mehreren
@@ -329,6 +335,54 @@ const ICONS: Record<IconName, () => JSX.Element> = {
     <>
       <circle cx="12" cy="12" r="9" />
       <path d="m6 6 12 12" />
+    </>
+  ),
+  // Zurueck-Pfeil: gerade nach links
+  'arrow-left': () => (
+    <>
+      <path d="M19 12H5" />
+      <path d="m12 19-7-7 7-7" />
+    </>
+  ),
+  // Sicherheit: geschlossenes Schloss
+  'lock-closed': () => (
+    <>
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </>
+  ),
+  // Sichtbarkeit: Auge mit Pupille
+  eye: () => (
+    <>
+      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  // Mitglieder: zwei Personen
+  users: () => (
+    <>
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3 20a6 6 0 0 1 12 0" />
+      <path d="M16 11a3 3 0 0 0 0-6" />
+      <path d="M21 20a5 5 0 0 0-4-4.9" />
+    </>
+  ),
+  // Liste: drei horizontale Linien mit Bullet-Punkten links
+  'list-bullet': () => (
+    <>
+      <path d="M9 6h12" />
+      <path d="M9 12h12" />
+      <path d="M9 18h12" />
+      <circle cx="4.5" cy="6" r="1" fill="currentColor" stroke="none" />
+      <circle cx="4.5" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="4.5" cy="18" r="1" fill="currentColor" stroke="none" />
+    </>
+  ),
+  // Audit/Schutz: Schild mit Haken
+  'shield-check': () => (
+    <>
+      <path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6Z" />
+      <path d="m9 12 2 2 4-4" />
     </>
   ),
 };

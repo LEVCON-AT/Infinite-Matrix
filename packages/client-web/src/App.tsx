@@ -6,8 +6,16 @@ import Toasts from './components/Toasts';
 import { bootstrapAuth, useAuthReady, useSession } from './lib/auth';
 import { useEditModeHotkey } from './lib/edit-mode';
 import { useThemeBootstrap } from './lib/theme';
+import { PENDING_INVITE_KEY } from './routes/Invite';
 
 bootstrapAuth();
+
+// Routen, die der globale Auth-Guard nicht zwingend redirecten soll.
+// /invite/:token bleibt aufrufbar — die Page selbst handhabt den
+// Login-Redirect mit Token-Memorierung in sessionStorage.
+function isPublicRoute(pathname: string): boolean {
+  return pathname === '/login' || pathname.startsWith('/invite/');
+}
 
 const App: ParentComponent = (props): JSX.Element => {
   const ready = useAuthReady();
@@ -18,14 +26,31 @@ const App: ParentComponent = (props): JSX.Element => {
   useEditModeHotkey();
   useThemeBootstrap();
 
-  // Route-Guard: ohne Session -> /login, mit Session auf /login -> /
+  // Route-Guard: ohne Session -> /login (ausser auf public-Routen),
+  // mit Session auf /login -> Pending-Invite-Redeem oder /.
   createEffect(() => {
     if (!ready()) return;
-    const onLogin = location.pathname === '/login';
-    if (!session() && !onLogin) {
+    const path = location.pathname;
+    const onLogin = path === '/login';
+    if (!session() && !isPublicRoute(path)) {
       navigate('/login', { replace: true });
-    } else if (session() && onLogin) {
-      navigate('/', { replace: true });
+      return;
+    }
+    if (session() && onLogin) {
+      // Falls /invite/:token zwischengeparkt wurde, den nach Login
+      // wieder anspringen. Ein Re-Klick auf den Mail-Link waere sonst
+      // noetig.
+      let pending: string | null = null;
+      try {
+        pending = sessionStorage.getItem(PENDING_INVITE_KEY);
+      } catch {
+        pending = null;
+      }
+      if (pending) {
+        navigate(`/invite/${encodeURIComponent(pending)}`, { replace: true });
+      } else {
+        navigate('/', { replace: true });
+      }
     }
   });
 

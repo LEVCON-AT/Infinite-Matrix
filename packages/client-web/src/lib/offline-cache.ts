@@ -44,6 +44,7 @@ const TABLES = [
   'checklist_items',
   'links',
   'docs',
+  'invites',
 ] as const;
 
 export type CacheTable = (typeof TABLES)[number];
@@ -65,15 +66,14 @@ interface MatrixCacheSchema extends DBSchema {
   checklist_items: StoreDef;
   links: StoreDef;
   docs: StoreDef;
+  invites: StoreDef;
 }
 
 const DB_NAME = 'matrix-cache';
-// V2 ergaenzt den `docs`-Store, der mit Migration 007 ins Schema kam.
-// V1-Installs (alle Browser-Tabs vor 0g.2c) haben den Store nie angelegt
-// — ohne Version-Bump bekommt das `upgrade()`-Callback nie wieder Aufruf,
-// und `putAll('docs', ...)` faellt mit "ObjectStore not found" silent.
-// Der idempotente `contains(t)`-Guard im Loop legt nur Fehlendes an.
-const DB_VERSION = 2;
+// V2 ergaenzte den `docs`-Store. V3 ergaenzt den `invites`-Store fuer
+// die Phase-1-Settings/Members-Page. Der `contains(t)`-Guard im Loop
+// laesst V1/V2-Installs den fehlenden Store nachzugefuegt bekommen.
+const DB_VERSION = 3;
 
 let dbPromise: Promise<IDBPDatabase<MatrixCacheSchema>> | null = null;
 

@@ -26,7 +26,6 @@ import MatrixView from '../components/MatrixView';
 import NodeDescription from '../components/NodeDescription';
 import NodeTree from '../components/NodeTree';
 import PresenceStack from '../components/PresenceStack';
-import SettingsModal from '../components/SettingsModal';
 import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
 import { useAggregateView } from '../lib/aggregate-view';
 import { aliasChipMenuState, closeAliasChipMenu } from '../lib/alias-chip-menu';
@@ -152,7 +151,6 @@ const Workspace: Component = () => {
   const [showCommand, setShowCommand] = createSignal(false);
   const [showDocs, setShowDocs] = createSignal(false);
   const [showHelp, setShowHelp] = createSignal(false);
-  const [showSettings, setShowSettings] = createSignal(false);
   useSettingsBodyClassSync();
   // Callback, das die HeaderSearchBar beim Mount registriert — `f`-Keybind
   // benutzt es, um den Input zu fokussieren.
@@ -799,10 +797,6 @@ const Workspace: Component = () => {
         <KeyboardHelp onClose={() => setShowHelp(false)} />
       </Show>
 
-      <Show when={showSettings()}>
-        <SettingsModal onClose={() => setShowSettings(false)} />
-      </Show>
-
       <main class="ws-main">
         <Show when={currentWs()} fallback={<p class="hint">Workspace waehlen.</p>}>
           <header class="ws-main-header">
@@ -928,9 +922,13 @@ const Workspace: Component = () => {
             <button
               type="button"
               class="theme-toggle-btn"
-              onClick={() => setShowSettings(true)}
+              onClick={() => {
+                const wsId = params.workspaceId;
+                if (wsId) navigate(`/w/${wsId}/settings/account/visibility`);
+              }}
               title="Einstellungen"
               aria-label="Einstellungen"
+              disabled={!params.workspaceId}
             >
               <Icon name="cog" size={18} />
             </button>
