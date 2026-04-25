@@ -1,18 +1,20 @@
-// /invite/:token — Phase 1 (P1.A).
+// /invite/:token — Phase 1 (P1.A.3).
 //
 // Token aus URL ziehen, redeem_invite-RPC aufrufen, bei Erfolg in den
 // neu betretenen Workspace navigieren.
 //
-// Login-Flow: ohne Session bypassen wir hier den globalen Route-Guard
-// nicht (App.tsx wuerde das URL-Token wegspuelen). Wir merken uns den
-// Token in sessionStorage, schicken den User zu /login, und nach
-// erfolgreichem Magic-Link-Login fischt App.tsx den Token wieder
-// raus + navigiert hierher zurueck.
+// Login-Flow: ohne Session zeigen wir eine Inline-Magic-Link-Form, die
+// den Mail-Link mit emailRedirectTo=/app/invite/<token> ausstellt — der
+// Klick im Postfach landet damit direkt wieder hier, mit aktiver
+// Session, und der Redeem laeuft automatisch durch.
+//
+// Fallback fuer "User landet auf /login statt hier": wir merken den
+// Token in sessionStorage; App.tsx fischt ihn nach Login wieder raus.
 
 import { useNavigate, useParams } from '@solidjs/router';
-import { Show, createResource, onMount } from 'solid-js';
+import { Show, createResource, createSignal, onMount } from 'solid-js';
 import Icon from '../components/Icon';
-import { useSession } from '../lib/auth';
+import { signInWithMagicLink, useSession } from '../lib/auth';
 import { translateDbError } from '../lib/errors';
 import { redeemInvite, translateInviteError } from '../lib/invites';
 import { showToast } from '../lib/toasts';
@@ -24,17 +26,21 @@ const Invite = () => {
   const navigate = useNavigate();
   const session = useSession();
 
-  // Wenn ohne Session geoeffnet: Token zwischenparken + zu /login.
-  // App.tsx greift den Token nach Login wieder auf.
+  const [email, setEmail] = createSignal('');
+  const [magicStatus, setMagicStatus] = createSignal<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [magicError, setMagicError] = createSignal<string | null>(null);
+
+  // Token in sessionStorage zwischenparken — falls der User aus dem
+  // Mail-Link zwar logged-in zurueckkommt, aber irgendwann auf /login
+  // umgeleitet wurde, kann App.tsx den Token wiederfinden.
   onMount(() => {
-    if (!session() && params.token) {
+    if (params.token && !session()) {
       try {
         sessionStorage.setItem(PENDING_INVITE_KEY, params.token);
       } catch {
-        // sessionStorage gesperrt (Privacy-Mode) — User muss den Link
-        // nach Login neu klicken. Nicht fatal.
+        // sessionStorage gesperrt (Privacy-Mode) — User muss den Mail-
+        // Link halt erneut aus dem Postfach klicken. Nicht fatal.
       }
-      navigate('/login', { replace: true });
     }
   });
 
@@ -43,15 +49,12 @@ const Invite = () => {
     async (token) => {
       try {
         const res = await redeemInvite(token);
-        // Token aus Storage raeumen falls noch da.
         try {
           sessionStorage.removeItem(PENDING_INVITE_KEY);
         } catch {
           // ignore
         }
         showToast(`Workspace betreten als ${res.role}.`, 'success');
-        // Kurzer Delay, damit der Toast sichtbar ist, dann ab in den
-        // neuen Workspace.
         window.setTimeout(() => {
           navigate(`/w/${res.workspace_id}`, { replace: true });
         }, 600);
@@ -66,6 +69,24 @@ const Invite = () => {
       }
     },
   );
+
+  const sendMagicLink = async (e: Event) => {
+    e.preventDefault();
+    const v = email().trim();
+    if (!v) return;
+    setMagicStatus('sending');
+    setMagicError(null);
+    try {
+      // emailRedirectTo so setzen, dass der Mail-Link wieder hier landet.
+      // Token aus dem URL-Param uebernehmen; encodeURIComponent ist nicht
+      // noetig (urlsafe-base64 enthaelt nur a-zA-Z0-9_-).
+      await signInWithMagicLink(v, `invite/${params.token}`);
+      setMagicStatus('sent');
+    } catch (err) {
+      setMagicStatus('error');
+      setMagicError(err instanceof Error ? err.message : 'Unbekannter Fehler');
+    }
+  };
 
   return (
     <section class="invite-page">
@@ -111,14 +132,53 @@ const Invite = () => {
             </Show>
           }
         >
-          <div class="invite-state">
-            <Icon name="envelope" size={20} />
-            <h1>Login erforderlich</h1>
-            <p class="hint">
-              Um die Einladung anzunehmen, melde dich bitte an. Wir merken uns den Link automatisch
-              und nehmen die Einladung nach dem Login an.
-            </p>
-          </div>
+          <Show
+            when={magicStatus() === 'sent'}
+            fallback={
+              <div class="invite-state">
+                <Icon name="envelope" size={20} />
+                <h1>Einladung annehmen</h1>
+                <p class="hint">
+                  Trag deine E-Mail ein. Wir schicken dir einen Magic-Link, der dich direkt nach dem
+                  Klick im Postfach in den Workspace bringt.
+                </p>
+                <form class="invite-magic-form" onSubmit={(e) => void sendMagicLink(e)}>
+                  <label class="invite-form-field invite-form-field-grow">
+                    <span class="invite-form-label">E-Mail</span>
+                    <input
+                      type="email"
+                      class="invite-form-input"
+                      value={email()}
+                      onInput={(e) => setEmail(e.currentTarget.value)}
+                      placeholder="name@beispiel.at"
+                      autocomplete="email"
+                      required
+                      disabled={magicStatus() === 'sending'}
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    class="btn-c"
+                    disabled={magicStatus() === 'sending' || !email().trim()}
+                  >
+                    {magicStatus() === 'sending' ? 'Sende Link…' : 'Magic-Link senden'}
+                  </button>
+                  <Show when={magicStatus() === 'error' && magicError()}>
+                    <p class="error">{magicError()}</p>
+                  </Show>
+                </form>
+              </div>
+            }
+          >
+            <div class="invite-state invite-state-ok">
+              <Icon name="envelope" size={24} />
+              <h1>Mail gesendet</h1>
+              <p class="hint">
+                Postfach checken, Link klicken, fertig — du landest danach direkt im neuen
+                Workspace.
+              </p>
+            </div>
+          </Show>
         </Show>
       </div>
     </section>

@@ -53,10 +53,19 @@ export function useUser(): () => User | null {
   return () => session()?.user ?? null;
 }
 
-export async function signInWithMagicLink(email: string): Promise<void> {
+// Magic-Link senden. `redirectPath` (ohne fuehrenden Slash) wird an
+// SITE_URL angehaengt und an Supabase als emailRedirectTo uebergeben —
+// damit der Klick auf den Mail-Link direkt auf einer bestimmten Sub-
+// Route landet (z.B. invite/<token> fuer den Invite-Redeem-Flow). Ohne
+// redirectPath landet der Mail-Link auf SITE_URL (Default-Verhalten).
+//
+// SITE_URL endet immer mit '/', daher ein evtl. fuehrender Slash am
+// redirectPath wird gestrippt damit '//' nicht entstehen.
+export async function signInWithMagicLink(email: string, redirectPath?: string): Promise<void> {
+  const emailRedirectTo = redirectPath ? SITE_URL + redirectPath.replace(/^\/+/, '') : SITE_URL;
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: SITE_URL },
+    options: { emailRedirectTo },
   });
   if (error) throw error;
 }

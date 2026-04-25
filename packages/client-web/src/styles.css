@@ -6558,6 +6558,22 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   color: var(--red);
 }
 
+.invite-magic-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+  max-width: 320px;
+  align-self: stretch;
+  align-items: stretch;
+}
+.invite-magic-form .invite-form-field {
+  align-items: stretch;
+}
+.invite-magic-form .btn-c {
+  align-self: stretch;
+}
+
 /* ── btn-danger-subtle: leiserer destruktiver Style ──────── */
 .btn-danger-subtle {
   background: transparent;
