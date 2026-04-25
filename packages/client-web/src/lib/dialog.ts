@@ -135,3 +135,74 @@ export function showPrompt(opts: {
     resolve: () => {},
   });
 }
+
+// Focus-Trap fuer Modals (WCAG 2.1.2). Tab/Shift+Tab werden auf den
+// Container eingefangen — wer den letzten Focusable-Knoten verlaesst,
+// landet wieder auf dem ersten und umgekehrt. Ohne den Trap kann der
+// Browser-Default-Tab-Order in die Untergrund-UI durchsickern, was bei
+// einem aria-modal="true"-Dialog falsch ist.
+//
+// Selektor deckt die nativen Interaktiven plus alle Elemente mit
+// explizitem tabindex>=0. tabindex="-1" ist programmatisch fokussierbar
+// aber NICHT in der Tab-Reihenfolge — also korrekt ausgeschlossen.
+// disabled/hidden-Elemente sind durch :not(...) gefiltert; Visibility-
+// driven hidden (display:none) liefert offsetParent===null, das wird
+// in getFocusable() final geprueft.
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+  '[contenteditable="true"]',
+].join(',');
+
+function getFocusable(container: HTMLElement): HTMLElement[] {
+  const list = Array.from(
+    container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+  );
+  return list.filter((el) => {
+    if (el.hasAttribute('disabled')) return false;
+    if (el.getAttribute('aria-hidden') === 'true') return false;
+    // offsetParent ist null fuer display:none Elements (oder fixed-
+    // positioned, aber innerhalb eines Modals praktisch immer relevant
+    // gestyled). Reicht fuer unsere Modal-Struktur.
+    if (el.offsetParent === null && el.tagName !== 'BODY') return false;
+    return true;
+  });
+}
+
+export function installFocusTrap(container: HTMLElement): () => void {
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key !== 'Tab') return;
+    const focusables = getFocusable(container);
+    if (focusables.length === 0) {
+      // Keine fokussierbaren Knoten — Container selbst nehmen, damit
+      // der Fokus nicht in die Untergrund-UI rutscht.
+      e.preventDefault();
+      container.focus();
+      return;
+    }
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    const active = document.activeElement as HTMLElement | null;
+    // Edge-Case: Fokus liegt aktuell ausserhalb des Containers (z.B.
+    // weil ein Submit den Fokus verloren hat). Dann auf erstes Element
+    // zuruecksetzen.
+    if (!active || !container.contains(active)) {
+      e.preventDefault();
+      first.focus();
+      return;
+    }
+    if (e.shiftKey && active === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && active === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
+  container.addEventListener('keydown', onKeyDown);
+  return () => container.removeEventListener('keydown', onKeyDown);
+}

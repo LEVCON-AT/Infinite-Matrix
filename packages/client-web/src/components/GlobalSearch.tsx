@@ -270,6 +270,7 @@ const GlobalSearch: Component<Props> = (p) => {
       <div
         class="overlay-card global-search-card"
         role="dialog"
+        aria-modal="true"
         aria-label="Suche im Workspace"
       >
         <div class="global-search-head">

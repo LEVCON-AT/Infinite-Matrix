@@ -14,7 +14,7 @@ import {
   onMount,
   type Component,
 } from 'solid-js';
-import { dialogQueue, type DialogRequest } from '../lib/dialog';
+import { dialogQueue, installFocusTrap, type DialogRequest } from '../lib/dialog';
 import Icon from './Icon';
 
 const DialogHost: Component = () => {
@@ -35,6 +35,7 @@ const DialogHost: Component = () => {
 
   let primaryBtnRef: HTMLButtonElement | undefined;
   let promptInputRef: HTMLInputElement | undefined;
+  let cardRef: HTMLDivElement | undefined;
 
   // Fokus auf primary Button / Input beim Open. Micro-task-Defer, damit
   // das Element im DOM ist.
@@ -49,6 +50,16 @@ const DialogHost: Component = () => {
         primaryBtnRef.focus();
       }
     });
+  });
+
+  // Focus-Trap (WCAG 2.1.2). Wird pro Dialog (top-of-stack) installiert
+  // und beim Wechsel/Close wieder geloest. cardRef referenziert den
+  // dialog-card-Container, der die fokussierbaren Elemente umfasst.
+  createEffect(() => {
+    const d = top();
+    if (!d || !cardRef) return;
+    const cleanup = installFocusTrap(cardRef);
+    onCleanup(cleanup);
   });
 
   // ESC in Capture, um andere ESC-Handler nicht zu schlucken (die
@@ -109,6 +120,7 @@ const DialogHost: Component = () => {
             }}
           >
             <div
+              ref={cardRef}
               class="overlay-card dialog-card"
               role="dialog"
               aria-modal="true"

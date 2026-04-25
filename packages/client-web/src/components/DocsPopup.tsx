@@ -750,6 +750,7 @@ const DocsPopup: Component<Props> = (p) => {
       <div
         class="overlay-card docs-popup-card"
         role="dialog"
+        aria-modal="true"
         aria-label="Dokumentation"
       >
         <header class="docs-popup-head">

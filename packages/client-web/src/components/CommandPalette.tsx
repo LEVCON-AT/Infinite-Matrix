@@ -302,6 +302,7 @@ const CommandPalette: Component<Props> = (p) => {
       <div
         class="overlay-card command-palette-card"
         role="dialog"
+        aria-modal="true"
         aria-label="Command-Palette"
       >
         <Show when={!colPick()}>

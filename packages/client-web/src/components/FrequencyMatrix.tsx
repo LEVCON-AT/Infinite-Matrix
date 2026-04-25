@@ -244,7 +244,12 @@ const FrequencyMatrix: Component<Props> = (p) => {
               if (e.target === e.currentTarget) setFlyout(null);
             }}
           >
-            <div class="overlay-card freq-flyout-card" role="dialog">
+            <div
+              class="overlay-card freq-flyout-card"
+              role="dialog"
+              aria-modal="true"
+              aria-label={f().title}
+            >
               <header class="overlay-head">
                 <h3>{f().title}</h3>
                 <button
