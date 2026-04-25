@@ -144,6 +144,9 @@ jobs:
           # Daten, Storage) weggeputzt, die im Working-Tree liegen
           # aber nicht im Repo. Stattdessen gezielt nur untracked
           # Migrations-Files raeumen, die hier ueblicherweise stoeren.
+          # Lesson learned 2026-04-25: ein Pauschal-clean hat die
+          # komplette Postgres-Datenbank weggeputzt (siehe Memory-
+          # Eintrag feedback_no_pauschal_git_clean).
           ssh -i ~/.ssh/id_ed25519 "$USER@$HOST" bash -s <<'REMOTE'
             set -euo pipefail
             sudo git -C /opt/matrix-repo fetch --quiet origin main
