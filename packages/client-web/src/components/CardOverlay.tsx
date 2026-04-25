@@ -1098,7 +1098,8 @@ const CardOverlay: Component<Props> = (p) => {
                 rows="4"
                 autofocus
                 ref={(el) => {
-                  bindAliasAutocomplete(el, p.card.workspace_id);
+                  const cleanup = bindAliasAutocomplete(el, p.card.workspace_id);
+                  onCleanup(cleanup);
                   // Beim ersten Render nach Mode-Wechsel Fokus ans Ende.
                   queueMicrotask(() => {
                     try {

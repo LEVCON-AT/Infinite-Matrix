@@ -175,7 +175,10 @@ const ChecklistActionModal: Component<Props> = (p) => {
                 value={target()}
                 onInput={(e) => setTarget(e.currentTarget.value)}
                 placeholder="^alias"
-                ref={(el) => bindAliasAutocomplete(el, p.workspaceId)}
+                ref={(el) => {
+                  const cleanup = bindAliasAutocomplete(el, p.workspaceId);
+                  onCleanup(cleanup);
+                }}
               />
             </label>
           </Show>

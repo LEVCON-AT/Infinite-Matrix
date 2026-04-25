@@ -4,7 +4,7 @@
 // Aenderungen an Items sind struktur-aehnlich, nicht blosse Zustands-
 // Flips.
 
-import { For, Show, createEffect, createSignal, type Component } from 'solid-js';
+import { For, Show, createEffect, createSignal, onCleanup, type Component } from 'solid-js';
 import type {
   ChecklistCloseMode,
   ChecklistItemRow,
@@ -511,7 +511,10 @@ const ChecklistPanel: Component<Props> = (p) => {
                   value={it.text}
                   placeholder="(Punkt)"
                   tabIndex={0}
-                  ref={(el) => bindAliasAutocomplete(el, p.workspaceId)}
+                  ref={(el) => {
+                    const cleanup = bindAliasAutocomplete(el, p.workspaceId);
+                    onCleanup(cleanup);
+                  }}
                   onPaste={(e) => {
                     // Multi-line-Paste → Popup mit Parser-Vorschau.
                     // Single-line bleibt normaler Paste (kein preventDefault).

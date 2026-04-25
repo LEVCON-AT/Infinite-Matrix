@@ -13,7 +13,7 @@
 //     View-Mode deaktiviert (zero layout shift)
 //   - "+ Feld": nur sichtbar im Edit-Mode
 
-import { For, Show, createSignal, type Component } from 'solid-js';
+import { For, Show, createSignal, onCleanup, type Component } from 'solid-js';
 import type { CellRow, ColRow, InfoField, InfoLink, RowRow } from '../lib/types';
 import { useEditMode } from '../lib/edit-mode';
 import {
@@ -278,7 +278,10 @@ const CellInfoPage: Component<Props> = (p) => {
                     placeholder="(Wert eingeben)"
                     tabIndex={0}
                     rows={3}
-                    ref={(el) => bindAliasAutocomplete(el, p.workspaceId)}
+                    ref={(el) => {
+                      const cleanup = bindAliasAutocomplete(el, p.workspaceId);
+                      onCleanup(cleanup);
+                    }}
                     onBlur={(e) => onSetValue(f, e.currentTarget.value)}
                   />
                 </Show>

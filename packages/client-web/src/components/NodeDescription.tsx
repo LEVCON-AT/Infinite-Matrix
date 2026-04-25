@@ -6,7 +6,7 @@
 // Realtime: nodes.data mutiert -> postgres_changes.nodes feuert ->
 // Workspace refetcht nodes -> currentNode().data.description ist frisch.
 
-import { Show, createEffect, createSignal, type Component } from 'solid-js';
+import { Show, createEffect, createSignal, onCleanup, type Component } from 'solid-js';
 import type { NodeRow } from '../lib/types';
 import { useEditMode } from '../lib/edit-mode';
 import { setNodeDescription } from '../lib/mutations';
@@ -80,7 +80,8 @@ const NodeDescription: Component<Props> = (p) => {
           <textarea
             ref={(el) => {
               textareaRef = el;
-              bindAliasAutocomplete(el, p.node.workspace_id);
+              const cleanup = bindAliasAutocomplete(el, p.node.workspace_id);
+              onCleanup(cleanup);
             }}
             class="node-desc-input"
             placeholder="Beschreibung (Markdown: **bold**, *italic*, `code`, http-Links)…"

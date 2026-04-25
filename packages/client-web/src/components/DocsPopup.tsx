@@ -951,7 +951,8 @@ const DocsPopup: Component<Props> = (p) => {
                   <textarea
                     ref={(el) => {
                       contentRef = el;
-                      bindAliasAutocomplete(el, p.workspaceId);
+                      const cleanup = bindAliasAutocomplete(el, p.workspaceId);
+                      onCleanup(cleanup);
                     }}
                     class="docs-popup-content"
                     value={t().content}
