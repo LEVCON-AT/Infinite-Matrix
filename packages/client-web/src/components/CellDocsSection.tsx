@@ -13,17 +13,11 @@
 // Add-Buttons im Zell-Bereich). Die bestehenden Docs bleiben immer
 // sichtbar — schnelles Abrufen ist der Punkt dieser Sektion.
 
-import {
-  For,
-  Show,
-  createEffect,
-  createResource,
-  type Component,
-} from 'solid-js';
-import type { CellRow, DocRow } from '../lib/types';
-import { fetchDocsForCell } from '../lib/queries';
-import { useEditMode } from '../lib/edit-mode';
+import { type Component, For, Show, createEffect, createResource } from 'solid-js';
 import { openDocsPopup } from '../lib/docs-ui';
+import { useEditMode } from '../lib/edit-mode';
+import { fetchDocsForCell } from '../lib/queries';
+import type { CellRow, DocRow } from '../lib/types';
 
 type Props = {
   cell: CellRow;
@@ -101,12 +95,8 @@ const CellDocsSection: Component<Props> = (p) => {
                     }
                   }}
                 >
-                  <span class="cell-docs-date hint">
-                    {fmtDateShort(d.updated_at)}
-                  </span>
-                  <span class="cell-docs-item-title">
-                    {d.title || '(ohne Titel)'}
-                  </span>
+                  <span class="cell-docs-date hint">{fmtDateShort(d.updated_at)}</span>
+                  <span class="cell-docs-item-title">{d.title || '(ohne Titel)'}</span>
                   <Show when={d.alias}>
                     <span class="cell-docs-alias">^{d.alias}</span>
                   </Show>

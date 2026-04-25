@@ -1,19 +1,9 @@
-import {
-  For,
-  Show,
-  createMemo,
-  createSignal,
-  onCleanup,
-  onMount,
-  type Component,
-} from 'solid-js';
-import type {
-  BoardContent,
-  CardRecur,
-  CardRecurType,
-  InlineChecklistItem,
-  KbCardRow,
-} from '../lib/types';
+import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
+import { validateAlias } from '../lib/alias';
+import { showConfirm } from '../lib/dialog';
+import { openDocsPopup } from '../lib/docs-ui';
+import { translateDbError } from '../lib/errors';
+import { flashError } from '../lib/flash';
 import {
   addCardInlineItem,
   addChecklistItem,
@@ -46,11 +36,13 @@ import {
   toggleOccurrence,
 } from '../lib/recur';
 import { showToast } from '../lib/toasts';
-import { translateDbError } from '../lib/errors';
-import { flashError } from '../lib/flash';
-import { showConfirm } from '../lib/dialog';
-import { validateAlias } from '../lib/alias';
-import { openDocsPopup } from '../lib/docs-ui';
+import type {
+  BoardContent,
+  CardRecur,
+  CardRecurType,
+  InlineChecklistItem,
+  KbCardRow,
+} from '../lib/types';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 import AliasText from './AliasText';
 import Icon from './Icon';
@@ -255,7 +247,7 @@ const CardOverlay: Component<Props> = (p) => {
       startDate: typeof r.startDate === 'string' ? r.startDate : '',
       weekdays: Array.isArray(r.weekdays) ? r.weekdays : undefined,
       weekday: typeof r.weekday === 'number' ? r.weekday : undefined,
-      monthType: r.monthType === 'weekday' ? 'weekday' : (r.monthType === 'day' ? 'day' : undefined),
+      monthType: r.monthType === 'weekday' ? 'weekday' : r.monthType === 'day' ? 'day' : undefined,
       weekdayOrd: typeof r.weekdayOrd === 'number' ? r.weekdayOrd : undefined,
       day: typeof r.day === 'number' ? r.day : undefined,
       yearMonth: typeof r.yearMonth === 'number' ? r.yearMonth : undefined,
@@ -587,12 +579,7 @@ const CardOverlay: Component<Props> = (p) => {
               }
             }}
           />
-          <button
-            type="button"
-            class="overlay-close"
-            onClick={p.onClose}
-            aria-label="Schliessen"
-          >
+          <button type="button" class="overlay-close" onClick={p.onClose} aria-label="Schliessen">
             <Icon name="x" size={18} />
           </button>
         </header>
@@ -696,9 +683,7 @@ const CardOverlay: Component<Props> = (p) => {
               />
               <Show when={(p.card.tags ?? []).length > 0}>
                 <div class="overlay-chip-row">
-                  <For each={p.card.tags ?? []}>
-                    {(t) => <span class="kb-tag">#{t}</span>}
-                  </For>
+                  <For each={p.card.tags ?? []}>{(t) => <span class="kb-tag">#{t}</span>}</For>
                 </div>
               </Show>
             </label>
@@ -719,9 +704,7 @@ const CardOverlay: Component<Props> = (p) => {
               />
               <Show when={(p.card.who ?? []).length > 0}>
                 <div class="overlay-chip-row">
-                  <For each={p.card.who ?? []}>
-                    {(w) => <span class="kb-who">@{w}</span>}
-                  </For>
+                  <For each={p.card.who ?? []}>{(w) => <span class="kb-who">@{w}</span>}</For>
                 </div>
               </Show>
             </label>
@@ -734,9 +717,14 @@ const CardOverlay: Component<Props> = (p) => {
             <header class="card-recur-head">
               <h4>Wiederholung</h4>
               <Show when={recurVal().type !== 'none'}>
-                <span class="card-recur-summary" title={recurHumanLabel(recurVal()) + (recurEndLabel(recurVal()) ? ' · ' + recurEndLabel(recurVal()) : '')}>
-                  <Icon name="arrow-path" size={12} />
-                  {' '}{recurHumanLabel(recurVal())}
+                <span
+                  class="card-recur-summary"
+                  title={
+                    recurHumanLabel(recurVal()) +
+                    (recurEndLabel(recurVal()) ? ' · ' + recurEndLabel(recurVal()) : '')
+                  }
+                >
+                  <Icon name="arrow-path" size={12} /> {recurHumanLabel(recurVal())}
                   <Show when={recurEndLabel(recurVal())}>
                     {' '}
                     <span class="card-recur-end-hint">· {recurEndLabel(recurVal())}</span>
@@ -821,7 +809,17 @@ const CardOverlay: Component<Props> = (p) => {
                           classList={{ 'card-recur-weekday-on': isOn() }}
                           onClick={() => onRecurToggleWeekday(wd)}
                           aria-pressed={isOn()}
-                          title={['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'][wd]}
+                          title={
+                            [
+                              'Montag',
+                              'Dienstag',
+                              'Mittwoch',
+                              'Donnerstag',
+                              'Freitag',
+                              'Samstag',
+                              'Sonntag',
+                            ][wd]
+                          }
                         >
                           {lbl}
                         </button>
@@ -830,7 +828,9 @@ const CardOverlay: Component<Props> = (p) => {
                   </For>
                 </div>
                 <Show when={(recurVal().weekdays ?? []).length === 0}>
-                  <p class="card-recur-hint">Mindestens einen Wochentag waehlen, sonst feuert die Regel nie.</p>
+                  <p class="card-recur-hint">
+                    Mindestens einen Wochentag waehlen, sonst feuert die Regel nie.
+                  </p>
                 </Show>
               </div>
             </Show>
@@ -914,7 +914,22 @@ const CardOverlay: Component<Props> = (p) => {
                     value={recurVal().yearMonth ?? 0}
                     onChange={(e) => onRecurYearMonth(e.currentTarget.value)}
                   >
-                    <For each={['Januar', 'Februar', 'Maerz', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']}>
+                    <For
+                      each={[
+                        'Januar',
+                        'Februar',
+                        'Maerz',
+                        'April',
+                        'Mai',
+                        'Juni',
+                        'Juli',
+                        'August',
+                        'September',
+                        'Oktober',
+                        'November',
+                        'Dezember',
+                      ]}
+                    >
                       {(m, i) => <option value={i()}>{m}</option>}
                     </For>
                   </select>
@@ -1040,11 +1055,12 @@ const CardOverlay: Component<Props> = (p) => {
                     {(p.card.done_occurrences ?? []).length}
                     <Show when={recurVal().endCount && recurVal().endType === 'count'}>
                       /{recurVal().endCount}
-                    </Show>
-                    {' '}Termine
+                    </Show>{' '}
+                    Termine
                   </span>
                   <span class="card-recur-occ-last hint">
-                    zuletzt {new Date(
+                    zuletzt{' '}
+                    {new Date(
                       [...(p.card.done_occurrences ?? [])].sort().at(-1) as string,
                     ).toLocaleDateString('de-DE')}
                   </span>
@@ -1123,16 +1139,10 @@ const CardOverlay: Component<Props> = (p) => {
             <h4>
               Checkliste
               <Show when={refChecklistLabel()}>
-                <span class="hint">
-                  {' '}
-                  — Referenz auf „{refChecklistLabel()}"
-                </span>
+                <span class="hint"> — Referenz auf „{refChecklistLabel()}"</span>
               </Show>
             </h4>
-            <Show
-              when={items().length > 0}
-              fallback={<p class="hint">Noch keine Punkte.</p>}
-            >
+            <Show when={items().length > 0} fallback={<p class="hint">Noch keine Punkte.</p>}>
               <ul class="cl-items overlay-cl">
                 <For each={items()}>
                   {(it) => (
@@ -1146,9 +1156,7 @@ const CardOverlay: Component<Props> = (p) => {
                         class="cl-checkbox-input"
                         checked={it.done}
                         aria-label="Erledigt"
-                        onChange={(e) =>
-                          onToggleItem(it, e.currentTarget.checked)
-                        }
+                        onChange={(e) => onToggleItem(it, e.currentTarget.checked)}
                       />
                       <input
                         class="cl-text-input"
@@ -1178,12 +1186,7 @@ const CardOverlay: Component<Props> = (p) => {
                 </For>
               </ul>
             </Show>
-            <button
-              type="button"
-              class="cl-add-item-btn"
-              onClick={onAddItem}
-              disabled={busy()}
-            >
+            <button type="button" class="cl-add-item-btn" onClick={onAddItem} disabled={busy()}>
               + Punkt
             </button>
           </section>
@@ -1194,8 +1197,7 @@ const CardOverlay: Component<Props> = (p) => {
                 when={p.card.source_cl_id}
                 fallback={<>ehemals Checkliste „{p.card.source_label}"</>}
               >
-                stammt aus Checkliste-ID{' '}
-                <code>{p.card.source_cl_id}</code>
+                stammt aus Checkliste-ID <code>{p.card.source_cl_id}</code>
               </Show>
             </p>
           </Show>
@@ -1227,12 +1229,7 @@ const CardOverlay: Component<Props> = (p) => {
             >
               {p.card.archived ? 'Aus Archiv holen' : 'Archivieren'}
             </button>
-            <button
-              type="button"
-              class="btn-danger"
-              onClick={onDelete}
-              disabled={busy()}
-            >
+            <button type="button" class="btn-danger" onClick={onDelete} disabled={busy()}>
               Karte loeschen
             </button>
           </footer>

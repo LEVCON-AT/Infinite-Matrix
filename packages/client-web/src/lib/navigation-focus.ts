@@ -18,11 +18,7 @@ export type FocusCoord = {
 
 const [focusMap, setFocusMap] = createSignal<Map<string, FocusCoord>>(new Map());
 
-export function rememberFocus(
-  matrixId: string,
-  rowId: string,
-  colId: string,
-): void {
+export function rememberFocus(matrixId: string, rowId: string, colId: string): void {
   setFocusMap((prev) => {
     const next = new Map(prev);
     next.set(matrixId, { rowId, colId });

@@ -91,10 +91,7 @@ function sameDay(a: Date, b: Date): boolean {
   );
 }
 
-export function recurFiresOn(
-  r: RecurRule | null | undefined,
-  date: Date,
-): boolean {
+export function recurFiresOn(r: RecurRule | null | undefined, date: Date): boolean {
   if (!r || !r.type || r.type === 'none') return false;
 
   if (r.endType === 'date' && r.endDate) {
@@ -165,9 +162,7 @@ export function recurFiresOn(
     if (every === 1) return true;
     if (!r.startDate) return true;
     const sd = day0(r.startDate);
-    const mDiff =
-      (date.getFullYear() - sd.getFullYear()) * 12 +
-      (date.getMonth() - sd.getMonth());
+    const mDiff = (date.getFullYear() - sd.getFullYear()) * 12 + (date.getMonth() - sd.getMonth());
     return mDiff >= 0 && mDiff % every === 0;
   }
 
@@ -250,7 +245,20 @@ export function recurFiresInRange(
 //   yearly, yearMonth=3 day=24 → "jaehrlich am 24. Apr"
 const WD_SHORT = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 const WD_LONG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
-const MONTH_SHORT = ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+const MONTH_SHORT = [
+  'Jan',
+  'Feb',
+  'Mrz',
+  'Apr',
+  'Mai',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Okt',
+  'Nov',
+  'Dez',
+];
 const ORD_LABEL: Record<number, string> = {
   1: '1.',
   2: '2.',

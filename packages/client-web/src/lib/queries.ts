@@ -1,3 +1,6 @@
+import { isNetworkError } from './mutation-queue';
+import { getById, getByWorkspace, mergeRows, withCache } from './offline-cache';
+import { markCacheFallback, markLiveSuccess } from './offline-state';
 import { supabase } from './supabase';
 import type {
   BoardContent,
@@ -18,9 +21,6 @@ import type {
   TreeNode,
   WorkspaceWithRole,
 } from './types';
-import { getById, getByWorkspace, mergeRows, withCache } from './offline-cache';
-import { markCacheFallback, markLiveSuccess } from './offline-state';
-import { isNetworkError } from './mutation-queue';
 
 // ─── Workspaces ──────────────────────────────────────────────────
 // Gibt alle Workspaces zurueck, in denen der aktuelle User Mitglied ist.
@@ -148,10 +148,7 @@ export async function fetchCellsForWorkspace(workspaceId: string): Promise<CellR
 
 export async function fetchRowsForWorkspace(workspaceId: string): Promise<RowRow[]> {
   return cachedList<RowRow>('rows', workspaceId, async () => {
-    const { data, error } = await supabase
-      .from('rows')
-      .select('*')
-      .eq('workspace_id', workspaceId);
+    const { data, error } = await supabase.from('rows').select('*').eq('workspace_id', workspaceId);
     if (error) throw error;
     return (data ?? []) as RowRow[];
   });
@@ -159,10 +156,7 @@ export async function fetchRowsForWorkspace(workspaceId: string): Promise<RowRow
 
 export async function fetchColsForWorkspace(workspaceId: string): Promise<ColRow[]> {
   return cachedList<ColRow>('cols', workspaceId, async () => {
-    const { data, error } = await supabase
-      .from('cols')
-      .select('*')
-      .eq('workspace_id', workspaceId);
+    const { data, error } = await supabase.from('cols').select('*').eq('workspace_id', workspaceId);
     if (error) throw error;
     return (data ?? []) as ColRow[];
   });
@@ -220,11 +214,7 @@ export async function fetchMatrixContent(
         .eq('matrix_id', matrixId)
         .eq('workspace_id', workspaceId)
         .order('position', { ascending: true }),
-      supabase
-        .from('cells')
-        .select('*')
-        .eq('matrix_id', matrixId)
-        .eq('workspace_id', workspaceId),
+      supabase.from('cells').select('*').eq('matrix_id', matrixId).eq('workspace_id', workspaceId),
     ]);
 
     if (rowsRes.error) throw rowsRes.error;
@@ -421,40 +411,19 @@ export async function fetchCellChecklists(
 // Gibt true zurueck, wenn der Node weder strukturelle Kinder (rows/cols
 // bzw. kb_cols/kb_cards/checklists/links) hat. Ein leerer Sub-Node
 // kann ohne Rueckfrage geloescht werden — User hat nichts zu verlieren.
-export async function isNodeEmpty(
-  nodeId: string,
-  nodeType: 'matrix' | 'board',
-): Promise<boolean> {
+export async function isNodeEmpty(nodeId: string, nodeType: 'matrix' | 'board'): Promise<boolean> {
   if (nodeType === 'matrix') {
     const [r, c] = await Promise.all([
-      supabase
-        .from('rows')
-        .select('id', { head: true, count: 'exact' })
-        .eq('matrix_id', nodeId),
-      supabase
-        .from('cols')
-        .select('id', { head: true, count: 'exact' })
-        .eq('matrix_id', nodeId),
+      supabase.from('rows').select('id', { head: true, count: 'exact' }).eq('matrix_id', nodeId),
+      supabase.from('cols').select('id', { head: true, count: 'exact' }).eq('matrix_id', nodeId),
     ]);
     return (r.count ?? 0) === 0 && (c.count ?? 0) === 0;
   }
   const [cards, cols, cls, links] = await Promise.all([
-    supabase
-      .from('kb_cards')
-      .select('id', { head: true, count: 'exact' })
-      .eq('board_id', nodeId),
-    supabase
-      .from('kb_cols')
-      .select('id', { head: true, count: 'exact' })
-      .eq('board_id', nodeId),
-    supabase
-      .from('checklists')
-      .select('id', { head: true, count: 'exact' })
-      .eq('board_id', nodeId),
-    supabase
-      .from('links')
-      .select('id', { head: true, count: 'exact' })
-      .eq('board_id', nodeId),
+    supabase.from('kb_cards').select('id', { head: true, count: 'exact' }).eq('board_id', nodeId),
+    supabase.from('kb_cols').select('id', { head: true, count: 'exact' }).eq('board_id', nodeId),
+    supabase.from('checklists').select('id', { head: true, count: 'exact' }).eq('board_id', nodeId),
+    supabase.from('links').select('id', { head: true, count: 'exact' }).eq('board_id', nodeId),
   ]);
   return [cards, cols, cls, links].every((res) => (res.count ?? 0) === 0);
 }
@@ -565,8 +534,7 @@ export function buildSidebarTree(
     // InfoLinks haben keinen Typ-Discriminator (InfoLink hat nur
     // id/label/url). Wir derivieren url/mail aus dem Prefix; das ist
     // dieselbe Heuristik wie in der Link-Add-Eingabe.
-    const looksLikeMail =
-      l.url.includes('@') && !/^[a-z]+:\/\//i.test(l.url);
+    const looksLikeMail = l.url.includes('@') && !/^[a-z]+:\/\//i.test(l.url);
     return {
       kind: 'link',
       id: `link-info-${cellId}-${l.id}`,
@@ -615,9 +583,7 @@ export function buildSidebarTree(
     if (node.type === 'board' && linkTypes.size > 0) {
       const links = linksByBoardId.get(node.id) ?? [];
       const filtered = links.filter((l) => linkTypes.has(l.type));
-      (entry.children as TreeEntry[]).push(
-        ...filtered.map(linkEntryFromBoardLink),
-      );
+      (entry.children as TreeEntry[]).push(...filtered.map(linkEntryFromBoardLink));
       return entry;
     }
     if (node.type !== 'matrix') return entry;
@@ -644,12 +610,7 @@ export function buildSidebarTree(
     // Feature-Reihenfolge bewusst fix: matrix -> info -> board -> checklists.
     // So sieht jede Cell im Sidebar-Tree gleich strukturiert aus; User
     // entwickelt eine stabile Ortserwartung.
-    const FEATURE_ORDER: CellFeature[] = [
-      'matrix',
-      'info',
-      'board',
-      'checklists',
-    ];
+    const FEATURE_ORDER: CellFeature[] = ['matrix', 'info', 'board', 'checklists'];
 
     for (const { cell, row, col } of decorated) {
       const kids = childNodesByCell.get(cell.id) ?? [];
@@ -671,8 +632,7 @@ export function buildSidebarTree(
         showInfoLinks && features.includes('info')
           ? readCellInfoLinks(cell)
               .filter((l) => {
-                const looksLikeMail =
-                  l.url.includes('@') && !/^[a-z]+:\/\//i.test(l.url);
+                const looksLikeMail = l.url.includes('@') && !/^[a-z]+:\/\//i.test(l.url);
                 const t: 'url' | 'mail' = looksLikeMail ? 'mail' : 'url';
                 return linkTypes.has(t);
               })
@@ -730,11 +690,7 @@ export function buildSidebarTree(
         cell,
         rowLabel: row!.label || '(Zeile)',
         colLabel: col!.label || '(Spalte)',
-        children: [
-          ...docChildren,
-          ...featureChildren,
-          ...orphanKids.map(buildNode),
-        ],
+        children: [...docChildren, ...featureChildren, ...orphanKids.map(buildNode)],
       };
       (entry.children as TreeEntry[]).push(cellEntry);
     }
@@ -754,10 +710,7 @@ export function buildSidebarTree(
 // Laedt die n zuletzt geaenderten Docs (Recent-Liste im Popup).
 // Sort nach updated_at DESC, Limit einstellbar (default 20 — genug
 // fuer die sichtbare Recent-Sektion ohne Scroll).
-export async function fetchDocsRecent(
-  workspaceId: string,
-  limit = 20,
-): Promise<DocRow[]> {
+export async function fetchDocsRecent(workspaceId: string, limit = 20): Promise<DocRow[]> {
   try {
     const { data, error } = await supabase
       .from('docs')
@@ -781,10 +734,7 @@ export async function fetchDocsRecent(
 }
 
 // Einzel-Doc fetch — fuer Tab-Restore via ^alias.
-export async function fetchDocById(
-  docId: string,
-  workspaceId: string,
-): Promise<DocRow | null> {
+export async function fetchDocById(docId: string, workspaceId: string): Promise<DocRow | null> {
   try {
     const { data, error } = await supabase
       .from('docs')
@@ -810,10 +760,7 @@ export async function fetchDocById(
 // Cell-Info/Checklists-Pages — zeigt dem User "welche Dokus liegen
 // hier". Sort nach updated_at DESC (zuletzt geaenderte zuerst, wie
 // im Alt-Client-Vorbild).
-export async function fetchDocsForCell(
-  cellId: string,
-  workspaceId: string,
-): Promise<DocRow[]> {
+export async function fetchDocsForCell(cellId: string, workspaceId: string): Promise<DocRow[]> {
   try {
     const { data, error } = await supabase
       .from('docs')
@@ -832,9 +779,7 @@ export async function fetchDocsForCell(
     markCacheFallback();
     return all
       .filter((d) => d.attached_cell_id === cellId)
-      .sort((a, b) =>
-        (b.updated_at ?? '').localeCompare(a.updated_at ?? ''),
-      );
+      .sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''));
   }
 }
 
@@ -842,9 +787,7 @@ export async function fetchDocsForCell(
 // (SB.2) — wenn aktiv, haengen die Links unter dem jeweiligen
 // Board-Node. Erwartete Groesse: wenige hundert Rows, tragbar ohne
 // Paging.
-export async function fetchWorkspaceLinks(
-  workspaceId: string,
-): Promise<LinkRow[]> {
+export async function fetchWorkspaceLinks(workspaceId: string): Promise<LinkRow[]> {
   return cachedList<LinkRow>('links', workspaceId, async () => {
     const { data, error } = await supabase
       .from('links')
@@ -859,9 +802,7 @@ export async function fetchWorkspaceLinks(
 // Alle Dokus mit attached_cell_id im Workspace. Fuer den Sidebar-
 // Tree-Docs-Chip (SB.2) — Rendering haengt die Doc-Row unter die
 // passende Cell-Row.
-export async function fetchWorkspaceAttachedDocs(
-  workspaceId: string,
-): Promise<DocRow[]> {
+export async function fetchWorkspaceAttachedDocs(workspaceId: string): Promise<DocRow[]> {
   // Wir cachen workspace-weit (alle Docs), filtern dann lokal.
   // Lookups via fetchDocsForCell / fetchCellIdsWithDocs nutzen den
   // gleichen Cache, daher konsistent.
@@ -883,9 +824,7 @@ export async function fetchWorkspaceAttachedDocs(
     markCacheFallback();
     return all
       .filter((d) => d.attached_cell_id != null)
-      .sort((a, b) =>
-        (b.updated_at ?? '').localeCompare(a.updated_at ?? ''),
-      );
+      .sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''));
   }
 }
 
@@ -894,9 +833,7 @@ export async function fetchWorkspaceAttachedDocs(
 // filtern workspace-weit und deduplizieren client-seitig. Erwartete
 // Groesse: wenige hundert Rows selbst bei grossen Workspaces —
 // tragbar ohne Paging.
-export async function fetchCellIdsWithDocs(
-  workspaceId: string,
-): Promise<Set<string>> {
+export async function fetchCellIdsWithDocs(workspaceId: string): Promise<Set<string>> {
   try {
     const { data, error } = await supabase
       .from('docs')

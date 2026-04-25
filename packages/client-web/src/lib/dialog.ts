@@ -59,9 +59,7 @@ function nextId(): string {
 // Queue der aktiven Dialoge. Neue Dialoge kommen hinten rein; DialogHost
 // rendert das letzte Element (LIFO — so erscheint der neu geoeffnete
 // oben auf dem Stapel).
-const [queue, setQueue] = createSignal<Array<DialogRequest & { id: string }>>(
-  [],
-);
+const [queue, setQueue] = createSignal<Array<DialogRequest & { id: string }>>([]);
 
 export function dialogQueue() {
   return queue();
@@ -159,9 +157,7 @@ const FOCUSABLE_SELECTOR = [
 ].join(',');
 
 function getFocusable(container: HTMLElement): HTMLElement[] {
-  const list = Array.from(
-    container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
-  );
+  const list = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
   return list.filter((el) => {
     if (el.hasAttribute('disabled')) return false;
     if (el.getAttribute('aria-hidden') === 'true') return false;

@@ -4,11 +4,8 @@
 //
 // Vorbild: das `.aa-pop`-Popup im Alt-Client (Zeile 5207-5220).
 
-import { For, Show, createMemo, type Component } from 'solid-js';
-import {
-  aliasAutocompleteState,
-  commitAliasAutocomplete,
-} from '../lib/use-alias-autocomplete';
+import { type Component, For, Show, createMemo } from 'solid-js';
+import { aliasAutocompleteState, commitAliasAutocomplete } from '../lib/use-alias-autocomplete';
 
 // Feste Offsets: knapp unter dem Input, minimales Leading.
 const POPUP_GAP_PX = 4;

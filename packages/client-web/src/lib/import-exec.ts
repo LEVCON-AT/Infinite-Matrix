@@ -12,8 +12,8 @@
 // Fehler im Insert brechen ab und werfen — Teil-Importe bleiben. User bekommt
 // Toast, kann Workspace manuell bereinigen oder neu importieren.
 
-import { supabase } from './supabase';
 import type { ImportPlan } from './import-types';
+import { supabase } from './supabase';
 
 export type ImportProgressEvent = {
   step: string;
@@ -27,8 +27,7 @@ export class ImportExecError extends Error {
   public step: string;
   public cause: unknown;
   constructor(step: string, cause: unknown) {
-    const msg =
-      cause instanceof Error ? cause.message : JSON.stringify(cause);
+    const msg = cause instanceof Error ? cause.message : JSON.stringify(cause);
     super(`Import-Schritt "${step}" fehlgeschlagen: ${msg}`);
     this.name = 'ImportExecError';
     this.step = step;

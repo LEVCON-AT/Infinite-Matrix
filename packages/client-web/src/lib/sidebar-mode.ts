@@ -45,10 +45,13 @@ function saveMode(workspaceId: string, m: SidebarMode): void {
   }
 }
 
-const REGISTRY = new Map<string, {
-  mode: () => SidebarMode;
-  setMode: (v: SidebarMode) => void;
-}>();
+const REGISTRY = new Map<
+  string,
+  {
+    mode: () => SidebarMode;
+    setMode: (v: SidebarMode) => void;
+  }
+>();
 
 export function useSidebarMode(workspaceId: string) {
   let entry = REGISTRY.get(workspaceId);

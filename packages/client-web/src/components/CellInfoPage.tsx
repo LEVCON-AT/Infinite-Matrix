@@ -13,9 +13,13 @@
 //     View-Mode deaktiviert (zero layout shift)
 //   - "+ Feld": nur sichtbar im Edit-Mode
 
-import { For, Show, createSignal, onCleanup, type Component } from 'solid-js';
-import type { CellRow, ColRow, InfoField, InfoLink, RowRow } from '../lib/types';
+import { useNavigate } from '@solidjs/router';
+import { type Component, For, Show, createSignal, onCleanup } from 'solid-js';
+import { readCellLinksFromCell, readInfoFieldsFromCell } from '../lib/cell-data';
+import { showConfirm, showPrompt } from '../lib/dialog';
+import { openDocsPopup } from '../lib/docs-ui';
 import { useEditMode } from '../lib/edit-mode';
+import { translateDbError } from '../lib/errors';
 import {
   addCellInfoField,
   addCellLink,
@@ -28,19 +32,12 @@ import {
   setCellLinkLabel,
   setCellLinkUrl,
 } from '../lib/mutations';
-import {
-  readCellLinksFromCell,
-  readInfoFieldsFromCell,
-} from '../lib/cell-data';
-import { sanitizeUrl } from '../lib/url';
 import { showToast } from '../lib/toasts';
-import { translateDbError } from '../lib/errors';
-import { showConfirm, showPrompt } from '../lib/dialog';
-import CellDocsSection from './CellDocsSection';
-import { openDocsPopup } from '../lib/docs-ui';
+import type { CellRow, ColRow, InfoField, InfoLink, RowRow } from '../lib/types';
+import { sanitizeUrl } from '../lib/url';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 import AliasText from './AliasText';
-import { useNavigate } from '@solidjs/router';
+import CellDocsSection from './CellDocsSection';
 
 type Props = {
   workspaceId: string;
@@ -117,13 +114,12 @@ const CellInfoPage: Component<Props> = (p) => {
       showToast('URL ungueltig.', 'error');
       return;
     }
-    const label = (await showPrompt({
-      title: 'Bezeichnung',
-      message: 'Bezeichnung (optional):',
-    })) ?? '';
-    await wrap(() =>
-      addCellLink({ cellId: p.cell.id, label, url: clean }),
-    );
+    const label =
+      (await showPrompt({
+        title: 'Bezeichnung',
+        message: 'Bezeichnung (optional):',
+      })) ?? '';
+    await wrap(() => addCellLink({ cellId: p.cell.id, label, url: clean }));
   }
 
   async function onRenameLink(l: InfoLink, label: string) {
@@ -195,7 +191,7 @@ const CellInfoPage: Component<Props> = (p) => {
         fallback={
           <p class="hint">
             Keine Info-Felder.
-            <Show when={editMode()}>{' '}+ Feld unten.</Show>
+            <Show when={editMode()}> + Feld unten.</Show>
           </p>
         }
       >
@@ -262,10 +258,7 @@ const CellInfoPage: Component<Props> = (p) => {
                 <Show
                   when={editMode()}
                   fallback={
-                    <div
-                      class="info-val info-val-view"
-                      classList={{ 'info-val-empty': !f.value }}
-                    >
+                    <div class="info-val info-val-view" classList={{ 'info-val-empty': !f.value }}>
                       <Show when={f.value} fallback="(leer)">
                         <AliasText text={f.value} workspaceId={p.workspaceId} />
                       </Show>
@@ -309,7 +302,7 @@ const CellInfoPage: Component<Props> = (p) => {
           fallback={
             <p class="hint">
               Keine Links.
-              <Show when={editMode()}>{' '}+ Link unten.</Show>
+              <Show when={editMode()}> + Link unten.</Show>
             </p>
           }
         >

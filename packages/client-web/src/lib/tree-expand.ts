@@ -13,7 +13,7 @@ import { createEffect, createSignal } from 'solid-js';
 
 type State = {
   expanded: Set<string>; // Node-IDs, die aufgeklappt sind
-  all: boolean;          // Sticky "alles expanded"
+  all: boolean; // Sticky "alles expanded"
 };
 
 function storageKey(workspaceId: string): string {
@@ -48,10 +48,13 @@ function saveState(workspaceId: string, s: State): void {
 // Ein Signal-Paar pro Workspace. Mehrfach-Aufruf mit derselben ID
 // liefert denselben State-Speicher — so bleiben verschiedene
 // Komponenten (NodeTree, Shortcut-Handler) synchron.
-const REGISTRY = new Map<string, {
-  state: () => State;
-  setState: (v: State) => void;
-}>();
+const REGISTRY = new Map<
+  string,
+  {
+    state: () => State;
+    setState: (v: State) => void;
+  }
+>();
 
 export function useTreeExpand(workspaceId: string) {
   let entry = REGISTRY.get(workspaceId);

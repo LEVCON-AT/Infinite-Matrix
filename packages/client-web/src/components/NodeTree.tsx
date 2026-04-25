@@ -1,15 +1,22 @@
-import {
-  For,
-  Show,
-  createEffect,
-  createMemo,
-  createSignal,
-  type Component,
-} from 'solid-js';
-import { Dynamic } from 'solid-js/web';
 import { A, useNavigate } from '@solidjs/router';
-import type { CellFeature, CellRow, TreeEntry } from '../lib/types';
-import { useTreeExpand } from '../lib/tree-expand';
+import { type Component, For, Show, createEffect, createMemo, createSignal } from 'solid-js';
+import { Dynamic } from 'solid-js/web';
+import { cellTarget } from '../lib/alias-dispatch';
+import type { ParsedPasteItem } from '../lib/checklist-paste-parse';
+import { decryptPayload, isEncrypted } from '../lib/crypto';
+import { showChoice, showPrompt } from '../lib/dialog';
+import { openDocsPopup } from '../lib/docs-ui';
+import { useEditMode } from '../lib/edit-mode';
+import { translateDbError } from '../lib/errors';
+import {
+  type WorkspaceExport,
+  downloadSubtreeExport,
+  exportCellSubtree,
+  exportFeatureChecklists,
+  exportFeatureInfo,
+  exportSubtree,
+  summarizeExport,
+} from '../lib/export';
 import {
   addCellChecklist,
   addCellInfoField,
@@ -20,43 +27,29 @@ import {
   renameNode,
   updateCell,
 } from '../lib/mutations';
-import type { ParsedPasteItem } from '../lib/checklist-paste-parse';
-import { cellTarget } from '../lib/alias-dispatch';
-import { supabase } from '../lib/supabase';
-import { showToast } from '../lib/toasts';
-import { showChoice, showPrompt } from '../lib/dialog';
-import { translateDbError } from '../lib/errors';
-import { decryptPayload, isEncrypted } from '../lib/crypto';
-import { sanitizeUrl } from '../lib/url';
-import { useVis } from '../lib/settings';
-import { useEditMode } from '../lib/edit-mode';
-import { useSidebarChips } from '../lib/sidebar-chips';
-import { openDocsPopup } from '../lib/docs-ui';
-import {
-  downloadSubtreeExport,
-  exportCellSubtree,
-  exportFeatureChecklists,
-  exportFeatureInfo,
-  exportSubtree,
-  summarizeExport,
-  type WorkspaceExport,
-} from '../lib/export';
-import { runResetScope } from '../lib/workspace-reset';
 import { endProgress, startProgress } from '../lib/progress';
+import { useVis } from '../lib/settings';
+import { useSidebarChips } from '../lib/sidebar-chips';
 import {
+  ImportError,
+  type ImportMode,
+  type ImportTarget,
   checkTypeCompatibility,
   executeFeatureChecklistsImport,
   executeFeatureInfoImport,
   executeSubtreeImportIntoBoard,
   executeSubtreeImportIntoCell,
   executeSubtreeImportIntoMatrix,
-  ImportError,
   parseImportPayload,
-  type ImportMode,
-  type ImportTarget,
 } from '../lib/subtree-import';
-import ContextMenu, { type CtxMenuState } from './ContextMenu';
+import { supabase } from '../lib/supabase';
+import { showToast } from '../lib/toasts';
+import { useTreeExpand } from '../lib/tree-expand';
+import type { CellFeature, CellRow, TreeEntry } from '../lib/types';
+import { sanitizeUrl } from '../lib/url';
+import { runResetScope } from '../lib/workspace-reset';
 import ChecklistPastePopup from './ChecklistPastePopup';
+import ContextMenu, { type CtxMenuState } from './ContextMenu';
 import Icon, { type IconName } from './Icon';
 
 // Verschluesselter Export ueber Passphrase-Prompt. Wird vom Kontext-
@@ -85,10 +78,7 @@ async function runEncryptedExport(args: {
   try {
     const data = await args.getData();
     await downloadSubtreeExport(data, args.filenameLabel, { passphrase: pw });
-    showToast(
-      `Verschluesselt exportiert — ${summarizeExport(data)}`,
-      'success',
-    );
+    showToast(`Verschluesselt exportiert — ${summarizeExport(data)}`, 'success');
   } catch (err) {
     showToast(translateDbError(err), 'error');
   }
@@ -144,15 +134,7 @@ function dotColorFor(entry: TreeEntry): string {
 // .ln-<type>/.dot-<type>-CSS-Klassen in der tree-connections-Schicht.
 function dotTypeFor(
   entry: TreeEntry,
-):
-  | 'matrix'
-  | 'board'
-  | 'cell'
-  | 'info'
-  | 'checklists'
-  | 'link'
-  | 'mail'
-  | 'doc' {
+): 'matrix' | 'board' | 'cell' | 'info' | 'checklists' | 'link' | 'mail' | 'doc' {
   if (entry.kind === 'node') {
     return entry.node.type === 'matrix' ? 'matrix' : 'board';
   }
@@ -226,11 +208,7 @@ type FilterChip = 'matrix' | 'board' | 'cell';
 // qualifiziert, wenn BEIDES zutrifft (Text matcht UND Entry-Kind ist
 // im aktiven Set). Ancestors bleiben sichtbar, damit der Pfad sichtbar
 // ist; bei einem Self-Match zeigen wir den ganzen Subtree mit.
-function filterTree(
-  tree: TreeEntry[],
-  q: string,
-  chips: Set<FilterChip>,
-): TreeEntry[] {
+function filterTree(tree: TreeEntry[], q: string, chips: Set<FilterChip>): TreeEntry[] {
   if (!q && chips.size === 0) return tree;
   const query = q.toLowerCase();
 
@@ -319,8 +297,7 @@ const TreeItem: Component<{
   let rowRef: HTMLDivElement | undefined;
 
   const dotStyle = { background: dotColorFor(p.entry) };
-  const isBoard = () =>
-    p.entry.kind === 'node' && p.entry.node.type === 'board';
+  const isBoard = () => p.entry.kind === 'node' && p.entry.node.type === 'board';
 
   return (
     <li>
@@ -377,14 +354,14 @@ const TreeItem: Component<{
           </button>
         </Show>
         <Dynamic
-          component={
-            p.entry.kind === 'link' || p.entry.kind === 'doc' ? 'a' : A
-          }
-          href={
-            p.entry.kind === 'doc' ? '#' : hrefOf(p.workspaceId, p.entry)
-          }
+          component={p.entry.kind === 'link' || p.entry.kind === 'doc' ? 'a' : A}
+          href={p.entry.kind === 'doc' ? '#' : hrefOf(p.workspaceId, p.entry)}
           target={p.entry.kind === 'link' && p.entry.linkType === 'url' ? '_blank' : undefined}
-          rel={p.entry.kind === 'link' && p.entry.linkType === 'url' ? 'noopener noreferrer' : undefined}
+          rel={
+            p.entry.kind === 'link' && p.entry.linkType === 'url'
+              ? 'noopener noreferrer'
+              : undefined
+          }
           onClick={
             p.entry.kind === 'doc'
               ? (e: MouseEvent) => {
@@ -450,11 +427,7 @@ const TreeItem: Component<{
           <span class="tree-label">
             <For each={highlightLabel(labelOf(p.entry), p.query)}>
               {(part) =>
-                typeof part === 'string' ? (
-                  <>{part}</>
-                ) : (
-                  <mark class="tree-match">{part.m}</mark>
-                )
+                typeof part === 'string' ? <>{part}</> : <mark class="tree-match">{part.m}</mark>
               }
             </For>
           </span>
@@ -503,9 +476,7 @@ const NodeTree: Component<Props> = (props) => {
   // Paste-Dialog-State: wenn gesetzt, wird ChecklistPastePopup fuer das
   // Anlegen einer neuen Checkliste geoeffnet. Ausgeloest durch Ctrl+V
   // auf einer Checklists-Feature-Row.
-  const [pasteTarget, setPasteTarget] = createSignal<
-    { cellId: string; text: string } | null
-  >(null);
+  const [pasteTarget, setPasteTarget] = createSignal<{ cellId: string; text: string } | null>(null);
   // Settings-Gates fuer Kontextmenue-Eintraege. useVis reagiert auf
   // Edit-Mode + vis-Key — so greifen die Menu-Items automatisch, wenn
   // der User per Settings-Modal toggelt.
@@ -517,10 +488,7 @@ const NodeTree: Component<Props> = (props) => {
   // Zentraler Mutation-Wrapper: Toast bei Erfolg/Fehler, onChanged-
   // Propagation, optionales success-Label. Kapselt die 4-Zeilen-try-
   // catch-Idiom, die in jedem Menu-Onclick auftauchen wuerde.
-  async function runMenuMutation<T>(
-    fn: () => Promise<T>,
-    successMsg?: string,
-  ): Promise<void> {
+  async function runMenuMutation<T>(fn: () => Promise<T>, successMsg?: string): Promise<void> {
     try {
       await fn();
       if (successMsg) showToast(successMsg, 'success');
@@ -533,10 +501,7 @@ const NodeTree: Component<Props> = (props) => {
   // Feature-Flag auf der Cell anheben, falls nicht schon gesetzt.
   // Wird vom + Feld / + Checkliste / + Link-Flow benutzt, damit der
   // User nicht vorher separat das Feature einschalten muss.
-  async function ensureCellFeature(
-    cell: CellRow,
-    feature: CellFeature,
-  ): Promise<void> {
+  async function ensureCellFeature(cell: CellRow, feature: CellFeature): Promise<void> {
     const current = (cell.features ?? []) as CellFeature[];
     if (current.includes(feature)) return;
     await updateCell(cell.id, { features: [...current, feature] });
@@ -633,30 +598,64 @@ const NodeTree: Component<Props> = (props) => {
       // Phase-Updates kommen aus den Executor-Funktionen selbst.
       startProgress('Import laeuft…');
       try {
-      if (target.kind === 'matrix') {
-        await runMenuMutation(
-          () =>
-            executeSubtreeImportIntoMatrix({
-              payload,
-              workspaceId: props.workspaceId,
-              targetMatrixId: target.matrixNodeId,
-              mode,
-            }).then(() => undefined),
-          `Matrix-Import: ${summary}`,
-        );
-      } else if (target.kind === 'board') {
-        await runMenuMutation(
-          () =>
-            executeSubtreeImportIntoBoard({
-              payload,
-              workspaceId: props.workspaceId,
-              targetBoardId: target.boardNodeId,
-              mode,
-            }).then(() => undefined),
-          `Board-Import: ${summary}`,
-        );
-      } else if (target.kind === 'cell') {
-        if (payload.payloadType === 'feature-info') {
+        if (target.kind === 'matrix') {
+          await runMenuMutation(
+            () =>
+              executeSubtreeImportIntoMatrix({
+                payload,
+                workspaceId: props.workspaceId,
+                targetMatrixId: target.matrixNodeId,
+                mode,
+              }).then(() => undefined),
+            `Matrix-Import: ${summary}`,
+          );
+        } else if (target.kind === 'board') {
+          await runMenuMutation(
+            () =>
+              executeSubtreeImportIntoBoard({
+                payload,
+                workspaceId: props.workspaceId,
+                targetBoardId: target.boardNodeId,
+                mode,
+              }).then(() => undefined),
+            `Board-Import: ${summary}`,
+          );
+        } else if (target.kind === 'cell') {
+          if (payload.payloadType === 'feature-info') {
+            await runMenuMutation(
+              () =>
+                executeFeatureInfoImport({
+                  payload,
+                  workspaceId: props.workspaceId,
+                  targetCellId: target.cellId,
+                  mode,
+                }).then(() => undefined),
+              `Info-Import: ${summary}`,
+            );
+          } else if (payload.payloadType === 'feature-checklists') {
+            await runMenuMutation(
+              () =>
+                executeFeatureChecklistsImport({
+                  payload,
+                  workspaceId: props.workspaceId,
+                  targetCellId: target.cellId,
+                  mode,
+                }).then(() => undefined),
+              `Checklisten-Import: ${summary}`,
+            );
+          } else {
+            await runMenuMutation(
+              () =>
+                executeSubtreeImportIntoCell({
+                  payload,
+                  workspaceId: props.workspaceId,
+                  targetCellId: target.cellId,
+                  mode,
+                }).then(() => undefined),
+              `Subtree-Import: ${summary}`,
+            );
+          }
+        } else if (target.kind === 'feature-info') {
           await runMenuMutation(
             () =>
               executeFeatureInfoImport({
@@ -667,7 +666,7 @@ const NodeTree: Component<Props> = (props) => {
               }).then(() => undefined),
             `Info-Import: ${summary}`,
           );
-        } else if (payload.payloadType === 'feature-checklists') {
+        } else if (target.kind === 'feature-checklists') {
           await runMenuMutation(
             () =>
               executeFeatureChecklistsImport({
@@ -678,41 +677,7 @@ const NodeTree: Component<Props> = (props) => {
               }).then(() => undefined),
             `Checklisten-Import: ${summary}`,
           );
-        } else {
-          await runMenuMutation(
-            () =>
-              executeSubtreeImportIntoCell({
-                payload,
-                workspaceId: props.workspaceId,
-                targetCellId: target.cellId,
-                mode,
-              }).then(() => undefined),
-            `Subtree-Import: ${summary}`,
-          );
         }
-      } else if (target.kind === 'feature-info') {
-        await runMenuMutation(
-          () =>
-            executeFeatureInfoImport({
-              payload,
-              workspaceId: props.workspaceId,
-              targetCellId: target.cellId,
-              mode,
-            }).then(() => undefined),
-          `Info-Import: ${summary}`,
-        );
-      } else if (target.kind === 'feature-checklists') {
-        await runMenuMutation(
-          () =>
-            executeFeatureChecklistsImport({
-              payload,
-              workspaceId: props.workspaceId,
-              targetCellId: target.cellId,
-              mode,
-            }).then(() => undefined),
-          `Checklisten-Import: ${summary}`,
-        );
-      }
       } finally {
         endProgress();
       }
@@ -790,27 +755,27 @@ const NodeTree: Component<Props> = (props) => {
     }
   }
 
-  async function commitPastedChecklist(
-    cellId: string,
-    parsed: ParsedPasteItem[],
-  ): Promise<void> {
+  async function commitPastedChecklist(cellId: string, parsed: ParsedPasteItem[]): Promise<void> {
     if (parsed.length === 0) {
       setPasteTarget(null);
       return;
     }
-    await runMenuMutation(async () => {
-      const label = parsed[0]?.text?.slice(0, 60) || 'Aus Zwischenablage';
-      const cl = await addCellChecklist({
-        workspaceId: props.workspaceId,
-        cellId,
-        label,
-      });
-      await bulkAddChecklistItems({
-        workspaceId: props.workspaceId,
-        checklistId: cl.id,
-        items: parsed.map((it) => ({ text: it.text, level: it.level })),
-      });
-    }, `Checkliste mit ${parsed.length} ${parsed.length === 1 ? 'Punkt' : 'Punkten'} angelegt.`);
+    await runMenuMutation(
+      async () => {
+        const label = parsed[0]?.text?.slice(0, 60) || 'Aus Zwischenablage';
+        const cl = await addCellChecklist({
+          workspaceId: props.workspaceId,
+          cellId,
+          label,
+        });
+        await bulkAddChecklistItems({
+          workspaceId: props.workspaceId,
+          checklistId: cl.id,
+          items: parsed.map((it) => ({ text: it.text, level: it.level })),
+        });
+      },
+      `Checkliste mit ${parsed.length} ${parsed.length === 1 ? 'Punkt' : 'Punkten'} angelegt.`,
+    );
     setPasteTarget(null);
   }
   let inputRef: HTMLInputElement | undefined;
@@ -851,9 +816,7 @@ const NodeTree: Component<Props> = (props) => {
     svgRef.style.left = `${rootUl.offsetLeft}px`;
 
     const rootRect = rootUl.getBoundingClientRect();
-    const rows = Array.from(
-      scrollRef.querySelectorAll<HTMLElement>('.tree-row'),
-    );
+    const rows = Array.from(scrollRef.querySelectorAll<HTMLElement>('.tree-row'));
 
     type Meta = {
       cx: number;
@@ -877,7 +840,7 @@ const NodeTree: Component<Props> = (props) => {
       const id = el.dataset.treeId;
       if (!id) return;
       const parent = el.dataset.treeParent || '';
-      const depth = parseInt(el.dataset.treeDepth || '0', 10);
+      const depth = Number.parseInt(el.dataset.treeDepth || '0', 10);
       const dotType = el.dataset.dotType || 'matrix';
       const r = el.getBoundingClientRect();
       const cx = depth * INDENT + ORIGIN_X;
@@ -893,9 +856,9 @@ const NodeTree: Component<Props> = (props) => {
       const kids = byParent.get(nodeId);
       if (!kids || kids.length === 0) {
         const m = meta.get(nodeId);
-        return m ? m.cy : -Infinity;
+        return m ? m.cy : Number.NEGATIVE_INFINITY;
       }
-      let maxY = -Infinity;
+      let maxY = Number.NEGATIVE_INFINITY;
       for (const cid of kids) {
         const y = lastDescendantCy(cid);
         if (y > maxY) maxY = y;
@@ -961,8 +924,7 @@ const NodeTree: Component<Props> = (props) => {
     setDragOverBoardId(null);
     if (!e.dataTransfer) return;
     const cardId =
-      e.dataTransfer.getData('text/matrix-card-id') ||
-      e.dataTransfer.getData('text/plain');
+      e.dataTransfer.getData('text/matrix-card-id') || e.dataTransfer.getData('text/plain');
     if (!cardId) return;
 
     try {
@@ -977,9 +939,7 @@ const NodeTree: Component<Props> = (props) => {
           .limit(1),
       ]);
       if (colsRes.error) throw colsRes.error;
-      const firstCol = (colsRes.data ?? [])[0] as
-        | { id: string; position: number }
-        | undefined;
+      const firstCol = (colsRes.data ?? [])[0] as { id: string; position: number } | undefined;
       if (!firstCol) {
         showToast('Ziel-Board hat keine Spalte.', 'error');
         return;
@@ -1021,9 +981,7 @@ const NodeTree: Component<Props> = (props) => {
     expand.seedIfFresh(roots.map((r) => r.id));
   });
 
-  const filtered = createMemo(() =>
-    filterTree(props.tree, query().trim(), chips()),
-  );
+  const filtered = createMemo(() => filterTree(props.tree, query().trim(), chips()));
 
   // Active-Path: Set aller Ancestor-IDs, die zur currentNodeId fuehren.
   // Wird im TreeItem benutzt, um Pfad zur aktiven Node automatisch
@@ -1111,7 +1069,7 @@ const NodeTree: Component<Props> = (props) => {
             void (async () => {
               try {
                 const data = await exportSubtree(entry.id, props.workspaceId);
-                await downloadSubtreeExport(data,entry.node.label);
+                await downloadSubtreeExport(data, entry.node.label);
                 showToast(`Export geladen — ${summarizeExport(data)}`, 'success');
               } catch (err) {
                 showToast(translateDbError(err), 'error');
@@ -1187,7 +1145,7 @@ const NodeTree: Component<Props> = (props) => {
               label: entry.node.label,
               exportFn: async () => {
                 const data = await exportSubtree(entry.id, props.workspaceId);
-                await downloadSubtreeExport(data,entry.node.label);
+                await downloadSubtreeExport(data, entry.node.label);
               },
               deleteFn: () => deleteNode(entry.id),
               successMsg: `"${entry.node.label}" geloescht.`,
@@ -1282,15 +1240,9 @@ const NodeTree: Component<Props> = (props) => {
           onClick: () => {
             void (async () => {
               try {
-                const data = await exportCellSubtree(
-                  cell.id,
-                  props.workspaceId,
-                );
-                await downloadSubtreeExport(data,labelGuess);
-                showToast(
-                  `Export geladen — ${summarizeExport(data)}`,
-                  'success',
-                );
+                const data = await exportCellSubtree(cell.id, props.workspaceId);
+                await downloadSubtreeExport(data, labelGuess);
+                showToast(`Export geladen — ${summarizeExport(data)}`, 'success');
               } catch (err) {
                 showToast(translateDbError(err), 'error');
               }
@@ -1372,10 +1324,7 @@ const NodeTree: Component<Props> = (props) => {
           label: '+ Feld',
           icon: '+',
           onClick: () => {
-            void runMenuMutation(
-              () => addCellInfoField({ cellId }),
-              'Feld angelegt.',
-            );
+            void runMenuMutation(() => addCellInfoField({ cellId }), 'Feld angelegt.');
           },
         });
         items.push({
@@ -1452,15 +1401,9 @@ const NodeTree: Component<Props> = (props) => {
                 const data =
                   entry.feature === 'info'
                     ? await exportFeatureInfo(cellId, props.workspaceId)
-                    : await exportFeatureChecklists(
-                        cellId,
-                        props.workspaceId,
-                      );
-                await downloadSubtreeExport(data,entry.feature);
-                showToast(
-                  `Export geladen — ${summarizeExport(data)}`,
-                  'success',
-                );
+                    : await exportFeatureChecklists(cellId, props.workspaceId);
+                await downloadSubtreeExport(data, entry.feature);
+                showToast(`Export geladen — ${summarizeExport(data)}`, 'success');
               } catch (err) {
                 showToast(translateDbError(err), 'error');
               }
@@ -1506,9 +1449,7 @@ const NodeTree: Component<Props> = (props) => {
                 });
                 if (ran) {
                   showToast(
-                    entry.feature === 'info'
-                      ? 'Info-Felder geleert.'
-                      : 'Checklisten geleert.',
+                    entry.feature === 'info' ? 'Info-Felder geleert.' : 'Checklisten geleert.',
                     'success',
                   );
                   props.onChanged?.();
@@ -1562,9 +1503,7 @@ const NodeTree: Component<Props> = (props) => {
     // Alle sichtbaren tree-links in DOM-Reihenfolge sammeln.
     const container = link.closest('.tree-root');
     if (!container) return;
-    const links = Array.from(
-      container.querySelectorAll<HTMLElement>('.tree-link'),
-    );
+    const links = Array.from(container.querySelectorAll<HTMLElement>('.tree-link'));
     const idx = links.indexOf(link);
     if (idx < 0) return;
 
@@ -1617,14 +1556,14 @@ const NodeTree: Component<Props> = (props) => {
       // Bereits geschlossen / Leaf: Fokus auf den Parent-Link. Den
       // finden wir ueber .closest('li').parentElement ... aber einfacher:
       // der naeheste vorherige Link mit niedrigerer Einrueckung.
-      const linkDepth = parseInt(
+      const linkDepth = Number.parseInt(
         link.closest<HTMLElement>('.tree-row')?.style.paddingLeft || '0',
         10,
       );
       for (let j = idx - 1; j >= 0; j--) {
         const r = links[j].closest<HTMLElement>('.tree-row');
         if (!r) continue;
-        const rd = parseInt(r.style.paddingLeft || '0', 10);
+        const rd = Number.parseInt(r.style.paddingLeft || '0', 10);
         if (rd < linkDepth) {
           e.preventDefault();
           links[j].focus();
@@ -1723,45 +1662,45 @@ const NodeTree: Component<Props> = (props) => {
         </button>
       </div>
       <div class="node-tree-scroll" ref={scrollRef}>
-      <svg
-        class="tree-connections"
-        ref={svgRef}
-        xmlns="http://www.w3.org/2000/svg"
-        aria-hidden="true"
-      />
-      <Show
-        when={filtered().length > 0}
-        fallback={
-          <div class="tree-empty">
-            <Show when={query()} fallback={<>Keine Elemente.</>}>
-              Keine Treffer.
-            </Show>
-          </div>
-        }
-      >
-        <ul class="tree-root" onKeyDown={handleTreeKeyDown}>
-          <For each={filtered()}>
-            {(entry) => (
-              <TreeItem
-                workspaceId={props.workspaceId}
-                entry={entry}
-                currentNodeId={props.currentNodeId}
-                currentFeature={props.currentFeature}
-                depth={0}
-                expand={expand}
-                query={query().trim()}
-                activePath={activePath()}
-                openMenu={openMenu}
-                onPasteChecklist={triggerPasteForCell}
-                dragOverBoardId={dragOverBoardId}
-                onCardDragOver={onCardDragOver}
-                onCardDragLeave={onCardDragLeave}
-                onCardDrop={onCardDrop}
-              />
-            )}
-          </For>
-        </ul>
-      </Show>
+        <svg
+          class="tree-connections"
+          ref={svgRef}
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+        />
+        <Show
+          when={filtered().length > 0}
+          fallback={
+            <div class="tree-empty">
+              <Show when={query()} fallback={<>Keine Elemente.</>}>
+                Keine Treffer.
+              </Show>
+            </div>
+          }
+        >
+          <ul class="tree-root" onKeyDown={handleTreeKeyDown}>
+            <For each={filtered()}>
+              {(entry) => (
+                <TreeItem
+                  workspaceId={props.workspaceId}
+                  entry={entry}
+                  currentNodeId={props.currentNodeId}
+                  currentFeature={props.currentFeature}
+                  depth={0}
+                  expand={expand}
+                  query={query().trim()}
+                  activePath={activePath()}
+                  openMenu={openMenu}
+                  onPasteChecklist={triggerPasteForCell}
+                  dragOverBoardId={dragOverBoardId}
+                  onCardDragOver={onCardDragOver}
+                  onCardDragLeave={onCardDragLeave}
+                  onCardDrop={onCardDrop}
+                />
+              )}
+            </For>
+          </ul>
+        </Show>
       </div>
       <ContextMenu state={ctxMenu()} onClose={() => setCtxMenu(null)} />
       {/* Hidden file-input fuer Subtree/Feature-Import. Wird per
@@ -1784,7 +1723,8 @@ const NodeTree: Component<Props> = (props) => {
             if (!t) return;
             await commitPastedChecklist(t.cellId, parsed);
           }}
-        /></Show>
+        />
+      </Show>
     </div>
   );
 };

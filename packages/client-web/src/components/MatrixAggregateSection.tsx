@@ -8,14 +8,7 @@
 // (inkl. Sub-Matrix + Boards) aktive Karten gibt. Leere Matrizen
 // sehen die Sektion nicht — spart Platz und Visual-Noise.
 
-import {
-  For,
-  Show,
-  createMemo,
-  createResource,
-  type Component,
-} from 'solid-js';
-import type { CellRow, ColRow, NodeRow, RowRow } from '../lib/types';
+import { type Component, For, Show, createMemo, createResource } from 'solid-js';
 import {
   buildFrequencyAggregates,
   collectBoardIdsInMatrixTree,
@@ -23,6 +16,7 @@ import {
 } from '../lib/aggregate';
 import { useAggregateView } from '../lib/aggregate-view';
 import { fetchCardsForBoards } from '../lib/queries';
+import type { CellRow, ColRow, NodeRow, RowRow } from '../lib/types';
 import FrequencyMatrix from './FrequencyMatrix';
 import TaskOverview from './TaskOverview';
 
@@ -68,9 +62,7 @@ const MatrixAggregateSection: Component<Props> = (p) => {
     },
   );
 
-  const activeCount = createMemo(
-    () => (cards() ?? []).filter(isFreqCardActive).length,
-  );
+  const activeCount = createMemo(() => (cards() ?? []).filter(isFreqCardActive).length);
 
   const aggregates = createMemo(() => {
     const list = cards();
@@ -99,11 +91,7 @@ const MatrixAggregateSection: Component<Props> = (p) => {
     <Show when={activeCount() > 0}>
       <section class="matrix-aggregate">
         <header class="matrix-aggregate-head">
-          <div
-            class="matrix-aggregate-tabs"
-            role="tablist"
-            aria-label="Aggregat-Ansicht"
-          >
+          <div class="matrix-aggregate-tabs" role="tablist" aria-label="Aggregat-Ansicht">
             <For each={['overview', 'freq'] as const}>
               {(key) => (
                 <button

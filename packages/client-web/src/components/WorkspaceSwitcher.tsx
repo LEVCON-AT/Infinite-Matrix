@@ -1,14 +1,6 @@
-import {
-  For,
-  Show,
-  createMemo,
-  createSignal,
-  onCleanup,
-  onMount,
-  type Component,
-} from 'solid-js';
-import { Portal } from 'solid-js/web';
 import { useNavigate } from '@solidjs/router';
+import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
+import { Portal } from 'solid-js/web';
 import type { WorkspaceWithRole } from '../lib/types';
 import Icon from './Icon';
 
@@ -127,11 +119,7 @@ const WorkspaceSwitcher: Component<Props> = (props) => {
           <Show when={current()}>
             <span class="ws-role">{roleLabel[current()!.role]}</span>
           </Show>
-          <Icon
-            name={open() ? 'chevron-up' : 'chevron-down'}
-            size={14}
-            class="ws-switcher-chev"
-          />
+          <Icon name={open() ? 'chevron-up' : 'chevron-down'} size={14} class="ws-switcher-chev" />
         </button>
         <Show when={open() && pos()}>
           <Portal mount={document.body}>

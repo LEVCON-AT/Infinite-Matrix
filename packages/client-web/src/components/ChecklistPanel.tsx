@@ -4,13 +4,15 @@
 // Aenderungen an Items sind struktur-aehnlich, nicht blosse Zustands-
 // Flips.
 
-import { For, Show, createEffect, createSignal, onCleanup, type Component } from 'solid-js';
-import type {
-  ChecklistCloseMode,
-  ChecklistItemRow,
-  ChecklistRow,
-} from '../lib/types';
+import { useNavigate } from '@solidjs/router';
+import { type Component, For, Show, createEffect, createSignal, onCleanup } from 'solid-js';
+import { validateAlias } from '../lib/alias';
+import { executeChecklistAction, parseChecklistAction } from '../lib/checklist-action';
+import type { ParsedPasteItem } from '../lib/checklist-paste-parse';
+import { showConfirm } from '../lib/dialog';
 import { useEditMode } from '../lib/edit-mode';
+import { translateDbError } from '../lib/errors';
+import { flashError } from '../lib/flash';
 import {
   addChecklistItem,
   applyChecklistClose,
@@ -31,18 +33,12 @@ import {
   toggleChecklistItemDone,
 } from '../lib/mutations';
 import { showToast, showUndoToast } from '../lib/toasts';
-import { translateDbError } from '../lib/errors';
-import { flashError } from '../lib/flash';
-import { validateAlias } from '../lib/alias';
-import { showConfirm } from '../lib/dialog';
+import type { ChecklistCloseMode, ChecklistItemRow, ChecklistRow } from '../lib/types';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 import AliasText from './AliasText';
-import ChecklistPastePopup from './ChecklistPastePopup';
-import type { ParsedPasteItem } from '../lib/checklist-paste-parse';
-import ChecklistToCardPopup from './ChecklistToCardPopup';
 import ChecklistActionModal from './ChecklistActionModal';
-import { executeChecklistAction, parseChecklistAction } from '../lib/checklist-action';
-import { useNavigate } from '@solidjs/router';
+import ChecklistPastePopup from './ChecklistPastePopup';
+import ChecklistToCardPopup from './ChecklistToCardPopup';
 import Icon from './Icon';
 
 type Props = {
@@ -130,20 +126,17 @@ const ChecklistPanel: Component<Props> = (p) => {
     const clSnap = { ...p.checklist };
     const itemSnaps = p.items.map((i) => ({ ...i }));
     await wrap(() => delChecklist(p.checklist.id));
-    showUndoToast(
-      `Checkliste "${clSnap.label || '(Liste)'}" geloescht.`,
-      () => {
-        void (async () => {
-          try {
-            await restoreChecklistWithItems(clSnap, itemSnaps);
-            showToast('Checkliste wiederhergestellt.', 'success');
-            p.onChanged();
-          } catch (err) {
-            showToast(translateDbError(err), 'error');
-          }
-        })();
-      },
-    );
+    showUndoToast(`Checkliste "${clSnap.label || '(Liste)'}" geloescht.`, () => {
+      void (async () => {
+        try {
+          await restoreChecklistWithItems(clSnap, itemSnaps);
+          showToast('Checkliste wiederhergestellt.', 'success');
+          p.onChanged();
+        } catch (err) {
+          showToast(translateDbError(err), 'error');
+        }
+      })();
+    });
   }
 
   async function onAddItem() {
@@ -227,10 +220,7 @@ const ChecklistPanel: Component<Props> = (p) => {
         checklistId: p.checklist.id,
         recurring: recur,
       });
-      showToast(
-        recur ? 'Abgeschlossen — Punkte zurueckgesetzt.' : 'Abgeschlossen.',
-        'success',
-      );
+      showToast(recur ? 'Abgeschlossen — Punkte zurueckgesetzt.' : 'Abgeschlossen.', 'success');
       p.onChanged();
       // Konfigurierte Close-Action ausfuehren (Toast/Jump/Webhook/Mail).
       // Fehler in der Action brechen den Close-Erfolg nicht — sie werden
@@ -258,9 +248,7 @@ const ChecklistPanel: Component<Props> = (p) => {
     // Pre-Snapshot des betroffenen Eintrags fuer Undo. Der aktuelle
     // history-Array liegt im props-Objekt vor — der Eintrag wird per
     // closedAt gefunden und vollstaendig gemerkt.
-    const snap = (p.checklist.history ?? []).find(
-      (s) => s.closedAt === closedAt,
-    );
+    const snap = (p.checklist.history ?? []).find((s) => s.closedAt === closedAt);
     await wrap(() =>
       delChecklistSnapshot({
         workspaceId: p.workspaceId,
@@ -306,16 +294,8 @@ const ChecklistPanel: Component<Props> = (p) => {
     return 'daily';
   }
   async function onRecurChange(val: string) {
-    const next =
-      val === 'none'
-        ? null
-        : { type: val };
-    await wrap(() =>
-      setChecklistRecur(
-        p.checklist.id,
-        next as Record<string, unknown> | null,
-      ),
-    );
+    const next = val === 'none' ? null : { type: val };
+    await wrap(() => setChecklistRecur(p.checklist.id, next as Record<string, unknown> | null));
   }
 
   // Auto-Close-Detection: feuert bei Zustandsuebergang von "nicht alle done"
@@ -334,19 +314,15 @@ const ChecklistPanel: Component<Props> = (p) => {
       } else if (mode === 'auto-prompt') {
         // Generischer Action-Toast mit passendem Button-Label
         // ("Abschliessen" statt generischem "Rueckgaengig").
-        showToast(
-          `"${p.checklist.label || '(Liste)'}" ist vollstaendig.`,
-          'info',
-          {
-            ms: 10000,
-            action: {
-              label: 'Abschliessen',
-              onClick: () => {
-                void performClose(true);
-              },
+        showToast(`"${p.checklist.label || '(Liste)'}" ist vollstaendig.`, 'info', {
+          ms: 10000,
+          action: {
+            label: 'Abschliessen',
+            onClick: () => {
+              void performClose(true);
             },
           },
-        );
+        });
       }
     } else if (!all) {
       prevAllDone = false;
@@ -431,9 +407,7 @@ const ChecklistPanel: Component<Props> = (p) => {
           <select
             class="cl-close-mode"
             value={p.checklist.close_mode}
-            onChange={(e) =>
-              void onCloseModeChange(e.currentTarget.value as ChecklistCloseMode)
-            }
+            onChange={(e) => void onCloseModeChange(e.currentTarget.value as ChecklistCloseMode)}
             disabled={busy()}
             title="Wann soll diese Checkliste abgeschlossen werden?"
             aria-label="Close-Modus der Checkliste"
@@ -557,12 +531,7 @@ const ChecklistPanel: Component<Props> = (p) => {
 
       <div class="cl-actions">
         <Show when={editMode()}>
-          <button
-            type="button"
-            class="cl-add-item-btn"
-            onClick={onAddItem}
-            disabled={busy()}
-          >
+          <button type="button" class="cl-add-item-btn" onClick={onAddItem} disabled={busy()}>
             + Punkt
           </button>
         </Show>
@@ -591,20 +560,14 @@ const ChecklistPanel: Component<Props> = (p) => {
       </div>
 
       <Show when={historyList().length > 0}>
-        <section
-          class="cl-history"
-          classList={{ 'cl-history-open': historyOpen() }}
-        >
+        <section class="cl-history" classList={{ 'cl-history-open': historyOpen() }}>
           <button
             type="button"
             class="cl-history-toggle"
             onClick={() => setHistoryOpen((v) => !v)}
             aria-expanded={historyOpen()}
           >
-            <span
-              class="cl-history-chev"
-              classList={{ expanded: historyOpen() }}
-            >
+            <span class="cl-history-chev" classList={{ expanded: historyOpen() }}>
               ▸
             </span>
             Historie ({historyList().length})
@@ -619,9 +582,7 @@ const ChecklistPanel: Component<Props> = (p) => {
                     <li class="cl-history-entry">
                       <details class="cl-history-details">
                         <summary class="cl-history-summary">
-                          <span class="cl-history-time">
-                            {formatClosedAt(snap.closedAt)}
-                          </span>
+                          <span class="cl-history-time">{formatClosedAt(snap.closedAt)}</span>
                           <span class="cl-history-count">
                             {doneN}/{total}
                           </span>
@@ -650,10 +611,7 @@ const ChecklistPanel: Component<Props> = (p) => {
                                 classList={{ done: si.done }}
                                 style={{ '--cl-level': si.level }}
                               >
-                                <span
-                                  class="cl-history-check"
-                                  aria-hidden="true"
-                                >
+                                <span class="cl-history-check" aria-hidden="true">
                                   {si.done ? '☑' : '☐'}
                                 </span>
                                 <span class="cl-history-text">{si.text}</span>

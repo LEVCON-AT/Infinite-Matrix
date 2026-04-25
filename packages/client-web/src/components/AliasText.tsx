@@ -2,7 +2,7 @@
 // (z.B. Checklisten-Item-Text). Wo Markdown erlaubt ist, nutzt man
 // MarkdownLightView — der Parser dort erkennt Alias-Tokens ebenfalls.
 
-import { For, type Component } from 'solid-js';
+import { type Component, For } from 'solid-js';
 import { tokenizeAliasText } from '../lib/alias-tokenizer';
 import AliasChip from './AliasChip';
 

@@ -11,31 +11,23 @@
 // FREQ-2 Scope: nur Lesen + Navigation + Done-Toggle. Spalten-CRUD
 // (anlegen/umbenennen/loeschen) kommt in FREQ-3+ oder separat.
 
-import { For, Show, type Component } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
-import type { KbCardRow } from '../lib/types';
+import { type Component, For, Show } from 'solid-js';
 import type { DailyCol, DailyColType } from '../lib/daily-cols';
 import {
+  DCTYPE_LABELS,
   allOccurrencesDoneInRange,
   cardFitsCol,
-  DCTYPE_LABELS,
   getTimeRange,
   useDailyCols,
 } from '../lib/daily-cols';
-import {
-  isCardDone,
-  isRecurCard,
-  todayIso,
-  toggleOccurrence,
-} from '../lib/recur';
-import {
-  setCardDoneOccurrences,
-  toggleCardDone,
-} from '../lib/mutations';
+import { showChoice } from '../lib/dialog';
+import { translateDbError } from '../lib/errors';
+import { setCardDoneOccurrences, toggleCardDone } from '../lib/mutations';
+import { isCardDone, isRecurCard, todayIso, toggleOccurrence } from '../lib/recur';
 import { useVis } from '../lib/settings';
 import { showToast } from '../lib/toasts';
-import { translateDbError } from '../lib/errors';
-import { showChoice } from '../lib/dialog';
+import type { KbCardRow } from '../lib/types';
 import Icon from './Icon';
 
 type Props = {
@@ -155,9 +147,7 @@ const TaskOverview: Component<Props> = (p) => {
                     <select
                       class="dcolh-type-select"
                       value={col.type}
-                      onChange={(e) =>
-                        dcs.setType(col.id, e.currentTarget.value as DailyColType)
-                      }
+                      onChange={(e) => dcs.setType(col.id, e.currentTarget.value as DailyColType)}
                       title="Zeitfenster"
                     >
                       <For each={DCTYPE_ORDER}>
@@ -223,9 +213,7 @@ const TaskOverview: Component<Props> = (p) => {
                   {(card) => {
                     const dl = fmtDate(card.deadline);
                     const overdue =
-                      card.deadline &&
-                      !isCardDone(card) &&
-                      new Date(card.deadline) < today;
+                      card.deadline && !isCardDone(card) && new Date(card.deadline) < today;
                     return (
                       <div
                         class="daily-item"
@@ -256,9 +244,7 @@ const TaskOverview: Component<Props> = (p) => {
                           </div>
                           <div class="di-from">
                             {dl && <span>{dl}</span>}
-                            {overdue && (
-                              <span class="di-overdue-text"> · ueberfaellig</span>
-                            )}
+                            {overdue && <span class="di-overdue-text"> · ueberfaellig</span>}
                             {isRecurCard(card) && (
                               <span class="di-recur-badge">
                                 {' · '}

@@ -12,22 +12,22 @@
 // priorisiert childMatrixId > boardId > checklists > info > Overlay auf
 // Parent-Matrix.
 
+import { useNavigate } from '@solidjs/router';
 import {
+  type Component,
   For,
   Show,
   createEffect,
   createSignal,
   onCleanup,
   onMount,
-  type Component,
 } from 'solid-js';
-import { useNavigate } from '@solidjs/router';
-import { matchExcerpt, searchWorkspace, type SearchResult } from '../lib/search';
-import { rememberFocus } from '../lib/navigation-focus';
-import { showToast } from '../lib/toasts';
-import { translateDbError } from '../lib/errors';
-import { openDocsPopup } from '../lib/docs-ui';
 import { cellTarget } from '../lib/alias-dispatch';
+import { openDocsPopup } from '../lib/docs-ui';
+import { translateDbError } from '../lib/errors';
+import { rememberFocus } from '../lib/navigation-focus';
+import { type SearchResult, matchExcerpt, searchWorkspace } from '../lib/search';
+import { showToast } from '../lib/toasts';
 
 type Props = {
   workspaceId: string;
@@ -329,10 +329,7 @@ const GlobalSearch: Component<Props> = (p) => {
                             }
                           }}
                         >
-                          <span
-                            class="global-search-badge"
-                            data-type={badgeDataType(r)}
-                          >
+                          <span class="global-search-badge" data-type={badgeDataType(r)}>
                             {badgeLabel(r)}
                           </span>
                           <div class="global-search-text">
@@ -347,9 +344,7 @@ const GlobalSearch: Component<Props> = (p) => {
                                 }
                               </For>
                               <Show when={r.alias}>
-                                <span class="global-search-alias">
-                                  ^{r.alias}
-                                </span>
+                                <span class="global-search-alias">^{r.alias}</span>
                               </Show>
                             </div>
                             <Show when={subtitleFor(r)}>

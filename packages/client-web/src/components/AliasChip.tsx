@@ -11,13 +11,13 @@
 // wir den Text trotzdem als Chip, aber im Dispatch gibt es eine
 // freundliche Fehlermeldung.
 
-import { type Component } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
-import { resolveAlias } from '../lib/alias-resolve';
-import { dispatchAliasResult } from '../lib/alias-dispatch';
-import { showToast } from '../lib/toasts';
-import { lookupAlias } from '../lib/alias-index';
+import type { Component } from 'solid-js';
 import { openAliasChipMenu } from '../lib/alias-chip-menu';
+import { dispatchAliasResult } from '../lib/alias-dispatch';
+import { lookupAlias } from '../lib/alias-index';
+import { resolveAlias } from '../lib/alias-resolve';
+import { showToast } from '../lib/toasts';
 
 type Props = {
   alias: string;

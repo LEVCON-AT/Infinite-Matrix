@@ -1,22 +1,10 @@
-import {
-  For,
-  Show,
-  createEffect,
-  createMemo,
-  createSignal,
-  type Component,
-} from 'solid-js';
 import { useSearchParams } from '@solidjs/router';
-import type {
-  BoardContent,
-  KbCardRow,
-  KbColRow,
-  LinkRow,
-  LinkType,
-} from '../lib/types';
-import { useVis } from '../lib/settings';
+import { type Component, For, Show, createEffect, createMemo, createSignal } from 'solid-js';
 import { useBoardUi } from '../lib/board-ui-state';
+import { showConfirm, showPrompt } from '../lib/dialog';
+import { translateDbError } from '../lib/errors';
 import {
+  InvalidUrlError,
   addBoardLink,
   addCard,
   addChecklist,
@@ -24,7 +12,6 @@ import {
   delBoardLink,
   delCard,
   delKbCol,
-  InvalidUrlError,
   moveCard,
   renameKbCol,
   restoreBoardLink,
@@ -33,22 +20,17 @@ import {
   setBoardLinkType,
   setBoardLinkUrl,
   setCardColAndPosition,
-  setCardPosition,
   setCardDoneOccurrences,
+  setCardPosition,
   setKbColColor,
   setKbColPosition,
   toggleCardDone,
 } from '../lib/mutations';
-import {
-  isCardDone,
-  isRecurCard,
-  todayIso,
-  toggleOccurrence,
-} from '../lib/recur';
+import { isCardDone, isRecurCard, todayIso, toggleOccurrence } from '../lib/recur';
+import { useVis } from '../lib/settings';
 import { showToast, showUndoToast } from '../lib/toasts';
-import { translateDbError } from '../lib/errors';
+import type { BoardContent, KbCardRow, KbColRow, LinkRow, LinkType } from '../lib/types';
 import { sanitizeUrl } from '../lib/url';
-import { showConfirm, showPrompt } from '../lib/dialog';
 import CardOverlay from './CardOverlay';
 import ChecklistPanel from './ChecklistPanel';
 import Icon from './Icon';
@@ -66,9 +48,7 @@ function checklistProgress(
   content: BoardContent,
 ): { done: number; total: number } | null {
   if (card.checklist_ref) {
-    const items = content.checklistItems.filter(
-      (it) => it.checklist_id === card.checklist_ref,
-    );
+    const items = content.checklistItems.filter((it) => it.checklist_id === card.checklist_ref);
     if (items.length === 0) return null;
     return { done: items.filter((i) => i.done).length, total: items.length };
   }
@@ -157,10 +137,7 @@ const BoardView: Component<Props> = (p) => {
   const canDeleteRowCol = useVis('deleteRowCol');
   const canAddInfoField = useVis('addInfoField');
   const colHeadEditable = () =>
-    canRenameHeaders() ||
-    canMoveRowCol() ||
-    canDeleteRowCol() ||
-    canColorPicker();
+    canRenameHeaders() || canMoveRowCol() || canDeleteRowCol() || canColorPicker();
   const boardUi = useBoardUi(p.boardId);
 
   // Drag-State: welche Card wird gerade gezogen, welcher Col-Container
@@ -288,12 +265,7 @@ const BoardView: Component<Props> = (p) => {
   ) {
     const fromColId = srcCard.col_id;
     const isCrossCol = fromColId !== toColId;
-    const targetOrder = computeInsertOrder(
-      srcCard,
-      toColId,
-      anchorCardId,
-      before,
-    );
+    const targetOrder = computeInsertOrder(srcCard, toColId, anchorCardId, before);
     const insertPos = targetOrder.indexOf(srcCard.id);
 
     // Quell-Spalte (falls cross-col) zuerst neu nummerieren — dann
@@ -302,9 +274,7 @@ const BoardView: Component<Props> = (p) => {
     // explizit auf insertPos gesetzt wird).
     await wrap(async () => {
       if (isCrossCol) {
-        const fromList = (cardsByCol().get(fromColId) ?? []).filter(
-          (c) => c.id !== srcCard.id,
-        );
+        const fromList = (cardsByCol().get(fromColId) ?? []).filter((c) => c.id !== srcCard.id);
         for (let i = 0; i < fromList.length; i++) {
           await setCardPosition(fromList[i].id, i);
         }
@@ -386,7 +356,7 @@ const BoardView: Component<Props> = (p) => {
   // kb-card-archived-Klasse sichtbar rein.
   const activeCards = createMemo<KbCardRow[]>(() => {
     const all = showArchived()
-      ? p.content?.kbCards ?? []
+      ? (p.content?.kbCards ?? [])
       : (p.content?.kbCards ?? []).filter((c) => !c.archived);
     const q = filter().trim().toLowerCase();
     if (!q) return all;
@@ -427,7 +397,7 @@ const BoardView: Component<Props> = (p) => {
   const totalCardsAll = createMemo(
     () =>
       (showArchived()
-        ? p.content?.kbCards ?? []
+        ? (p.content?.kbCards ?? [])
         : (p.content?.kbCards ?? []).filter((c) => !c.archived)
       ).length,
   );
@@ -453,9 +423,7 @@ const BoardView: Component<Props> = (p) => {
   }
 
   async function onAddCol() {
-    await wrap(() =>
-      addKbCol({ workspaceId: p.workspaceId, boardId: p.boardId }),
-    );
+    await wrap(() => addKbCol({ workspaceId: p.workspaceId, boardId: p.boardId }));
   }
 
   async function onRenameCol(col: KbColRow, newLabel: string) {
@@ -558,9 +526,7 @@ const BoardView: Component<Props> = (p) => {
   }
 
   async function onAddChecklist() {
-    await wrap(() =>
-      addChecklist({ workspaceId: p.workspaceId, boardId: p.boardId }),
-    );
+    await wrap(() => addChecklist({ workspaceId: p.workspaceId, boardId: p.boardId }));
   }
 
   // Board-Links: Add via Prompt (URL dann Label). Invalid-URL liefert
@@ -578,10 +544,11 @@ const BoardView: Component<Props> = (p) => {
     // Simple Heuristik: enthaelt @ ohne :// → wohl eine Mail.
     const looksLikeMail = raw.includes('@') && !/^[a-z]+:\/\//i.test(raw);
     const type: LinkType = looksLikeMail ? 'mail' : 'url';
-    const label = (await showPrompt({
-      title: 'Anzeigetext',
-      message: 'Anzeigetext (optional):',
-    })) ?? '';
+    const label =
+      (await showPrompt({
+        title: 'Anzeigetext',
+        message: 'Anzeigetext (optional):',
+      })) ?? '';
     try {
       await addBoardLink({
         workspaceId: p.workspaceId,
@@ -733,9 +700,7 @@ const BoardView: Component<Props> = (p) => {
                   onClick={() => setShowArchived((v) => !v)}
                   aria-pressed={showArchived()}
                   title={
-                    showArchived()
-                      ? 'Archivierte Karten ausblenden'
-                      : 'Archivierte Karten anzeigen'
+                    showArchived() ? 'Archivierte Karten ausblenden' : 'Archivierte Karten anzeigen'
                   }
                 >
                   <Icon name="archive-box" size={14} />
@@ -764,9 +729,7 @@ const BoardView: Component<Props> = (p) => {
                           return link.type === 'mail' ? `mailto:${safe}` : safe;
                         })()}
                         target={link.type === 'url' ? '_blank' : undefined}
-                        rel={
-                          link.type === 'url' ? 'noopener noreferrer' : undefined
-                        }
+                        rel={link.type === 'url' ? 'noopener noreferrer' : undefined}
                         title={link.url}
                       >
                         <span class="link-ico">
@@ -782,20 +745,13 @@ const BoardView: Component<Props> = (p) => {
                       </a>
                     }
                   >
-                    <div
-                      class="board-link-edit"
-                      data-link-type={link.type}
-                    >
+                    <div class="board-link-edit" data-link-type={link.type}>
                       <select
                         class="board-link-type"
                         value={link.type}
                         title="Link-Typ"
                         onChange={(e) =>
-                          onLinkType(
-                            link,
-                            (e.currentTarget as HTMLSelectElement)
-                              .value as LinkType,
-                          )
+                          onLinkType(link, (e.currentTarget as HTMLSelectElement).value as LinkType)
                         }
                       >
                         <option value="url">URL</option>
@@ -806,9 +762,7 @@ const BoardView: Component<Props> = (p) => {
                         type="text"
                         value={link.label}
                         placeholder="Label"
-                        onBlur={(e) =>
-                          onRenameLink(link, e.currentTarget.value)
-                        }
+                        onBlur={(e) => onRenameLink(link, e.currentTarget.value)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
@@ -820,11 +774,7 @@ const BoardView: Component<Props> = (p) => {
                         class="board-link-url"
                         type="text"
                         value={link.url}
-                        placeholder={
-                          link.type === 'mail'
-                            ? 'name@example.com'
-                            : 'https://...'
-                        }
+                        placeholder={link.type === 'mail' ? 'name@example.com' : 'https://...'}
                         onBlur={(e) => onLinkUrl(link, e.currentTarget.value)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
@@ -868,18 +818,10 @@ const BoardView: Component<Props> = (p) => {
               <div class="board-empty">
                 <p class="hint">
                   Board ohne Spalten.
-                  <Show when={canAddKbCol()}>
-                    {' '}
-                    + Spalte, um zu starten.
-                  </Show>
+                  <Show when={canAddKbCol()}> + Spalte, um zu starten.</Show>
                 </p>
                 <Show when={canAddKbCol()}>
-                  <button
-                    type="button"
-                    class="btn-subtle"
-                    onClick={onAddCol}
-                    disabled={busy()}
-                  >
+                  <button type="button" class="btn-subtle" onClick={onAddCol} disabled={busy()}>
                     <Icon name="plus" size={14} />
                     <span>Spalte</span>
                   </button>
@@ -905,26 +847,16 @@ const BoardView: Component<Props> = (p) => {
                       onDragLeave={(e) => onColDragLeave(col.id, e)}
                       onDrop={(e) => onColDrop(col.id, e)}
                     >
-                      <header
-                        class="kb-col-head"
-                        classList={{ 'mx-editable': colHeadEditable() }}
-                      >
+                      <header class="kb-col-head" classList={{ 'mx-editable': colHeadEditable() }}>
                         <button
                           type="button"
                           class="kb-col-collapse-btn"
-                          title={
-                            collapsed() ? 'Spalte aufklappen' : 'Spalte kollabieren'
-                          }
-                          aria-label={
-                            collapsed() ? 'Spalte aufklappen' : 'Spalte kollabieren'
-                          }
+                          title={collapsed() ? 'Spalte aufklappen' : 'Spalte kollabieren'}
+                          aria-label={collapsed() ? 'Spalte aufklappen' : 'Spalte kollabieren'}
                           aria-expanded={!collapsed()}
                           onClick={() => boardUi.toggleCol(col.id)}
                         >
-                          <Icon
-                            name={collapsed() ? 'chevron-right' : 'chevron-down'}
-                            size={14}
-                          />
+                          <Icon name={collapsed() ? 'chevron-right' : 'chevron-down'} size={14} />
                         </button>
                         <input
                           class="mx-head-input"
@@ -983,7 +915,9 @@ const BoardView: Component<Props> = (p) => {
                           aria-label="Spalte nach rechts"
                           tabIndex={canMoveRowCol() ? 0 : -1}
                           onClick={() => onMoveCol(col, 'right')}
-                          disabled={busy() || !canMoveRowCol() || colIdx() === visibleCols().length - 1}
+                          disabled={
+                            busy() || !canMoveRowCol() || colIdx() === visibleCols().length - 1
+                          }
                         >
                           <Icon name="chevron-right" size={12} />
                         </button>
@@ -1030,16 +964,11 @@ const BoardView: Component<Props> = (p) => {
                                   classList={{
                                     'kb-card-done': isCardDone(card),
                                     'kb-card-archived': card.archived,
-                                    'kb-card-dragging':
-                                      draggingCardId() === card.id,
+                                    'kb-card-dragging': draggingCardId() === card.id,
                                     'kb-card-drop-before': dropBefore(),
                                     'kb-card-drop-after': dropAfter(),
                                   }}
-                                  style={
-                                    card.color
-                                      ? { '--kb-card-color': card.color }
-                                      : undefined
-                                  }
+                                  style={card.color ? { '--kb-card-color': card.color } : undefined}
                                   data-has-color={card.color ? 'yes' : 'no'}
                                   role="button"
                                   tabIndex={0}
@@ -1062,7 +991,9 @@ const BoardView: Component<Props> = (p) => {
                                       class="kb-card-done-checkbox"
                                       checked={isCardDone(card)}
                                       aria-label="Erledigt"
-                                      title={isCardDone(card) ? 'Wieder offen' : 'Als erledigt markieren'}
+                                      title={
+                                        isCardDone(card) ? 'Wieder offen' : 'Als erledigt markieren'
+                                      }
                                       onClick={(e) => e.stopPropagation()}
                                       onChange={(e) => {
                                         onToggleCardDone(card, e.currentTarget.checked);
@@ -1072,9 +1003,7 @@ const BoardView: Component<Props> = (p) => {
                                       {card.name || '(ohne Titel)'}
                                     </span>
                                     <Show when={card.alias}>
-                                      <span class="kb-card-alias">
-                                        ^{card.alias}
-                                      </span>
+                                      <span class="kb-card-alias">^{card.alias}</span>
                                     </Show>
                                   </div>
 
@@ -1145,9 +1074,7 @@ const BoardView: Component<Props> = (p) => {
                                       aria-label="Karte nach oben"
                                       onClick={() => onMoveCardWithin(card, 'up')}
                                       disabled={
-                                        busy() ||
-                                        cardIdx() === 0 ||
-                                        boardUi.sort() !== 'manual'
+                                        busy() || cardIdx() === 0 || boardUi.sort() !== 'manual'
                                       }
                                     >
                                       <Icon name="arrow-up" size={12} />
@@ -1246,11 +1173,7 @@ const BoardView: Component<Props> = (p) => {
           {/* Standalone-Checklisten. Section wird gerendert, sobald
               Listen da sind ODER der Edit-Mode aktiv ist (damit der
               "+ Checkliste"-Button erreichbar bleibt). */}
-          <Show
-            when={
-              (p.content!.checklists ?? []).length > 0 || canAddInfoField()
-            }
-          >
+          <Show when={(p.content!.checklists ?? []).length > 0 || canAddInfoField()}>
             <section class="board-checklists">
               <h3 class="board-section-title">Checklisten</h3>
               <Show when={(p.content!.checklists ?? []).length > 0}>
@@ -1258,8 +1181,8 @@ const BoardView: Component<Props> = (p) => {
                   <For each={p.content!.checklists}>
                     {(cl) => {
                       const items = () =>
-                        p.content!.checklistItems
-                          .filter((it) => it.checklist_id === cl.id)
+                        p
+                          .content!.checklistItems.filter((it) => it.checklist_id === cl.id)
                           .sort((a, b) => a.position - b.position);
                       return (
                         <ChecklistPanel

@@ -7,8 +7,8 @@
 // dynamisch nur-aktiven Spalten (Kategorien ohne Karten werden
 // ausgelassen — identisch zum HTML-Vorbild).
 
-import { For, Show, createMemo, createSignal, onCleanup, onMount, type Component } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
+import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
 import type { AggregateCell, FreqCategoryKey } from '../lib/aggregate';
 import { FREQ_CATEGORIES } from '../lib/aggregate';
 import { cellTarget } from '../lib/alias-dispatch';
@@ -153,9 +153,7 @@ const FrequencyMatrix: Component<Props> = (p) => {
           <thead>
             <tr>
               <th class="freq-hd freq-hd-corner" />
-              <For each={cats()}>
-                {(cat) => <th class="freq-hd">{cat.label}</th>}
-              </For>
+              <For each={cats()}>{(cat) => <th class="freq-hd">{cat.label}</th>}</For>
             </tr>
           </thead>
           <tbody>
@@ -180,10 +178,7 @@ const FrequencyMatrix: Component<Props> = (p) => {
                       }}
                       title="Zelle oeffnen"
                     >
-                      <Show
-                        when={agg.expandable}
-                        fallback={<span class="freq-chevron-spacer" />}
-                      >
+                      <Show when={agg.expandable} fallback={<span class="freq-chevron-spacer" />}>
                         <button
                           type="button"
                           class="freq-chevron"
@@ -270,13 +265,9 @@ const FrequencyMatrix: Component<Props> = (p) => {
                         class="freq-flyout-item"
                         onClick={() => openCardFromFlyout(card)}
                       >
-                        <span class="freq-flyout-name">
-                          {card.name || '(ohne Name)'}
-                        </span>
+                        <span class="freq-flyout-name">{card.name || '(ohne Name)'}</span>
                         <Show when={card.deadline}>
-                          <span class="freq-flyout-meta">
-                            {card.deadline}
-                          </span>
+                          <span class="freq-flyout-meta">{card.deadline}</span>
                         </Show>
                       </button>
                     </li>

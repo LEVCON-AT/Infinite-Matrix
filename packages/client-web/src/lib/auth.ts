@@ -1,5 +1,5 @@
-import { createSignal, onCleanup } from 'solid-js';
 import type { Session, User } from '@supabase/supabase-js';
+import { createSignal, onCleanup } from 'solid-js';
 import { supabase } from './supabase';
 
 // Magic-Link-Redirect-URI: aus VITE_SITE_URL (Build-time-Konstante).

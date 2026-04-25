@@ -22,13 +22,7 @@
 // sie hier als Helper. Fuer Board gibt es noch keinen Helper, wird
 // lokal implementiert.
 
-import { supabase } from './supabase';
-import {
-  clearCellCompletely,
-  clearCellInfoData,
-  clearCellChecklistsData,
-  clearMatrixContents,
-} from './subtree-import';
+import { showChoice } from './dialog';
 import {
   downloadSubtreeExport,
   downloadWorkspaceExport,
@@ -39,7 +33,13 @@ import {
   exportWorkspace,
   summarizeExport,
 } from './export';
-import { showChoice } from './dialog';
+import {
+  clearCellChecklistsData,
+  clearCellCompletely,
+  clearCellInfoData,
+  clearMatrixContents,
+} from './subtree-import';
+import { supabase } from './supabase';
 import type { NodeRow } from './types';
 
 export type ResetScope =
@@ -55,26 +55,14 @@ async function clearBoardContents(boardNodeId: string): Promise<void> {
   // kb_cards + kb_cols + links haben alle board_id als FK.
   // Reihenfolge: kb_cards zuerst (FK auf kb_cols), dann kb_cols, dann
   // checklists (mit Cascade auf items), dann links.
-  const { error: cardsErr } = await supabase
-    .from('kb_cards')
-    .delete()
-    .eq('board_id', boardNodeId);
+  const { error: cardsErr } = await supabase.from('kb_cards').delete().eq('board_id', boardNodeId);
   if (cardsErr) throw cardsErr;
-  const { error: colsErr } = await supabase
-    .from('kb_cols')
-    .delete()
-    .eq('board_id', boardNodeId);
+  const { error: colsErr } = await supabase.from('kb_cols').delete().eq('board_id', boardNodeId);
   if (colsErr) throw colsErr;
   // Checklisten mit board_id=target — Cascade auf checklist_items.
-  const { error: clErr } = await supabase
-    .from('checklists')
-    .delete()
-    .eq('board_id', boardNodeId);
+  const { error: clErr } = await supabase.from('checklists').delete().eq('board_id', boardNodeId);
   if (clErr) throw clErr;
-  const { error: linksErr } = await supabase
-    .from('links')
-    .delete()
-    .eq('board_id', boardNodeId);
+  const { error: linksErr } = await supabase.from('links').delete().eq('board_id', boardNodeId);
   if (linksErr) throw linksErr;
 }
 
@@ -101,23 +89,15 @@ export async function resetScope(scope: ResetScope): Promise<void> {
 // Kompletter Workspace-Reset: alle User-Daten wegwerfen, dann eine
 // frische Root-Matrix anlegen. Gibt die neue Matrix-Node-ID zurueck,
 // damit der Caller nach dem Reset zu ihr navigieren kann.
-export async function resetAllWorkspace(
-  workspaceId: string,
-): Promise<{ rootMatrixId: string }> {
+export async function resetAllWorkspace(workspaceId: string): Promise<{ rootMatrixId: string }> {
   // 1. Alle Nodes loeschen — Cascade entfernt rows/cols/cells/kb_cols/
   //    kb_cards/checklists/checklist_items/links per FK-Kette.
   //    Docs haben docs.workspace_id → workspaces CASCADE, aber
   //    workspace bleibt; attached_cell_id wird durch Cell-Delete auf
   //    NULL gesetzt. Wir loeschen docs deshalb explizit.
-  const { error: docsErr } = await supabase
-    .from('docs')
-    .delete()
-    .eq('workspace_id', workspaceId);
+  const { error: docsErr } = await supabase.from('docs').delete().eq('workspace_id', workspaceId);
   if (docsErr) throw docsErr;
-  const { error: nodesErr } = await supabase
-    .from('nodes')
-    .delete()
-    .eq('workspace_id', workspaceId);
+  const { error: nodesErr } = await supabase.from('nodes').delete().eq('workspace_id', workspaceId);
   if (nodesErr) throw nodesErr;
 
   // 2. Frische Root-Matrix anlegen — neuer Start-Punkt.
@@ -161,10 +141,7 @@ function labelForScope(scope: ResetScope, nodeLabel?: string): string {
   }
 }
 
-async function exportForScope(
-  scope: ResetScope,
-  workspaceId: string,
-): Promise<void> {
+async function exportForScope(scope: ResetScope, workspaceId: string): Promise<void> {
   // Jeweilige Export-Funktion + Download mit sinnvollem Dateinamen.
   switch (scope.kind) {
     case 'matrix': {
@@ -254,9 +231,10 @@ export async function runResetAll(args: {
   if (!choice || choice === 'cancel') return null;
   if (choice === 'export-clear') {
     const data = await exportWorkspace(workspaceId);
-    const wsName = typeof (data.workspace as { name?: unknown }).name === 'string'
-      ? ((data.workspace as { name: string }).name)
-      : 'workspace';
+    const wsName =
+      typeof (data.workspace as { name?: unknown }).name === 'string'
+        ? (data.workspace as { name: string }).name
+        : 'workspace';
     await downloadWorkspaceExport(data, `backup-${wsName}`);
   }
   return await resetAllWorkspace(workspaceId);
@@ -265,10 +243,7 @@ export async function runResetAll(args: {
 // Hilfs-Builder fuer Context-Menue-Scope: aus einem Tree-Entry den
 // passenden ResetScope ableiten. Undefined = keine Reset-Aktion
 // moeglich (z.B. link/doc-Rows).
-export function scopeFromNodeRow(
-  nodeId: string,
-  type: 'matrix' | 'board',
-): ResetScope {
+export function scopeFromNodeRow(nodeId: string, type: 'matrix' | 'board'): ResetScope {
   return type === 'matrix'
     ? { kind: 'matrix', matrixNodeId: nodeId }
     : { kind: 'board', boardNodeId: nodeId };

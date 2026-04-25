@@ -50,9 +50,7 @@ function assertPayload(x: unknown): asserts x is AltPayload {
   }
   const nodes = p.nodes as Record<string, unknown>;
   if (!nodes[p.rootId]) {
-    throw new ImportParseError(
-      `rootId="${p.rootId}" referenziert keinen Node in "nodes".`,
-    );
+    throw new ImportParseError(`rootId="${p.rootId}" referenziert keinen Node in "nodes".`);
   }
 }
 
@@ -61,9 +59,7 @@ export function parsePayload(rawJson: string): AltPayload {
   try {
     parsed = JSON.parse(rawJson);
   } catch (e) {
-    throw new ImportParseError(
-      `JSON ungueltig: ${(e as Error).message}`,
-    );
+    throw new ImportParseError(`JSON ungueltig: ${(e as Error).message}`);
   }
   assertPayload(parsed);
   return parsed;
@@ -101,9 +97,7 @@ function asDateString(v: unknown): string | null {
 }
 
 function safeObj(v: unknown): Record<string, unknown> | null {
-  return v && typeof v === 'object' && !Array.isArray(v)
-    ? (v as Record<string, unknown>)
-    : null;
+  return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
 }
 
 // ─── Haupt-Planner ────────────────────────────────────────────
@@ -192,15 +186,11 @@ export function buildImportPlan(payload: AltPayload): ImportPlan {
         if (!rowUuid || !colUuid) continue; // verwaiste Cell → ueberspringen
 
         const features = asStringArray(cell.features);
-        const boardIdAlt =
-          typeof cell.boardId === 'string' ? cell.boardId : null;
-        const matrixIdAlt =
-          typeof cell.matrixId === 'string' ? cell.matrixId : null;
+        const boardIdAlt = typeof cell.boardId === 'string' ? cell.boardId : null;
+        const matrixIdAlt = typeof cell.matrixId === 'string' ? cell.matrixId : null;
 
-        const boardUuid = boardIdAlt ? map.get(boardIdAlt) ?? null : null;
-        const childMatrixUuid = matrixIdAlt
-          ? map.get(matrixIdAlt) ?? null
-          : null;
+        const boardUuid = boardIdAlt ? (map.get(boardIdAlt) ?? null) : null;
+        const childMatrixUuid = matrixIdAlt ? (map.get(matrixIdAlt) ?? null) : null;
 
         // Rest-Daten (infoFields etc.) als jsonb-data mitgeben.
         const extra: Record<string, unknown> = {};
@@ -216,9 +206,7 @@ export function buildImportPlan(payload: AltPayload): ImportPlan {
           row_id: rowUuid,
           col_id: colUuid,
           alias: asAlias(cell.alias),
-          features: features.filter((f) =>
-            ['info', 'board', 'matrix', 'checklists'].includes(f),
-          ),
+          features: features.filter((f) => ['info', 'board', 'matrix', 'checklists'].includes(f)),
           child_matrix_id: childMatrixUuid,
           board_id: boardUuid,
           data: extra,
@@ -299,12 +287,8 @@ export function buildImportPlan(payload: AltPayload): ImportPlan {
         const cardUuid = ensureMap(card.id);
         const colUuid = map.get(card.colId);
         if (!colUuid) return; // Karte ohne gueltige Spalte → skip.
-        const checklistRef = card.checklistRef
-          ? map.get(card.checklistRef) ?? null
-          : null;
-        const sourceClId = card.sourceClId
-          ? map.get(card.sourceClId) ?? null
-          : null;
+        const checklistRef = card.checklistRef ? (map.get(card.checklistRef) ?? null) : null;
+        const sourceClId = card.sourceClId ? (map.get(card.sourceClId) ?? null) : null;
         const pcard: PlannedKbCard = {
           id: cardUuid,
           board_id: boardUuid,
@@ -324,9 +308,7 @@ export function buildImportPlan(payload: AltPayload): ImportPlan {
             /^\d{4}-\d{2}-\d{2}$/.test(s),
           ),
           source_cl_id: sourceClId,
-          source_label: typeof card.sourceLabel === 'string'
-            ? card.sourceLabel
-            : null,
+          source_label: typeof card.sourceLabel === 'string' ? card.sourceLabel : null,
           // Exklusiv: checklist_ref ODER inline-checklist (DB-CHECK).
           checklist_ref: checklistRef,
           checklist:

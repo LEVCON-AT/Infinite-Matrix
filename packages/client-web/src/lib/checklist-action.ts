@@ -9,10 +9,10 @@
 // Die Config lebt in `checklists.action` (jsonb). Ist `action` null
 // oder `{type:'none'}`, passiert nichts — default-Fall.
 
-import { resolveAlias } from './alias-resolve';
 import { dispatchAliasResult } from './alias-dispatch';
-import { sanitizeUrl } from './url';
+import { resolveAlias } from './alias-resolve';
 import { showToast } from './toasts';
+import { sanitizeUrl } from './url';
 
 export type ChecklistAction =
   | { type: 'none' }

@@ -4,7 +4,7 @@
 // der Scrim Pointer-Events — die Oberflaeche ist grau und
 // un-klickbar.
 
-import { Show, type Component } from 'solid-js';
+import { type Component, Show } from 'solid-js';
 import { useProgress } from '../lib/progress';
 
 const ProgressOverlay: Component = () => {
@@ -19,20 +19,12 @@ const ProgressOverlay: Component = () => {
           return Math.min(100, Math.round((s.current / t) * 100));
         };
         return (
-          <div
-            class="progress-scrim"
-            role="status"
-            aria-live="polite"
-            aria-busy="true"
-          >
+          <div class="progress-scrim" role="status" aria-live="polite" aria-busy="true">
             <div class="progress-card">
               <div class="progress-title">{state().title}</div>
               <div class="progress-phase">{state().phase}</div>
               <div class="progress-bar" aria-hidden="true">
-                <div
-                  class="progress-bar-fill"
-                  style={{ width: `${pct()}%` }}
-                />
+                <div class="progress-bar-fill" style={{ width: `${pct()}%` }} />
               </div>
               <div class="progress-meta">
                 Schritt {state().current} von {state().total} · {pct()}%

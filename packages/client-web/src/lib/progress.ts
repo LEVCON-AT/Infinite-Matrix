@@ -35,11 +35,7 @@ export function startProgress(title: string): void {
 // (kein startProgress-Call vorangegangen), no-op — so koennen Executor-
 // Funktionen diese API bedenkenlos aufrufen, auch wenn sie nicht aus
 // dem Import-Flow kommen (z.B. einzelne Mutations-Calls).
-export function setProgressPhase(
-  phase: string,
-  current: number,
-  total: number,
-): void {
+export function setProgressPhase(phase: string, current: number, total: number): void {
   const cur = progress();
   if (!cur) return;
   setProgress({ title: cur.title, phase, current, total });

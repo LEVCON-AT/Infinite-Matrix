@@ -121,12 +121,7 @@ export type InlineChecklistItem = {
 //  - yearly:  every, startDate, yearMonth, monthType='day' → yearDay
 //                                          monthType='weekday' → weekday + weekdayOrd
 // + endType: 'never' | 'date' → endDate | 'count' → endCount
-export type CardRecurType =
-  | 'none'
-  | 'daily'
-  | 'weekly'
-  | 'monthly'
-  | 'yearly';
+export type CardRecurType = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 export type CardRecur = {
   type: CardRecurType;

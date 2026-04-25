@@ -1,11 +1,11 @@
-import { Show, createEffect, type JSX, type ParentComponent } from 'solid-js';
 import { useLocation, useNavigate } from '@solidjs/router';
+import { type JSX, type ParentComponent, Show, createEffect } from 'solid-js';
+import DialogHost from './components/DialogHost';
+import ProgressOverlay from './components/ProgressOverlay';
+import Toasts from './components/Toasts';
 import { bootstrapAuth, useAuthReady, useSession } from './lib/auth';
 import { useEditModeHotkey } from './lib/edit-mode';
 import { useThemeBootstrap } from './lib/theme';
-import Toasts from './components/Toasts';
-import DialogHost from './components/DialogHost';
-import ProgressOverlay from './components/ProgressOverlay';
 
 bootstrapAuth();
 

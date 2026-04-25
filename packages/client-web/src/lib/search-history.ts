@@ -55,10 +55,7 @@ export function saveHistory(workspaceId: string, entries: HistoryEntry[]): void 
 // Push mit Dedup: gleicher raw wandert auf Position 0. Cap 25. Ueber-
 // schreibt den `kind` nicht (ein Entry bleibt seiner urspruenglichen
 // Kategorie treu).
-export function pushHistory(
-  workspaceId: string,
-  entry: Omit<HistoryEntry, 'ts'>,
-): HistoryEntry[] {
+export function pushHistory(workspaceId: string, entry: Omit<HistoryEntry, 'ts'>): HistoryEntry[] {
   const raw = entry.raw.trim();
   if (!raw) return loadHistory(workspaceId);
   const current = loadHistory(workspaceId);

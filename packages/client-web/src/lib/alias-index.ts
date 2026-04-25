@@ -10,19 +10,12 @@
 // Shape orientiert sich am Alt-Client `aliasIndex` (matrix_tool_beta.html
 // Zeile 1462ff) — gleiche Kinds, canonical lowercase als Key.
 
-import { createSignal, type Accessor } from 'solid-js';
-import { supabase } from './supabase';
-import { getByWorkspace } from './offline-cache';
+import { type Accessor, createSignal } from 'solid-js';
 import { isNetworkError } from './mutation-queue';
+import { getByWorkspace } from './offline-cache';
 import { markCacheFallback, markLiveSuccess } from './offline-state';
-import type {
-  CellRow,
-  ChecklistRow,
-  DocRow,
-  KbCardRow,
-  LinkRow,
-  NodeRow,
-} from './types';
+import { supabase } from './supabase';
+import type { CellRow, ChecklistRow, DocRow, KbCardRow, LinkRow, NodeRow } from './types';
 
 export type AliasKind = 'node' | 'cell' | 'card' | 'checklist' | 'link' | 'doc';
 
@@ -197,11 +190,7 @@ async function fetchAliasIndexLive(wsId: string, s: WsState): Promise<void> {
       .select('id, alias, label, type')
       .eq('workspace_id', wsId)
       .not('alias', 'is', null),
-    supabase
-      .from('cells')
-      .select('id, alias')
-      .eq('workspace_id', wsId)
-      .not('alias', 'is', null),
+    supabase.from('cells').select('id, alias').eq('workspace_id', wsId).not('alias', 'is', null),
     supabase
       .from('kb_cards')
       .select('id, alias, name')
@@ -249,10 +238,7 @@ async function fetchAliasIndexFromCache(wsId: string, s: WsState): Promise<void>
     getByWorkspace<LinkRow>('links', wsId),
     getByWorkspace<DocRow>('docs', wsId),
   ]);
-  commitEntries(
-    s,
-    buildAliasEntries({ nodes, cells, cards, checklists, links, docs }),
-  );
+  commitEntries(s, buildAliasEntries({ nodes, cells, cards, checklists, links, docs }));
 }
 
 // Reactive Accessor — Komponenten koennen direkt auf Aenderungen reagieren.
@@ -263,11 +249,7 @@ export function aliasIndexSignal(wsId: string): Accessor<AliasEntry[]> {
 // Sync prefix-match, case-insensitive. Leerer Query liefert die ersten
 // `limit` Eintraege (nuetzlich fuer Klick-Trigger ohne Typing).
 // Analog _aaOnInput (HTML Zeile 5223) — startsWith, limitiert.
-export function getAliasMatches(
-  wsId: string,
-  query: string,
-  limit = 8,
-): AliasEntry[] {
+export function getAliasMatches(wsId: string, query: string, limit = 8): AliasEntry[] {
   const s = states.get(wsId);
   if (!s) return [];
   const all = s.entries();

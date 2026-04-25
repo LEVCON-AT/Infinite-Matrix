@@ -33,9 +33,7 @@ export function useDocsRequest(): () => OpenDocsRequest | null {
 
 let tickCounter = 0;
 
-export function openDocsPopup(
-  opts: Omit<OpenDocsRequest, 'tick'> = {},
-): void {
+export function openDocsPopup(opts: Omit<OpenDocsRequest, 'tick'> = {}): void {
   tickCounter += 1;
   setRequest({ ...opts, tick: tickCounter });
 }

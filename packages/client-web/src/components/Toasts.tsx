@@ -1,4 +1,4 @@
-import { For, Show, type Component } from 'solid-js';
+import { type Component, For, Show } from 'solid-js';
 import { dismissToast, useToasts } from '../lib/toasts';
 
 const Toasts: Component = () => {

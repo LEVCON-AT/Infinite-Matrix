@@ -21,7 +21,7 @@
 //   - Promise-basiert, keine `onupgradeneeded`-Callback-Suppe.
 //   - Typisiert, +3 kB gz. Ausreichend klein fuer den Wert.
 
-import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import { type DBSchema, type IDBPDatabase, openDB } from 'idb';
 
 // DB-Schema: ein Store pro User-Tabelle. Alle Rows tragen workspace_id
 // (Supabase-RLS-Konvention) — daher der gemeinsame Index. Key bleibt
@@ -29,10 +29,7 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 //
 // Neue Tabellen spaeter: hier ergaenzen, DB_VERSION hochdrehen, im
 // upgrade()-Callback den neuen Store anlegen.
-type CacheRow = { id: string; workspace_id: string } & Record<
-  string,
-  unknown
->;
+type CacheRow = { id: string; workspace_id: string } & Record<string, unknown>;
 
 // Tabellen-Liste als const-Tuple, damit wir sowohl die Typ-Union als
 // auch die Runtime-Iteration aus einer Quelle bekommen.
@@ -115,9 +112,7 @@ export async function putAll<T extends CacheRow>(
     // gegen falschen Aufruf.
     for (const r of rows) {
       if (r.workspace_id !== workspaceId) {
-        throw new Error(
-          `[offline-cache] row workspace_id mismatch in ${table}`,
-        );
+        throw new Error(`[offline-cache] row workspace_id mismatch in ${table}`);
       }
     }
   }
@@ -187,10 +182,7 @@ export async function mergeRows<T extends CacheRow>(
 
 // Loescht eine Row aus dem Cache. Verwendet von runOptimisticDelete.
 // No-op wenn die Row nicht existiert.
-export async function deleteOne(
-  table: CacheTable,
-  id: string,
-): Promise<void> {
+export async function deleteOne(table: CacheTable, id: string): Promise<void> {
   const inst = await db();
   await inst.delete(table, id);
 }

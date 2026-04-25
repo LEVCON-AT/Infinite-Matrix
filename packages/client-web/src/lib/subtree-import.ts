@@ -22,10 +22,10 @@
 //
 // Type-Mismatch -> Error. UUID-Remap gegen Kollision + Alias-Dedup.
 
-import { supabase } from './supabase';
 import type { ExportPayloadType, WorkspaceExport } from './export';
 import { WORKSPACE_EXPORT_VERSION } from './export';
 import { setProgressPhase } from './progress';
+import { supabase } from './supabase';
 import { sanitizeUrl } from './url';
 
 export class ImportError extends Error {
@@ -62,9 +62,7 @@ export function parseImportPayload(rawJson: string): WorkspaceExport {
     );
   }
   if (!parsed || typeof parsed !== 'object') {
-    throw new ImportError(
-      'Diese Datei sieht nicht wie ein Infinite-Matrix-Export aus.',
-    );
+    throw new ImportError('Diese Datei sieht nicht wie ein Infinite-Matrix-Export aus.');
   }
   const p = parsed as Record<string, unknown>;
   if (p.version !== WORKSPACE_EXPORT_VERSION) {
@@ -95,14 +93,9 @@ export function parseImportPayload(rawJson: string): WorkspaceExport {
   if (p.sourceCell && typeof p.sourceCell === 'object') {
     const sc = p.sourceCell as Record<string, unknown>;
     sourceCell = {
-      data:
-        sc.data && typeof sc.data === 'object'
-          ? (sc.data as Record<string, unknown>)
-          : {},
+      data: sc.data && typeof sc.data === 'object' ? (sc.data as Record<string, unknown>) : {},
       features: Array.isArray(sc.features)
-        ? (sc.features as unknown[]).filter(
-            (x): x is string => typeof x === 'string',
-          )
+        ? (sc.features as unknown[]).filter((x): x is string => typeof x === 'string')
         : [],
     };
   }
@@ -148,11 +141,7 @@ export function checkTypeCompatibility(
       }
       return null;
     case 'cell':
-      if (
-        p !== 'subtree' &&
-        p !== 'feature-info' &&
-        p !== 'feature-checklists'
-      ) {
+      if (p !== 'subtree' && p !== 'feature-info' && p !== 'feature-checklists') {
         return 'In eine Zelle passt nur ein Bereichs-Export (Matrix/Board) oder ein Feature-Export (Info/Checklisten). Diese Datei hat einen anderen Typ.';
       }
       return null;
@@ -282,10 +271,7 @@ function applyAliasMap<T extends Record<string, unknown>>(
 }
 
 // ─── Insert-Helpers ────────────────────────────────────────────
-async function insertBatch(
-  table: string,
-  rows: Record<string, unknown>[],
-): Promise<void> {
+async function insertBatch(table: string, rows: Record<string, unknown>[]): Promise<void> {
   if (rows.length === 0) return;
   // Postgres REST limits batch size ~ 1k rows; fuer V1 splitten wir
   // bei 500, um RLS-Trigger nicht zu ueberfordern.
@@ -337,9 +323,7 @@ async function clearCellSubstructure(cellId: string): Promise<void> {
     .eq('id', cellId)
     .single();
   if (error || !cell) return;
-  const subIds = [cell.child_matrix_id, cell.board_id].filter(
-    (x): x is string => !!x,
-  );
+  const subIds = [cell.child_matrix_id, cell.board_id].filter((x): x is string => !!x);
   // 1. Cell-FKs auf NULL — sonst verhindert FK das Node-Delete.
   //    Features 'matrix'/'board' entfernen, Info/Checklists bleiben.
   const nextFeatures = ((cell.features ?? []) as string[]).filter(
@@ -370,11 +354,9 @@ export async function clearCellInfoData(cellId: string): Promise<void> {
     .eq('id', cellId)
     .single();
   if (error || !cell) return;
-  const data = ((cell.data as unknown) as Record<string, unknown>) ?? {};
+  const data = (cell.data as unknown as Record<string, unknown>) ?? {};
   const nextData = { ...data, infoFields: [], links: [] };
-  const nextFeatures = ((cell.features ?? []) as string[]).filter(
-    (f) => f !== 'info',
-  );
+  const nextFeatures = ((cell.features ?? []) as string[]).filter((f) => f !== 'info');
   const { error: upErr } = await supabase
     .from('cells')
     .update({ data: nextData, features: nextFeatures })
@@ -397,25 +379,13 @@ export async function clearCellChecklistsData(cellId: string): Promise<void> {
       .delete()
       .in('checklist_id', ids);
     if (itErr) throw itErr;
-    const { error: clErr } = await supabase
-      .from('checklists')
-      .delete()
-      .in('id', ids);
+    const { error: clErr } = await supabase.from('checklists').delete().in('id', ids);
     if (clErr) throw clErr;
   }
-  const { data: cell } = await supabase
-    .from('cells')
-    .select('features')
-    .eq('id', cellId)
-    .single();
+  const { data: cell } = await supabase.from('cells').select('features').eq('id', cellId).single();
   if (cell) {
-    const nextFeatures = ((cell.features ?? []) as string[]).filter(
-      (f) => f !== 'checklists',
-    );
-    await supabase
-      .from('cells')
-      .update({ features: nextFeatures })
-      .eq('id', cellId);
+    const nextFeatures = ((cell.features ?? []) as string[]).filter((f) => f !== 'checklists');
+    await supabase.from('cells').update({ features: nextFeatures }).eq('id', cellId);
   }
 }
 
@@ -423,10 +393,7 @@ export async function clearCellChecklistsData(cellId: string): Promise<void> {
 // Dokus, die an der Zelle haengen, gelten als Cell-Inhalt und werden
 // entfernt.
 async function clearCellDocs(cellId: string): Promise<void> {
-  const { error } = await supabase
-    .from('docs')
-    .delete()
-    .eq('attached_cell_id', cellId);
+  const { error } = await supabase.from('docs').delete().eq('attached_cell_id', cellId);
   if (error) throw error;
 }
 
@@ -444,9 +411,7 @@ export async function clearCellCompletely(cellId: string): Promise<void> {
 // ins Ergebnis aufgenommen (Caller will die Target-Matrix behalten).
 // Walking ueber cells.child_matrix_id + cells.board_id. Board-Nodes
 // sind Blaetter (keine cells) und beenden den Branch.
-async function collectDescendantNodeIds(
-  rootMatrixId: string,
-): Promise<string[]> {
+async function collectDescendantNodeIds(rootMatrixId: string): Promise<string[]> {
   const descendants: string[] = [];
   const seen = new Set<string>([rootMatrixId]);
   const stack: string[] = [rootMatrixId];
@@ -497,10 +462,7 @@ export async function clearMatrixContents(matrixId: string): Promise<void> {
   if (cellsQueryErr) throw cellsQueryErr;
   const cellIds = ((cells ?? []) as Array<{ id: string }>).map((c) => c.id);
   if (cellIds.length > 0) {
-    const { error: dErr } = await supabase
-      .from('docs')
-      .delete()
-      .in('attached_cell_id', cellIds);
+    const { error: dErr } = await supabase.from('docs').delete().in('attached_cell_id', cellIds);
     if (dErr) throw dErr;
   }
 
@@ -508,30 +470,18 @@ export async function clearMatrixContents(matrixId: string): Promise<void> {
   //    cols / cells / kb_cols / kb_cards / checklists / items / links
   //    mit auf (matrix_id / board_id FKs sind ON DELETE CASCADE).
   if (descendants.length > 0) {
-    const { error: dnErr } = await supabase
-      .from('nodes')
-      .delete()
-      .in('id', descendants);
+    const { error: dnErr } = await supabase.from('nodes').delete().in('id', descendants);
     if (dnErr) throw dnErr;
   }
 
   // 4. Target-Matrix eigene Cells/Rows/Cols loeschen — Matrix-Node
   //    selbst bleibt stehen, damit Label/Alias erhalten bleiben
   //    (bzw. separat vom Caller ersetzt werden koennen).
-  const { error: cErr } = await supabase
-    .from('cells')
-    .delete()
-    .eq('matrix_id', matrixId);
+  const { error: cErr } = await supabase.from('cells').delete().eq('matrix_id', matrixId);
   if (cErr) throw cErr;
-  const { error: rErr } = await supabase
-    .from('rows')
-    .delete()
-    .eq('matrix_id', matrixId);
+  const { error: rErr } = await supabase.from('rows').delete().eq('matrix_id', matrixId);
   if (rErr) throw rErr;
-  const { error: colErr } = await supabase
-    .from('cols')
-    .delete()
-    .eq('matrix_id', matrixId);
+  const { error: colErr } = await supabase.from('cols').delete().eq('matrix_id', matrixId);
   if (colErr) throw colErr;
 }
 
@@ -571,7 +521,7 @@ export async function executeSubtreeImportIntoCell(args: {
     step('Sicherungs-Export…');
     const { exportCellSubtree, downloadSubtreeExport } = await import('./export');
     const current = await exportCellSubtree(targetCellId, workspaceId);
-    await downloadSubtreeExport(current,`backup-ziel-zelle`);
+    await downloadSubtreeExport(current, `backup-ziel-zelle`);
   }
   if (mode === 'overwrite' || mode === 'export-overwrite') {
     step('Ziel-Zelle leeren…');
@@ -604,18 +554,14 @@ export async function executeSubtreeImportIntoCell(args: {
   //      wurde — d.h. der Quell-Node ist der Top-Root der Payload.
   //      (Ältere Exports vor dem parent-strip-Fix.)
   // Nur Nodes mit parent im exportierten Cell-Set sind innere Sub-Nodes.
-  const exportedCellIds = new Set(
-    (payload.cells as Array<{ id: string }>).map((c) => c.id),
-  );
+  const exportedCellIds = new Set((payload.cells as Array<{ id: string }>).map((c) => c.id));
   const rootRow = (
     payload.nodes as Array<{
       id: string;
       type: string;
       parent_cell_id: string | null;
     }>
-  ).find(
-    (n) => !n.parent_cell_id || !exportedCellIds.has(n.parent_cell_id),
-  );
+  ).find((n) => !n.parent_cell_id || !exportedCellIds.has(n.parent_cell_id));
   if (!rootRow) {
     throw new ImportError(
       'Der Export ist unvollstaendig — es fehlt der Start-Punkt. Die Datei ist vermutlich beschaedigt.',
@@ -655,10 +601,8 @@ export async function executeSubtreeImportIntoCell(args: {
   for (const c of payload.cells) remap((c as { id: string }).id, remapMap);
   for (const k of payload.kb_cols) remap((k as { id: string }).id, remapMap);
   for (const k of payload.kb_cards) remap((k as { id: string }).id, remapMap);
-  for (const cl of payload.checklists)
-    remap((cl as { id: string }).id, remapMap);
-  for (const it of payload.checklist_items)
-    remap((it as { id: string }).id, remapMap);
+  for (const cl of payload.checklists) remap((cl as { id: string }).id, remapMap);
+  for (const it of payload.checklist_items) remap((it as { id: string }).id, remapMap);
   for (const l of payload.links) remap((l as { id: string }).id, remapMap);
 
   // Rows mappen + FKs auf neue IDs umbiegen + workspace_id setzen.
@@ -735,61 +679,55 @@ export async function executeSubtreeImportIntoCell(args: {
     );
   });
 
-  const kbColsOut = (payload.kb_cols as Array<Record<string, unknown>>).map(
-    (k) => ({
-      ...k,
-      id: remapMap.get((k as { id: string }).id)!,
-      workspace_id: workspaceId,
-      board_id: remap((k as { board_id: string }).board_id, remapMap),
-    }),
-  );
+  const kbColsOut = (payload.kb_cols as Array<Record<string, unknown>>).map((k) => ({
+    ...k,
+    id: remapMap.get((k as { id: string }).id)!,
+    workspace_id: workspaceId,
+    board_id: remap((k as { board_id: string }).board_id, remapMap),
+  }));
 
-  const kbCardsOut = (payload.kb_cards as Array<Record<string, unknown>>).map(
-    (k) => {
-      const raw = k as {
-        id: string;
-        board_id: string;
-        col_id: string;
-        checklist_ref: string | null;
-        source_cl_id: string | null;
-      };
-      // FK-Felder explizit remappen. checklist_ref/source_cl_id zeigen
-      // auf checklists innerhalb des Payloads; ohne Remap zeigen sie
-      // nach dem Import auf alte / nicht existierende Checklisten.
-      const checklistRefMapped =
-        raw.checklist_ref && remapMap.has(raw.checklist_ref)
-          ? remapMap.get(raw.checklist_ref)!
-          : raw.checklist_ref
-            ? null // Referenz zeigt aus dem Payload raus — sauber auf NULL setzen.
-            : null;
-      const sourceClMapped =
-        raw.source_cl_id && remapMap.has(raw.source_cl_id)
-          ? remapMap.get(raw.source_cl_id)!
-          : raw.source_cl_id
-            ? null
-            : null;
-      return applyAliasMap(
-        {
-          ...k,
-          id: remapMap.get(raw.id)!,
-          workspace_id: workspaceId,
-          board_id: remap(raw.board_id, remapMap),
-          col_id: remap(raw.col_id, remapMap),
-          checklist_ref: checklistRefMapped,
-          source_cl_id: sourceClMapped,
-        },
-        aliasMap,
-      );
-    },
-  );
+  const kbCardsOut = (payload.kb_cards as Array<Record<string, unknown>>).map((k) => {
+    const raw = k as {
+      id: string;
+      board_id: string;
+      col_id: string;
+      checklist_ref: string | null;
+      source_cl_id: string | null;
+    };
+    // FK-Felder explizit remappen. checklist_ref/source_cl_id zeigen
+    // auf checklists innerhalb des Payloads; ohne Remap zeigen sie
+    // nach dem Import auf alte / nicht existierende Checklisten.
+    const checklistRefMapped =
+      raw.checklist_ref && remapMap.has(raw.checklist_ref)
+        ? remapMap.get(raw.checklist_ref)!
+        : raw.checklist_ref
+          ? null // Referenz zeigt aus dem Payload raus — sauber auf NULL setzen.
+          : null;
+    const sourceClMapped =
+      raw.source_cl_id && remapMap.has(raw.source_cl_id)
+        ? remapMap.get(raw.source_cl_id)!
+        : raw.source_cl_id
+          ? null
+          : null;
+    return applyAliasMap(
+      {
+        ...k,
+        id: remapMap.get(raw.id)!,
+        workspace_id: workspaceId,
+        board_id: remap(raw.board_id, remapMap),
+        col_id: remap(raw.col_id, remapMap),
+        checklist_ref: checklistRefMapped,
+        source_cl_id: sourceClMapped,
+      },
+      aliasMap,
+    );
+  });
 
   // Checklisten-cell_id: wenn eine Liste im Export cell_id gesetzt
   // hat, aber diese Cell NICHT unter den remappten Cells ist, dann
   // kam sie vom Quell-Container (Cell-Subtree-Export). Wir haengen
   // sie an die Ziel-Zelle.
-  const checklistsOut = (
-    payload.checklists as Array<Record<string, unknown>>
-  ).map((cl) => {
+  const checklistsOut = (payload.checklists as Array<Record<string, unknown>>).map((cl) => {
     const raw = cl as {
       id: string;
       board_id: string | null;
@@ -817,32 +755,27 @@ export async function executeSubtreeImportIntoCell(args: {
     );
   });
 
-  const checklistItemsOut = (
-    payload.checklist_items as Array<Record<string, unknown>>
-  ).map((it) => ({
-    ...it,
-    id: remapMap.get((it as { id: string }).id)!,
-    workspace_id: workspaceId,
-    checklist_id: remap(
-      (it as { checklist_id: string }).checklist_id,
-      remapMap,
-    ),
-  }));
-
-  const linksOut = (payload.links as Array<Record<string, unknown>>).map(
-    (l) => {
-      const raw = l as { id: string; board_id: string };
-      return applyAliasMap(
-        {
-          ...l,
-          id: remapMap.get(raw.id)!,
-          workspace_id: workspaceId,
-          board_id: remap(raw.board_id, remapMap),
-        },
-        aliasMap,
-      );
-    },
+  const checklistItemsOut = (payload.checklist_items as Array<Record<string, unknown>>).map(
+    (it) => ({
+      ...it,
+      id: remapMap.get((it as { id: string }).id)!,
+      workspace_id: workspaceId,
+      checklist_id: remap((it as { checklist_id: string }).checklist_id, remapMap),
+    }),
   );
+
+  const linksOut = (payload.links as Array<Record<string, unknown>>).map((l) => {
+    const raw = l as { id: string; board_id: string };
+    return applyAliasMap(
+      {
+        ...l,
+        id: remapMap.get(raw.id)!,
+        workspace_id: workspaceId,
+        board_id: remap(raw.board_id, remapMap),
+      },
+      aliasMap,
+    );
+  });
 
   // Docs: neue UUID pro Doc, attached_cell_id remappen. Falls eine
   // Doc im Export an der Quell-Container-Zelle (NICHT in remapMap) hing,
@@ -931,14 +864,11 @@ export async function executeSubtreeImportIntoCell(args: {
   // Export), mergen wir zusaetzlich info-Felder/Links + aktivieren die
   // passenden Flags (info / checklists).
   const featKey = rootRow.type === 'matrix' ? 'matrix' : 'board';
-  const nextFeatures = new Set<string>(
-    (targetCell.features ?? []) as string[],
-  );
+  const nextFeatures = new Set<string>((targetCell.features ?? []) as string[]);
   nextFeatures.add(featKey);
 
   const targetDataBase =
-    ((targetCell as { data?: unknown }).data as Record<string, unknown> | null) ??
-    {};
+    ((targetCell as { data?: unknown }).data as Record<string, unknown> | null) ?? {};
   let mergedData: Record<string, unknown> = { ...targetDataBase };
 
   if (payload.sourceCell) {
@@ -949,9 +879,7 @@ export async function executeSubtreeImportIntoCell(args: {
     for (const f of scFeatures) {
       if (f === 'info' || f === 'checklists') nextFeatures.add(f);
     }
-    const srcFields = Array.isArray(
-      (scData as { infoFields?: unknown }).infoFields,
-    )
+    const srcFields = Array.isArray((scData as { infoFields?: unknown }).infoFields)
       ? ((scData as { infoFields: unknown[] }).infoFields as Array<{
           id?: unknown;
           label?: unknown;
@@ -968,13 +896,9 @@ export async function executeSubtreeImportIntoCell(args: {
     const existingFields = Array.isArray(mergedData.infoFields)
       ? (mergedData.infoFields as unknown[])
       : [];
-    const existingLinks = Array.isArray(mergedData.links)
-      ? (mergedData.links as unknown[])
-      : [];
+    const existingLinks = Array.isArray(mergedData.links) ? (mergedData.links as unknown[]) : [];
     const newFields = srcFields
-      .filter(
-        (f) => typeof f.label === 'string' && typeof f.value === 'string',
-      )
+      .filter((f) => typeof f.label === 'string' && typeof f.value === 'string')
       .map((f) => ({
         id: newUuid(),
         label: f.label as string,
@@ -1015,10 +939,7 @@ export async function executeSubtreeImportIntoCell(args: {
           features: Array.from(nextFeatures),
           data: mergedData,
         };
-  const { error: patchErr } = await supabase
-    .from('cells')
-    .update(patch)
-    .eq('id', targetCellId);
+  const { error: patchErr } = await supabase.from('cells').update(patch).eq('id', targetCellId);
   if (patchErr) {
     // Ziel-Zelle-Patch hat geworfen — Nodes + Docs wurden schon
     // eingefuegt. Cleanup nachziehen, damit der Workspace nicht mit
@@ -1060,8 +981,7 @@ async function executeCellContainerMerge(args: {
     {};
   const sourceFeatures =
     payload.sourceCell?.features ??
-    ((payload.cells[0] as { features?: unknown } | undefined)
-      ?.features as string[] | undefined) ??
+    ((payload.cells[0] as { features?: unknown } | undefined)?.features as string[] | undefined) ??
     [];
   const sourceFields = (
     Array.isArray((sourceData as { infoFields?: unknown }).infoFields)
@@ -1084,14 +1004,11 @@ async function executeCellContainerMerge(args: {
       'Die Ziel-Zelle konnte nicht geladen werden — wurde sie gerade geloescht?',
     );
   }
-  const targetData =
-    ((targetCell.data as unknown) as Record<string, unknown>) ?? {};
+  const targetData = (targetCell.data as unknown as Record<string, unknown>) ?? {};
   const existingFields = Array.isArray(targetData.infoFields)
     ? (targetData.infoFields as unknown[])
     : [];
-  const existingLinks = Array.isArray(targetData.links)
-    ? (targetData.links as unknown[])
-    : [];
+  const existingLinks = Array.isArray(targetData.links) ? (targetData.links as unknown[]) : [];
 
   const newFields = sourceFields
     .filter((f) => typeof f.label === 'string' && typeof f.value === 'string')
@@ -1110,9 +1027,7 @@ async function executeCellContainerMerge(args: {
 
   // Features mergen: Source-Features (nur info/checklists relevant —
   // matrix/board kommen nicht hier an) + bestehende Target-Features.
-  const nextFeatures = new Set<string>(
-    (targetCell.features ?? []) as string[],
-  );
+  const nextFeatures = new Set<string>((targetCell.features ?? []) as string[]);
   for (const f of sourceFeatures) {
     if (f === 'info' || f === 'checklists') nextFeatures.add(f);
   }
@@ -1135,10 +1050,8 @@ async function executeCellContainerMerge(args: {
   //    neuer UUID, cell_id=target, board_id=null, position ans Ende.
   step?.('Checklisten mergen…');
   const remapMap: RemapMap = new Map();
-  for (const cl of payload.checklists)
-    remap((cl as { id: string }).id, remapMap);
-  for (const it of payload.checklist_items)
-    remap((it as { id: string }).id, remapMap);
+  for (const cl of payload.checklists) remap((cl as { id: string }).id, remapMap);
+  for (const it of payload.checklist_items) remap((it as { id: string }).id, remapMap);
 
   if (payload.checklists.length > 0) {
     const aliasMap = await reserveAliases(
@@ -1158,9 +1071,7 @@ async function executeCellContainerMerge(args: {
         ? ((existingLists[0].position as number) ?? 0) + 1
         : 0;
 
-    const checklistsOut = (
-      payload.checklists as Array<Record<string, unknown>>
-    ).map((cl, idx) => {
+    const checklistsOut = (payload.checklists as Array<Record<string, unknown>>).map((cl, idx) => {
       const raw = cl as { id: string };
       return applyAliasMap(
         {
@@ -1174,16 +1085,11 @@ async function executeCellContainerMerge(args: {
         aliasMap,
       );
     });
-    const itemsOut = (
-      payload.checklist_items as Array<Record<string, unknown>>
-    ).map((it) => ({
+    const itemsOut = (payload.checklist_items as Array<Record<string, unknown>>).map((it) => ({
       ...it,
       id: remapMap.get((it as { id: string }).id)!,
       workspace_id: workspaceId,
-      checklist_id: remap(
-        (it as { checklist_id: string }).checklist_id,
-        remapMap,
-      ),
+      checklist_id: remap((it as { checklist_id: string }).checklist_id, remapMap),
     }));
     await insertBatch('checklists', checklistsOut);
     await insertBatch('checklist_items', itemsOut);
@@ -1198,17 +1104,16 @@ async function executeCellContainerMerge(args: {
         typeof d.alias === 'string' && d.alias ? [d.alias] : [],
       ),
     );
-    const docsOut = (payload.docs as Array<Record<string, unknown>>).map(
-      (d) =>
-        applyAliasMap(
-          {
-            ...d,
-            id: newUuid(),
-            workspace_id: workspaceId,
-            attached_cell_id: targetCellId,
-          },
-          aliasMap,
-        ),
+    const docsOut = (payload.docs as Array<Record<string, unknown>>).map((d) =>
+      applyAliasMap(
+        {
+          ...d,
+          id: newUuid(),
+          workspace_id: workspaceId,
+          attached_cell_id: targetCellId,
+        },
+        aliasMap,
+      ),
     );
     await insertBatch('docs', docsOut);
   }
@@ -1245,7 +1150,7 @@ export async function executeFeatureInfoImport(args: {
     step('Sicherungs-Export…');
     const { exportFeatureInfo, downloadSubtreeExport } = await import('./export');
     const current = await exportFeatureInfo(targetCellId, args.workspaceId);
-    await downloadSubtreeExport(current,`backup-info`);
+    await downloadSubtreeExport(current, `backup-info`);
   }
   if (mode === 'overwrite' || mode === 'export-overwrite') {
     step('Bisherige Info-Daten leeren…');
@@ -1254,18 +1159,16 @@ export async function executeFeatureInfoImport(args: {
   step('Info-Felder + Links mergen…');
   const sourceCell = payload.cells[0];
   if (!sourceCell) {
-    throw new ImportError(
-      'Die Info-Export-Datei ist leer — keine Felder oder Links drin.',
-    );
+    throw new ImportError('Die Info-Export-Datei ist leer — keine Felder oder Links drin.');
   }
-  const sourceData =
-    ((sourceCell as { data?: unknown }).data as Record<string, unknown>) ?? {};
-  const sourceFields =
-    (Array.isArray(sourceData.infoFields) ? sourceData.infoFields : []) as Array<{
-      id?: unknown;
-      label?: unknown;
-      value?: unknown;
-    }>;
+  const sourceData = ((sourceCell as { data?: unknown }).data as Record<string, unknown>) ?? {};
+  const sourceFields = (
+    Array.isArray(sourceData.infoFields) ? sourceData.infoFields : []
+  ) as Array<{
+    id?: unknown;
+    label?: unknown;
+    value?: unknown;
+  }>;
   const sourceLinks = (Array.isArray(sourceData.links) ? sourceData.links : []) as Array<{
     id?: unknown;
     label?: unknown;
@@ -1282,14 +1185,11 @@ export async function executeFeatureInfoImport(args: {
       'Die Ziel-Zelle konnte nicht geladen werden — wurde sie gerade geloescht?',
     );
   }
-  const targetData =
-    ((targetCell.data as unknown) as Record<string, unknown>) ?? {};
+  const targetData = (targetCell.data as unknown as Record<string, unknown>) ?? {};
   const existingFields = Array.isArray(targetData.infoFields)
     ? (targetData.infoFields as unknown[])
     : [];
-  const existingLinks = Array.isArray(targetData.links)
-    ? (targetData.links as unknown[])
-    : [];
+  const existingLinks = Array.isArray(targetData.links) ? (targetData.links as unknown[]) : [];
 
   // IDs mit neuen UUIDs; labels + values unveraendert durchreichen.
   const newFields = sourceFields
@@ -1335,9 +1235,7 @@ export async function executeFeatureChecklistsImport(args: {
   const { payload, workspaceId, targetCellId } = args;
   const mode = args.mode ?? 'add';
   if (payload.payloadType !== 'feature-checklists') {
-    throw new ImportError(
-      'Das ist kein Checklisten-Export. Bitte waehle eine Checklisten-Datei.',
-    );
+    throw new ImportError('Das ist kein Checklisten-Export. Bitte waehle eine Checklisten-Datei.');
   }
   // Progress: backup / clear / vorbereitung / listen / items.
   const phaseTotal =
@@ -1351,11 +1249,9 @@ export async function executeFeatureChecklistsImport(args: {
   };
   if (mode === 'export-overwrite') {
     step('Sicherungs-Export…');
-    const { exportFeatureChecklists, downloadSubtreeExport } = await import(
-      './export'
-    );
+    const { exportFeatureChecklists, downloadSubtreeExport } = await import('./export');
     const current = await exportFeatureChecklists(targetCellId, workspaceId);
-    await downloadSubtreeExport(current,`backup-checklists`);
+    await downloadSubtreeExport(current, `backup-checklists`);
   }
   if (mode === 'overwrite' || mode === 'export-overwrite') {
     step('Bisherige Checklisten leeren…');
@@ -1364,10 +1260,8 @@ export async function executeFeatureChecklistsImport(args: {
   step('Vorbereitung…');
   const aliasMap = await reserveAliases(workspaceId, collectAliases(payload));
   const remapMap: RemapMap = new Map();
-  for (const cl of payload.checklists)
-    remap((cl as { id: string }).id, remapMap);
-  for (const it of payload.checklist_items)
-    remap((it as { id: string }).id, remapMap);
+  for (const cl of payload.checklists) remap((cl as { id: string }).id, remapMap);
+  for (const it of payload.checklist_items) remap((it as { id: string }).id, remapMap);
 
   // Position-Offset: wir haengen hinter die letzte existierende Liste
   // in dieser Cell.
@@ -1382,9 +1276,7 @@ export async function executeFeatureChecklistsImport(args: {
       ? ((existing[0].position as number) ?? 0) + 1
       : 0;
 
-  const checklistsOut = (
-    payload.checklists as Array<Record<string, unknown>>
-  ).map((cl, idx) => {
+  const checklistsOut = (payload.checklists as Array<Record<string, unknown>>).map((cl, idx) => {
     const raw = cl as { id: string };
     return applyAliasMap(
       {
@@ -1399,16 +1291,11 @@ export async function executeFeatureChecklistsImport(args: {
     );
   });
 
-  const itemsOut = (
-    payload.checklist_items as Array<Record<string, unknown>>
-  ).map((it) => ({
+  const itemsOut = (payload.checklist_items as Array<Record<string, unknown>>).map((it) => ({
     ...it,
     id: remapMap.get((it as { id: string }).id)!,
     workspace_id: workspaceId,
-    checklist_id: remap(
-      (it as { checklist_id: string }).checklist_id,
-      remapMap,
-    ),
+    checklist_id: remap((it as { checklist_id: string }).checklist_id, remapMap),
   }));
 
   step('Checklisten einfuegen…');
@@ -1422,16 +1309,11 @@ export async function executeFeatureChecklistsImport(args: {
     .select('features')
     .eq('id', targetCellId)
     .single();
-  const features = ((targetCell?.features ?? []) as string[]).includes(
-    'checklists',
-  )
+  const features = ((targetCell?.features ?? []) as string[]).includes('checklists')
     ? (targetCell?.features as string[])
     : [...((targetCell?.features ?? []) as string[]), 'checklists'];
   if (!((targetCell?.features ?? []) as string[]).includes('checklists')) {
-    await supabase
-      .from('cells')
-      .update({ features })
-      .eq('id', targetCellId);
+    await supabase.from('cells').update({ features }).eq('id', targetCellId);
   }
 
   return {
@@ -1462,15 +1344,11 @@ export async function executeSubtreeImportIntoMatrix(args: {
   const { payload, workspaceId, targetMatrixId } = args;
   const mode = args.mode ?? 'add';
   if (payload.payloadType !== 'subtree' && payload.payloadType !== 'workspace') {
-    throw new ImportError(
-      'In eine Matrix kannst du nur einen Matrix-Export einfuegen.',
-    );
+    throw new ImportError('In eine Matrix kannst du nur einen Matrix-Export einfuegen.');
   }
 
   // Root-Detection (tolerant zu alten Exports).
-  const exportedCellIds = new Set(
-    (payload.cells as Array<{ id: string }>).map((c) => c.id),
-  );
+  const exportedCellIds = new Set((payload.cells as Array<{ id: string }>).map((c) => c.id));
   const rootRow = (
     payload.nodes as Array<{
       id: string;
@@ -1505,7 +1383,7 @@ export async function executeSubtreeImportIntoMatrix(args: {
     step('Sicherungs-Export…');
     const { exportSubtree, downloadSubtreeExport } = await import('./export');
     const current = await exportSubtree(targetMatrixId, workspaceId);
-    await downloadSubtreeExport(current,'backup-ziel-matrix');
+    await downloadSubtreeExport(current, 'backup-ziel-matrix');
   }
   if (mode === 'overwrite' || mode === 'export-overwrite') {
     step('Ziel-Matrix leeren…');
@@ -1564,10 +1442,8 @@ export async function executeSubtreeImportIntoMatrix(args: {
   for (const c of payload.cells) remap((c as { id: string }).id, remapMap);
   for (const k of payload.kb_cols) remap((k as { id: string }).id, remapMap);
   for (const k of payload.kb_cards) remap((k as { id: string }).id, remapMap);
-  for (const cl of payload.checklists)
-    remap((cl as { id: string }).id, remapMap);
-  for (const it of payload.checklist_items)
-    remap((it as { id: string }).id, remapMap);
+  for (const cl of payload.checklists) remap((cl as { id: string }).id, remapMap);
+  for (const it of payload.checklist_items) remap((it as { id: string }).id, remapMap);
   for (const l of payload.links) remap((l as { id: string }).id, remapMap);
   for (const d of payload.docs) remap((d as { id: string }).id, remapMap);
 
@@ -1605,97 +1481,85 @@ export async function executeSubtreeImportIntoMatrix(args: {
 
   // Rows + Cols: matrix_id=target, position mit Offset. Payload-eigene
   // position als relative Reihenfolge beibehalten (fallback idx).
-  const rowsOut = (payload.rows as Array<Record<string, unknown>>).map(
-    (r, idx) => {
-      const raw = r as { id: string; position?: number };
-      return {
-        ...r,
-        id: remapMap.get(raw.id)!,
-        workspace_id: workspaceId,
-        matrix_id: targetMatrixId,
-        position: rowOffset + (raw.position ?? idx),
-      };
-    },
-  );
-  const colsOut = (payload.cols as Array<Record<string, unknown>>).map(
-    (c, idx) => {
-      const raw = c as { id: string; position?: number };
-      return {
+  const rowsOut = (payload.rows as Array<Record<string, unknown>>).map((r, idx) => {
+    const raw = r as { id: string; position?: number };
+    return {
+      ...r,
+      id: remapMap.get(raw.id)!,
+      workspace_id: workspaceId,
+      matrix_id: targetMatrixId,
+      position: rowOffset + (raw.position ?? idx),
+    };
+  });
+  const colsOut = (payload.cols as Array<Record<string, unknown>>).map((c, idx) => {
+    const raw = c as { id: string; position?: number };
+    return {
+      ...c,
+      id: remapMap.get(raw.id)!,
+      workspace_id: workspaceId,
+      matrix_id: targetMatrixId,
+      position: colOffset + (raw.position ?? idx),
+    };
+  });
+
+  const cellsOut = (payload.cells as Array<Record<string, unknown>>).map((c) => {
+    const raw = c as {
+      id: string;
+      matrix_id: string;
+      row_id: string;
+      col_id: string;
+      child_matrix_id: string | null;
+      board_id: string | null;
+    };
+    return applyAliasMap(
+      {
         ...c,
         id: remapMap.get(raw.id)!,
         workspace_id: workspaceId,
-        matrix_id: targetMatrixId,
-        position: colOffset + (raw.position ?? idx),
-      };
-    },
-  );
+        matrix_id: remap(raw.matrix_id, remapMap),
+        row_id: remap(raw.row_id, remapMap),
+        col_id: remap(raw.col_id, remapMap),
+        child_matrix_id: remap(raw.child_matrix_id, remapMap),
+        board_id: remap(raw.board_id, remapMap),
+      },
+      aliasMap,
+    );
+  });
 
-  const cellsOut = (payload.cells as Array<Record<string, unknown>>).map(
-    (c) => {
-      const raw = c as {
-        id: string;
-        matrix_id: string;
-        row_id: string;
-        col_id: string;
-        child_matrix_id: string | null;
-        board_id: string | null;
-      };
-      return applyAliasMap(
-        {
-          ...c,
-          id: remapMap.get(raw.id)!,
-          workspace_id: workspaceId,
-          matrix_id: remap(raw.matrix_id, remapMap),
-          row_id: remap(raw.row_id, remapMap),
-          col_id: remap(raw.col_id, remapMap),
-          child_matrix_id: remap(raw.child_matrix_id, remapMap),
-          board_id: remap(raw.board_id, remapMap),
-        },
-        aliasMap,
-      );
-    },
-  );
-
-  const kbColsOut = (payload.kb_cols as Array<Record<string, unknown>>).map(
-    (k) => ({
-      ...k,
-      id: remapMap.get((k as { id: string }).id)!,
-      workspace_id: workspaceId,
-      board_id: remap((k as { board_id: string }).board_id, remapMap),
-    }),
-  );
-  const kbCardsOut = (payload.kb_cards as Array<Record<string, unknown>>).map(
-    (k) => {
-      const raw = k as {
-        id: string;
-        board_id: string;
-        col_id: string;
-        checklist_ref: string | null;
-        source_cl_id: string | null;
-      };
-      return applyAliasMap(
-        {
-          ...k,
-          id: remapMap.get(raw.id)!,
-          workspace_id: workspaceId,
-          board_id: remap(raw.board_id, remapMap),
-          col_id: remap(raw.col_id, remapMap),
-          checklist_ref:
-            raw.checklist_ref && remapMap.has(raw.checklist_ref)
-              ? remapMap.get(raw.checklist_ref)!
-              : null,
-          source_cl_id:
-            raw.source_cl_id && remapMap.has(raw.source_cl_id)
-              ? remapMap.get(raw.source_cl_id)!
-              : null,
-        },
-        aliasMap,
-      );
-    },
-  );
-  const checklistsOut = (
-    payload.checklists as Array<Record<string, unknown>>
-  ).map((cl) => {
+  const kbColsOut = (payload.kb_cols as Array<Record<string, unknown>>).map((k) => ({
+    ...k,
+    id: remapMap.get((k as { id: string }).id)!,
+    workspace_id: workspaceId,
+    board_id: remap((k as { board_id: string }).board_id, remapMap),
+  }));
+  const kbCardsOut = (payload.kb_cards as Array<Record<string, unknown>>).map((k) => {
+    const raw = k as {
+      id: string;
+      board_id: string;
+      col_id: string;
+      checklist_ref: string | null;
+      source_cl_id: string | null;
+    };
+    return applyAliasMap(
+      {
+        ...k,
+        id: remapMap.get(raw.id)!,
+        workspace_id: workspaceId,
+        board_id: remap(raw.board_id, remapMap),
+        col_id: remap(raw.col_id, remapMap),
+        checklist_ref:
+          raw.checklist_ref && remapMap.has(raw.checklist_ref)
+            ? remapMap.get(raw.checklist_ref)!
+            : null,
+        source_cl_id:
+          raw.source_cl_id && remapMap.has(raw.source_cl_id)
+            ? remapMap.get(raw.source_cl_id)!
+            : null,
+      },
+      aliasMap,
+    );
+  });
+  const checklistsOut = (payload.checklists as Array<Record<string, unknown>>).map((cl) => {
     const raw = cl as {
       id: string;
       board_id: string | null;
@@ -1712,32 +1576,27 @@ export async function executeSubtreeImportIntoMatrix(args: {
       aliasMap,
     );
   });
-  const checklistItemsOut = (
-    payload.checklist_items as Array<Record<string, unknown>>
-  ).map((it) => ({
-    ...it,
-    id: remapMap.get((it as { id: string }).id)!,
-    workspace_id: workspaceId,
-    checklist_id: remap(
-      (it as { checklist_id: string }).checklist_id,
-      remapMap,
-    ),
-  }));
-  const linksOut = (payload.links as Array<Record<string, unknown>>).map(
-    (l) => {
-      const raw = l as { id: string; board_id: string; url?: string };
-      return applyAliasMap(
-        {
-          ...l,
-          id: remapMap.get(raw.id)!,
-          workspace_id: workspaceId,
-          board_id: remap(raw.board_id, remapMap),
-          url: sanitizeUrl(raw.url) ?? '',
-        },
-        aliasMap,
-      );
-    },
+  const checklistItemsOut = (payload.checklist_items as Array<Record<string, unknown>>).map(
+    (it) => ({
+      ...it,
+      id: remapMap.get((it as { id: string }).id)!,
+      workspace_id: workspaceId,
+      checklist_id: remap((it as { checklist_id: string }).checklist_id, remapMap),
+    }),
   );
+  const linksOut = (payload.links as Array<Record<string, unknown>>).map((l) => {
+    const raw = l as { id: string; board_id: string; url?: string };
+    return applyAliasMap(
+      {
+        ...l,
+        id: remapMap.get(raw.id)!,
+        workspace_id: workspaceId,
+        board_id: remap(raw.board_id, remapMap),
+        url: sanitizeUrl(raw.url) ?? '',
+      },
+      aliasMap,
+    );
+  });
   const docsOut = (payload.docs as Array<Record<string, unknown>>).map((d) => {
     const raw = d as { id: string; attached_cell_id: string | null };
     // attached_cell_id remappen (wenn im Export dabei), sonst NULL lassen —
@@ -1812,10 +1671,7 @@ export async function executeSubtreeImportIntoMatrix(args: {
     }
     if (rootData && typeof rootData === 'object') patch.data = rootData;
     if (Object.keys(patch).length > 0) {
-      const { error: nupErr } = await supabase
-        .from('nodes')
-        .update(patch)
-        .eq('id', targetMatrixId);
+      const { error: nupErr } = await supabase.from('nodes').update(patch).eq('id', targetMatrixId);
       if (nupErr) {
         // Matrix-Label-/Alias-Patch hat geworfen — Inserts stehen,
         // Workspace ist inkonsistent. Cleanup, damit die zuvor ange-
@@ -1848,14 +1704,10 @@ export async function executeSubtreeImportIntoBoard(args: {
   const { payload, workspaceId, targetBoardId } = args;
   const mode = args.mode ?? 'add';
   if (payload.payloadType !== 'subtree' && payload.payloadType !== 'workspace') {
-    throw new ImportError(
-      'In ein Board kannst du nur einen Board-Export einfuegen.',
-    );
+    throw new ImportError('In ein Board kannst du nur einen Board-Export einfuegen.');
   }
 
-  const exportedCellIds = new Set(
-    (payload.cells as Array<{ id: string }>).map((c) => c.id),
-  );
+  const exportedCellIds = new Set((payload.cells as Array<{ id: string }>).map((c) => c.id));
   const rootRow = (
     payload.nodes as Array<{
       id: string;
@@ -1889,7 +1741,7 @@ export async function executeSubtreeImportIntoBoard(args: {
     step('Sicherungs-Export…');
     const { exportSubtree, downloadSubtreeExport } = await import('./export');
     const current = await exportSubtree(targetBoardId, workspaceId);
-    await downloadSubtreeExport(current,'backup-ziel-board');
+    await downloadSubtreeExport(current, 'backup-ziel-board');
   }
   if (mode === 'overwrite' || mode === 'export-overwrite') {
     step('Ziel-Board leeren…');
@@ -1910,10 +1762,7 @@ export async function executeSubtreeImportIntoBoard(args: {
       .delete()
       .eq('board_id', targetBoardId);
     if (clErr) throw clErr;
-    const { error: linksErr } = await supabase
-      .from('links')
-      .delete()
-      .eq('board_id', targetBoardId);
+    const { error: linksErr } = await supabase.from('links').delete().eq('board_id', targetBoardId);
     if (linksErr) throw linksErr;
     // Target-Alias auf NULL, damit reserveAliases kollisionsfrei die
     // Payload-Root-Alias verwenden kann.
@@ -1969,9 +1818,9 @@ export async function executeSubtreeImportIntoBoard(args: {
     payload.checklists as Array<{ id: string; board_id: string | null }>
   ).filter((cl) => cl.board_id === rootId);
   const checklistIdsSrc = new Set(checklistsSrc.map((cl) => cl.id));
-  const itemsSrc = (
-    payload.checklist_items as Array<{ id: string; checklist_id: string }>
-  ).filter((it) => checklistIdsSrc.has(it.checklist_id));
+  const itemsSrc = (payload.checklist_items as Array<{ id: string; checklist_id: string }>).filter(
+    (it) => checklistIdsSrc.has(it.checklist_id),
+  );
   const linksSrc = (
     payload.links as Array<{ id: string; board_id: string; position?: number }>
   ).filter((l) => l.board_id === rootId);
@@ -2002,13 +1851,9 @@ export async function executeSubtreeImportIntoBoard(args: {
         board_id: targetBoardId,
         col_id: remap(k.col_id, remapMap),
         checklist_ref:
-          k.checklist_ref && remapMap.has(k.checklist_ref)
-            ? remapMap.get(k.checklist_ref)!
-            : null,
+          k.checklist_ref && remapMap.has(k.checklist_ref) ? remapMap.get(k.checklist_ref)! : null,
         source_cl_id:
-          k.source_cl_id && remapMap.has(k.source_cl_id)
-            ? remapMap.get(k.source_cl_id)!
-            : null,
+          k.source_cl_id && remapMap.has(k.source_cl_id) ? remapMap.get(k.source_cl_id)! : null,
       },
       aliasMap,
     ),
@@ -2070,10 +1915,7 @@ export async function executeSubtreeImportIntoBoard(args: {
     }
     if (rootData && typeof rootData === 'object') patch.data = rootData;
     if (Object.keys(patch).length > 0) {
-      const { error: nupErr } = await supabase
-        .from('nodes')
-        .update(patch)
-        .eq('id', targetBoardId);
+      const { error: nupErr } = await supabase.from('nodes').update(patch).eq('id', targetBoardId);
       if (nupErr) throw nupErr;
     }
   }

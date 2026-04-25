@@ -10,8 +10,8 @@
 // tatsaechlich noetig sind (Node-ID, Matrix-ID fuer Cell, Board-ID
 // fuer Card, URL fuer Link).
 
-import { supabase } from './supabase';
 import { validateAliasFormat } from './alias';
+import { supabase } from './supabase';
 
 export type AliasResolveResult =
   | { kind: 'node'; nodeId: string; nodeType: 'matrix' | 'board'; label: string }
@@ -40,10 +40,7 @@ export type AliasResolveOutcome =
 // sollten durch die Alias-Validierung beim Schreiben verhindert sein;
 // falls doch einer existiert, priorisieren wir nodes > cells > cards >
 // checklists > links — erste Quelle die trifft).
-export async function resolveAlias(
-  raw: string,
-  workspaceId: string,
-): Promise<AliasResolveOutcome> {
+export async function resolveAlias(raw: string, workspaceId: string): Promise<AliasResolveOutcome> {
   const stripped = raw.trim().replace(/^\^+/, '');
   const fmt = validateAliasFormat(stripped);
   if (!fmt.ok) return { ok: false, msg: fmt.msg };

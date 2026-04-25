@@ -13,41 +13,26 @@
 //   col-pick — Sekundaer-Prompt fuer move-card ohne explizite Spalte:
 //              zeigt die Ziel-Board-Spalten als Select, User bestaetigt.
 
-import {
-  createMemo,
-  createSignal,
-  For,
-  onCleanup,
-  onMount,
-  Show,
-  type Component,
-} from 'solid-js';
 import { useNavigate } from '@solidjs/router';
-import type { NodeRow } from '../lib/types';
+import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
+import { dispatchAliasResult } from '../lib/alias-dispatch';
+import { resolveAlias } from '../lib/alias-resolve';
 import {
   COMMAND_VERBS,
+  type CommandUiHooks,
   executeCommand,
   parseCommand,
   reportOutcome,
-  type CommandUiHooks,
 } from '../lib/commands';
-import { resolveAlias } from '../lib/alias-resolve';
-import { dispatchAliasResult } from '../lib/alias-dispatch';
-import {
-  runResetAll,
-  runResetScope,
-  type ResetScope,
-} from '../lib/workspace-reset';
+import { openDocsPopup } from '../lib/docs-ui';
+import { translateDbError } from '../lib/errors';
+import { flashError } from '../lib/flash';
 import { moveCardToBoard } from '../lib/mutations';
 import { supabase } from '../lib/supabase';
-import { flashError } from '../lib/flash';
-import { openDocsPopup } from '../lib/docs-ui';
 import { showToast } from '../lib/toasts';
-import { translateDbError } from '../lib/errors';
-import {
-  exportWorkspaceWithUi,
-  importWorkspaceWithUi,
-} from '../lib/workspace-io';
+import type { NodeRow } from '../lib/types';
+import { exportWorkspaceWithUi, importWorkspaceWithUi } from '../lib/workspace-io';
+import { type ResetScope, runResetAll, runResetScope } from '../lib/workspace-reset';
 
 type Props = {
   workspaceId: string;
@@ -200,10 +185,7 @@ const CommandPalette: Component<Props> = (p) => {
       if (result) {
         // Nach Reset zur neuen Root-Matrix navigieren.
         p.onClose();
-        setTimeout(
-          () => navigate(`/w/${p.workspaceId}/n/${result.rootMatrixId}`),
-          0,
-        );
+        setTimeout(() => navigate(`/w/${p.workspaceId}/n/${result.rootMatrixId}`), 0);
         return true;
       }
       return false;
@@ -376,8 +358,8 @@ const CommandPalette: Component<Props> = (p) => {
           {(state) => (
             <div class="command-palette-colpick">
               <p class="command-palette-colpick-title">
-                Karte <strong>{state().cardLabel}</strong> in{' '}
-                <strong>{state().boardLabel}</strong> — Spalte waehlen:
+                Karte <strong>{state().cardLabel}</strong> in <strong>{state().boardLabel}</strong>{' '}
+                — Spalte waehlen:
               </p>
               <select
                 ref={colSelectRef}
@@ -385,7 +367,7 @@ const CommandPalette: Component<Props> = (p) => {
                 size={Math.min(8, state().cols.length)}
                 value={state().selectedIdx}
                 onChange={(e) => {
-                  const idx = parseInt(e.currentTarget.value, 10);
+                  const idx = Number.parseInt(e.currentTarget.value, 10);
                   const cur = colPick();
                   if (cur) setColPick({ ...cur, selectedIdx: idx });
                 }}
@@ -397,9 +379,7 @@ const CommandPalette: Component<Props> = (p) => {
                 }}
               >
                 <For each={state().cols}>
-                  {(col, idx) => (
-                    <option value={idx()}>{col.label || '(leer)'}</option>
-                  )}
+                  {(col, idx) => <option value={idx()}>{col.label || '(leer)'}</option>}
                 </For>
               </select>
               <div class="command-palette-colpick-actions">

@@ -6,14 +6,14 @@
 // Realtime: nodes.data mutiert -> postgres_changes.nodes feuert ->
 // Workspace refetcht nodes -> currentNode().data.description ist frisch.
 
-import { Show, createEffect, createSignal, onCleanup, type Component } from 'solid-js';
-import type { NodeRow } from '../lib/types';
+import { type Component, Show, createEffect, createSignal, onCleanup } from 'solid-js';
 import { useEditMode } from '../lib/edit-mode';
+import { translateDbError } from '../lib/errors';
 import { setNodeDescription } from '../lib/mutations';
 import { showToast } from '../lib/toasts';
-import { translateDbError } from '../lib/errors';
-import MarkdownLightView from './MarkdownLightView';
+import type { NodeRow } from '../lib/types';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
+import MarkdownLightView from './MarkdownLightView';
 
 type Props = {
   node: NodeRow;

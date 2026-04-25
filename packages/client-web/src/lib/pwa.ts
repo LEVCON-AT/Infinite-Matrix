@@ -23,8 +23,7 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 };
 
-const [deferredPrompt, setDeferredPrompt] =
-  createSignal<BeforeInstallPromptEvent | null>(null);
+const [deferredPrompt, setDeferredPrompt] = createSignal<BeforeInstallPromptEvent | null>(null);
 const [installed, setInstalled] = createSignal<boolean>(false);
 
 export function installPromptSignal() {

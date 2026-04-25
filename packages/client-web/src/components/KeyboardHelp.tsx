@@ -1,7 +1,7 @@
 // Cheat-Sheet fuer alle Tastatur-Shortcuts. Oeffnet via ? und schliesst
 // via ESC. Liste ist handgepflegt — waechst mit neuen Shortcuts.
 
-import { For, onCleanup, onMount, type Component } from 'solid-js';
+import { type Component, For, onCleanup, onMount } from 'solid-js';
 import Icon from './Icon';
 
 type Props = {
@@ -30,7 +30,10 @@ const SECTIONS: ShortcutSection[] = [
       { keys: ['Shift+D'], desc: 'Dokumentations-Popup oeffnen' },
       { keys: ['Shift+N'], desc: 'Sidebar-Modus zyklen (full → rails → aus)' },
       { keys: ['s'], desc: 'Fokus Sidebar ↔ Canvas swappen' },
-      { keys: ['Shift+W'], desc: 'Aufgabenuebersicht ↔ Intervallmatrix toggeln (im Matrix-Kontext)' },
+      {
+        keys: ['Shift+W'],
+        desc: 'Aufgabenuebersicht ↔ Intervallmatrix toggeln (im Matrix-Kontext)',
+      },
       { keys: ['Shift+E'], desc: 'Edit-Mode togglen' },
       { keys: ['Shift+A'], desc: 'Sidebar: alles aufklappen (sticky)' },
       { keys: ['Esc'], desc: 'Overlay schliessen / eine Ebene hoch' },
@@ -100,12 +103,7 @@ const KeyboardHelp: Component<Props> = (p) => {
       >
         <header class="overlay-head">
           <h3>Tastatur-Shortcuts</h3>
-          <button
-            type="button"
-            class="overlay-close"
-            onClick={p.onClose}
-            aria-label="Schliessen"
-          >
+          <button type="button" class="overlay-close" onClick={p.onClose} aria-label="Schliessen">
             <Icon name="x" size={18} />
           </button>
         </header>

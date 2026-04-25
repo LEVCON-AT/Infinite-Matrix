@@ -8,8 +8,8 @@
 // RLS kuemmert sich um die Authorization: der anonym-JWT sieht nur
 // Rows in Workspaces, in denen der User Mitglied ist.
 
-import { supabase } from './supabase';
 import { encryptPayload } from './crypto';
+import { supabase } from './supabase';
 
 export const WORKSPACE_EXPORT_VERSION = 1 as const;
 
@@ -18,11 +18,7 @@ export const WORKSPACE_EXPORT_VERSION = 1 as const;
 // FK-Ziele), deren data.infoFields + .links der eigentliche Inhalt
 // sind. 'feature-checklists' enthaelt eine Cell + cell-scoped
 // Checklisten + Items.
-export type ExportPayloadType =
-  | 'workspace'
-  | 'subtree'
-  | 'feature-info'
-  | 'feature-checklists';
+export type ExportPayloadType = 'workspace' | 'subtree' | 'feature-info' | 'feature-checklists';
 
 export type WorkspaceExport = {
   version: typeof WORKSPACE_EXPORT_VERSION;
@@ -105,31 +101,18 @@ export function formatExportStats(s: ExportStats): string {
   // Nur Zahlen > 0 anzeigen — ein Feature-Export zeigt sonst nutzlose
   // 0-Zeilen.
   const parts: string[] = [];
-  if (s.matrixCount)
-    parts.push(
-      `${s.matrixCount} ${s.matrixCount === 1 ? 'Matrix' : 'Matrizen'}`,
-    );
-  if (s.boardCount)
-    parts.push(`${s.boardCount} ${s.boardCount === 1 ? 'Board' : 'Boards'}`);
+  if (s.matrixCount) parts.push(`${s.matrixCount} ${s.matrixCount === 1 ? 'Matrix' : 'Matrizen'}`);
+  if (s.boardCount) parts.push(`${s.boardCount} ${s.boardCount === 1 ? 'Board' : 'Boards'}`);
   if (s.cells) parts.push(`${s.cells} ${s.cells === 1 ? 'Zelle' : 'Zellen'}`);
   if (s.cards) parts.push(`${s.cards} ${s.cards === 1 ? 'Karte' : 'Karten'}`);
   if (s.checklists)
-    parts.push(
-      `${s.checklists} ${s.checklists === 1 ? 'Checkliste' : 'Checklisten'}`,
-    );
+    parts.push(`${s.checklists} ${s.checklists === 1 ? 'Checkliste' : 'Checklisten'}`);
   if (s.checklistItems)
-    parts.push(
-      `${s.checklistItems} ${s.checklistItems === 1 ? 'Punkt' : 'Punkte'}`,
-    );
+    parts.push(`${s.checklistItems} ${s.checklistItems === 1 ? 'Punkt' : 'Punkte'}`);
   if (s.links) parts.push(`${s.links} Board-Links`);
   if (s.infoFields)
-    parts.push(
-      `${s.infoFields} ${s.infoFields === 1 ? 'Info-Feld' : 'Info-Felder'}`,
-    );
-  if (s.infoLinks)
-    parts.push(
-      `${s.infoLinks} ${s.infoLinks === 1 ? 'Info-Link' : 'Info-Links'}`,
-    );
+    parts.push(`${s.infoFields} ${s.infoFields === 1 ? 'Info-Feld' : 'Info-Felder'}`);
+  if (s.infoLinks) parts.push(`${s.infoLinks} ${s.infoLinks === 1 ? 'Info-Link' : 'Info-Links'}`);
   if (s.docs) parts.push(`${s.docs} ${s.docs === 1 ? 'Doku' : 'Dokus'}`);
   return parts.length === 0 ? '(leer)' : parts.join(' · ');
 }
@@ -138,16 +121,10 @@ export function summarizeExport(e: WorkspaceExport): string {
   return formatExportStats(statsOf(e));
 }
 
-export async function exportWorkspace(
-  workspaceId: string,
-): Promise<WorkspaceExport> {
+export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExport> {
   // Workspace-Stammdaten (Name, Owner, Timestamps) — RLS erlaubt nur
   // Read auf Memberships-Workspaces.
-  const wsRes = await supabase
-    .from('workspaces')
-    .select('*')
-    .eq('id', workspaceId)
-    .single();
+  const wsRes = await supabase.from('workspaces').select('*').eq('id', workspaceId).single();
   if (wsRes.error) throw wsRes.error;
 
   // Alle Kind-Tabellen parallel laden. workspace_id-Filter zusaetzlich
@@ -171,10 +148,7 @@ export async function exportWorkspace(
     supabase.from('kb_cols').select('*').eq('workspace_id', workspaceId),
     supabase.from('kb_cards').select('*').eq('workspace_id', workspaceId),
     supabase.from('checklists').select('*').eq('workspace_id', workspaceId),
-    supabase
-      .from('checklist_items')
-      .select('*')
-      .eq('workspace_id', workspaceId),
+    supabase.from('checklist_items').select('*').eq('workspace_id', workspaceId),
     supabase.from('links').select('*').eq('workspace_id', workspaceId),
     supabase.from('docs').select('*').eq('workspace_id', workspaceId),
   ]);
@@ -206,10 +180,7 @@ export async function exportWorkspace(
     kb_cols: (kbColsRes.data ?? []) as Record<string, unknown>[],
     kb_cards: (kbCardsRes.data ?? []) as Record<string, unknown>[],
     checklists: (checklistsRes.data ?? []) as Record<string, unknown>[],
-    checklist_items: (checklistItemsRes.data ?? []) as Record<
-      string,
-      unknown
-    >[],
+    checklist_items: (checklistItemsRes.data ?? []) as Record<string, unknown>[],
     links: (linksRes.data ?? []) as Record<string, unknown>[],
     docs: (docsRes.data ?? []) as Record<string, unknown>[],
   };
@@ -230,9 +201,7 @@ export async function downloadWorkspaceExport(
   encrypt?: { passphrase: string },
 ): Promise<void> {
   const pretty = JSON.stringify(exportData, null, 2);
-  const content = encrypt
-    ? await encryptPayload(pretty, encrypt.passphrase)
-    : pretty;
+  const content = encrypt ? await encryptPayload(pretty, encrypt.passphrase) : pretty;
   const blob = new Blob([content], {
     type: encrypt ? 'application/octet-stream' : 'application/json',
   });
@@ -289,10 +258,7 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     supabase.from('kb_cols').select('*').eq('workspace_id', workspaceId),
     supabase.from('kb_cards').select('*').eq('workspace_id', workspaceId),
     supabase.from('checklists').select('*').eq('workspace_id', workspaceId),
-    supabase
-      .from('checklist_items')
-      .select('*')
-      .eq('workspace_id', workspaceId),
+    supabase.from('checklist_items').select('*').eq('workspace_id', workspaceId),
     supabase.from('links').select('*').eq('workspace_id', workspaceId),
     supabase.from('docs').select('*').eq('workspace_id', workspaceId),
     supabase.from('workspaces').select('*').eq('id', workspaceId).single(),
@@ -314,7 +280,11 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
   }
   return {
     workspace: wsRes.data as Record<string, unknown>,
-    nodes: (nodesRes.data ?? []) as Array<{ id: string; parent_cell_id: string | null; type: string }>,
+    nodes: (nodesRes.data ?? []) as Array<{
+      id: string;
+      parent_cell_id: string | null;
+      type: string;
+    }>,
     rows: (rowsRes.data ?? []) as Array<{ id: string; matrix_id: string }>,
     cols: (colsRes.data ?? []) as Array<{ id: string; matrix_id: string }>,
     cells: (cellsRes.data ?? []) as Array<{
@@ -400,13 +370,7 @@ export async function exportSubtree(
   workspaceId: string,
 ): Promise<WorkspaceExport> {
   const all = await fetchWorkspaceRowsForExport(workspaceId);
-  const sub = collectSubtreeIds(
-    rootNodeId,
-    all.nodes,
-    all.cells,
-    all.rows,
-    all.cols,
-  );
+  const sub = collectSubtreeIds(rootNodeId, all.nodes, all.cells, all.rows, all.cols);
 
   // Pro Tabelle auf Subtree filtern. Board-abhaengige Tabellen
   // (kb_cols, kb_cards, links, checklists mit board_id) ueber
@@ -421,18 +385,14 @@ export async function exportSubtree(
   // keinen Start-Punkt und meldet "Export unvollstaendig".
   const filteredNodes = all.nodes
     .filter((n) => inNodes(n.id))
-    .map((n) =>
-      n.id === rootNodeId ? { ...n, parent_cell_id: null } : n,
-    );
+    .map((n) => (n.id === rootNodeId ? { ...n, parent_cell_id: null } : n));
   const filteredRows = all.rows.filter((r) => sub.rowIds.has(r.id));
   const filteredCols = all.cols.filter((c) => sub.colIds.has(c.id));
   const filteredCells = all.cells.filter((c) => inCells(c.id));
   const filteredKbCols = all.kb_cols.filter((k) => inNodes(k.board_id));
   const filteredKbCards = all.kb_cards.filter((k) => inNodes(k.board_id));
   const filteredChecklists = all.checklists.filter(
-    (cl) =>
-      (cl.board_id && inNodes(cl.board_id)) ||
-      (cl.cell_id && inCells(cl.cell_id)),
+    (cl) => (cl.board_id && inNodes(cl.board_id)) || (cl.cell_id && inCells(cl.cell_id)),
   );
   const filteredChecklistIds = new Set(filteredChecklists.map((cl) => cl.id));
   const filteredChecklistItems = all.checklist_items.filter((it) =>
@@ -440,9 +400,7 @@ export async function exportSubtree(
   );
   const filteredLinks = all.links.filter((l) => inNodes(l.board_id));
   // Docs wandern mit, wenn sie an einer Subtree-Cell kleben.
-  const filteredDocs = all.docs.filter(
-    (d) => d.attached_cell_id && inCells(d.attached_cell_id),
-  );
+  const filteredDocs = all.docs.filter((d) => d.attached_cell_id && inCells(d.attached_cell_id));
 
   return {
     version: WORKSPACE_EXPORT_VERSION,
@@ -456,8 +414,7 @@ export async function exportSubtree(
     kb_cols: filteredKbCols as unknown as Record<string, unknown>[],
     kb_cards: filteredKbCards as unknown as Record<string, unknown>[],
     checklists: filteredChecklists as unknown as Record<string, unknown>[],
-    checklist_items:
-      filteredChecklistItems as unknown as Record<string, unknown>[],
+    checklist_items: filteredChecklistItems as unknown as Record<string, unknown>[],
     links: filteredLinks as unknown as Record<string, unknown>[],
     docs: filteredDocs as unknown as Record<string, unknown>[],
   };
@@ -485,10 +442,7 @@ export async function exportCellSubtree(
 ): Promise<WorkspaceExport> {
   const all = await fetchWorkspaceRowsForExport(workspaceId);
   const cell = all.cells.find((c) => c.id === cellId);
-  if (!cell)
-    throw new Error(
-      'Die Zelle konnte nicht geladen werden — wurde sie gerade geloescht?',
-    );
+  if (!cell) throw new Error('Die Zelle konnte nicht geladen werden — wurde sie gerade geloescht?');
 
   // Sub-Struktur sammeln (nur was unter der Cell haengt, ohne die
   // Cell/Row/Col selbst).
@@ -498,16 +452,8 @@ export async function exportCellSubtree(
     rowIds: new Set(),
     colIds: new Set(),
   };
-  for (const rootId of [cell.child_matrix_id, cell.board_id].filter(
-    (x): x is string => !!x,
-  )) {
-    const sub2 = collectSubtreeIds(
-      rootId,
-      all.nodes,
-      all.cells,
-      all.rows,
-      all.cols,
-    );
+  for (const rootId of [cell.child_matrix_id, cell.board_id].filter((x): x is string => !!x)) {
+    const sub2 = collectSubtreeIds(rootId, all.nodes, all.cells, all.rows, all.cols);
     for (const id of sub2.nodeIds) sub.nodeIds.add(id);
     for (const id of sub2.cellIds) sub.cellIds.add(id);
     for (const id of sub2.rowIds) sub.rowIds.add(id);
@@ -544,9 +490,7 @@ export async function exportCellSubtree(
   const filteredLinks = all.links.filter((l) => inNodes(l.board_id));
   // Docs: die an der Quell-Zelle haengen UND die in Sub-Struktur-Cells.
   const filteredDocs = all.docs.filter(
-    (d) =>
-      d.attached_cell_id === cellId ||
-      (d.attached_cell_id && inCells(d.attached_cell_id)),
+    (d) => d.attached_cell_id === cellId || (d.attached_cell_id && inCells(d.attached_cell_id)),
   );
 
   return {
@@ -561,8 +505,7 @@ export async function exportCellSubtree(
     kb_cols: filteredKbCols as unknown as Record<string, unknown>[],
     kb_cards: filteredKbCards as unknown as Record<string, unknown>[],
     checklists: filteredChecklists as unknown as Record<string, unknown>[],
-    checklist_items:
-      filteredChecklistItems as unknown as Record<string, unknown>[],
+    checklist_items: filteredChecklistItems as unknown as Record<string, unknown>[],
     links: filteredLinks as unknown as Record<string, unknown>[],
     docs: filteredDocs as unknown as Record<string, unknown>[],
     sourceCell: {
@@ -581,19 +524,18 @@ export async function downloadSubtreeExport(
   encrypt?: { passphrase: string },
 ): Promise<void> {
   const pretty = JSON.stringify(exportData, null, 2);
-  const content = encrypt
-    ? await encryptPayload(pretty, encrypt.passphrase)
-    : pretty;
+  const content = encrypt ? await encryptPayload(pretty, encrypt.passphrase) : pretty;
   const blob = new Blob([content], {
     type: encrypt ? 'application/octet-stream' : 'application/json',
   });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   const date = new Date().toISOString().slice(0, 10);
-  const safeLabel = (filenameLabel || 'subtree')
-    .replace(/[^a-z0-9-]+/gi, '-')
-    .replace(/^-+|-+$/g, '')
-    .toLowerCase() || 'subtree';
+  const safeLabel =
+    (filenameLabel || 'subtree')
+      .replace(/[^a-z0-9-]+/gi, '-')
+      .replace(/^-+|-+$/g, '')
+      .toLowerCase() || 'subtree';
   // Dateinamen-Prefix unterscheidet die Payload-Typen, damit der User
   // spaeter beim Import-Flow erkennt was er gerade offen hat.
   const prefix =
@@ -624,10 +566,7 @@ export async function exportFeatureInfo(
 ): Promise<WorkspaceExport> {
   const all = await fetchWorkspaceRowsForExport(workspaceId);
   const cell = all.cells.find((c) => c.id === cellId);
-  if (!cell)
-    throw new Error(
-      'Die Zelle konnte nicht geladen werden — wurde sie gerade geloescht?',
-    );
+  if (!cell) throw new Error('Die Zelle konnte nicht geladen werden — wurde sie gerade geloescht?');
   return {
     version: WORKSPACE_EXPORT_VERSION,
     payloadType: 'feature-info',
@@ -654,10 +593,7 @@ export async function exportFeatureChecklists(
 ): Promise<WorkspaceExport> {
   const all = await fetchWorkspaceRowsForExport(workspaceId);
   const cell = all.cells.find((c) => c.id === cellId);
-  if (!cell)
-    throw new Error(
-      'Die Zelle konnte nicht geladen werden — wurde sie gerade geloescht?',
-    );
+  if (!cell) throw new Error('Die Zelle konnte nicht geladen werden — wurde sie gerade geloescht?');
   const cellChecklists = all.checklists.filter((cl) => cl.cell_id === cellId);
   const clIds = new Set(cellChecklists.map((cl) => cl.id));
   const items = all.checklist_items.filter((it) => clIds.has(it.checklist_id));

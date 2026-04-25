@@ -3,12 +3,8 @@
 // Parser- und Render-Pfad nutzen (bold/italic/code/http-Auto-Link,
 // Paragraphen nach Leerzeile, Line-Breaks innerhalb Paragraph).
 
-import { For, type Component } from 'solid-js';
-import {
-  parseMarkdownLight,
-  type MdInline,
-  type MdParagraph,
-} from '../lib/markdown-lite';
+import { type Component, For } from 'solid-js';
+import { type MdInline, type MdParagraph, parseMarkdownLight } from '../lib/markdown-lite';
 import AliasChip from './AliasChip';
 
 const RenderInline: Component<{ nodes: MdInline[]; workspaceId?: string }> = (p) => {
@@ -31,12 +27,7 @@ const RenderInline: Component<{ nodes: MdInline[]; workspaceId?: string }> = (p)
         if (n.type === 'code') return <code class="md-code">{n.value}</code>;
         if (n.type === 'link')
           return (
-            <a
-              href={n.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="md-link"
-            >
+            <a href={n.href} target="_blank" rel="noopener noreferrer" class="md-link">
               {n.label}
             </a>
           );
@@ -85,12 +76,7 @@ type Props = {
 // Markdown-Light-Rendering als Top-Level-Component. Nimmt den Rohtext,
 // parsed pro Render (leichtgewichtig; Memoization im Caller wenn noetig).
 const MarkdownLightView: Component<Props> = (p) => {
-  return (
-    <RenderParagraphs
-      paragraphs={parseMarkdownLight(p.text)}
-      workspaceId={p.workspaceId}
-    />
-  );
+  return <RenderParagraphs paragraphs={parseMarkdownLight(p.text)} workspaceId={p.workspaceId} />;
 };
 
 export default MarkdownLightView;

@@ -23,18 +23,8 @@
 // runSpec()-basierten Online-Pfad umstellen — dann faellt der
 // Run-Argument weg.
 
-import {
-  enqueueMutation,
-  isNetworkError,
-  type MutationSpec,
-} from './mutation-queue';
-import {
-  deleteOne,
-  getById,
-  patchRow,
-  putOne,
-  type CacheTable,
-} from './offline-cache';
+import { type MutationSpec, enqueueMutation, isNetworkError } from './mutation-queue';
+import { type CacheTable, deleteOne, getById, patchRow, putOne } from './offline-cache';
 import { showToast } from './toasts';
 
 export type RunMutationResult<T> =
@@ -51,9 +41,7 @@ export type RunMutationResult<T> =
 // durchreichen muss. Liegt die Row nicht im Cache (frisch geladene
 // Tab-Sitzung ohne vorherigen Read), faellt die Funktion auf das
 // klassische Throw-Verhalten zurueck — V1-Pragmatik.
-export async function runOptimisticUpdate<
-  T extends { id: string; workspace_id: string },
->(args: {
+export async function runOptimisticUpdate<T extends { id: string; workspace_id: string }>(args: {
   table: CacheTable;
   id: string;
   patch: Record<string, unknown>;
@@ -98,9 +86,7 @@ export async function runOptimisticUpdate<
 // Aufrufer einen synthetischen Builder, der die Row aus den Args
 // + crypto.randomUUID() zusammensetzt. buildOffline darf async sein,
 // damit der Builder z.B. die Position aus dem Cache ableiten kann.
-export async function runOptimisticInsert<
-  T extends { id: string; workspace_id: string },
->(args: {
+export async function runOptimisticInsert<T extends { id: string; workspace_id: string }>(args: {
   table: CacheTable;
   workspaceId: string;
   buildOffline: (id: string) => T | Promise<T>;

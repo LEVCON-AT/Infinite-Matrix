@@ -25,9 +25,7 @@ function load(boardId: string): BoardUi {
       sort?: string;
     };
     const sort: CardSortMode =
-      parsed.sort === 'deadline' ||
-      parsed.sort === 'priority' ||
-      parsed.sort === 'name'
+      parsed.sort === 'deadline' || parsed.sort === 'priority' || parsed.sort === 'name'
         ? parsed.sort
         : 'manual';
     return {
@@ -53,10 +51,7 @@ function save(boardId: string, ui: BoardUi): void {
   }
 }
 
-const REGISTRY = new Map<
-  string,
-  { state: () => BoardUi; setState: (v: BoardUi) => void }
->();
+const REGISTRY = new Map<string, { state: () => BoardUi; setState: (v: BoardUi) => void }>();
 
 export function useBoardUi(boardId: string) {
   let entry = REGISTRY.get(boardId);

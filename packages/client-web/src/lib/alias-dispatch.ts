@@ -7,9 +7,9 @@
 // braucht (Navigate-Funktion, Toasts) wird als Parameter reingereicht.
 
 import type { AliasResolveResult } from './alias-resolve';
+import { openDocsPopup } from './docs-ui';
 import { rememberFocus } from './navigation-focus';
 import { sanitizeUrl } from './url';
-import { openDocsPopup } from './docs-ui';
 
 type Navigate = (path: string) => void;
 
@@ -43,10 +43,7 @@ export function cellTarget(wsId: string, c: CellLikeTarget): string {
 
 // Einheitlicher Dispatch-Schalter. Throws nicht — Fehler werden via
 // onError() gemeldet (typischerweise showToast).
-export function dispatchAliasResult(
-  result: AliasResolveResult,
-  deps: DispatchDeps,
-): void {
+export function dispatchAliasResult(result: AliasResolveResult, deps: DispatchDeps): void {
   switch (result.kind) {
     case 'node':
       deps.navigate(`/w/${deps.workspaceId}/n/${result.nodeId}`);

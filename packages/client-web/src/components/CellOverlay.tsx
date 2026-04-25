@@ -1,15 +1,10 @@
-import {
-  For,
-  Show,
-  createMemo,
-  createSignal,
-  onCleanup,
-  onMount,
-  type Component,
-} from 'solid-js';
 import { useNavigate } from '@solidjs/router';
-import type { CellRow, ColRow, RowRow } from '../lib/types';
-import { CELL_FEATURES, findFeatureByHotkey, type FeatureDef } from '../lib/features';
+import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
+import { validateAlias } from '../lib/alias';
+import { showConfirm } from '../lib/dialog';
+import { translateDbError } from '../lib/errors';
+import { CELL_FEATURES, type FeatureDef, findFeatureByHotkey } from '../lib/features';
+import { flashError } from '../lib/flash';
 import {
   createChildBoard,
   createChildMatrix,
@@ -20,10 +15,7 @@ import {
 } from '../lib/mutations';
 import { isNodeEmpty } from '../lib/queries';
 import { showToast } from '../lib/toasts';
-import { translateDbError } from '../lib/errors';
-import { flashError } from '../lib/flash';
-import { validateAlias } from '../lib/alias';
-import { showConfirm } from '../lib/dialog';
+import type { CellRow, ColRow, RowRow } from '../lib/types';
 import Icon from './Icon';
 
 type Props = {
@@ -110,9 +102,7 @@ const CellOverlay: Component<Props> = (p) => {
     const isOn = hasActive(def.key);
     const cur = current();
     const existing = cur?.features ?? [];
-    const next = isOn
-      ? existing.filter((f) => f !== def.key)
-      : [...existing, def.key];
+    const next = isOn ? existing.filter((f) => f !== def.key) : [...existing, def.key];
     await ensureCell({ features: next });
   }
 
@@ -122,8 +112,7 @@ const CellOverlay: Component<Props> = (p) => {
     if (isOn) {
       // Off: Sub-Node loeschen. Confirm NUR wenn Sub-Content hat —
       // leerer Sub-Node wird direkt entfernt (kein Datenverlust).
-      const nodeId =
-        def.key === 'matrix' ? cur?.child_matrix_id : cur?.board_id;
+      const nodeId = def.key === 'matrix' ? cur?.child_matrix_id : cur?.board_id;
       if (nodeId) {
         const nodeType = def.key === 'matrix' ? 'matrix' : 'board';
         const empty = await isNodeEmpty(nodeId, nodeType);
@@ -154,23 +143,17 @@ const CellOverlay: Component<Props> = (p) => {
         ? await createChildMatrix({
             workspaceId: p.workspaceId,
             parentCellId: baseCell.id,
-            label: p.row.label && p.col.label
-              ? `${p.row.label} × ${p.col.label}`
-              : undefined,
+            label: p.row.label && p.col.label ? `${p.row.label} × ${p.col.label}` : undefined,
           })
         : await createChildBoard({
             workspaceId: p.workspaceId,
             parentCellId: baseCell.id,
-            label: p.row.label && p.col.label
-              ? `${p.row.label} × ${p.col.label}`
-              : undefined,
+            label: p.row.label && p.col.label ? `${p.row.label} × ${p.col.label}` : undefined,
           });
     const nextFeatures = [...(baseCell.features ?? []), def.key];
     await ensureCell({
       features: nextFeatures,
-      ...(def.key === 'matrix'
-        ? { child_matrix_id: newNode.id }
-        : { board_id: newNode.id }),
+      ...(def.key === 'matrix' ? { child_matrix_id: newNode.id } : { board_id: newNode.id }),
     });
   }
 
@@ -242,12 +225,7 @@ const CellOverlay: Component<Props> = (p) => {
   const hasAnyContent = createMemo(() => {
     const c = current();
     if (!c) return false;
-    return (
-      (c.features?.length ?? 0) > 0 ||
-      !!c.alias ||
-      !!c.child_matrix_id ||
-      !!c.board_id
-    );
+    return (c.features?.length ?? 0) > 0 || !!c.alias || !!c.child_matrix_id || !!c.board_id;
   });
 
   // hasDestructiveContent: nur Sub-Nodes gelten als destruktiv
@@ -270,12 +248,8 @@ const CellOverlay: Component<Props> = (p) => {
     // Confirm nur wenn echte Sub-Struktur mitgeloescht wird.
     if (hasDestructiveContent()) {
       // Wenn die Sub-Nodes leer sind, ueberspringen wir das Confirm.
-      const matrixEmpty = c.child_matrix_id
-        ? await isNodeEmpty(c.child_matrix_id, 'matrix')
-        : true;
-      const boardEmpty = c.board_id
-        ? await isNodeEmpty(c.board_id, 'board')
-        : true;
+      const matrixEmpty = c.child_matrix_id ? await isNodeEmpty(c.child_matrix_id, 'matrix') : true;
+      const boardEmpty = c.board_id ? await isNodeEmpty(c.board_id, 'board') : true;
       if (!matrixEmpty || !boardEmpty) {
         const ok = await showConfirm({
           title: 'Zelle leeren?',
@@ -331,10 +305,7 @@ const CellOverlay: Component<Props> = (p) => {
   function onGlobalKeyDown(e: KeyboardEvent) {
     const t = e.target as HTMLElement | null;
     const inEditable =
-      !!t &&
-      (t.tagName === 'INPUT' ||
-        t.tagName === 'TEXTAREA' ||
-        t.isContentEditable);
+      !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
 
     if (e.key === 'Escape') {
       e.stopImmediatePropagation();
@@ -362,8 +333,7 @@ const CellOverlay: Component<Props> = (p) => {
   }
 
   // Breadcrumb-Label oben
-  const breadcrumb = () =>
-    `${p.row.label || '(Zeile)'} × ${p.col.label || '(Spalte)'}`;
+  const breadcrumb = () => `${p.row.label || '(Zeile)'} × ${p.col.label || '(Spalte)'}`;
 
   return (
     <div
@@ -378,12 +348,7 @@ const CellOverlay: Component<Props> = (p) => {
             <h2>Zelle bearbeiten</h2>
             <span class="overlay-sub">{breadcrumb()}</span>
           </div>
-          <button
-            type="button"
-            class="overlay-close"
-            onClick={p.onClose}
-            aria-label="Schliessen"
-          >
+          <button type="button" class="overlay-close" onClick={p.onClose} aria-label="Schliessen">
             <Icon name="x" size={18} />
           </button>
         </header>
@@ -437,24 +402,14 @@ const CellOverlay: Component<Props> = (p) => {
           </div>
 
           <Show when={navTargetCount() === 1}>
-            <button
-              type="button"
-              class="cell-open-btn"
-              onClick={onOpen}
-              title="Enter"
-            >
+            <button type="button" class="cell-open-btn" onClick={onOpen} title="Enter">
               ↗ Oeffnen (Enter)
             </button>
           </Show>
 
           <div class="cell-overlay-footer">
             <Show when={hasAnyContent()}>
-              <button
-                type="button"
-                class="btn-danger"
-                onClick={onClear}
-                disabled={busy() !== null}
-              >
+              <button type="button" class="btn-danger" onClick={onClear} disabled={busy() !== null}>
                 Zelle leeren
               </button>
             </Show>

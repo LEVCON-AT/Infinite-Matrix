@@ -10,11 +10,11 @@
 // Die bestehende CellDocsSection wird wiederverwendet — ueberall
 // dort, wo Docs angezeigt werden, sehen sie gleich aus.
 
-import { Show, type Component } from 'solid-js';
+import { useNavigate } from '@solidjs/router';
+import { type Component, Show } from 'solid-js';
+import { openDocsPopup } from '../lib/docs-ui';
 import type { CellRow, ColRow, RowRow } from '../lib/types';
 import CellDocsSection from './CellDocsSection';
-import { openDocsPopup } from '../lib/docs-ui';
-import { useNavigate } from '@solidjs/router';
 
 type Props = {
   workspaceId: string;

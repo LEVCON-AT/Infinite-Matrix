@@ -20,7 +20,7 @@
 // Workspaces. Wenn spaeter pro-Workspace-Settings dazukommen, sollte
 // das ein separater Storage-Slot sein, kein Sub-Tree dieses Schluessels.
 
-import { createEffect, createMemo, createSignal, onMount, type Accessor } from 'solid-js';
+import { type Accessor, createEffect, createMemo, createSignal, onMount } from 'solid-js';
 import { useEditMode } from './edit-mode';
 
 export type VisValue = 'edit' | 'always' | 'never';

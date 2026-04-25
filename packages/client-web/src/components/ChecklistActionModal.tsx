@@ -2,14 +2,11 @@
 // (none/toast/jump/webhook/mail) + typspezifische Felder. Gespeichert
 // wird als jsonb in checklists.action via setChecklistAction.
 
-import { Show, createSignal, onCleanup, onMount, type Component } from 'solid-js';
-import {
-  parseChecklistAction,
-  type ChecklistAction,
-} from '../lib/checklist-action';
+import { type Component, Show, createSignal, onCleanup, onMount } from 'solid-js';
+import { type ChecklistAction, parseChecklistAction } from '../lib/checklist-action';
+import { translateDbError } from '../lib/errors';
 import { setChecklistAction } from '../lib/mutations';
 import { showToast } from '../lib/toasts';
-import { translateDbError } from '../lib/errors';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 import Icon from './Icon';
 
@@ -25,17 +22,13 @@ const ChecklistActionModal: Component<Props> = (p) => {
   const initial = parseChecklistAction(p.currentAction);
   const [type, setType] = createSignal<ChecklistAction['type']>(initial.type);
   const [message, setMessage] = createSignal(
-    initial.type === 'toast' || initial.type === 'webhook'
-      ? initial.message ?? ''
-      : '',
+    initial.type === 'toast' || initial.type === 'webhook' ? (initial.message ?? '') : '',
   );
-  const [target, setTarget] = createSignal(
-    initial.type === 'jump' ? initial.target : '',
-  );
+  const [target, setTarget] = createSignal(initial.type === 'jump' ? initial.target : '');
   const [url, setUrl] = createSignal(initial.type === 'webhook' ? initial.url : '');
   const [to, setTo] = createSignal(initial.type === 'mail' ? initial.to : '');
   const [subject, setSubject] = createSignal(
-    initial.type === 'mail' ? initial.subject ?? '' : '',
+    initial.type === 'mail' ? (initial.subject ?? '') : '',
   );
   const [busy, setBusy] = createSignal(false);
 
@@ -123,12 +116,7 @@ const ChecklistActionModal: Component<Props> = (p) => {
       <div class="overlay-card cl-action-card" role="dialog" aria-modal="true">
         <header class="overlay-head">
           <h3>Close-Aktion</h3>
-          <button
-            type="button"
-            class="overlay-close"
-            onClick={p.onClose}
-            aria-label="Schliessen"
-          >
+          <button type="button" class="overlay-close" onClick={p.onClose} aria-label="Schliessen">
             <Icon name="x" size={18} />
           </button>
         </header>
@@ -141,9 +129,7 @@ const ChecklistActionModal: Component<Props> = (p) => {
             <select
               class="cl2c-select"
               value={type()}
-              onChange={(e) =>
-                setType(e.currentTarget.value as ChecklistAction['type'])
-              }
+              onChange={(e) => setType(e.currentTarget.value as ChecklistAction['type'])}
             >
               <option value="none">keine</option>
               <option value="toast">Toast</option>
@@ -204,8 +190,8 @@ const ChecklistActionModal: Component<Props> = (p) => {
               />
             </label>
             <p class="cl-action-hint">
-              Achtung: Webhooks laufen best-effort aus dem Browser; CORS
-              kann den Request blockieren.
+              Achtung: Webhooks laufen best-effort aus dem Browser; CORS kann den Request
+              blockieren.
             </p>
           </Show>
 
@@ -235,12 +221,7 @@ const ChecklistActionModal: Component<Props> = (p) => {
           <button type="button" class="btn-subtle" onClick={p.onClose}>
             Abbrechen
           </button>
-          <button
-            type="button"
-            class="btn btn-p"
-            onClick={save}
-            disabled={busy()}
-          >
+          <button type="button" class="btn btn-p" onClick={save} disabled={busy()}>
             Speichern (Strg+Enter)
           </button>
         </footer>

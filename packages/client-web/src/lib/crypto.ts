@@ -17,13 +17,9 @@ export function isEncrypted(text: string): boolean {
 }
 
 async function deriveKey(pw: string, salt: Uint8Array): Promise<CryptoKey> {
-  const km = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(pw),
-    'PBKDF2',
-    false,
-    ['deriveKey'],
-  );
+  const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, [
+    'deriveKey',
+  ]);
   // TS 5.7: Uint8Array<ArrayBufferLike> erfuellt nicht BufferSource-Constraint
   // (verlangt ArrayBufferView<ArrayBuffer>). Cast am Aufrufpunkt reicht,
   // da salt zur Laufzeit ein echter Uint8Array<ArrayBuffer> ist.

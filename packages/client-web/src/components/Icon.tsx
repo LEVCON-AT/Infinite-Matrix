@@ -280,9 +280,7 @@ const ICONS: Record<IconName, () => JSX.Element> = {
     </>
   ),
   // Cell-Indicator: kleiner ausgefuellter Punkt
-  'dot-filled': () => (
-    <circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none" />
-  ),
+  'dot-filled': () => <circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none" />,
   // Export-Icon: Download-Pfeil
   'arrow-down-tray': () => (
     <>

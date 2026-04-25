@@ -6,15 +6,15 @@
 // KeyboardHelp und SettingsModal — damit Look+Feel konsistent.
 
 import {
+  type Component,
   For,
   Show,
   createEffect,
   createSignal,
   onCleanup,
   onMount,
-  type Component,
 } from 'solid-js';
-import { dialogQueue, installFocusTrap, type DialogRequest } from '../lib/dialog';
+import { type DialogRequest, dialogQueue, installFocusTrap } from '../lib/dialog';
 import Icon from './Icon';
 
 const DialogHost: Component = () => {
@@ -149,9 +149,7 @@ const DialogHost: Component = () => {
                         class="dialog-input"
                         value={promptValue()}
                         placeholder={dd.placeholder}
-                        autocomplete={
-                          dd.inputType === 'password' ? 'new-password' : 'off'
-                        }
+                        autocomplete={dd.inputType === 'password' ? 'new-password' : 'off'}
                         spellcheck={false}
                         onInput={(e) => setPromptValue(e.currentTarget.value)}
                       />
@@ -165,11 +163,7 @@ const DialogHost: Component = () => {
                     const dd = d() as Extract<DialogRequest, { kind: 'confirm' }>;
                     return (
                       <>
-                        <button
-                          type="button"
-                          class="btn-subtle"
-                          onClick={() => dd.resolve(false)}
-                        >
+                        <button type="button" class="btn-subtle" onClick={() => dd.resolve(false)}>
                           {dd.cancelLabel}
                         </button>
                         <button
@@ -189,11 +183,7 @@ const DialogHost: Component = () => {
                     const dd = d() as Extract<DialogRequest, { kind: 'prompt' }>;
                     return (
                       <>
-                        <button
-                          type="button"
-                          class="btn-subtle"
-                          onClick={() => dd.resolve(null)}
-                        >
+                        <button type="button" class="btn-subtle" onClick={() => dd.resolve(null)}>
                           {dd.cancelLabel}
                         </button>
                         <button

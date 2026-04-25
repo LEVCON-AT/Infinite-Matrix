@@ -13,7 +13,9 @@
 // NICHT in den Draft gemerged (wie NodeDescription) — sonst reisst es
 // laufende Tippers den Text weg.
 
+import { useNavigate } from '@solidjs/router';
 import {
+  type Component,
   For,
   Show,
   batch,
@@ -23,11 +25,15 @@ import {
   createSignal,
   onCleanup,
   onMount,
-  type Component,
 } from 'solid-js';
-import { useNavigate } from '@solidjs/router';
-import type { DocRow } from '../lib/types';
-import { fetchDocById, fetchDocsRecent } from '../lib/queries';
+import { validateAlias } from '../lib/alias';
+import { dispatchAliasResult } from '../lib/alias-dispatch';
+import { resolveAlias } from '../lib/alias-resolve';
+import { showConfirm } from '../lib/dialog';
+import { type Draft, getDrafts, newClientId, persistDrafts, removeDraft } from '../lib/docs-drafts';
+import { getPersistedTabIds, persistTabIds } from '../lib/docs-tab-restore';
+import { type OpenDocsRequest, clearDocsRequest } from '../lib/docs-ui';
+import { translateDbError } from '../lib/errors';
 import {
   createDoc,
   delDoc,
@@ -37,25 +43,13 @@ import {
   setDocContent,
   setDocTitle,
 } from '../lib/mutations';
-import { validateAlias } from '../lib/alias';
-import { showToast, showUndoToast } from '../lib/toasts';
-import { translateDbError } from '../lib/errors';
-import { showConfirm } from '../lib/dialog';
-import { clearDocsRequest, type OpenDocsRequest } from '../lib/docs-ui';
-import { resolveAlias } from '../lib/alias-resolve';
-import { dispatchAliasResult } from '../lib/alias-dispatch';
+import { fetchDocById, fetchDocsRecent } from '../lib/queries';
 import { supabase } from '../lib/supabase';
-import MarkdownLightView from './MarkdownLightView';
+import { showToast, showUndoToast } from '../lib/toasts';
+import type { DocRow } from '../lib/types';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
-import { getPersistedTabIds, persistTabIds } from '../lib/docs-tab-restore';
-import {
-  getDrafts,
-  newClientId,
-  persistDrafts,
-  removeDraft,
-  type Draft,
-} from '../lib/docs-drafts';
 import Icon from './Icon';
+import MarkdownLightView from './MarkdownLightView';
 
 type Props = {
   workspaceId: string;
@@ -153,10 +147,7 @@ function tabFromDraft(d: Draft): Tab {
 
 // Lookup der Zell-Alias fuer Display. Silent fail (bei Permission/FK-
 // Fehler wird attachedCellAlias=null belassen).
-async function lookupCellAlias(
-  cellId: string,
-  workspaceId: string,
-): Promise<string | null> {
+async function lookupCellAlias(cellId: string, workspaceId: string): Promise<string | null> {
   try {
     const { data } = await supabase
       .from('cells')
@@ -208,9 +199,7 @@ const DocsPopup: Component<Props> = (p) => {
   function openTab(tab: Tab) {
     batch(() => {
       const current = tabs();
-      const existing = tab.docId
-        ? current.findIndex((t) => t.docId === tab.docId)
-        : -1;
+      const existing = tab.docId ? current.findIndex((t) => t.docId === tab.docId) : -1;
       if (existing >= 0) {
         setActiveIdx(existing);
       } else {
@@ -221,7 +210,10 @@ const DocsPopup: Component<Props> = (p) => {
     });
   }
 
-  function newPendingTab(sourceAlias: string | null = null, attachedCellId: string | null = null): Tab {
+  function newPendingTab(
+    sourceAlias: string | null = null,
+    attachedCellId: string | null = null,
+  ): Tab {
     return {
       docId: null,
       clientId: newClientId(),
@@ -324,9 +316,7 @@ const DocsPopup: Component<Props> = (p) => {
     }
 
     if (loaded.length === 0) {
-      loaded.push(
-        newPendingTab(req?.sourceAlias ?? null, req?.attachedCellId ?? null),
-      );
+      loaded.push(newPendingTab(req?.sourceAlias ?? null, req?.attachedCellId ?? null));
     }
 
     setTabs(loaded);
@@ -355,9 +345,7 @@ const DocsPopup: Component<Props> = (p) => {
   // Eintraege gleicher clientId; neue kommen dazu; fehlende bleiben.
   createEffect(() => {
     const current = tabs();
-    const ids = current
-      .map((t) => t.docId)
-      .filter((id): id is string => id !== null);
+    const ids = current.map((t) => t.docId).filter((id): id is string => id !== null);
     persistTabIds(p.workspaceId, ids);
 
     const now = Date.now();
@@ -404,9 +392,7 @@ const DocsPopup: Component<Props> = (p) => {
 
   function onOpenDraft(d: Draft) {
     const current = tabs();
-    const existingIdx = current.findIndex(
-      (t) => t.docId === null && t.clientId === d.clientId,
-    );
+    const existingIdx = current.findIndex((t) => t.docId === null && t.clientId === d.clientId);
     if (existingIdx >= 0) {
       setActiveIdx(existingIdx);
       return;
@@ -497,9 +483,14 @@ const DocsPopup: Component<Props> = (p) => {
           workspaceId: p.workspaceId,
           title: field === 'title' ? value : t.title,
           content: field === 'content' ? value : t.content,
-          alias: field === 'alias'
-            ? value.trim() ? value.trim() : null
-            : t.alias.trim() ? t.alias.trim() : null,
+          alias:
+            field === 'alias'
+              ? value.trim()
+                ? value.trim()
+                : null
+              : t.alias.trim()
+                ? t.alias.trim()
+                : null,
           source_alias: t.sourceAlias,
           attached_cell_id: t.attachedCellId,
         });
@@ -570,11 +561,10 @@ const DocsPopup: Component<Props> = (p) => {
     // Cross-Table-Validation. Bei Pending-Doc: id-Ausschluss leer
     // (noch kein DB-Row), findAliasConflict erkennt dann alle
     // anderen Treffer als Konflikt. Bei Persisted: eigene id excluden.
-    const v = await validateAlias(
-      cleaned,
-      p.workspaceId,
-      { type: 'doc', id: t.docId ?? '00000000-0000-0000-0000-000000000000' },
-    );
+    const v = await validateAlias(cleaned, p.workspaceId, {
+      type: 'doc',
+      id: t.docId ?? '00000000-0000-0000-0000-000000000000',
+    });
     if (!v.ok) {
       showToast(v.msg, 'error');
       // Alias-Input leeren, damit der User nicht im Collision-Loop
@@ -796,12 +786,7 @@ const DocsPopup: Component<Props> = (p) => {
               +
             </button>
           </div>
-          <button
-            type="button"
-            class="overlay-close"
-            onClick={p.onClose}
-            aria-label="Schliessen"
-          >
+          <button type="button" class="overlay-close" onClick={p.onClose} aria-label="Schliessen">
             <Icon name="x" size={18} />
           </button>
         </header>
@@ -861,11 +846,7 @@ const DocsPopup: Component<Props> = (p) => {
                       })
                     }
                     disabled={t().content.trim().length === 0}
-                    title={
-                      t().mode === 'edit'
-                        ? 'Vorschau anzeigen'
-                        : 'Bearbeiten'
-                    }
+                    title={t().mode === 'edit' ? 'Vorschau anzeigen' : 'Bearbeiten'}
                   >
                     {t().mode === 'edit' ? 'Vorschau' : 'Bearbeiten'}
                   </button>
@@ -966,17 +947,12 @@ const DocsPopup: Component<Props> = (p) => {
 
               <aside class="docs-popup-sidebar">
                 <Show when={draftsList().length > 0}>
-                  <h4 class="docs-popup-sidebar-title">
-                    Entwuerfe ({draftsList().length})
-                  </h4>
+                  <h4 class="docs-popup-sidebar-title">Entwuerfe ({draftsList().length})</h4>
                   <ul class="docs-popup-recent-list">
                     <For each={draftsList()}>
                       {(d) => {
                         const isOpenTab = () =>
-                          tabs().some(
-                            (tb) =>
-                              tb.docId === null && tb.clientId === d.clientId,
-                          );
+                          tabs().some((tb) => tb.docId === null && tb.clientId === d.clientId);
                         return (
                           <li
                             class="docs-popup-recent-item docs-popup-draft-item"
@@ -988,15 +964,11 @@ const DocsPopup: Component<Props> = (p) => {
                             <div class="docs-popup-recent-title">
                               {d.title || '(ohne Titel)'}
                               <Show when={d.alias}>
-                                <span class="docs-popup-recent-alias">
-                                  ^{d.alias}
-                                </span>
+                                <span class="docs-popup-recent-alias">^{d.alias}</span>
                               </Show>
                             </div>
                             <Show when={d.content}>
-                              <div class="docs-popup-recent-preview">
-                                {d.content.slice(0, 80)}
-                              </div>
+                              <div class="docs-popup-recent-preview">{d.content.slice(0, 80)}</div>
                             </Show>
                             <button
                               type="button"
@@ -1024,8 +996,7 @@ const DocsPopup: Component<Props> = (p) => {
                   <ul class="docs-popup-recent-list">
                     <For each={recent() ?? []}>
                       {(row) => {
-                        const isOpenTab = () =>
-                          tabs().some((tb) => tb.docId === row.id);
+                        const isOpenTab = () => tabs().some((tb) => tb.docId === row.id);
                         return (
                           <li
                             class="docs-popup-recent-item"
@@ -1037,9 +1008,7 @@ const DocsPopup: Component<Props> = (p) => {
                             <div class="docs-popup-recent-title">
                               {row.title || '(ohne Titel)'}
                               <Show when={row.alias}>
-                                <span class="docs-popup-recent-alias">
-                                  ^{row.alias}
-                                </span>
+                                <span class="docs-popup-recent-alias">^{row.alias}</span>
                               </Show>
                             </div>
                             <Show when={row.content}>

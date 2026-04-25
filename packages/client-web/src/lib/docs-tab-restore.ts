@@ -13,8 +13,7 @@
 // createEffect-basierte persist schreibt dann die bereinigte Liste
 // zurueck — selbst-heilend.
 
-const STORAGE_KEY = (workspaceId: string) =>
-  `matrix.docs.tabs.${workspaceId}`;
+const STORAGE_KEY = (workspaceId: string) => `matrix.docs.tabs.${workspaceId}`;
 
 export function getPersistedTabIds(workspaceId: string): string[] {
   try {

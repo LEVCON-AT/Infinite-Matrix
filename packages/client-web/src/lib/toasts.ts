@@ -34,8 +34,7 @@ export function showToast(
   kind: ToastKind = 'info',
   msOrOpts: number | ShowToastOptions = 4200,
 ): number {
-  const opts: ShowToastOptions =
-    typeof msOrOpts === 'number' ? { ms: msOrOpts } : msOrOpts;
+  const opts: ShowToastOptions = typeof msOrOpts === 'number' ? { ms: msOrOpts } : msOrOpts;
   const ms = opts.ms ?? (opts.action ? 10000 : 4200);
   const id = ++_id;
   setToasts((list) => [...list, { id, kind, msg, action: opts.action }]);
@@ -46,10 +45,7 @@ export function showToast(
 // Bequem-Wrapper fuer Undo-Flows. Der Callback wird genau einmal
 // aufgerufen — wir dismissen den Toast sofort nach dem Click, damit
 // man nicht doppelt rueckgaengig macht.
-export function showUndoToast(
-  label: string,
-  onUndo: () => void,
-): number {
+export function showUndoToast(label: string, onUndo: () => void): number {
   return showToast(label, 'info', {
     ms: 10000,
     action: {

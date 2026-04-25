@@ -3,28 +3,24 @@
 // Kein Focus-Trap — ausreichend: onMount setzt Fokus auf das erste Select,
 // Tab wandert natuerlich durch die Rows.
 
-import { For, Show, onCleanup, onMount, type Component } from 'solid-js';
-import Icon from './Icon';
+import { useParams } from '@solidjs/router';
+import { type Component, For, Show, onCleanup, onMount } from 'solid-js';
+import { showChoice } from '../lib/dialog';
+import { translateDbError } from '../lib/errors';
+import { clearWorkspaceQueue, pendingMutationCount, replayQueue } from '../lib/mutation-queue';
+import { clearAll as clearOfflineCache } from '../lib/offline-cache';
+import { resetOfflineState } from '../lib/offline-state';
 import {
   VIS_GROUPS,
   VIS_LABELS,
   VIS_OPTIONS,
+  type VisKey,
   resetSettings,
   setVis,
   useSettings,
-  type VisKey,
 } from '../lib/settings';
-import { clearAll as clearOfflineCache } from '../lib/offline-cache';
-import { resetOfflineState } from '../lib/offline-state';
-import { showChoice } from '../lib/dialog';
 import { showToast } from '../lib/toasts';
-import { translateDbError } from '../lib/errors';
-import {
-  clearWorkspaceQueue,
-  pendingMutationCount,
-  replayQueue,
-} from '../lib/mutation-queue';
-import { useParams } from '@solidjs/router';
+import Icon from './Icon';
 
 type Props = {
   onClose: () => void;
@@ -63,19 +59,13 @@ const SettingsModal: Component<Props> = (p) => {
       >
         <header class="overlay-head">
           <h3>Einstellungen</h3>
-          <button
-            type="button"
-            class="overlay-close"
-            onClick={p.onClose}
-            aria-label="Schliessen"
-          >
+          <button type="button" class="overlay-close" onClick={p.onClose} aria-label="Schliessen">
             <Icon name="x" size={18} />
           </button>
         </header>
         <div class="overlay-body settings-body">
           <p class="settings-hint hint">
-            Sichtbarkeit der Bedienelemente. „Nur Edit-Modus" ist der
-            Default — Edit toggelt man mit{' '}
+            Sichtbarkeit der Bedienelemente. „Nur Edit-Modus" ist der Default — Edit toggelt man mit{' '}
             <kbd>Shift</kbd>+<kbd>E</kbd>.
           </p>
           <For each={VIS_GROUPS}>
@@ -89,9 +79,7 @@ const SettingsModal: Component<Props> = (p) => {
                       return (
                         <>
                           <dt class="settings-label">
-                            <label for={`settings-vis-${key}`}>
-                              {VIS_LABELS[key]}
-                            </label>
+                            <label for={`settings-vis-${key}`}>{VIS_LABELS[key]}</label>
                           </dt>
                           <dd class="settings-control">
                             <select
@@ -102,10 +90,7 @@ const SettingsModal: Component<Props> = (p) => {
                               onChange={(e) =>
                                 setVis(
                                   key as VisKey,
-                                  e.currentTarget.value as
-                                    | 'edit'
-                                    | 'always'
-                                    | 'never',
+                                  e.currentTarget.value as 'edit' | 'always' | 'never',
                                 )
                               }
                             >
@@ -126,9 +111,9 @@ const SettingsModal: Component<Props> = (p) => {
             <section class="settings-group">
               <h4>Synchronisation</h4>
               <p class="hint">
-                {pendingMutationCount()} offline-Aenderungen warten auf
-                Synchronisation. Beim naechsten Online-Event laufen sie
-                automatisch durch — du kannst aber auch direkt anstossen.
+                {pendingMutationCount()} offline-Aenderungen warten auf Synchronisation. Beim
+                naechsten Online-Event laufen sie automatisch durch — du kannst aber auch direkt
+                anstossen.
               </p>
               <div class="settings-foot" style="margin-top:var(--space-sm);gap:var(--space-sm);">
                 <button
@@ -136,9 +121,7 @@ const SettingsModal: Component<Props> = (p) => {
                   class="btn-subtle"
                   onClick={() => {
                     void (async () => {
-                      const res = await replayQueue(
-                        params.workspaceId as string,
-                      );
+                      const res = await replayQueue(params.workspaceId as string);
                       if (res.skippedBusy) {
                         showToast('Sync laeuft bereits.', 'info');
                         return;
@@ -152,9 +135,7 @@ const SettingsModal: Component<Props> = (p) => {
                       } else {
                         showToast(
                           `Sync: ${res.succeeded} ok · ${res.staled} veraltet · ${res.failed} Fehler.`,
-                          res.failed > 0 || res.staled > 0
-                            ? 'error'
-                            : 'success',
+                          res.failed > 0 || res.staled > 0 ? 'error' : 'success',
                         );
                       }
                     })();
@@ -187,9 +168,7 @@ const SettingsModal: Component<Props> = (p) => {
                       });
                       if (ok !== 'clear') return;
                       try {
-                        await clearWorkspaceQueue(
-                          params.workspaceId as string,
-                        );
+                        await clearWorkspaceQueue(params.workspaceId as string);
                         showToast('Sync-Queue geleert.', 'success');
                       } catch (err) {
                         showToast(translateDbError(err), 'error');

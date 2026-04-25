@@ -20,7 +20,7 @@
 //   - Multi-Step-Mutations (komplexe Transform-Operationen): sind nicht
 //     queueable und schlagen weiterhin direkt fehl.
 
-import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import { type DBSchema, type IDBPDatabase, openDB } from 'idb';
 import { createSignal } from 'solid-js';
 import { supabase } from './supabase';
 
@@ -112,11 +112,7 @@ export function pendingMutationCount() {
 
 async function refreshPendingCount(workspaceId: string): Promise<void> {
   const inst = await db();
-  const all = await inst.getAllFromIndex(
-    'mutation_queue',
-    'by_workspace',
-    workspaceId,
-  );
+  const all = await inst.getAllFromIndex('mutation_queue', 'by_workspace', workspaceId);
   const pending = all.filter((e) => e.status === 'pending').length;
   setPendingCount(pending);
 }
@@ -144,15 +140,9 @@ export async function enqueueMutation(args: {
   return entry;
 }
 
-export async function listForWorkspace(
-  workspaceId: string,
-): Promise<QueueEntry[]> {
+export async function listForWorkspace(workspaceId: string): Promise<QueueEntry[]> {
   const inst = await db();
-  const all = await inst.getAllFromIndex(
-    'mutation_queue',
-    'by_workspace',
-    workspaceId,
-  );
+  const all = await inst.getAllFromIndex('mutation_queue', 'by_workspace', workspaceId);
   return all.sort((a, b) => a.created_at - b.created_at);
 }
 
@@ -164,11 +154,7 @@ export async function removeEntry(id: string, workspaceId: string): Promise<void
 
 export async function clearWorkspaceQueue(workspaceId: string): Promise<void> {
   const inst = await db();
-  const all = await inst.getAllFromIndex(
-    'mutation_queue',
-    'by_workspace',
-    workspaceId,
-  );
+  const all = await inst.getAllFromIndex('mutation_queue', 'by_workspace', workspaceId);
   const tx = inst.transaction('mutation_queue', 'readwrite');
   for (const e of all) {
     await tx.store.delete(e.id);
@@ -177,9 +163,7 @@ export async function clearWorkspaceQueue(workspaceId: string): Promise<void> {
   await refreshPendingCount(workspaceId);
 }
 
-export async function refreshCountForWorkspace(
-  workspaceId: string,
-): Promise<void> {
+export async function refreshCountForWorkspace(workspaceId: string): Promise<void> {
   await refreshPendingCount(workspaceId);
 }
 
@@ -206,11 +190,7 @@ export async function replayQueue(workspaceId: string): Promise<ReplayResult> {
   replayInFlight.set(workspaceId, true);
   try {
     const inst = await db();
-    const all = await inst.getAllFromIndex(
-      'mutation_queue',
-      'by_workspace',
-      workspaceId,
-    );
+    const all = await inst.getAllFromIndex('mutation_queue', 'by_workspace', workspaceId);
     const pending = all
       .filter((e) => e.status === 'pending')
       .sort((a, b) => a.created_at - b.created_at);
@@ -261,9 +241,7 @@ export async function replayQueue(workspaceId: string): Promise<ReplayResult> {
 //   ok=false, kind='network'  -> Verbindungsfehler, retry spaeter
 //   ok=false, kind='other'    -> echter Server-Fehler, attempts++
 
-type RunResult =
-  | { ok: true }
-  | { ok: false; kind: 'stale' | 'network' | 'other'; error: string };
+type RunResult = { ok: true } | { ok: false; kind: 'stale' | 'network' | 'other'; error: string };
 
 async function runSpec(spec: MutationSpec): Promise<RunResult> {
   try {
@@ -291,7 +269,8 @@ async function runSpec(spec: MutationSpec): Promise<RunResult> {
         return {
           ok: false,
           kind: 'stale',
-          error: 'Keine passende Zeile mehr — der Eintrag wurde inzwischen entfernt oder geaendert.',
+          error:
+            'Keine passende Zeile mehr — der Eintrag wurde inzwischen entfernt oder geaendert.',
         };
       }
       return { ok: true };
@@ -339,7 +318,6 @@ function classifyError(err: unknown): RunResult {
 export function isNetworkError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
   return (
-    err instanceof TypeError ||
-    /failed to fetch|networkerror|network error|load failed/i.test(msg)
+    err instanceof TypeError || /failed to fetch|networkerror|network error|load failed/i.test(msg)
   );
 }

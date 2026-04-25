@@ -1,4 +1,6 @@
+import { useLocation, useNavigate, useParams } from '@solidjs/router';
 import {
+  type Component,
   For,
   Show,
   createEffect,
@@ -7,11 +9,36 @@ import {
   createSignal,
   onCleanup,
   onMount,
-  type Component,
 } from 'solid-js';
-import { useLocation, useNavigate, useParams } from '@solidjs/router';
+import AliasAutocomplete from '../components/AliasAutocomplete';
+import BoardView from '../components/BoardView';
+import CellChecklistsPage from '../components/CellChecklistsPage';
+import CellDocsPage from '../components/CellDocsPage';
+import CellInfoPage from '../components/CellInfoPage';
+import CommandPalette from '../components/CommandPalette';
+import ContextMenu from '../components/ContextMenu';
+import DocsPopup from '../components/DocsPopup';
+import GlobalSearch from '../components/GlobalSearch';
+import HeaderSearchBar from '../components/HeaderSearchBar';
+import Icon from '../components/Icon';
+import KeyboardHelp from '../components/KeyboardHelp';
+import MatrixView from '../components/MatrixView';
+import NodeDescription from '../components/NodeDescription';
+import NodeTree from '../components/NodeTree';
+import PresenceStack from '../components/PresenceStack';
+import SettingsModal from '../components/SettingsModal';
+import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
+import { useAggregateView } from '../lib/aggregate-view';
+import { aliasChipMenuState, closeAliasChipMenu } from '../lib/alias-chip-menu';
+import { clearAliasIndex, fetchAliasIndex, scheduleAliasRefresh } from '../lib/alias-index';
 import { signOut, useUser } from '../lib/auth';
+import { clearDocsRequest, openDocsPopup, useDocsRequest } from '../lib/docs-ui';
+import { toggleEditMode, useEditMode } from '../lib/edit-mode';
+import { pendingMutationCount, refreshCountForWorkspace, replayQueue } from '../lib/mutation-queue';
+import { offlineState } from '../lib/offline-state';
+import { installPromptSignal, triggerInstallPrompt } from '../lib/pwa';
 import {
+  type SidebarChipData,
   buildSidebarTree,
   fetchBoardContent,
   fetchCellIdsWithDocs,
@@ -23,46 +50,15 @@ import {
   fetchRowsForWorkspace,
   fetchWorkspaceAttachedDocs,
   fetchWorkspaceLinks,
-  type SidebarChipData,
 } from '../lib/queries';
-import { useSidebarChips } from '../lib/sidebar-chips';
-import type { DocRow, LinkRow } from '../lib/types';
-import { toggleEditMode, useEditMode } from '../lib/edit-mode';
-import { useSidebarMode } from '../lib/sidebar-mode';
-import { useAggregateView } from '../lib/aggregate-view';
-import { toggleTheme, useTheme } from '../lib/theme';
 import { subscribeWorkspace } from '../lib/realtime';
-import { clearAliasIndex, fetchAliasIndex, scheduleAliasRefresh } from '../lib/alias-index';
-import { useTreeExpand } from '../lib/tree-expand';
-import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
-import NodeTree from '../components/NodeTree';
-import MatrixView from '../components/MatrixView';
-import BoardView from '../components/BoardView';
-import CellChecklistsPage from '../components/CellChecklistsPage';
-import CellDocsPage from '../components/CellDocsPage';
-import CellInfoPage from '../components/CellInfoPage';
-import AliasAutocomplete from '../components/AliasAutocomplete';
-import ContextMenu from '../components/ContextMenu';
-import HeaderSearchBar from '../components/HeaderSearchBar';
-import Icon from '../components/Icon';
-import { aliasChipMenuState, closeAliasChipMenu } from '../lib/alias-chip-menu';
-import CommandPalette from '../components/CommandPalette';
-import DocsPopup from '../components/DocsPopup';
-import GlobalSearch from '../components/GlobalSearch';
-import KeyboardHelp from '../components/KeyboardHelp';
-import SettingsModal from '../components/SettingsModal';
 import { useSettingsBodyClassSync } from '../lib/settings';
-import NodeDescription from '../components/NodeDescription';
-import PresenceStack from '../components/PresenceStack';
-import { clearDocsRequest, openDocsPopup, useDocsRequest } from '../lib/docs-ui';
-import { installPromptSignal, triggerInstallPrompt } from '../lib/pwa';
-import { offlineState } from '../lib/offline-state';
-import {
-  pendingMutationCount,
-  refreshCountForWorkspace,
-  replayQueue,
-} from '../lib/mutation-queue';
+import { useSidebarChips } from '../lib/sidebar-chips';
+import { useSidebarMode } from '../lib/sidebar-mode';
+import { toggleTheme, useTheme } from '../lib/theme';
 import { showToast } from '../lib/toasts';
+import { useTreeExpand } from '../lib/tree-expand';
+import type { DocRow, LinkRow } from '../lib/types';
 
 const Workspace: Component = () => {
   const user = useUser();
@@ -257,15 +253,11 @@ const Workspace: Component = () => {
   // Deep-Dive-Chips (SB.2): opt-in Tree-Extras. State pro Workspace
   // persistiert. Fetches nur aktiv, wenn der passende Chip auch an ist —
   // sonst bleibt die Sidebar schlank.
-  const chips = params.workspaceId
-    ? useSidebarChips(params.workspaceId as string)
-    : null;
+  const chips = params.workspaceId ? useSidebarChips(params.workspaceId as string) : null;
 
   const [wsLinks] = createResource(
     () =>
-      params.workspaceId &&
-      chips &&
-      (chips.isOn('links') || chips.isOn('mails'))
+      params.workspaceId && chips && (chips.isOn('links') || chips.isOn('mails'))
         ? { workspaceId: params.workspaceId as string }
         : null,
     async (key) => (key ? fetchWorkspaceLinks(key.workspaceId) : []),
@@ -308,13 +300,7 @@ const Workspace: Component = () => {
   });
 
   const tree = createMemo(() =>
-    buildSidebarTree(
-      nodes() ?? [],
-      cells() ?? [],
-      rows() ?? [],
-      colsData() ?? [],
-      chipData(),
-    ),
+    buildSidebarTree(nodes() ?? [], cells() ?? [], rows() ?? [], colsData() ?? [], chipData()),
   );
 
   // Path-Focus Expand: bei jeder Route-Change den Weg vom aktuellen
@@ -385,40 +371,40 @@ const Workspace: Component = () => {
   // Bei Cell-Routen (/c/:cellId) ist der Start die Parent-Matrix der
   // Zelle. Die Zelle selbst wird nicht eigens als Crumb gerendert;
   // das aktuelle Section-Label steht ohnehin auf der Cell-Page.
-  const breadcrumb = createMemo<
-    Array<{ id: string; label: string; type: 'matrix' | 'board' }>
-  >(() => {
-    const nodesList = nodes() ?? [];
-    const cellsList = cells() ?? [];
-    const byNodeId = new Map(nodesList.map((n) => [n.id, n]));
-    const byCellId = new Map(cellsList.map((c) => [c.id, c]));
+  const breadcrumb = createMemo<Array<{ id: string; label: string; type: 'matrix' | 'board' }>>(
+    () => {
+      const nodesList = nodes() ?? [];
+      const cellsList = cells() ?? [];
+      const byNodeId = new Map(nodesList.map((n) => [n.id, n]));
+      const byCellId = new Map(cellsList.map((c) => [c.id, c]));
 
-    let startNodeId: string | undefined;
-    const c = currentCell();
-    if (c) {
-      startNodeId = c.matrix_id;
-    } else {
-      startNodeId = currentNode()?.id;
-    }
-    if (!startNodeId) return [];
+      let startNodeId: string | undefined;
+      const c = currentCell();
+      if (c) {
+        startNodeId = c.matrix_id;
+      } else {
+        startNodeId = currentNode()?.id;
+      }
+      if (!startNodeId) return [];
 
-    const chain: Array<{ id: string; label: string; type: 'matrix' | 'board' }> = [];
-    let cursor = byNodeId.get(startNodeId);
-    const seen = new Set<string>();
-    while (cursor && !seen.has(cursor.id)) {
-      seen.add(cursor.id);
-      chain.unshift({
-        id: cursor.id,
-        label: cursor.label || '(ohne Label)',
-        type: cursor.type,
-      });
-      if (!cursor.parent_cell_id) break;
-      const pc = byCellId.get(cursor.parent_cell_id);
-      if (!pc) break;
-      cursor = byNodeId.get(pc.matrix_id);
-    }
-    return chain;
-  });
+      const chain: Array<{ id: string; label: string; type: 'matrix' | 'board' }> = [];
+      let cursor = byNodeId.get(startNodeId);
+      const seen = new Set<string>();
+      while (cursor && !seen.has(cursor.id)) {
+        seen.add(cursor.id);
+        chain.unshift({
+          id: cursor.id,
+          label: cursor.label || '(ohne Label)',
+          type: cursor.type,
+        });
+        if (!cursor.parent_cell_id) break;
+        const pc = byCellId.get(cursor.parent_cell_id);
+        if (!pc) break;
+        cursor = byNodeId.get(pc.matrix_id);
+      }
+      return chain;
+    },
+  );
 
   // Matrix-Content fuer die aktuelle Node (nur wenn Typ=matrix).
   const [matrixContent, { refetch: refetchMatrix }] = createResource(
@@ -541,12 +527,7 @@ const Workspace: Component = () => {
       // "/" oeffnet Global-Search-Modal. Parallel zur HeaderSearchBar
       // erreichbar. Auf DE-Layout ist "/" = Shift+7; e.key ist '/' in
       // beiden Faellen. In Inputs ignorieren.
-      if (
-        e.key === '/' &&
-        !e.ctrlKey &&
-        !e.metaKey &&
-        !e.altKey
-      ) {
+      if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         if (isTextInput(e.target)) return;
         e.preventDefault();
         setShowSearch(true);
@@ -557,13 +538,7 @@ const Workspace: Component = () => {
       // Primaerer Weg seit 2026-04-24 — `/` + `^` bleiben als Modal-
       // Alternativen. In Inputs ignorieren, sonst kann User kein "f"
       // tippen.
-      if (
-        e.key === 'f' &&
-        !e.ctrlKey &&
-        !e.metaKey &&
-        !e.altKey &&
-        !e.shiftKey
-      ) {
+      if (e.key === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
         if (isTextInput(e.target)) return;
         if (!focusHeaderSearch) return;
         e.preventDefault();
@@ -573,13 +548,7 @@ const Workspace: Component = () => {
 
       // Shift+A: Expand-All-Tree togglen (sticky pro Workspace).
       // In Text-Inputs ignorieren — sonst kann man kein A eintippen.
-      if (
-        e.shiftKey &&
-        !e.ctrlKey &&
-        !e.metaKey &&
-        !e.altKey &&
-        (e.key === 'A' || e.key === 'a')
-      ) {
+      if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'A' || e.key === 'a')) {
         if (isTextInput(e.target)) return;
         e.preventDefault();
         useTreeExpand(params.workspaceId).toggleExpandAll();
@@ -587,13 +556,7 @@ const Workspace: Component = () => {
       }
 
       // Shift+D: Dokumentations-Popup oeffnen.
-      if (
-        e.shiftKey &&
-        !e.ctrlKey &&
-        !e.metaKey &&
-        !e.altKey &&
-        (e.key === 'D' || e.key === 'd')
-      ) {
+      if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'D' || e.key === 'd')) {
         if (isTextInput(e.target)) return;
         e.preventDefault();
         openDocsPopup();
@@ -601,13 +564,7 @@ const Workspace: Component = () => {
       }
 
       // Shift+N: Sidebar-Modus zyklen (full → rails → collapsed → full).
-      if (
-        e.shiftKey &&
-        !e.ctrlKey &&
-        !e.metaKey &&
-        !e.altKey &&
-        (e.key === 'N' || e.key === 'n')
-      ) {
+      if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'N' || e.key === 'n')) {
         if (isTextInput(e.target)) return;
         e.preventDefault();
         sidebar.cycle();
@@ -617,13 +574,7 @@ const Workspace: Component = () => {
       // Shift+W: Aggregat-Sektion unter der Matrix umschalten zwischen
       // Aufgabenuebersicht und Intervallmatrix. Nur wenn aktuell eine
       // Matrix im Fokus ist.
-      if (
-        e.shiftKey &&
-        !e.ctrlKey &&
-        !e.metaKey &&
-        !e.altKey &&
-        (e.key === 'W' || e.key === 'w')
-      ) {
+      if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'W' || e.key === 'w')) {
         if (isTextInput(e.target)) return;
         const n = currentNode();
         if (!n || n.type !== 'matrix') return;
@@ -636,13 +587,7 @@ const Workspace: Component = () => {
       // In Text-Inputs ignorieren (sonst kann man kein s tippen). Wenn
       // Sidebar collapsed ist, erst auf full promoten, damit der Focus-
       // Restore ein Ziel hat.
-      if (
-        e.key === 's' &&
-        !e.shiftKey &&
-        !e.ctrlKey &&
-        !e.metaKey &&
-        !e.altKey
-      ) {
+      if (e.key === 's' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
         if (isTextInput(e.target)) return;
         e.preventDefault();
         swapFocus();
@@ -652,12 +597,7 @@ const Workspace: Component = () => {
       // ? oeffnet/schliesst die Shortcut-Hilfe. Auf DE-Layout ist
       // ? = Shift+ß, auf US Shift+/. e.key ist '?' in beiden Faellen.
       // In Inputs ignorieren — sonst kann man kein ? eintippen.
-      if (
-        e.key === '?' &&
-        !e.ctrlKey &&
-        !e.metaKey &&
-        !e.altKey
-      ) {
+      if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         if (isTextInput(e.target)) return;
         e.preventDefault();
         setShowHelp((v) => !v);
@@ -667,8 +607,7 @@ const Workspace: Component = () => {
       // ^ direkt (ohne Modifier ausser evtl. Shift fuer US-Tastatur) —
       // oeffnet die einheitliche Palette fuer Alias-Navigation + Commands.
       if (e.ctrlKey || e.metaKey || e.altKey) return;
-      const isCaret =
-        e.key === '^' || (e.key === 'Dead' && e.code === 'Backquote');
+      const isCaret = e.key === '^' || (e.key === 'Dead' && e.code === 'Backquote');
       if (!isCaret) return;
       if (isTextInput(e.target)) return;
       e.preventDefault();
@@ -751,10 +690,7 @@ const Workspace: Component = () => {
             Beide Seiten auf derselben Y-Linie mit dem Main-Header-
             Content rechts. */}
         <div class="ws-sidebar-head">
-          <WorkspaceSwitcher
-            workspaces={workspaces()}
-            currentWorkspaceId={params.workspaceId}
-          />
+          <WorkspaceSwitcher workspaces={workspaces()} currentWorkspaceId={params.workspaceId} />
           <button
             type="button"
             class="ws-sidebar-mode-btn"
@@ -763,8 +699,8 @@ const Workspace: Component = () => {
               sidebar.mode() === 'full'
                 ? 'Sidebar einklappen (Shift+N)'
                 : sidebar.mode() === 'rails'
-                ? 'Sidebar ausblenden (Shift+N)'
-                : 'Sidebar aufklappen (Shift+N)'
+                  ? 'Sidebar ausblenden (Shift+N)'
+                  : 'Sidebar aufklappen (Shift+N)'
             }
             aria-label="Sidebar-Modus"
           >
@@ -868,10 +804,7 @@ const Workspace: Component = () => {
       </Show>
 
       <main class="ws-main">
-        <Show
-          when={currentWs()}
-          fallback={<p class="hint">Workspace waehlen.</p>}
-        >
+        <Show when={currentWs()} fallback={<p class="hint">Workspace waehlen.</p>}>
           <header class="ws-main-header">
             <nav class="ws-breadcrumb" aria-label="Breadcrumb">
               {/* Workspace-Ebene entfernt — der WorkspaceSwitcher-Chip
@@ -882,8 +815,7 @@ const Workspace: Component = () => {
                   // Wenn auf /c/:cellId — die Cell-Row/Col-Span folgt NACH
                   // dem For-Loop und ist die eigentliche "current". Dann
                   // duerfen alle Matrix/Board-Crumbs Links bleiben.
-                  const isLast = () =>
-                    !currentCell() && i() === breadcrumb().length - 1;
+                  const isLast = () => !currentCell() && i() === breadcrumb().length - 1;
                   return (
                     <>
                       {/* Kein Separator vor dem ersten Crumb — der
@@ -897,10 +829,7 @@ const Workspace: Component = () => {
                       <Show
                         when={!isLast()}
                         fallback={
-                          <span
-                            class="ws-breadcrumb-current"
-                            data-type={crumb.type}
-                          >
+                          <span class="ws-breadcrumb-current" data-type={crumb.type}>
                             {crumb.label}
                           </span>
                         }
@@ -971,7 +900,10 @@ const Workspace: Component = () => {
                       return;
                     }
                     if (res.succeeded === 0 && res.staled === 0 && res.failed === 0) {
-                      showToast('Keine Aenderungen synchronisierbar — wahrscheinlich offline.', 'info');
+                      showToast(
+                        'Keine Aenderungen synchronisierbar — wahrscheinlich offline.',
+                        'info',
+                      );
                     } else if (res.succeeded > 0) {
                       showToast(`${res.succeeded} Aenderungen synchronisiert.`, 'success');
                     }
@@ -1034,9 +966,7 @@ const Workspace: Component = () => {
 
           <Show
             when={currentCell() || currentNode()}
-            fallback={
-              <p class="hint">Waehle links eine Matrix oder ein Board.</p>
-            }
+            fallback={<p class="hint">Waehle links eine Matrix oder ein Board.</p>}
           >
             <Show when={currentCell()}>
               <section class="node-view">
@@ -1098,10 +1028,7 @@ const Workspace: Component = () => {
                   </button>
                 </div>
 
-                <NodeDescription
-                  node={currentNode()!}
-                  onChanged={() => void refetchNodes()}
-                />
+                <NodeDescription node={currentNode()!} onChanged={() => void refetchNodes()} />
 
                 <Show when={currentNode()?.type === 'matrix'}>
                   <MatrixView

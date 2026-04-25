@@ -9,9 +9,7 @@
 
 import { ALIAS_REF_RE } from './alias';
 
-export type AliasToken =
-  | { kind: 'text'; value: string }
-  | { kind: 'alias'; alias: string };
+export type AliasToken = { kind: 'text'; value: string } | { kind: 'alias'; alias: string };
 
 export function tokenizeAliasText(input: string): AliasToken[] {
   const out: AliasToken[] = [];

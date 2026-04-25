@@ -26,13 +26,7 @@
 import type { CellRow, ColRow, KbCardRow, NodeRow, RowRow } from './types';
 
 // Kategorien fuer die Intervallmatrix. Identisch zum HTML-Vorbild.
-export type FreqCategoryKey =
-  | 'daily'
-  | 'weekly'
-  | 'monthly'
-  | 'yearly'
-  | 'once'
-  | 'nodate';
+export type FreqCategoryKey = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'once' | 'nodate';
 
 export const FREQ_CATEGORIES: Array<{
   key: FreqCategoryKey;
@@ -42,26 +36,22 @@ export const FREQ_CATEGORIES: Array<{
   {
     key: 'daily',
     label: 'Taeglich',
-    test: (c) =>
-      !!c.recur && (c.recur as { type?: string }).type === 'daily',
+    test: (c) => !!c.recur && (c.recur as { type?: string }).type === 'daily',
   },
   {
     key: 'weekly',
     label: 'Woechentl.',
-    test: (c) =>
-      !!c.recur && (c.recur as { type?: string }).type === 'weekly',
+    test: (c) => !!c.recur && (c.recur as { type?: string }).type === 'weekly',
   },
   {
     key: 'monthly',
     label: 'Monatl.',
-    test: (c) =>
-      !!c.recur && (c.recur as { type?: string }).type === 'monthly',
+    test: (c) => !!c.recur && (c.recur as { type?: string }).type === 'monthly',
   },
   {
     key: 'yearly',
     label: 'Jaehrl.',
-    test: (c) =>
-      !!c.recur && (c.recur as { type?: string }).type === 'yearly',
+    test: (c) => !!c.recur && (c.recur as { type?: string }).type === 'yearly',
   },
   {
     key: 'once',
@@ -182,8 +172,7 @@ export function buildFrequencyAggregates(args: {
     for (const { cell, row, col } of decorated) {
       const subCards = aggregateCell(cell);
       if (subCards.length === 0) continue;
-      const children =
-        cell.child_matrix_id ? build(cell.child_matrix_id, depth + 1) : [];
+      const children = cell.child_matrix_id ? build(cell.child_matrix_id, depth + 1) : [];
       out.push({
         dataId: `cell-${mid}-${cell.row_id}-${cell.col_id}`,
         cellId: cell.id,

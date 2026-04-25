@@ -262,7 +262,7 @@ export async function searchWorkspace(
     const cellIds = Array.from(
       new Set(rows.filter((r) => !r.board_id && r.cell_id).map((r) => r.cell_id as string)),
     );
-    let cellIdToMatrixId = new Map<string, string>();
+    const cellIdToMatrixId = new Map<string, string>();
     if (cellIds.length > 0) {
       const cellsLookup = await supabase
         .from('cells')

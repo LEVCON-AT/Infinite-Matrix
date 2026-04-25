@@ -48,10 +48,7 @@ const TABLES: RealtimeTable[] = [
 // Subscribe in einem reaktiven Scope (onMount / createEffect). Der
 // Unsubscribe-Pfad wird automatisch ueber onCleanup ans Lifecycle
 // gehaengt — Caller muss nichts machen ausser die Funktion aufzurufen.
-export function subscribeWorkspace(
-  workspaceId: string,
-  bumps: RealtimeBumps,
-): void {
+export function subscribeWorkspace(workspaceId: string, bumps: RealtimeBumps): void {
   const channel = supabase.channel(`ws:${workspaceId}`);
 
   for (const table of TABLES) {

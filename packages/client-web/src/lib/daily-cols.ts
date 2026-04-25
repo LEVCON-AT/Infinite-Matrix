@@ -9,13 +9,13 @@
 // kann Spalten anlegen/umbenennen/loeschen (im Edit-Mode).
 
 import { createSignal } from 'solid-js';
-import type { KbCardRow } from './types';
 import {
+  type RecurRule,
   getOccurrenceDatesInRange,
   recurFiresInRange,
   recurFiresOn,
-  type RecurRule,
 } from './recur';
+import type { KbCardRow } from './types';
 
 export type DailyColType =
   | 'today'
@@ -81,10 +81,13 @@ export function saveDailyCols(workspaceId: string, cols: DailyCol[]): void {
 // â€” alle TaskOverview-Instanzen teilen denselben Store, damit eine
 // Mutation (add/rename/...) sofort ueberall ankommt. Persistiert nach
 // jedem Mutate.
-const REGISTRY = new Map<string, {
-  cols: () => DailyCol[];
-  setCols: (next: DailyCol[]) => void;
-}>();
+const REGISTRY = new Map<
+  string,
+  {
+    cols: () => DailyCol[];
+    setCols: (next: DailyCol[]) => void;
+  }
+>();
 
 function uid(): string {
   return `dc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -131,10 +134,7 @@ export function useDailyCols(workspaceId: string) {
               // Default-Label des alten Typs war. So behaelt ein User-
               // custom-Label "Heute erledigt" beim Typ-Wechsel seinen
               // Custom-Text; der Default-Fall bekommt das frische Label.
-              label:
-                c.label === DCTYPE_LABELS[c.type]
-                  ? DCTYPE_LABELS[type]
-                  : c.label,
+              label: c.label === DCTYPE_LABELS[c.type] ? DCTYPE_LABELS[type] : c.label,
             }
           : c,
       ),
@@ -170,10 +170,7 @@ function day0(d: Date): Date {
   return x;
 }
 
-export function getTimeRange(
-  type: DailyColType,
-  today: Date,
-): { s: Date; e: Date } | null {
+export function getTimeRange(type: DailyColType, today: Date): { s: Date; e: Date } | null {
   const s = new Date(today);
   const e = new Date(today);
   if (type === 'today') return { s, e };
@@ -222,11 +219,7 @@ export function getTimeRange(
 // Karten matchen, wenn die Deadline im Zeit-Range liegt. Rekurrente
 // Karten matchen, wenn sie im Range feuern (recurFiresInRange).
 // 'nodate'-Spalte: nur Karten ohne Deadline und ohne Recur.
-export function cardFitsCol(
-  card: KbCardRow,
-  col: DailyCol,
-  today: Date,
-): boolean {
+export function cardFitsCol(card: KbCardRow, col: DailyCol, today: Date): boolean {
   const recur = card.recur as RecurRule | null;
   const isRecur = !!recur && recur.type !== 'none';
 
@@ -265,16 +258,8 @@ function sameDay(a: Date, b: Date): boolean {
 
 // Fuer rekurrente Karten: wenn alle Feuerungs-Daten im Range bereits
 // als done_occurrence gebucht sind, Karte in der Spalte nicht zeigen.
-export function allOccurrencesDoneInRange(
-  card: KbCardRow,
-  start: Date,
-  end: Date,
-): boolean {
-  const dates = getOccurrenceDatesInRange(
-    card.recur as RecurRule | null,
-    start,
-    end,
-  );
+export function allOccurrencesDoneInRange(card: KbCardRow, start: Date, end: Date): boolean {
+  const dates = getOccurrenceDatesInRange(card.recur as RecurRule | null, start, end);
   if (dates.length === 0) return false;
   const done = new Set(card.done_occurrences ?? []);
   return dates.every((d) => done.has(d));

@@ -10,7 +10,7 @@
 // Node, Cell, Card, Checklist und Link sein — alle leben im gleichen
 // Alias-Namespace.
 
-import { ALIAS_TABLE_LABEL, findAliasConflict, type AliasTable } from './alias-check';
+import { ALIAS_TABLE_LABEL, type AliasTable, findAliasConflict } from './alias-check';
 
 // Analog zum Alt-Client: 8 Zeichen, a-z/0-9, Reserved-Keywords.
 export const ALIAS_MAX_LEN = 8;

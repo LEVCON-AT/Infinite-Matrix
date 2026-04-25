@@ -28,8 +28,7 @@ export type Draft = {
   updatedAt: number;
 };
 
-const STORAGE_KEY = (workspaceId: string) =>
-  `matrix.docs.drafts.${workspaceId}`;
+const STORAGE_KEY = (workspaceId: string) => `matrix.docs.drafts.${workspaceId}`;
 
 export function getDrafts(workspaceId: string): Draft[] {
   try {

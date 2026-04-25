@@ -29,28 +29,17 @@
 //     auf dieselbe position+1 landen. Realtime-Refetch beim ersten
 //     Online-Sync normalisiert die Reihenfolge.
 
-import { supabase } from './supabase';
-import {
-  runOptimisticDelete,
-  runOptimisticInsert,
-  runOptimisticUpdate,
-} from './safe-mutation';
-import { getById, getByWorkspace } from './offline-cache';
 import { isNetworkError } from './mutation-queue';
+import { getById, getByWorkspace } from './offline-cache';
+import { runOptimisticDelete, runOptimisticInsert, runOptimisticUpdate } from './safe-mutation';
+import { supabase } from './supabase';
 
 // Offline-Helper: groesste Position im Scope finden, +1. Aufrufer
 // reicht den Filter-Pradicat, das aus dem Cache passende Rows raus-
 // zieht (z.B. board_id + col_id matchen). Liefert 0 wenn der Scope
 // noch leer ist.
 async function nextPositionFromCache(
-  table:
-    | 'rows'
-    | 'cols'
-    | 'kb_cols'
-    | 'kb_cards'
-    | 'checklists'
-    | 'links'
-    | 'checklist_items',
+  table: 'rows' | 'cols' | 'kb_cols' | 'kb_cards' | 'checklists' | 'links' | 'checklist_items',
   workspaceId: string,
   filter: (r: Record<string, unknown> & { position?: number }) => boolean,
 ): Promise<number> {
@@ -65,6 +54,10 @@ async function nextPositionFromCache(
   if (filtered.length === 0) return 0;
   return filtered.reduce((m, r) => Math.max(m, r.position ?? -1), -1) + 1;
 }
+import {
+  readInfoFieldsFromData as readInfoFields,
+  readCellLinksFromData as readInfoLinks,
+} from './cell-data';
 import type {
   CardRecur,
   CellRow,
@@ -83,10 +76,6 @@ import type {
   NodeRow,
   RowRow,
 } from './types';
-import {
-  readCellLinksFromData as readInfoLinks,
-  readInfoFieldsFromData as readInfoFields,
-} from './cell-data';
 import { sanitizeUrl } from './url';
 
 // ─── Helpers ───────────────────────────────────────────────────
@@ -195,10 +184,7 @@ export function renameRow(rowId: string, label: string): Promise<RowRow> {
   return updateRow(rowId, { label });
 }
 
-export async function setRowPosition(
-  rowId: string,
-  position: number,
-): Promise<void> {
+export async function setRowPosition(rowId: string, position: number): Promise<void> {
   await updateRow(rowId, { position });
 }
 
@@ -282,10 +268,7 @@ export function renameCol(colId: string, label: string): Promise<ColRow> {
   return updateCol(colId, { label });
 }
 
-export async function setColPosition(
-  colId: string,
-  position: number,
-): Promise<void> {
+export async function setColPosition(colId: string, position: number): Promise<void> {
   await updateCol(colId, { position });
 }
 
@@ -333,11 +316,7 @@ export async function insertCell(args: {
     workspaceId: args.workspaceId,
     label: 'Zelle anlegen',
     run: async () => {
-      const { data, error } = await supabase
-        .from('cells')
-        .insert(payload)
-        .select()
-        .single();
+      const { data, error } = await supabase.from('cells').insert(payload).select().single();
       if (error) throw error;
       return data as CellRow;
     },
@@ -493,10 +472,7 @@ async function mutateNodeData<T>(
     if (!isNetworkError(err)) throw err;
     const cached = await getById<NodeRow>('nodes', nodeId);
     if (!cached) throw err;
-    nodeData = ((cached as { data?: unknown }).data ?? {}) as Record<
-      string,
-      unknown
-    >;
+    nodeData = ((cached as { data?: unknown }).data ?? {}) as Record<string, unknown>;
   }
   const { data: nextData, result } = mutator(nodeData);
   // Write geht ueber den Wrapper, indem wir runOptimisticUpdate
@@ -520,10 +496,7 @@ async function mutateNodeData<T>(
   return result;
 }
 
-export async function setNodeDescription(
-  nodeId: string,
-  description: string,
-): Promise<void> {
+export async function setNodeDescription(nodeId: string, description: string): Promise<void> {
   await mutateNodeData(nodeId, (data) => ({
     data: { ...data, description: description ?? '' },
     result: undefined,
@@ -541,19 +514,13 @@ export async function deleteNode(nodeId: string): Promise<void> {
     id: nodeId,
     label: 'Element loeschen',
     run: async () => {
-      const { error } = await supabase
-        .from('nodes')
-        .delete()
-        .eq('id', nodeId);
+      const { error } = await supabase.from('nodes').delete().eq('id', nodeId);
       if (error) throw error;
     },
   });
 }
 
-export async function renameNode(
-  nodeId: string,
-  label: string,
-): Promise<NodeRow> {
+export async function renameNode(nodeId: string, label: string): Promise<NodeRow> {
   return runOptimisticUpdate<NodeRow>({
     table: 'nodes',
     id: nodeId,
@@ -584,11 +551,7 @@ export async function addKbCol(args: {
     workspaceId: args.workspaceId,
     label: 'Kanban-Spalte anlegen',
     run: async () => {
-      const pos = await nextBoardPosition(
-        'kb_cols',
-        args.boardId,
-        args.workspaceId,
-      );
+      const pos = await nextBoardPosition('kb_cols', args.boardId, args.workspaceId);
       const { data, error } = await supabase
         .from('kb_cols')
         .insert({
@@ -652,17 +615,11 @@ export function renameKbCol(colId: string, label: string): Promise<KbColRow> {
   return updateKbCol(colId, { label });
 }
 
-export function setKbColColor(
-  colId: string,
-  color: string | null,
-): Promise<KbColRow> {
+export function setKbColColor(colId: string, color: string | null): Promise<KbColRow> {
   return updateKbCol(colId, { color });
 }
 
-export async function setKbColPosition(
-  colId: string,
-  position: number,
-): Promise<void> {
+export async function setKbColPosition(colId: string, position: number): Promise<void> {
   await updateKbCol(colId, { position });
 }
 
@@ -693,12 +650,9 @@ export async function addCard(args: {
     workspaceId: args.workspaceId,
     label: 'Karte anlegen',
     run: async () => {
-      const pos = await nextBoardPosition(
-        'kb_cards',
-        args.boardId,
-        args.workspaceId,
-        { col_id: args.colId },
-      );
+      const pos = await nextBoardPosition('kb_cards', args.boardId, args.workspaceId, {
+        col_id: args.colId,
+      });
       const { data, error } = await supabase
         .from('kb_cards')
         .insert({
@@ -774,12 +728,9 @@ export async function createCardFromChecklist(args: {
     workspaceId: args.workspaceId,
     label: 'Karte aus Checkliste',
     run: async () => {
-      const pos = await nextBoardPosition(
-        'kb_cards',
-        args.targetBoardId,
-        args.workspaceId,
-        { col_id: args.targetColId },
-      );
+      const pos = await nextBoardPosition('kb_cards', args.targetBoardId, args.workspaceId, {
+        col_id: args.targetColId,
+      });
       const { data, error } = await supabase
         .from('kb_cards')
         .insert({
@@ -889,8 +840,7 @@ async function updateCard(cardId: string, patch: CardPatch): Promise<KbCardRow> 
 // faellt auf "Karte aktualisieren" zurueck.
 function cardLabelFromPatch(patch: CardPatch): string {
   if ('done' in patch) return patch.done ? 'Karte erledigen' : 'Karte oeffnen';
-  if ('archived' in patch)
-    return patch.archived ? 'Karte archivieren' : 'Karte zurueckholen';
+  if ('archived' in patch) return patch.archived ? 'Karte archivieren' : 'Karte zurueckholen';
   if ('name' in patch) return 'Karte umbenennen';
   if ('note' in patch) return 'Notiz speichern';
   if ('alias' in patch) return 'Alias setzen';
@@ -915,24 +865,15 @@ export function setCardNote(cardId: string, note: string): Promise<KbCardRow> {
   return updateCard(cardId, { note });
 }
 
-export function setCardAlias(
-  cardId: string,
-  alias: string | null,
-): Promise<KbCardRow> {
+export function setCardAlias(cardId: string, alias: string | null): Promise<KbCardRow> {
   return updateCard(cardId, { alias });
 }
 
-export function setCardDeadline(
-  cardId: string,
-  deadline: string | null,
-): Promise<KbCardRow> {
+export function setCardDeadline(cardId: string, deadline: string | null): Promise<KbCardRow> {
   return updateCard(cardId, { deadline });
 }
 
-export function setCardPriority(
-  cardId: string,
-  priority: number | null,
-): Promise<KbCardRow> {
+export function setCardPriority(cardId: string, priority: number | null): Promise<KbCardRow> {
   return updateCard(cardId, { priority });
 }
 
@@ -944,24 +885,15 @@ export function setCardWho(cardId: string, who: string[]): Promise<KbCardRow> {
   return updateCard(cardId, { who });
 }
 
-export function setCardRecur(
-  cardId: string,
-  recur: CardRecur | null,
-): Promise<KbCardRow> {
+export function setCardRecur(cardId: string, recur: CardRecur | null): Promise<KbCardRow> {
   return updateCard(cardId, { recur });
 }
 
-export function setCardArchived(
-  cardId: string,
-  archived: boolean,
-): Promise<KbCardRow> {
+export function setCardArchived(cardId: string, archived: boolean): Promise<KbCardRow> {
   return updateCard(cardId, { archived });
 }
 
-export function setCardColor(
-  cardId: string,
-  color: string | null,
-): Promise<KbCardRow> {
+export function setCardColor(cardId: string, color: string | null): Promise<KbCardRow> {
   return updateCard(cardId, { color });
 }
 
@@ -1003,12 +935,9 @@ export async function moveCard(args: {
   // Updates gehen durch updateCard → runOptimisticUpdate.
   let pos: number;
   try {
-    pos = await nextBoardPosition(
-      'kb_cards',
-      args.boardId,
-      args.workspaceId,
-      { col_id: args.toColId },
-    );
+    pos = await nextBoardPosition('kb_cards', args.boardId, args.workspaceId, {
+      col_id: args.toColId,
+    });
   } catch (err) {
     if (!isNetworkError(err)) throw err;
     pos = await nextPositionFromCache(
@@ -1020,10 +949,7 @@ export async function moveCard(args: {
   return updateCard(args.cardId, { col_id: args.toColId, position: pos });
 }
 
-export async function setCardPosition(
-  cardId: string,
-  position: number,
-): Promise<void> {
+export async function setCardPosition(cardId: string, position: number): Promise<void> {
   await updateCard(cardId, { position } as CardPatch);
 }
 
@@ -1061,10 +987,7 @@ export async function delCard(cardId: string): Promise<void> {
     id: cardId,
     label: 'Karte loeschen',
     run: async () => {
-      const { error } = await supabase
-        .from('kb_cards')
-        .delete()
-        .eq('id', cardId);
+      const { error } = await supabase.from('kb_cards').delete().eq('id', cardId);
       if (error) throw error;
     },
   });
@@ -1084,11 +1007,7 @@ export async function addChecklist(args: {
     workspaceId: args.workspaceId,
     label: 'Checkliste anlegen',
     run: async () => {
-      const pos = await nextBoardPosition(
-        'checklists',
-        args.boardId,
-        args.workspaceId,
-      );
+      const pos = await nextBoardPosition('checklists', args.boardId, args.workspaceId);
       const { data, error } = await supabase
         .from('checklists')
         .insert({
@@ -1130,10 +1049,7 @@ export async function addChecklist(args: {
 
 // Zellen-Checkliste: cell_id statt board_id. Position innerhalb der
 // Zelle (eigene Reihenfolge pro cell_id).
-async function nextCellChecklistPosition(
-  cellId: string,
-  workspaceId: string,
-): Promise<number> {
+async function nextCellChecklistPosition(cellId: string, workspaceId: string): Promise<number> {
   const { data, error } = await supabase
     .from('checklists')
     .select('position')
@@ -1200,10 +1116,7 @@ type ChecklistPatch = Partial<
   Pick<ChecklistRow, 'label' | 'alias' | 'close_mode' | 'recur' | 'action' | 'history'>
 >;
 
-async function updateChecklist(
-  clId: string,
-  patch: ChecklistPatch,
-): Promise<ChecklistRow> {
+async function updateChecklist(clId: string, patch: ChecklistPatch): Promise<ChecklistRow> {
   return runOptimisticUpdate<ChecklistRow>({
     table: 'checklists',
     id: clId,
@@ -1222,17 +1135,11 @@ async function updateChecklist(
   });
 }
 
-export function renameChecklist(
-  clId: string,
-  label: string,
-): Promise<ChecklistRow> {
+export function renameChecklist(clId: string, label: string): Promise<ChecklistRow> {
   return updateChecklist(clId, { label });
 }
 
-export function setChecklistAlias(
-  clId: string,
-  alias: string | null,
-): Promise<ChecklistRow> {
+export function setChecklistAlias(clId: string, alias: string | null): Promise<ChecklistRow> {
   return updateChecklist(clId, { alias });
 }
 
@@ -1249,20 +1156,14 @@ export async function delChecklist(clId: string): Promise<void> {
     id: clId,
     label: 'Checkliste loeschen',
     run: async () => {
-      const { error } = await supabase
-        .from('checklists')
-        .delete()
-        .eq('id', clId);
+      const { error } = await supabase.from('checklists').delete().eq('id', clId);
       if (error) throw error;
     },
   });
 }
 
 // ─── Checklist-Items ───────────────────────────────────────────
-async function nextItemPosition(
-  checklistId: string,
-  workspaceId: string,
-): Promise<number> {
+async function nextItemPosition(checklistId: string, workspaceId: string): Promise<number> {
   const { data, error } = await supabase
     .from('checklist_items')
     .select('position')
@@ -1443,10 +1344,7 @@ export async function applyChecklistClose(args: {
     if (!isNetworkError(err)) throw err;
     // Offline-Fallback: aus dem Cache die Items dieser Liste ziehen
     // und einzeln durch den Wrapper schicken.
-    const items = await getByWorkspace<ChecklistItemRow>(
-      'checklist_items',
-      args.workspaceId,
-    );
+    const items = await getByWorkspace<ChecklistItemRow>('checklist_items', args.workspaceId);
     const own = items.filter((it) => it.checklist_id === args.checklistId);
     if (args.recurring) {
       for (const it of own) {
@@ -1515,10 +1413,7 @@ export async function bulkAddChecklistItems(args: {
       level: it.level,
       position: startPos + i,
     }));
-    const { data, error } = await supabase
-      .from('checklist_items')
-      .insert(payload)
-      .select();
+    const { data, error } = await supabase.from('checklist_items').insert(payload).select();
     if (error) throw error;
     return (data ?? []) as ChecklistItemRow[];
   } catch (err) {
@@ -1560,24 +1455,15 @@ async function updateItem(itemId: string, patch: ItemPatch): Promise<ChecklistIt
   });
 }
 
-export function renameChecklistItem(
-  itemId: string,
-  text: string,
-): Promise<ChecklistItemRow> {
+export function renameChecklistItem(itemId: string, text: string): Promise<ChecklistItemRow> {
   return updateItem(itemId, { text });
 }
 
-export function toggleChecklistItemDone(
-  itemId: string,
-  done: boolean,
-): Promise<ChecklistItemRow> {
+export function toggleChecklistItemDone(itemId: string, done: boolean): Promise<ChecklistItemRow> {
   return updateItem(itemId, { done });
 }
 
-export function setChecklistItemLevel(
-  itemId: string,
-  level: 0 | 1 | 2,
-): Promise<ChecklistItemRow> {
+export function setChecklistItemLevel(itemId: string, level: 0 | 1 | 2): Promise<ChecklistItemRow> {
   return updateItem(itemId, { level });
 }
 
@@ -1594,10 +1480,7 @@ export async function delChecklistItem(itemId: string): Promise<void> {
     id: itemId,
     label: 'Eintrag loeschen',
     run: async () => {
-      const { error } = await supabase
-        .from('checklist_items')
-        .delete()
-        .eq('id', itemId);
+      const { error } = await supabase.from('checklist_items').delete().eq('id', itemId);
       if (error) throw error;
     },
   });
@@ -1629,10 +1512,7 @@ async function mutateCellData<T>(
     if (!isNetworkError(err)) throw err;
     const cached = await getById<CellRow>('cells', cellId);
     if (!cached) throw err;
-    cellData = ((cached as { data?: unknown }).data ?? {}) as Record<
-      string,
-      unknown
-    >;
+    cellData = ((cached as { data?: unknown }).data ?? {}) as Record<string, unknown>;
   }
   const { data: nextData, result } = mutator(cellData);
   // Write-Step laeuft ueber updateCell — das ist bereits gewrappt
@@ -1669,9 +1549,7 @@ export async function renameCellInfoField(
   label: string,
 ): Promise<void> {
   await mutateCellData(cellId, (cellData) => {
-    const fields = readInfoFields(cellData).map((f) =>
-      f.id === fieldId ? { ...f, label } : f,
-    );
+    const fields = readInfoFields(cellData).map((f) => (f.id === fieldId ? { ...f, label } : f));
     return { data: { ...cellData, infoFields: fields }, result: undefined };
   });
 }
@@ -1682,9 +1560,7 @@ export async function setCellInfoFieldValue(
   value: string,
 ): Promise<void> {
   await mutateCellData(cellId, (cellData) => {
-    const fields = readInfoFields(cellData).map((f) =>
-      f.id === fieldId ? { ...f, value } : f,
-    );
+    const fields = readInfoFields(cellData).map((f) => (f.id === fieldId ? { ...f, value } : f));
     return { data: { ...cellData, infoFields: fields }, result: undefined };
   });
 }
@@ -1707,10 +1583,7 @@ export async function moveCellInfoField(
   });
 }
 
-export async function delCellInfoField(
-  cellId: string,
-  fieldId: string,
-): Promise<void> {
+export async function delCellInfoField(cellId: string, fieldId: string): Promise<void> {
   await mutateCellData(cellId, (cellData) => {
     const fields = readInfoFields(cellData).filter((f) => f.id !== fieldId);
     return { data: { ...cellData, infoFields: fields }, result: undefined };
@@ -1761,18 +1634,12 @@ export async function setCellLinkLabel(
   label: string,
 ): Promise<void> {
   await mutateCellData(cellId, (cellData) => {
-    const links = readInfoLinks(cellData).map((l) =>
-      l.id === linkId ? { ...l, label } : l,
-    );
+    const links = readInfoLinks(cellData).map((l) => (l.id === linkId ? { ...l, label } : l));
     return { data: { ...cellData, links }, result: undefined };
   });
 }
 
-export async function setCellLinkUrl(
-  cellId: string,
-  linkId: string,
-  url: string,
-): Promise<void> {
+export async function setCellLinkUrl(cellId: string, linkId: string, url: string): Promise<void> {
   const safeUrl = sanitizeUrl(url);
   if (!safeUrl) throw new InvalidUrlError();
   await mutateCellData(cellId, (cellData) => {
@@ -1783,11 +1650,7 @@ export async function setCellLinkUrl(
   });
 }
 
-export async function moveCellLink(
-  cellId: string,
-  linkId: string,
-  dir: -1 | 1,
-): Promise<void> {
+export async function moveCellLink(cellId: string, linkId: string, dir: -1 | 1): Promise<void> {
   await mutateCellData(cellId, (cellData) => {
     const links = readInfoLinks(cellData);
     const idx = links.findIndex((l) => l.id === linkId);
@@ -1801,10 +1664,7 @@ export async function moveCellLink(
   });
 }
 
-export async function delCellLink(
-  cellId: string,
-  linkId: string,
-): Promise<void> {
+export async function delCellLink(cellId: string, linkId: string): Promise<void> {
   await mutateCellData(cellId, (cellData) => {
     const links = readInfoLinks(cellData).filter((l) => l.id !== linkId);
     return { data: { ...cellData, links }, result: undefined };
@@ -1882,9 +1742,7 @@ export async function toggleCardInlineItem(
   done: boolean,
 ): Promise<void> {
   await mutateCardChecklist(cardId, (items) => ({
-    items: items
-      .map(ensureItemId)
-      .map((it) => (it.id === itemId ? { ...it, done } : it)),
+    items: items.map(ensureItemId).map((it) => (it.id === itemId ? { ...it, done } : it)),
     result: undefined,
   }));
 }
@@ -1895,17 +1753,12 @@ export async function renameCardInlineItem(
   text: string,
 ): Promise<void> {
   await mutateCardChecklist(cardId, (items) => ({
-    items: items
-      .map(ensureItemId)
-      .map((it) => (it.id === itemId ? { ...it, text } : it)),
+    items: items.map(ensureItemId).map((it) => (it.id === itemId ? { ...it, text } : it)),
     result: undefined,
   }));
 }
 
-export async function delCardInlineItem(
-  cardId: string,
-  itemId: string,
-): Promise<void> {
+export async function delCardInlineItem(cardId: string, itemId: string): Promise<void> {
   await mutateCardChecklist(cardId, (items) => ({
     items: items.map(ensureItemId).filter((it) => it.id !== itemId),
     result: undefined,
@@ -1931,11 +1784,7 @@ export async function addBoardLink(args: {
     workspaceId: args.workspaceId,
     label: 'Link anlegen',
     run: async () => {
-      const position = await nextBoardPosition(
-        'links',
-        args.boardId,
-        args.workspaceId,
-      );
+      const position = await nextBoardPosition('links', args.boardId, args.workspaceId);
       const { data, error } = await supabase
         .from('links')
         .insert({
@@ -1996,33 +1845,21 @@ async function updateBoardLink(
   });
 }
 
-export async function setBoardLinkLabel(
-  linkId: string,
-  label: string,
-): Promise<void> {
+export async function setBoardLinkLabel(linkId: string, label: string): Promise<void> {
   await updateBoardLink(linkId, { label: label.trim() });
 }
 
-export async function setBoardLinkUrl(
-  linkId: string,
-  url: string,
-): Promise<void> {
+export async function setBoardLinkUrl(linkId: string, url: string): Promise<void> {
   const safe = sanitizeUrl(url);
   if (!safe) throw new InvalidUrlError();
   await updateBoardLink(linkId, { url: safe });
 }
 
-export async function setBoardLinkType(
-  linkId: string,
-  type: LinkType,
-): Promise<void> {
+export async function setBoardLinkType(linkId: string, type: LinkType): Promise<void> {
   await updateBoardLink(linkId, { type });
 }
 
-export async function setBoardLinkPosition(
-  linkId: string,
-  position: number,
-): Promise<void> {
+export async function setBoardLinkPosition(linkId: string, position: number): Promise<void> {
   await updateBoardLink(linkId, { position });
 }
 
@@ -2083,11 +1920,7 @@ async function restoreRow(
     workspaceId: wsId,
     label: 'Wiederherstellen',
     run: async () => {
-      const { data, error } = await supabase
-        .from(table)
-        .insert(clean)
-        .select()
-        .single();
+      const { data, error } = await supabase.from(table).insert(clean).select().single();
       if (error) throw error;
       return data as { id: string; workspace_id: string };
     },
@@ -2110,20 +1943,14 @@ export async function restoreBoardLink(snapshot: LinkRow): Promise<void> {
 // Row + ihre Cells restore: zuerst die Row (FK-Parent), dann die
 // Cells (FK-Child). Reihenfolge matters — andere Reihenfolge wirft
 // FK-Violation.
-export async function restoreRowWithCells(
-  rowSnap: RowRow,
-  cellSnaps: CellRow[],
-): Promise<void> {
+export async function restoreRowWithCells(rowSnap: RowRow, cellSnaps: CellRow[]): Promise<void> {
   await restoreRow('rows', rowSnap as unknown as AnyRow);
   for (const cell of cellSnaps) {
     await restoreRow('cells', cell as unknown as AnyRow);
   }
 }
 
-export async function restoreColWithCells(
-  colSnap: ColRow,
-  cellSnaps: CellRow[],
-): Promise<void> {
+export async function restoreColWithCells(colSnap: ColRow, cellSnaps: CellRow[]): Promise<void> {
   await restoreRow('cols', colSnap as unknown as AnyRow);
   for (const cell of cellSnaps) {
     await restoreRow('cells', cell as unknown as AnyRow);
@@ -2140,9 +1967,7 @@ export async function restoreChecklistWithItems(
   }
 }
 
-export async function restoreChecklistItem(
-  snap: ChecklistItemRow,
-): Promise<void> {
+export async function restoreChecklistItem(snap: ChecklistItemRow): Promise<void> {
   await restoreRow('checklist_items', snap as unknown as AnyRow);
 }
 
@@ -2197,9 +2022,7 @@ export async function createDoc(args: {
 
 async function updateDoc(
   docId: string,
-  patch: Partial<
-    Pick<DocRow, 'title' | 'content' | 'alias' | 'source_alias' | 'attached_cell_id'>
-  >,
+  patch: Partial<Pick<DocRow, 'title' | 'content' | 'alias' | 'source_alias' | 'attached_cell_id'>>,
 ): Promise<DocRow> {
   return runOptimisticUpdate<DocRow>({
     table: 'docs',
@@ -2232,17 +2055,11 @@ export function setDocContent(docId: string, content: string): Promise<DocRow> {
   return updateDoc(docId, { content });
 }
 
-export function setDocAlias(
-  docId: string,
-  alias: string | null,
-): Promise<DocRow> {
+export function setDocAlias(docId: string, alias: string | null): Promise<DocRow> {
   return updateDoc(docId, { alias });
 }
 
-export function setDocAttachedCell(
-  docId: string,
-  cellId: string | null,
-): Promise<DocRow> {
+export function setDocAttachedCell(docId: string, cellId: string | null): Promise<DocRow> {
   return updateDoc(docId, { attached_cell_id: cellId });
 }
 

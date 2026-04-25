@@ -9,8 +9,8 @@
 // keine Item-Rearrange-UI, kein Level-Tuning pro Item — Parser ist
 // autoritativ, der User korrigiert ueber den Textarea-Text.
 
-import { For, Show, createMemo, createSignal, onCleanup, onMount, type Component } from 'solid-js';
-import { parsePastedText, type ParsedPasteItem } from '../lib/checklist-paste-parse';
+import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
+import { type ParsedPasteItem, parsePastedText } from '../lib/checklist-paste-parse';
 import Icon from './Icon';
 
 type Props = {
@@ -63,12 +63,7 @@ const ChecklistPastePopup: Component<Props> = (p) => {
       <div class="overlay-card cl-paste-card" role="dialog" aria-modal="true">
         <header class="overlay-head">
           <h3>Aus Zwischenablage einfuegen</h3>
-          <button
-            type="button"
-            class="overlay-close"
-            onClick={p.onClose}
-            aria-label="Schliessen"
-          >
+          <button type="button" class="overlay-close" onClick={p.onClose} aria-label="Schliessen">
             <Icon name="x" size={18} />
           </button>
         </header>
@@ -103,11 +98,10 @@ const ChecklistPastePopup: Component<Props> = (p) => {
             >
               <For each={items()}>
                 {(it) => (
-                  <div
-                    class="cl-paste-item"
-                    style={{ '--cl-level': it.level }}
-                  >
-                    <span class="cl-paste-bullet" aria-hidden="true">•</span>
+                  <div class="cl-paste-item" style={{ '--cl-level': it.level }}>
+                    <span class="cl-paste-bullet" aria-hidden="true">
+                      •
+                    </span>
                     <span class="cl-paste-text">{it.text}</span>
                   </div>
                 )}
@@ -119,12 +113,7 @@ const ChecklistPastePopup: Component<Props> = (p) => {
           <button type="button" class="btn-subtle" onClick={p.onClose}>
             Abbrechen
           </button>
-          <button
-            type="button"
-            class="btn btn-p"
-            onClick={commit}
-            disabled={items().length === 0}
-          >
+          <button type="button" class="btn btn-p" onClick={commit} disabled={items().length === 0}>
             Einfuegen (Strg+Enter)
           </button>
         </footer>

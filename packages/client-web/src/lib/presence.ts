@@ -13,13 +13,7 @@
 // haengt an den gelesenen Accessors; onCleanup im Effect entfernt
 // den alten Channel bevor der neue entsteht.
 
-import {
-  type Accessor,
-  createEffect,
-  createMemo,
-  createSignal,
-  onCleanup,
-} from 'solid-js';
+import { type Accessor, createEffect, createMemo, createSignal, onCleanup } from 'solid-js';
 import { supabase } from './supabase';
 
 export type PresenceUser = {
@@ -91,10 +85,7 @@ export function usePresence(
         list.push({
           userId,
           email: typeof meta.email === 'string' ? meta.email : '(unbekannt)',
-          joinedAt:
-            typeof meta.joinedAt === 'string'
-              ? meta.joinedAt
-              : sessionJoinedAt,
+          joinedAt: typeof meta.joinedAt === 'string' ? meta.joinedAt : sessionJoinedAt,
         });
       }
       list.sort((a, b) => {
@@ -152,13 +143,7 @@ export function usePresence(
 // Tokens.
 // Nur Token-Farben verwenden, die in styles.css :root definiert sind.
 // Pink/Green gibts nicht — einfach weglassen statt fehlschlagen.
-const AVATAR_COLORS = [
-  '--blue',
-  '--teal',
-  '--amber',
-  '--red',
-  '--purple',
-] as const;
+const AVATAR_COLORS = ['--blue', '--teal', '--amber', '--red', '--purple'] as const;
 
 export function avatarColorFor(email: string): string {
   let hash = 2166136261;

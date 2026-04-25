@@ -8,7 +8,7 @@
 // relativ zum Target-Element (fallback wenn x/y fehlen — z.B. bei `+`-
 // Shortcut ohne Mausposition).
 
-import { For, Show, onCleanup, onMount, type Component } from 'solid-js';
+import { type Component, For, Show, onCleanup, onMount } from 'solid-js';
 
 export type CtxMenuItem = {
   label: string;

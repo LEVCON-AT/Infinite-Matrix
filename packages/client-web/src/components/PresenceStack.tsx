@@ -3,13 +3,8 @@
 // Self (erster Eintrag) traegt eine dezente zweite Border-Linie, damit
 // man sich selbst unter anderen wiederfindet.
 
-import { Index, Show, type Component } from 'solid-js';
-import {
-  avatarColorFor,
-  avatarInitial,
-  usePresence,
-  type PresenceUser,
-} from '../lib/presence';
+import { type Component, Index, Show } from 'solid-js';
+import { type PresenceUser, avatarColorFor, avatarInitial, usePresence } from '../lib/presence';
 
 type Props = {
   workspaceId: string;
@@ -56,10 +51,7 @@ const PresenceStack: Component<Props> = (p) => {
         {(u) => <Avatar user={u()} isSelf={u().userId === p.selfUserId} />}
       </Index>
       <Show when={overflow() > 0}>
-        <span
-          class="presence-avatar presence-avatar-overflow"
-          title={`+${overflow()} weitere`}
-        >
+        <span class="presence-avatar presence-avatar-overflow" title={`+${overflow()} weitere`}>
           +{overflow()}
         </span>
       </Show>

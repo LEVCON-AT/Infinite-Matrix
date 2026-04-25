@@ -18,7 +18,9 @@
 // History via localStorage (lib/search-history.ts). Alt+Up/Down cycled
 // durch letzte 25 Eingaben.
 
+import { useNavigate } from '@solidjs/router';
 import {
+  type Component,
   For,
   Match,
   Show,
@@ -28,50 +30,29 @@ import {
   createSignal,
   onCleanup,
   onMount,
-  type Component,
 } from 'solid-js';
-import { useNavigate } from '@solidjs/router';
+import { dispatchAliasResult } from '../lib/alias-dispatch';
+import { cellTarget } from '../lib/alias-dispatch';
+import { type AliasEntry, aliasIndexSignal, getAliasMatches } from '../lib/alias-index';
+import { resolveAlias } from '../lib/alias-resolve';
 import {
   COMMAND_VERBS,
+  type CommandUiHooks,
   executeCommand,
   parseCommand,
   reportOutcome,
-  type CommandUiHooks,
 } from '../lib/commands';
-import type { NodeRow } from '../lib/types';
-import {
-  aliasIndexSignal,
-  getAliasMatches,
-  type AliasEntry,
-} from '../lib/alias-index';
-import {
-  matchExcerpt,
-  searchWorkspace,
-  type SearchResult,
-} from '../lib/search';
-import { resolveAlias } from '../lib/alias-resolve';
-import { dispatchAliasResult } from '../lib/alias-dispatch';
-import { cellTarget } from '../lib/alias-dispatch';
-import { moveCardToBoard } from '../lib/mutations';
-import { supabase } from '../lib/supabase';
-import {
-  loadHistory,
-  pushHistory,
-  type HistoryEntry,
-} from '../lib/search-history';
-import { rememberFocus } from '../lib/navigation-focus';
 import { openDocsPopup } from '../lib/docs-ui';
-import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
-import {
-  exportWorkspaceWithUi,
-  importWorkspaceWithUi,
-} from '../lib/workspace-io';
-import {
-  runResetAll,
-  runResetScope,
-  type ResetScope,
-} from '../lib/workspace-reset';
+import { moveCardToBoard } from '../lib/mutations';
+import { rememberFocus } from '../lib/navigation-focus';
+import { type SearchResult, matchExcerpt, searchWorkspace } from '../lib/search';
+import { type HistoryEntry, loadHistory, pushHistory } from '../lib/search-history';
+import { supabase } from '../lib/supabase';
+import { showToast } from '../lib/toasts';
+import type { NodeRow } from '../lib/types';
+import { exportWorkspaceWithUi, importWorkspaceWithUi } from '../lib/workspace-io';
+import { type ResetScope, runResetAll, runResetScope } from '../lib/workspace-reset';
 import Icon from './Icon';
 
 type Props = {
@@ -184,9 +165,7 @@ const HeaderSearchBar: Component<Props> = (p) => {
   const [colPick, setColPick] = createSignal<ColPickState | null>(null);
   const [historyCursor, setHistoryCursor] = createSignal(-1);
   let historyDraft = '';
-  const [history, setHistory] = createSignal<HistoryEntry[]>(
-    loadHistory(p.workspaceId),
-  );
+  const [history, setHistory] = createSignal<HistoryEntry[]>(loadHistory(p.workspaceId));
 
   let inputRef: HTMLInputElement | undefined;
   let colSelectRef: HTMLSelectElement | undefined;
@@ -274,9 +253,7 @@ const HeaderSearchBar: Component<Props> = (p) => {
   const showDropdown = createMemo(
     () =>
       focused() &&
-      (mode() !== 'idle' ||
-        (mode() === 'idle' && history().length > 0) ||
-        error() !== null),
+      (mode() !== 'idle' || (mode() === 'idle' && history().length > 0) || error() !== null),
   );
 
   // Debounced DB-Search. Nur in search-mode aktiv; mode-switch cancelt.
@@ -422,10 +399,7 @@ const HeaderSearchBar: Component<Props> = (p) => {
       });
       if (result) {
         inputRef?.blur();
-        setTimeout(
-          () => navigate(`/w/${p.workspaceId}/n/${result.rootMatrixId}`),
-          0,
-        );
+        setTimeout(() => navigate(`/w/${p.workspaceId}/n/${result.rootMatrixId}`), 0);
         return true;
       }
       return false;
@@ -722,10 +696,7 @@ const HeaderSearchBar: Component<Props> = (p) => {
       }}
     >
       <span class="header-search-icon" aria-hidden="true">
-        <Show
-          when={mode() === 'command'}
-          fallback={<Icon name="sparkles" size={15} />}
-        >
+        <Show when={mode() === 'command'} fallback={<Icon name="sparkles" size={15} />}>
           <span class="header-search-caret">^</span>
         </Show>
       </span>
@@ -775,7 +746,7 @@ const HeaderSearchBar: Component<Props> = (p) => {
                     size={Math.min(6, state().cols.length)}
                     value={state().selectedIdx}
                     onChange={(e) => {
-                      const idx = parseInt(e.currentTarget.value, 10);
+                      const idx = Number.parseInt(e.currentTarget.value, 10);
                       const cur = colPick();
                       if (cur) setColPick({ ...cur, selectedIdx: idx });
                     }}
@@ -793,9 +764,7 @@ const HeaderSearchBar: Component<Props> = (p) => {
                     }}
                   >
                     <For each={state().cols}>
-                      {(col, idx) => (
-                        <option value={idx()}>{col.label || '(leer)'}</option>
-                      )}
+                      {(col, idx) => <option value={idx()}>{col.label || '(leer)'}</option>}
                     </For>
                   </select>
                 </div>
@@ -824,10 +793,7 @@ const HeaderSearchBar: Component<Props> = (p) => {
                           onMouseEnter={() => setSelectedIdx(gIdx())}
                           onClick={() => applyHistoryEntry(h)}
                         >
-                          <span
-                            class="header-search-row-badge"
-                            data-hist-kind={h.kind}
-                          >
+                          <span class="header-search-row-badge" data-hist-kind={h.kind}>
                             {h.kind === 'command' ? '^' : '⌕'}
                           </span>
                           <span class="header-search-row-text">{h.raw}</span>
@@ -848,7 +814,9 @@ const HeaderSearchBar: Component<Props> = (p) => {
                     {(a) => {
                       const flat = flatItems();
                       const gIdx = () =>
-                        flat.findIndex((it) => it.kind === 'alias' && it.id === `a-${a.kind}-${a.id}`);
+                        flat.findIndex(
+                          (it) => it.kind === 'alias' && it.id === `a-${a.kind}-${a.id}`,
+                        );
                       return (
                         <button
                           type="button"
@@ -857,10 +825,7 @@ const HeaderSearchBar: Component<Props> = (p) => {
                           onMouseEnter={() => setSelectedIdx(gIdx())}
                           onClick={() => void applyAliasEntry(a)}
                         >
-                          <span
-                            class="header-search-row-badge"
-                            data-alias-kind={a.kind}
-                          >
+                          <span class="header-search-row-badge" data-alias-kind={a.kind}>
                             {a.subLabel ?? a.kind}
                           </span>
                           <span class="header-search-row-text">
@@ -885,9 +850,7 @@ const HeaderSearchBar: Component<Props> = (p) => {
                     {(v) => {
                       const flat = flatItems();
                       const gIdx = () =>
-                        flat.findIndex(
-                          (it) => it.kind === 'verb' && it.verb.verb === v.verb,
-                        );
+                        flat.findIndex((it) => it.kind === 'verb' && it.verb.verb === v.verb);
                       return (
                         <button
                           type="button"
@@ -945,15 +908,16 @@ const HeaderSearchBar: Component<Props> = (p) => {
                       <For each={g.items}>
                         {(r) => {
                           const flat = flatItems();
-                          const rid = (
-                            r as {
-                              nodeId?: string;
-                              cellId?: string;
-                              cardId?: string;
-                              checklistId?: string;
-                              docId?: string;
-                            }
-                          ).nodeId ??
+                          const rid =
+                            (
+                              r as {
+                                nodeId?: string;
+                                cellId?: string;
+                                cardId?: string;
+                                checklistId?: string;
+                                docId?: string;
+                              }
+                            ).nodeId ??
                             (r as { cellId?: string }).cellId ??
                             (r as { cardId?: string }).cardId ??
                             (r as { checklistId?: string }).checklistId ??
@@ -961,18 +925,13 @@ const HeaderSearchBar: Component<Props> = (p) => {
                             '';
                           const gIdx = () =>
                             flat.findIndex(
-                              (it) =>
-                                it.kind === 'result' && it.id === `r-${r.kind}-${rid}`,
+                              (it) => it.kind === 'result' && it.id === `r-${r.kind}-${rid}`,
                             );
                           const excerpt =
                             r.kind === 'card' && (r as { note?: string }).note
                               ? matchExcerpt((r as { note: string }).note, query(), 120)
                               : r.kind === 'doc' && (r as { content?: string }).content
-                                ? matchExcerpt(
-                                    (r as { content: string }).content,
-                                    query(),
-                                    120,
-                                  )
+                                ? matchExcerpt((r as { content: string }).content, query(), 120)
                                 : null;
                           return (
                             <button
@@ -982,10 +941,7 @@ const HeaderSearchBar: Component<Props> = (p) => {
                               onMouseEnter={() => setSelectedIdx(gIdx())}
                               onClick={() => void applyResult(r)}
                             >
-                              <span
-                                class="header-search-row-badge"
-                                data-type={badgeDataType(r)}
-                              >
+                              <span class="header-search-row-badge" data-type={badgeDataType(r)}>
                                 {badgeLabel(r)}
                               </span>
                               <span class="header-search-row-text">
@@ -1000,9 +956,7 @@ const HeaderSearchBar: Component<Props> = (p) => {
                                     }
                                   </For>
                                   <Show when={r.alias}>
-                                    <span class="header-search-alias-inline">
-                                      {' '}^{r.alias}
-                                    </span>
+                                    <span class="header-search-alias-inline"> ^{r.alias}</span>
                                   </Show>
                                 </span>
                                 <Show when={excerpt}>
@@ -1050,10 +1004,7 @@ const HeaderSearchBar: Component<Props> = (p) => {
                             onMouseEnter={() => setSelectedIdx(gIdx())}
                             onClick={() => void applyAliasEntry(a)}
                           >
-                            <span
-                              class="header-search-row-badge"
-                              data-alias-kind={a.kind}
-                            >
+                            <span class="header-search-row-badge" data-alias-kind={a.kind}>
                               {a.subLabel ?? a.kind}
                             </span>
                             <span class="header-search-row-text">

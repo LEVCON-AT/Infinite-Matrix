@@ -3,24 +3,17 @@
 // Overlay zu bekommen. ESC navigiert zurueck zur Parent-Matrix (wird in
 // Workspace.tsx verdrahtet, wo der globale ESC-Handler lebt).
 
-import {
-  For,
-  Show,
-  createEffect,
-  createResource,
-  createSignal,
-  type Component,
-} from 'solid-js';
-import type { CellRow, ColRow, RowRow } from '../lib/types';
+import { useNavigate } from '@solidjs/router';
+import { type Component, For, Show, createEffect, createResource, createSignal } from 'solid-js';
+import { openDocsPopup } from '../lib/docs-ui';
 import { useEditMode } from '../lib/edit-mode';
+import { translateDbError } from '../lib/errors';
 import { addCellChecklist } from '../lib/mutations';
 import { fetchCellChecklists } from '../lib/queries';
 import { showToast } from '../lib/toasts';
-import { translateDbError } from '../lib/errors';
-import ChecklistPanel from './ChecklistPanel';
+import type { CellRow, ColRow, RowRow } from '../lib/types';
 import CellDocsSection from './CellDocsSection';
-import { openDocsPopup } from '../lib/docs-ui';
-import { useNavigate } from '@solidjs/router';
+import ChecklistPanel from './ChecklistPanel';
 
 type Props = {
   workspaceId: string;
@@ -136,7 +129,7 @@ const CellChecklistsPage: Component<Props> = (p) => {
           fallback={
             <p class="hint">
               Noch keine Checkliste.
-              <Show when={editMode()}>{' '}+ Checkliste unten.</Show>
+              <Show when={editMode()}> + Checkliste unten.</Show>
             </p>
           }
         >

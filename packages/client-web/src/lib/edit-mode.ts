@@ -27,12 +27,7 @@ export function useEditModeHotkey() {
       if (!e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
       if (e.key !== 'E' && e.key !== 'e') return;
       const t = e.target as HTMLElement | null;
-      if (
-        t &&
-        (t.tagName === 'INPUT' ||
-          t.tagName === 'TEXTAREA' ||
-          t.isContentEditable)
-      ) {
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
         return;
       }
       e.preventDefault();

@@ -22,10 +22,11 @@
 // Stubs (noch nicht implementiert):
 //   w, s, sc, c, move (Rest), cl-to-card, fa, fi, fh, fc
 
-import type { NodeRow } from './types';
+import { type AliasResolveResult, resolveAlias } from './alias-resolve';
+import { showConfirm } from './dialog';
+import { translateDbError } from './errors';
 import {
   addCard,
-  setCardAlias,
   addChecklist,
   addChecklistItem,
   delCard,
@@ -36,13 +37,12 @@ import {
   renameCard,
   renameChecklist,
   renameNode,
+  setCardAlias,
   setDocTitle,
 } from './mutations';
 import { fetchBoardContent } from './queries';
-import { resolveAlias, type AliasResolveResult } from './alias-resolve';
 import { showToast } from './toasts';
-import { translateDbError } from './errors';
-import { showConfirm } from './dialog';
+import type { NodeRow } from './types';
 
 export type ParsedCommand =
   | { kind: 'new-card'; alias: string | null }
@@ -95,7 +95,12 @@ export const COMMAND_VERBS: Array<{
     supported: true,
   },
   { verb: 'copy', syntax: 'copy <src> [dst]', description: 'Checkliste clonen', supported: true },
-  { verb: 'del', syntax: 'del <alias>', description: 'Alias aufloesen + loeschen', supported: true },
+  {
+    verb: 'del',
+    syntax: 'del <alias>',
+    description: 'Alias aufloesen + loeschen',
+    supported: true,
+  },
   { verb: 'ren', syntax: 'ren <alias> <label>', description: 'Alias umbenennen', supported: true },
   { verb: 'nd', syntax: 'nd', description: 'Neue Doku (Docs-Popup oeffnen)', supported: true },
   {
@@ -120,16 +125,46 @@ export const COMMAND_VERBS: Array<{
     supported: true,
   },
   { verb: 'help', syntax: 'help', description: 'Diese Uebersicht zeigen', supported: true },
-  { verb: '<alias>', syntax: '<alias>', description: 'Zum Alias springen (Navigation)', supported: true },
+  {
+    verb: '<alias>',
+    syntax: '<alias>',
+    description: 'Zum Alias springen (Navigation)',
+    supported: true,
+  },
   // Stubs — parseCommand liefert {kind:'unsupported'}, die Bar zeigt sie
   // gedimmt. Reihenfolge grob nach Haeufigkeit im HTML-Vorbild.
-  { verb: 'w', syntax: 'w [alias]', description: 'Intervallmatrix (Wiederkehr-Ansicht)', supported: false },
+  {
+    verb: 'w',
+    syntax: 'w [alias]',
+    description: 'Intervallmatrix (Wiederkehr-Ansicht)',
+    supported: false,
+  },
   { verb: 's', syntax: 's', description: 'Einstellungen oeffnen', supported: false },
   { verb: 'sc', syntax: 'sc', description: 'Sidebar-Scroll-Modus togglen', supported: false },
-  { verb: 'c', syntax: 'c [tab] [alias] [-all]', description: 'Cleanup — Labels zuruecksetzen', supported: false },
-  { verb: 'move', syntax: 'move <alias> ...', description: 'Node verschieben (Alt-Variante)', supported: false },
-  { verb: 'delete', syntax: 'delete <alias>', description: 'Alias aufloesen + loeschen (Alt-Variante)', supported: false },
-  { verb: 'cl-to-card', syntax: 'cl-to-card <alias>', description: 'Checkliste in Karten umwandeln', supported: false },
+  {
+    verb: 'c',
+    syntax: 'c [tab] [alias] [-all]',
+    description: 'Cleanup — Labels zuruecksetzen',
+    supported: false,
+  },
+  {
+    verb: 'move',
+    syntax: 'move <alias> ...',
+    description: 'Node verschieben (Alt-Variante)',
+    supported: false,
+  },
+  {
+    verb: 'delete',
+    syntax: 'delete <alias>',
+    description: 'Alias aufloesen + loeschen (Alt-Variante)',
+    supported: false,
+  },
+  {
+    verb: 'cl-to-card',
+    syntax: 'cl-to-card <alias>',
+    description: 'Checkliste in Karten umwandeln',
+    supported: false,
+  },
   { verb: 'fa', syntax: 'fa <term>', description: 'Scope-Suche nur Karten', supported: false },
   { verb: 'fi', syntax: 'fi <term>', description: 'Scope-Suche nur Info-Felder', supported: false },
   { verb: 'fh', syntax: 'fh <term>', description: 'Scope-Suche nur Links', supported: false },
@@ -218,19 +253,7 @@ export function parseCommand(raw: string): ParsedCommand | null {
   }
 
   // Known-but-unsupported verbs.
-  const stubs = [
-    'w',
-    's',
-    'sc',
-    'c',
-    'move',
-    'delete',
-    'cl-to-card',
-    'fa',
-    'fi',
-    'fh',
-    'fc',
-  ];
+  const stubs = ['w', 's', 'sc', 'c', 'move', 'delete', 'cl-to-card', 'fa', 'fi', 'fh', 'fc'];
   if (stubs.includes(verb)) {
     return { kind: 'unsupported', verb };
   }
@@ -442,10 +465,7 @@ async function execCopy(
     if (!tgtOutcome.ok) {
       return { ok: false, message: `Ziel "^${cmd.target}": ${tgtOutcome.msg}` };
     }
-    if (
-      tgtOutcome.result.kind !== 'node' ||
-      tgtOutcome.result.nodeType !== 'board'
-    ) {
+    if (tgtOutcome.result.kind !== 'node' || tgtOutcome.result.nodeType !== 'board') {
       return {
         ok: false,
         message: `Ziel "^${cmd.target}" ist kein Board.`,
@@ -532,10 +552,7 @@ async function execMoveCard(
   if (!boardOutcome.ok) {
     return { ok: false, message: `Ziel "^${cmd.targetAlias}": ${boardOutcome.msg}` };
   }
-  if (
-    boardOutcome.result.kind !== 'node' ||
-    boardOutcome.result.nodeType !== 'board'
-  ) {
+  if (boardOutcome.result.kind !== 'node' || boardOutcome.result.nodeType !== 'board') {
     return {
       ok: false,
       message: `Ziel "^${cmd.targetAlias}" ist kein Board.`,
@@ -671,10 +688,8 @@ async function execDeleteAlias(
   try {
     if (r.result.kind === 'node') await deleteNode(r.result.nodeId);
     else if (r.result.kind === 'card') await delCard(r.result.cardId);
-    else if (r.result.kind === 'checklist-board')
-      await delChecklist(r.result.checklistId);
-    else if (r.result.kind === 'checklist-cell')
-      await delChecklist(r.result.checklistId);
+    else if (r.result.kind === 'checklist-board') await delChecklist(r.result.checklistId);
+    else if (r.result.kind === 'checklist-cell') await delChecklist(r.result.checklistId);
     else if (r.result.kind === 'doc') await delDoc(r.result.docId);
     return {
       ok: true,

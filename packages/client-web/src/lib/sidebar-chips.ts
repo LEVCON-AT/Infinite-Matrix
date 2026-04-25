@@ -5,7 +5,7 @@
 // Data-Fetch passiert in Workspace.tsx auf Basis der hier hinterlegten
 // Chip-Flags (createResource-key abhaengig davon).
 
-import { createEffect, createSignal, type Accessor } from 'solid-js';
+import { type Accessor, createEffect, createSignal } from 'solid-js';
 
 export type SidebarChipKey = 'links' | 'mails' | 'docs';
 
@@ -58,9 +58,7 @@ const REGISTRY = new Map<
 export function useSidebarChips(workspaceId: string) {
   let entry = REGISTRY.get(workspaceId);
   if (!entry) {
-    const [state, setState] = createSignal<SidebarChipsState>(
-      loadState(workspaceId),
-    );
+    const [state, setState] = createSignal<SidebarChipsState>(loadState(workspaceId));
     entry = { state, setState };
     REGISTRY.set(workspaceId, entry);
     createEffect(() => saveState(workspaceId, state()));

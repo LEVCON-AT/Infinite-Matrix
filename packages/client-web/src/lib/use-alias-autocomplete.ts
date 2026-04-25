@@ -69,9 +69,7 @@ if (typeof document !== 'undefined') {
 // Findet das `^token`-Pattern rueckwaerts vom Cursor im Input-Wert.
 // Liefert {start, end, query} oder null, wenn kein offenes Token aktiv ist.
 // Gueltige Query-Chars: a-zA-Z0-9. Alles andere beendet den Scan.
-function parseCaretQuery(
-  el: Target,
-): { start: number; end: number; query: string } | null {
+function parseCaretQuery(el: Target): { start: number; end: number; query: string } | null {
   const val = el.value;
   const caret = el.selectionStart ?? val.length;
   let i = caret;

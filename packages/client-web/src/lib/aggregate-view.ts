@@ -28,10 +28,13 @@ function saveView(matrixId: string, v: AggregateView): void {
   }
 }
 
-const REGISTRY = new Map<string, {
-  view: () => AggregateView;
-  setView: (v: AggregateView) => void;
-}>();
+const REGISTRY = new Map<
+  string,
+  {
+    view: () => AggregateView;
+    setView: (v: AggregateView) => void;
+  }
+>();
 
 export function useAggregateView(matrixId: string) {
   let entry = REGISTRY.get(matrixId);

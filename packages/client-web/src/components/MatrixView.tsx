@@ -1,4 +1,6 @@
+import { useNavigate, useSearchParams } from '@solidjs/router';
 import {
+  type Component,
   For,
   Show,
   createEffect,
@@ -6,12 +8,11 @@ import {
   createSignal,
   onCleanup,
   onMount,
-  type Component,
 } from 'solid-js';
-import { useNavigate, useSearchParams } from '@solidjs/router';
-import type { CellFeature, CellRow, ColRow, MatrixContent, NodeRow, RowRow } from '../lib/types';
+import { showConfirm } from '../lib/dialog';
+import { openDocsPopup } from '../lib/docs-ui';
 import { useEditMode } from '../lib/edit-mode';
-import { useVis } from '../lib/settings';
+import { translateDbError } from '../lib/errors';
 import { findFeatureByHotkey } from '../lib/features';
 import {
   addCol,
@@ -25,14 +26,13 @@ import {
   setColPosition,
   setRowPosition,
 } from '../lib/mutations';
-import { showToast, showUndoToast } from '../lib/toasts';
 import { rememberFocus, useLastFocus } from '../lib/navigation-focus';
-import { translateDbError } from '../lib/errors';
-import { showConfirm } from '../lib/dialog';
-import { openDocsPopup } from '../lib/docs-ui';
+import { useVis } from '../lib/settings';
+import { showToast, showUndoToast } from '../lib/toasts';
+import type { CellFeature, CellRow, ColRow, MatrixContent, NodeRow, RowRow } from '../lib/types';
 import CellOverlay from './CellOverlay';
-import MatrixAggregateSection from './MatrixAggregateSection';
 import Icon, { type IconName } from './Icon';
+import MatrixAggregateSection from './MatrixAggregateSection';
 
 const FEATURE_ORDER: CellFeature[] = ['matrix', 'board', 'info', 'checklists'];
 
@@ -87,16 +87,13 @@ const MatrixView: Component<Props> = (p) => {
   // Kombinierter Trigger fuer den Hover-Reveal-Parent (.mx-editable).
   // Wenn mindestens eine Header-Aktion sichtbar ist, soll der Hover-Rahmen
   // die Buttons zeigen; ohne bleibt der Header „nur-lesen".
-  const headerEditable = () =>
-    canDeleteRowCol() || canRenameHeaders() || canMoveRowCol();
+  const headerEditable = () => canDeleteRowCol() || canRenameHeaders() || canMoveRowCol();
 
   const [busy, setBusy] = createSignal(false);
   const [overlayTarget, setOverlayTarget] = createSignal<OverlayTarget | null>(null);
   // Guard: Initial-Focus (0,0) nur einmal pro Matrix-Besuch. Verhindert,
   // dass jede Content-Mutation den Fokus auf (0,0) zurueckreisst.
-  const [initialFocusedFor, setInitialFocusedFor] = createSignal<string | null>(
-    null,
-  );
+  const [initialFocusedFor, setInitialFocusedFor] = createSignal<string | null>(null);
 
   const cellMap = createMemo(() => {
     const m = new Map<string, CellRow>();
@@ -356,8 +353,7 @@ const MatrixView: Component<Props> = (p) => {
 
       const cell = cellMap().get(`${rowId}::${colId}`);
       if (!cell) return;
-      const targetNode =
-        def.key === 'matrix' ? cell.child_matrix_id : cell.board_id;
+      const targetNode = def.key === 'matrix' ? cell.child_matrix_id : cell.board_id;
       if (!targetNode) return;
 
       e.preventDefault();
@@ -416,12 +412,7 @@ const MatrixView: Component<Props> = (p) => {
       // fokussiert ist (z.B. Alias im CellOverlay), nicht in die Zelle
       // zurueckspringen.
       const ae = document.activeElement as HTMLElement | null;
-      if (
-        ae &&
-        (ae.tagName === 'INPUT' ||
-          ae.tagName === 'TEXTAREA' ||
-          ae.isContentEditable)
-      ) {
+      if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) {
         return;
       }
       if (document.querySelector('.overlay-scrim')) return;
@@ -466,21 +457,14 @@ const MatrixView: Component<Props> = (p) => {
 
       <Show
         when={
-          contentMatches() &&
-          (p.content?.rows.length ?? 0) > 0 &&
-          (p.content?.cols.length ?? 0) > 0
+          contentMatches() && (p.content?.rows.length ?? 0) > 0 && (p.content?.cols.length ?? 0) > 0
         }
         fallback={
           <div class="matrix-empty">
-            <Show
-              when={p.content && contentMatches()}
-              fallback={<p class="hint">Lade Matrix…</p>}
-            >
+            <Show when={p.content && contentMatches()} fallback={<p class="hint">Lade Matrix…</p>}>
               <p class="hint">
                 Leere Matrix.
-                <Show when={canAddRowCol()}>
-                  {' '}Zeile und Spalte anlegen, um zu starten.
-                </Show>
+                <Show when={canAddRowCol()}> Zeile und Spalte anlegen, um zu starten.</Show>
               </p>
               <Show when={canAddRowCol()}>
                 <div class="mx-toolbar">
@@ -699,8 +683,7 @@ const MatrixView: Component<Props> = (p) => {
                             </Show>
                             <Show
                               when={
-                                features().length > 0 ||
-                                (cell() && p.cellsWithDocs.has(cell()!.id))
+                                features().length > 0 || (cell() && p.cellsWithDocs.has(cell()!.id))
                               }
                             >
                               <div class="mx-cell-feats">
@@ -720,20 +703,14 @@ const MatrixView: Component<Props> = (p) => {
                                         }}
                                         data-feat={f}
                                         title={`${FEATURE_LABEL[f]} oeffnen`}
-                                        onClick={(e) =>
-                                          onChipClick(e, cell(), f, row, col)
-                                        }
+                                        onClick={(e) => onChipClick(e, cell(), f, row, col)}
                                       >
                                         <Icon name={FEATURE_ICON[f]} size={14} />
                                       </span>
                                     );
                                   }}
                                 </For>
-                                <Show
-                                  when={
-                                    cell() && p.cellsWithDocs.has(cell()!.id)
-                                  }
-                                >
+                                <Show when={cell() && p.cellsWithDocs.has(cell()!.id)}>
                                   <span
                                     class="mx-feat-chip mx-feat-chip-link"
                                     data-feat="doc"
@@ -742,9 +719,7 @@ const MatrixView: Component<Props> = (p) => {
                                       e.stopPropagation();
                                       const c = cell();
                                       if (!c) return;
-                                      navigate(
-                                        `/w/${p.workspaceId}/c/${c.id}/docs`,
-                                      );
+                                      navigate(`/w/${p.workspaceId}/c/${c.id}/docs`);
                                     }}
                                   >
                                     <Icon name="document-text" size={14} />

@@ -1,5 +1,5 @@
-import { createSignal, Show, type Component } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
+import { type Component, Show, createSignal } from 'solid-js';
 import { signInWithMagicLink, useSession } from '../lib/auth';
 
 const Login: Component = () => {

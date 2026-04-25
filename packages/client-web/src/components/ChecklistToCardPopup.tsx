@@ -4,7 +4,9 @@
 // Board aus sichtbar. Mehrfach-Transform (mehrere Karten zeigen auf
 // dieselbe Checkliste) ist erlaubt.
 
+import { useNavigate } from '@solidjs/router';
 import {
+  type Component,
   For,
   Show,
   createEffect,
@@ -12,16 +14,11 @@ import {
   createSignal,
   onCleanup,
   onMount,
-  type Component,
 } from 'solid-js';
-import { useNavigate } from '@solidjs/router';
-import {
-  fetchBoardContent,
-  fetchNodesForWorkspace,
-} from '../lib/queries';
-import { createCardFromChecklist } from '../lib/mutations';
-import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
+import { createCardFromChecklist } from '../lib/mutations';
+import { fetchBoardContent, fetchNodesForWorkspace } from '../lib/queries';
+import { showToast } from '../lib/toasts';
 import type { NodeRow } from '../lib/types';
 import Icon from './Icon';
 
@@ -45,8 +42,7 @@ const ChecklistToCardPopup: Component<Props> = (p) => {
     () => p.workspaceId,
     (wid) => fetchNodesForWorkspace(wid),
   );
-  const boards = (): NodeRow[] =>
-    (nodes() ?? []).filter((n) => n.type === 'board');
+  const boards = (): NodeRow[] => (nodes() ?? []).filter((n) => n.type === 'board');
 
   // Cols des gewaehlten Boards — reaktiv nachladen.
   const [boardContent] = createResource(
@@ -105,9 +101,7 @@ const ChecklistToCardPopup: Component<Props> = (p) => {
       p.onCreated?.();
       p.onClose();
       // Auf die neue Karte navigieren — User sieht das Ergebnis direkt.
-      navigate(
-        `/w/${p.workspaceId}/n/${card.board_id}?card=${card.id}`,
-      );
+      navigate(`/w/${p.workspaceId}/n/${card.board_id}?card=${card.id}`);
     } catch (err) {
       showToast(translateDbError(err), 'error');
     } finally {
@@ -125,20 +119,14 @@ const ChecklistToCardPopup: Component<Props> = (p) => {
       <div class="overlay-card cl2c-card" role="dialog" aria-modal="true">
         <header class="overlay-head">
           <h3>Checkliste in Karte umwandeln</h3>
-          <button
-            type="button"
-            class="overlay-close"
-            onClick={p.onClose}
-            aria-label="Schliessen"
-          >
+          <button type="button" class="overlay-close" onClick={p.onClose} aria-label="Schliessen">
             <Icon name="x" size={18} />
           </button>
         </header>
         <div class="cl2c-body">
           <p class="cl2c-hint">
-            Die Checkliste bleibt bestehen. Die neue Karte traegt eine
-            Referenz (checklist_ref) — Aenderungen an der Checkliste
-            sind in allen Karten sichtbar.
+            Die Checkliste bleibt bestehen. Die neue Karte traegt eine Referenz (checklist_ref) —
+            Aenderungen an der Checkliste sind in allen Karten sichtbar.
           </p>
           <label class="cl2c-field">
             <span class="cl2c-field-label">Karten-Name</span>

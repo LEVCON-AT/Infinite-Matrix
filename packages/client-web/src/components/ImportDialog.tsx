@@ -1,20 +1,9 @@
-import {
-  For,
-  Show,
-  createSignal,
-  onCleanup,
-  onMount,
-  type Component,
-} from 'solid-js';
-import {
-  ImportParseError,
-  buildImportPlan,
-  parsePayload,
-} from '../lib/import';
+import { type Component, For, Show, createSignal, onCleanup, onMount } from 'solid-js';
+import { decryptPayload, isEncrypted } from '../lib/crypto';
+import { ImportParseError, buildImportPlan, parsePayload } from '../lib/import';
 import { ImportExecError, executeImport } from '../lib/import-exec';
 import type { ImportPlan, ImportStats } from '../lib/import-types';
 import { planStats } from '../lib/import-types';
-import { decryptPayload, isEncrypted } from '../lib/crypto';
 import Icon from './Icon';
 
 type Props = {
@@ -158,17 +147,13 @@ const ImportDialog: Component<Props> = (p) => {
           <Show when={phase() === 'select'}>
             <p class="hint">
               Datei aus dem Alt-Client (<code>matrix_tool_beta.html</code>
-              Export) auswaehlen, oder JSON direkt einfuegen. Daten werden in
-              den aktuellen Workspace importiert (Append).
+              Export) auswaehlen, oder JSON direkt einfuegen. Daten werden in den aktuellen
+              Workspace importiert (Append).
             </p>
             <div class="import-actions">
               <label class="import-file-label">
                 Datei (.json / .imx)
-                <input
-                  type="file"
-                  accept="application/json,.json,.imx"
-                  onChange={onFileChange}
-                />
+                <input type="file" accept="application/json,.json,.imx" onChange={onFileChange} />
               </label>
               <span class="import-or">oder</span>
               <button
@@ -193,8 +178,7 @@ const ImportDialog: Component<Props> = (p) => {
 
           <Show when={phase() === 'password'}>
             <p class="hint">
-              Verschluesselte Datei (<code>.imx</code>). Passwort aus dem
-              Alt-Client eingeben.
+              Verschluesselte Datei (<code>.imx</code>). Passwort aus dem Alt-Client eingeben.
             </p>
             <form
               class="import-password-form"
@@ -240,8 +224,7 @@ const ImportDialog: Component<Props> = (p) => {
 
           <Show when={phase() === 'preview' && stats()}>
             <p class="hint">
-              Import-Plan erstellt. Folgende Daten werden in den aktuellen
-              Workspace eingefuegt:
+              Import-Plan erstellt. Folgende Daten werden in den aktuellen Workspace eingefuegt:
             </p>
             <ul class="import-stats">
               <For
@@ -268,15 +251,11 @@ const ImportDialog: Component<Props> = (p) => {
               </For>
             </ul>
             <p class="hint">
-              Hinweis: bestehende Aliases im Workspace kollidieren ggf. — dann
-              bricht der Import mit Fehler ab.
+              Hinweis: bestehende Aliases im Workspace kollidieren ggf. — dann bricht der Import mit
+              Fehler ab.
             </p>
             <div class="import-actions-bottom">
-              <button
-                type="button"
-                class="btn-secondary"
-                onClick={() => setPhase('select')}
-              >
+              <button type="button" class="btn-secondary" onClick={() => setPhase('select')}>
                 Zurueck
               </button>
               <button type="button" onClick={doRun}>
@@ -286,9 +265,7 @@ const ImportDialog: Component<Props> = (p) => {
           </Show>
 
           <Show when={phase() === 'running'}>
-            <p class="hint">
-              Import laeuft... bitte Dialog nicht schliessen.
-            </p>
+            <p class="hint">Import laeuft... bitte Dialog nicht schliessen.</p>
             <div class="import-progress">
               <div class="import-progress-label">
                 <span>{progressStep() || 'Start...'}</span>

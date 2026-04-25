@@ -7,22 +7,18 @@
 // Node, weil ^import einen Anker als Ziel-Matrix braucht. Rueckgabe-
 // Typen passen 1:1 in CommandUiHooks.
 
-import type { NodeRow } from './types';
-import { showChoice, showPrompt } from './dialog';
-import { showToast } from './toasts';
-import { translateDbError } from './errors';
 import { decryptPayload, isEncrypted } from './crypto';
+import { showChoice, showPrompt } from './dialog';
+import { translateDbError } from './errors';
+import { downloadWorkspaceExport, exportWorkspace, summarizeExport } from './export';
+import { endProgress, startProgress } from './progress';
 import {
-  downloadWorkspaceExport,
-  exportWorkspace,
-  summarizeExport,
-} from './export';
-import {
+  type ImportMode,
   executeSubtreeImportIntoMatrix,
   parseImportPayload,
-  type ImportMode,
 } from './subtree-import';
-import { startProgress, endProgress } from './progress';
+import { showToast } from './toasts';
+import type { NodeRow } from './types';
 
 // File-Picker als Promise. Erstellt ein temporaeres <input>, oeffnet
 // den Picker, resolvt mit der gewaehlten Datei oder null bei Abbruch.
@@ -84,13 +80,9 @@ export async function exportWorkspaceWithUi(args: {
     const data = await exportWorkspace(args.workspaceId);
     const wsName =
       typeof (data.workspace as { name?: unknown }).name === 'string'
-        ? ((data.workspace as { name: string }).name)
+        ? (data.workspace as { name: string }).name
         : 'workspace';
-    await downloadWorkspaceExport(
-      data,
-      wsName,
-      passphrase ? { passphrase } : undefined,
-    );
+    await downloadWorkspaceExport(data, wsName, passphrase ? { passphrase } : undefined);
     showToast(
       `${args.encrypted ? 'Verschluesselt e' : 'E'}xportiert — ${summarizeExport(data)}`,
       'success',

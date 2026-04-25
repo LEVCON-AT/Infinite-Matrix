@@ -49,7 +49,7 @@ export function parsePastedText(raw: string): ParsedPasteItem[] {
   if (entries.length === 0) return [];
 
   // Level-Normalisierung: alle Items relativ zum kleinsten Level.
-  let minLvl = Infinity;
+  let minLvl = Number.POSITIVE_INFINITY;
   for (const e of entries) if (e.lvl < minLvl) minLvl = e.lvl;
   if (!Number.isFinite(minLvl)) minLvl = 0;
 
