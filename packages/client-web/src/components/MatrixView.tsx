@@ -28,6 +28,7 @@ import {
 import { showToast, showUndoToast } from '../lib/toasts';
 import { rememberFocus, useLastFocus } from '../lib/navigation-focus';
 import { translateDbError } from '../lib/errors';
+import { showConfirm } from '../lib/dialog';
 import { openDocsPopup } from '../lib/docs-ui';
 import CellOverlay from './CellOverlay';
 import MatrixAggregateSection from './MatrixAggregateSection';
@@ -198,9 +199,13 @@ const MatrixView: Component<Props> = (p) => {
   async function onDelRow(row: RowRow) {
     const rowCells = (p.content?.cells ?? []).filter((c) => c.row_id === row.id);
     if (rowCells.length > 0) {
-      if (!window.confirm(`Zeile "${row.label || '(leer)'}" loeschen? Enthaelt Zellen mit Inhalt.`)) {
-        return;
-      }
+      const ok = await showConfirm({
+        title: 'Zeile loeschen?',
+        message: `Zeile "${row.label || '(leer)'}" loeschen? Enthaelt Zellen mit Inhalt.`,
+        variant: 'danger',
+        confirmLabel: 'Loeschen',
+      });
+      if (!ok) return;
     }
     const rowSnap: RowRow = { ...row };
     const cellSnaps: CellRow[] = rowCells.map((c) => ({ ...c }));
@@ -221,9 +226,13 @@ const MatrixView: Component<Props> = (p) => {
   async function onDelCol(col: ColRow) {
     const colCells = (p.content?.cells ?? []).filter((c) => c.col_id === col.id);
     if (colCells.length > 0) {
-      if (!window.confirm(`Spalte "${col.label || '(leer)'}" loeschen? Enthaelt Zellen mit Inhalt.`)) {
-        return;
-      }
+      const ok = await showConfirm({
+        title: 'Spalte loeschen?',
+        message: `Spalte "${col.label || '(leer)'}" loeschen? Enthaelt Zellen mit Inhalt.`,
+        variant: 'danger',
+        confirmLabel: 'Loeschen',
+      });
+      if (!ok) return;
     }
     const colSnap: ColRow = { ...col };
     const cellSnaps: CellRow[] = colCells.map((c) => ({ ...c }));

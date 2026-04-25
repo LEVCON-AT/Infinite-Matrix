@@ -35,6 +35,7 @@ import {
 import { sanitizeUrl } from '../lib/url';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
+import { showConfirm, showPrompt } from '../lib/dialog';
 import CellDocsSection from './CellDocsSection';
 import { openDocsPopup } from '../lib/docs-ui';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
@@ -93,26 +94,33 @@ const CellInfoPage: Component<Props> = (p) => {
   async function onDelField(f: InfoField) {
     const hasValue = f.value.trim().length > 0;
     if (hasValue) {
-      if (
-        !window.confirm(
-          `Feld "${f.label || '(ohne Label)'}" loeschen? Enthaelt Text.`,
-        )
-      ) {
-        return;
-      }
+      const ok = await showConfirm({
+        title: 'Feld loeschen?',
+        message: `Feld "${f.label || '(ohne Label)'}" loeschen? Enthaelt Text.`,
+        variant: 'danger',
+        confirmLabel: 'Loeschen',
+      });
+      if (!ok) return;
     }
     await wrap(() => delCellInfoField(p.cell.id, f.id), 'Feld geloescht.');
   }
 
   async function onAddLink() {
-    const url = window.prompt('URL:', 'https://');
+    const url = await showPrompt({
+      title: 'Link hinzufuegen',
+      message: 'URL:',
+      initialValue: 'https://',
+    });
     if (url == null) return;
     const clean = sanitizeUrl(url);
     if (!clean) {
       showToast('URL ungueltig.', 'error');
       return;
     }
-    const label = window.prompt('Bezeichnung (optional):', '') ?? '';
+    const label = (await showPrompt({
+      title: 'Bezeichnung',
+      message: 'Bezeichnung (optional):',
+    })) ?? '';
     await wrap(() =>
       addCellLink({ cellId: p.cell.id, label, url: clean }),
     );

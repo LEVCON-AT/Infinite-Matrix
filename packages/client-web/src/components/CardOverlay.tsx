@@ -48,6 +48,7 @@ import {
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
+import { showConfirm } from '../lib/dialog';
 import { validateAlias } from '../lib/alias';
 import { openDocsPopup } from '../lib/docs-ui';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
@@ -420,9 +421,12 @@ const CardOverlay: Component<Props> = (p) => {
     const occ = p.card.done_occurrences ?? [];
     if (occ.length === 0) return;
     if (occ.length > 3) {
-      const ok = window.confirm(
-        `${occ.length} erledigte Termine loeschen? Die Historie geht verloren.`,
-      );
+      const ok = await showConfirm({
+        title: 'Verlauf zuruecksetzen?',
+        message: `${occ.length} erledigte Termine loeschen? Die Historie geht verloren.`,
+        variant: 'danger',
+        confirmLabel: 'Loeschen',
+      });
       if (!ok) return;
     }
     await wrap(() => setCardDoneOccurrences(p.card.id, []));
@@ -437,9 +441,13 @@ const CardOverlay: Component<Props> = (p) => {
   }
 
   async function onDelete() {
-    if (!window.confirm(`Karte "${p.card.name || '(ohne Titel)'}" loeschen?`)) {
-      return;
-    }
+    const ok = await showConfirm({
+      title: 'Karte loeschen?',
+      message: `Karte "${p.card.name || '(ohne Titel)'}" loeschen?`,
+      variant: 'danger',
+      confirmLabel: 'Loeschen',
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await delCard(p.card.id);

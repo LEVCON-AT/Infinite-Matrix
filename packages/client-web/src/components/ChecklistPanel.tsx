@@ -34,6 +34,7 @@ import { showToast, showUndoToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
 import { validateAlias } from '../lib/alias';
+import { showConfirm } from '../lib/dialog';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 import AliasText from './AliasText';
 import ChecklistPastePopup from './ChecklistPastePopup';
@@ -118,13 +119,13 @@ const ChecklistPanel: Component<Props> = (p) => {
   async function onDel() {
     const count = p.items.length;
     if (count > 0) {
-      if (
-        !window.confirm(
-          `Checkliste "${p.checklist.label || '(Liste)'}" loeschen? Enthaelt ${count} Punkt(e).`,
-        )
-      ) {
-        return;
-      }
+      const ok = await showConfirm({
+        title: 'Checkliste loeschen?',
+        message: `Checkliste "${p.checklist.label || '(Liste)'}" loeschen? Enthaelt ${count} Punkt(e).`,
+        variant: 'danger',
+        confirmLabel: 'Loeschen',
+      });
+      if (!ok) return;
     }
     const clSnap = { ...p.checklist };
     const itemSnaps = p.items.map((i) => ({ ...i }));
@@ -198,11 +199,15 @@ const ChecklistPanel: Component<Props> = (p) => {
     if (busy()) return false;
     const recur = isRecurring();
     if (!recur && p.items.length > 0 && confirmIfDestructive) {
-      const ok = window.confirm(
-        `Checkliste "${p.checklist.label || '(Liste)'}" abschliessen? ` +
+      const ok = await showConfirm({
+        title: 'Checkliste abschliessen?',
+        message:
+          `Checkliste "${p.checklist.label || '(Liste)'}" abschliessen? ` +
           `Alle ${p.items.length} Punkte werden entfernt — ein Snapshot ` +
           `bleibt in der Historie.`,
-      );
+        variant: 'warning',
+        confirmLabel: 'Abschliessen',
+      });
       if (!ok) return false;
     }
     setBusy(true);

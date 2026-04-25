@@ -42,6 +42,7 @@ import { fetchBoardContent } from './queries';
 import { resolveAlias, type AliasResolveResult } from './alias-resolve';
 import { showToast } from './toasts';
 import { translateDbError } from './errors';
+import { showConfirm } from './dialog';
 
 export type ParsedCommand =
   | { kind: 'new-card'; alias: string | null }
@@ -653,11 +654,17 @@ async function execDeleteAlias(
   }
 
   // Confirm-Dialog. Bei Node besonders warnen (Subtree).
-  const prompt =
+  const message =
     kind === 'node'
       ? `${info.typeLabel} "${info.displayLabel}" (^${cmd.alias}) loeschen? Alle darunter liegenden Nodes, Zellen und Karten verschwinden mit.`
       : `${info.typeLabel} "${info.displayLabel}" (^${cmd.alias}) loeschen?`;
-  if (!window.confirm(prompt)) {
+  const ok = await showConfirm({
+    title: `${info.typeLabel} loeschen?`,
+    message,
+    variant: 'danger',
+    confirmLabel: 'Loeschen',
+  });
+  if (!ok) {
     return { ok: false, message: 'Abgebrochen.' };
   }
 

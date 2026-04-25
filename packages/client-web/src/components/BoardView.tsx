@@ -48,6 +48,7 @@ import {
 import { showToast, showUndoToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import { sanitizeUrl } from '../lib/url';
+import { showConfirm, showPrompt } from '../lib/dialog';
 import CardOverlay from './CardOverlay';
 import ChecklistPanel from './ChecklistPanel';
 import Icon from './Icon';
@@ -483,13 +484,13 @@ const BoardView: Component<Props> = (p) => {
   async function onDelCol(col: KbColRow) {
     const count = (cardsByCol().get(col.id) ?? []).length;
     if (count > 0) {
-      if (
-        !window.confirm(
-          `Spalte "${col.label || '(leer)'}" loeschen? Enthaelt ${count} Karte(n) — werden mitgeloescht.`,
-        )
-      ) {
-        return;
-      }
+      const ok = await showConfirm({
+        title: 'Spalte loeschen?',
+        message: `Spalte "${col.label || '(leer)'}" loeschen? Enthaelt ${count} Karte(n) — werden mitgeloescht.`,
+        variant: 'danger',
+        confirmLabel: 'Loeschen',
+      });
+      if (!ok) return;
     }
     await wrap(() => delKbCol(col.id), 'Spalte geloescht.');
   }
@@ -505,9 +506,13 @@ const BoardView: Component<Props> = (p) => {
   }
 
   async function onDelCard(card: KbCardRow) {
-    if (!window.confirm(`Karte "${card.name || '(ohne Titel)'}" loeschen?`)) {
-      return;
-    }
+    const ok = await showConfirm({
+      title: 'Karte loeschen?',
+      message: `Karte "${card.name || '(ohne Titel)'}" loeschen?`,
+      variant: 'danger',
+      confirmLabel: 'Loeschen',
+    });
+    if (!ok) return;
     const snap: KbCardRow = { ...card };
     await wrap(() => delCard(card.id));
     showUndoToast(`Karte "${snap.name || '(ohne Titel)'}" geloescht.`, () => {
@@ -562,17 +567,21 @@ const BoardView: Component<Props> = (p) => {
   // eine freundliche Fehler-Toast, Sanitization greift im
   // Mutations-Layer.
   async function onAddLink() {
-    const rawUrl = window.prompt(
-      'URL oder E-Mail-Adresse:',
-      'https://',
-    );
+    const rawUrl = await showPrompt({
+      title: 'Link hinzufuegen',
+      message: 'URL oder E-Mail-Adresse:',
+      initialValue: 'https://',
+    });
     if (!rawUrl) return;
     const raw = rawUrl.trim();
     if (!raw) return;
     // Simple Heuristik: enthaelt @ ohne :// → wohl eine Mail.
     const looksLikeMail = raw.includes('@') && !/^[a-z]+:\/\//i.test(raw);
     const type: LinkType = looksLikeMail ? 'mail' : 'url';
-    const label = window.prompt('Anzeigetext (optional):', '') ?? '';
+    const label = (await showPrompt({
+      title: 'Anzeigetext',
+      message: 'Anzeigetext (optional):',
+    })) ?? '';
     try {
       await addBoardLink({
         workspaceId: p.workspaceId,
@@ -592,11 +601,13 @@ const BoardView: Component<Props> = (p) => {
   }
 
   async function onDelLink(link: LinkRow) {
-    if (
-      !window.confirm(
-        `Link "${link.label || link.url}" loeschen?`,
-      )
-    ) {
+    const ok = await showConfirm({
+      title: 'Link loeschen?',
+      message: `Link "${link.label || link.url}" loeschen?`,
+      variant: 'danger',
+      confirmLabel: 'Loeschen',
+    });
+    if (!ok) {
       return;
     }
     const snap: LinkRow = { ...link };

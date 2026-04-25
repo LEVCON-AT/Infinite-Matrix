@@ -23,6 +23,7 @@ import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
 import { validateAlias } from '../lib/alias';
+import { showConfirm } from '../lib/dialog';
 import Icon from './Icon';
 
 type Props = {
@@ -127,13 +128,13 @@ const CellOverlay: Component<Props> = (p) => {
         const nodeType = def.key === 'matrix' ? 'matrix' : 'board';
         const empty = await isNodeEmpty(nodeId, nodeType);
         if (!empty) {
-          if (
-            !window.confirm(
-              `Sub-${def.label} und alle Inhalte loeschen? Das kann nicht rueckgaengig gemacht werden.`,
-            )
-          ) {
-            return;
-          }
+          const ok = await showConfirm({
+            title: `Sub-${def.label} loeschen?`,
+            message: `Sub-${def.label} und alle Inhalte loeschen? Das kann nicht rueckgaengig gemacht werden.`,
+            variant: 'danger',
+            confirmLabel: 'Loeschen',
+          });
+          if (!ok) return;
         }
         await deleteNode(nodeId);
       }
@@ -276,13 +277,13 @@ const CellOverlay: Component<Props> = (p) => {
         ? await isNodeEmpty(c.board_id, 'board')
         : true;
       if (!matrixEmpty || !boardEmpty) {
-        if (
-          !window.confirm(
-            'Zelle leeren? Sub-Strukturen werden mit geloescht.',
-          )
-        ) {
-          return;
-        }
+        const ok = await showConfirm({
+          title: 'Zelle leeren?',
+          message: 'Zelle leeren? Sub-Strukturen werden mit geloescht.',
+          variant: 'danger',
+          confirmLabel: 'Leeren',
+        });
+        if (!ok) return;
       }
     }
 

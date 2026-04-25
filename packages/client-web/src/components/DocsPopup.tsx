@@ -40,6 +40,7 @@ import {
 import { validateAlias } from '../lib/alias';
 import { showToast, showUndoToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
+import { showConfirm } from '../lib/dialog';
 import { clearDocsRequest, type OpenDocsRequest } from '../lib/docs-ui';
 import { resolveAlias } from '../lib/alias-resolve';
 import { dispatchAliasResult } from '../lib/alias-dispatch';
@@ -615,7 +616,13 @@ const DocsPopup: Component<Props> = (p) => {
       onCloseTab(activeIdx());
       return;
     }
-    if (!window.confirm(`Doku "${t.title || '(ohne Titel)'}" loeschen?`)) return;
+    const ok = await showConfirm({
+      title: 'Doku loeschen?',
+      message: `Doku "${t.title || '(ohne Titel)'}" loeschen?`,
+      variant: 'danger',
+      confirmLabel: 'Loeschen',
+    });
+    if (!ok) return;
     const snap: DocRow = {
       id: t.docId,
       workspace_id: p.workspaceId,
