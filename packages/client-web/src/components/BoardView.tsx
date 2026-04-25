@@ -47,6 +47,7 @@ import {
 } from '../lib/recur';
 import { showToast, showUndoToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
+import { sanitizeUrl } from '../lib/url';
 import CardOverlay from './CardOverlay';
 import ChecklistPanel from './ChecklistPanel';
 import Icon from './Icon';
@@ -746,9 +747,11 @@ const BoardView: Component<Props> = (p) => {
                       <a
                         class="board-link-chip"
                         data-link-type={link.type}
-                        href={
-                          link.type === 'mail' ? `mailto:${link.url}` : link.url
-                        }
+                        href={(() => {
+                          // Render-Pfad-Sanitization analog NodeTree.hrefOf.
+                          const safe = sanitizeUrl(link.url) ?? '';
+                          return link.type === 'mail' ? `mailto:${safe}` : safe;
+                        })()}
                         target={link.type === 'url' ? '_blank' : undefined}
                         rel={
                           link.type === 'url' ? 'noopener noreferrer' : undefined

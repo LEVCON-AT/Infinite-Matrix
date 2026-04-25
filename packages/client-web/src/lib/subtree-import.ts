@@ -26,6 +26,7 @@ import { supabase } from './supabase';
 import type { ExportPayloadType, WorkspaceExport } from './export';
 import { WORKSPACE_EXPORT_VERSION } from './export';
 import { setProgressPhase } from './progress';
+import { sanitizeUrl } from './url';
 
 export class ImportError extends Error {
   constructor(msg: string) {
@@ -1104,7 +1105,7 @@ async function executeCellContainerMerge(args: {
     .map((l) => ({
       id: newUuid(),
       label: typeof l.label === 'string' ? l.label : '',
-      url: l.url as string,
+      url: sanitizeUrl(l.url as string) ?? '',
     }));
 
   // Features mergen: Source-Features (nur info/checklists relevant —
@@ -1303,7 +1304,7 @@ export async function executeFeatureInfoImport(args: {
     .map((l) => ({
       id: newUuid(),
       label: typeof l.label === 'string' ? l.label : '',
-      url: l.url as string,
+      url: sanitizeUrl(l.url as string) ?? '',
     }));
 
   const features = ((targetCell.features ?? []) as string[]).includes('info')
@@ -1724,13 +1725,14 @@ export async function executeSubtreeImportIntoMatrix(args: {
   }));
   const linksOut = (payload.links as Array<Record<string, unknown>>).map(
     (l) => {
-      const raw = l as { id: string; board_id: string };
+      const raw = l as { id: string; board_id: string; url?: string };
       return applyAliasMap(
         {
           ...l,
           id: remapMap.get(raw.id)!,
           workspace_id: workspaceId,
           board_id: remap(raw.board_id, remapMap),
+          url: sanitizeUrl(raw.url) ?? '',
         },
         aliasMap,
       );

@@ -27,6 +27,7 @@ import { showToast } from '../lib/toasts';
 import { showChoice, showPrompt } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
 import { decryptPayload, isEncrypted } from '../lib/crypto';
+import { sanitizeUrl } from '../lib/url';
 import { useVis } from '../lib/settings';
 import { useEditMode } from '../lib/edit-mode';
 import { useSidebarChips } from '../lib/sidebar-chips';
@@ -195,7 +196,12 @@ function hrefOf(workspaceId: string, entry: TreeEntry): string {
   }
   if (entry.kind === 'link') {
     // External-Link oeffnet target=_blank; fuer mail mailto-URL.
-    return entry.linkType === 'mail' ? `mailto:${entry.url}` : entry.url;
+    // Render-Pfad-Sanitization: ein `javascript:`-Wert, der ueber Bridge
+    // oder Import (vor dem A1.4-Fix) in `links.url` landet, darf hier
+    // nicht zum klickbaren XSS-Vehikel werden — `sanitizeUrl` liefert
+    // null fuer non-allowlisted Schemes, dann lassen wir den href leer.
+    const safe = sanitizeUrl(entry.url) ?? '';
+    return entry.linkType === 'mail' ? `mailto:${safe}` : safe;
   }
   if (entry.kind === 'doc') {
     // Docs haben keine eigene Route im client-web — wir triggern das
@@ -1334,8 +1340,12 @@ const NodeTree: Component<Props> = (props) => {
         label: entry.linkType === 'mail' ? 'Mail oeffnen' : 'Link oeffnen',
         icon: '→',
         onClick: () => {
-          const href =
-            entry.linkType === 'mail' ? `mailto:${entry.url}` : entry.url;
+          const safe = sanitizeUrl(entry.url);
+          if (!safe) {
+            showToast('Link enthaelt nicht-erlaubtes Schema', 'error');
+            return;
+          }
+          const href = entry.linkType === 'mail' ? `mailto:${safe}` : safe;
           if (entry.linkType === 'mail') window.location.href = href;
           else window.open(href, '_blank', 'noopener,noreferrer');
         },

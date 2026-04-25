@@ -22,6 +22,7 @@ import type {
   PlannedNode,
   PlannedRow,
 } from './import-types';
+import { sanitizeUrl } from './url';
 
 export class ImportParseError extends Error {
   constructor(message: string) {
@@ -350,7 +351,10 @@ export function buildImportPlan(payload: AltPayload): ImportPlan {
           board_id: boardUuid,
           type,
           label: asString(l.label),
-          url: asString(l.url),
+          // URL-Sanitization: javascript:/data:/etc. wird vor DB-Insert
+          // verworfen. Empty-String fallback haelt das Schema (`NOT NULL`)
+          // intakt; der Render-Pfad zeigt dann einen leeren Chip.
+          url: sanitizeUrl(asString(l.url)) ?? '',
           alias: asAlias(l.alias),
           position: i,
           data: safeObj(l.data) ?? {},
