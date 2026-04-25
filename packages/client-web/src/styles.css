@@ -4929,7 +4929,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   height: 100%;
   background: var(--blue);
   border-radius: 999px;
-  transition: width 180ms cubic-bezier(.16, 1, .3, 1);
+  transition: width var(--tr-enter);
 }
 
 .progress-meta {
