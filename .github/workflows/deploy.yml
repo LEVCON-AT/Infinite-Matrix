@@ -10,6 +10,9 @@ on:
       - 'infra/**'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
+      # Workflow-Aenderungen triggern sich selbst — sonst muss man
+      # manuell ueber workflow_dispatch ausloesen.
+      - '.github/workflows/**'
   workflow_dispatch:
 
 permissions:
