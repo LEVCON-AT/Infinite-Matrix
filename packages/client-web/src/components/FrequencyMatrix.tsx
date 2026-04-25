@@ -7,7 +7,7 @@
 // dynamisch nur-aktiven Spalten (Kategorien ohne Karten werden
 // ausgelassen — identisch zum HTML-Vorbild).
 
-import { For, Show, createSignal, onCleanup, onMount, type Component } from 'solid-js';
+import { For, Show, createMemo, createSignal, onCleanup, onMount, type Component } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import type { AggregateCell, FreqCategoryKey } from '../lib/aggregate';
 import { FREQ_CATEGORIES } from '../lib/aggregate';
@@ -75,29 +75,58 @@ const FrequencyMatrix: Component<Props> = (p) => {
     setExpanded(next);
   }
 
-  // Flatten respecting expand-state (rekursiv).
-  function flatten(items: AggregateCell[]): AggregateCell[] {
-    const out: AggregateCell[] = [];
-    for (const a of items) {
-      out.push(a);
-      if (a.expandable && expanded().has(a.dataId)) {
-        out.push(...flatten(a.children));
+  // Flatten respecting expand-state (rekursiv). Reaktiv auf
+  // p.aggregates + expanded() — beide aendern sich nur bei
+  // Aggregate-Refetch oder Toggle, nicht bei jedem Re-Render.
+  const rows = createMemo<AggregateCell[]>(() => {
+    const exp = expanded();
+    const walk = (items: AggregateCell[]): AggregateCell[] => {
+      const out: AggregateCell[] = [];
+      for (const a of items) {
+        out.push(a);
+        if (a.expandable && exp.has(a.dataId)) {
+          out.push(...walk(a.children));
+        }
       }
-    }
-    return out;
-  }
+      return out;
+    };
+    return walk(p.aggregates);
+  });
 
   // Nur die Kategorien zeigen, die in der Top-Level Karten-Summe
   // mindestens eine Karte treffen. (HTML-Vorbild: `activeCols`.)
-  function activeCategories() {
+  // Haengt nur an p.aggregates — kein Re-Eval pro Expand-Klick.
+  const cats = createMemo(() => {
     const topCards = p.aggregates.flatMap((a) => a.cards);
     return FREQ_CATEGORIES.filter((cat) => topCards.some((c) => cat.test(c)));
-  }
+  });
+
+  // Pre-Bake der Counts: Map<dataId, Record<FreqCategoryKey, number>>.
+  // Vorher wurde fuer jede Cell-Cell-Render-Combo (~50 Rows × 6 Cats)
+  // `agg.cards.filter(cat.test)` neu gerechnet — das Memo zerlegt
+  // das in einen einzigen Walk pro Aggregate-Refetch.
+  const countMap = createMemo(() => {
+    const m = new Map<string, Partial<Record<FreqCategoryKey, number>>>();
+    const walk = (items: AggregateCell[]): void => {
+      for (const a of items) {
+        const counts: Partial<Record<FreqCategoryKey, number>> = {};
+        for (const cat of FREQ_CATEGORIES) {
+          let n = 0;
+          for (const c of a.cards) {
+            if (cat.test(c)) n += 1;
+          }
+          counts[cat.key] = n;
+        }
+        m.set(a.dataId, counts);
+        if (a.children.length > 0) walk(a.children);
+      }
+    };
+    walk(p.aggregates);
+    return m;
+  });
 
   function countFor(agg: AggregateCell, key: FreqCategoryKey) {
-    const cat = FREQ_CATEGORIES.find((c) => c.key === key);
-    if (!cat) return 0;
-    return agg.cards.filter((c) => cat.test(c)).length;
+    return countMap().get(agg.dataId)?.[key] ?? 0;
   }
 
   function navigateToCell(agg: AggregateCell) {
@@ -113,9 +142,6 @@ const FrequencyMatrix: Component<Props> = (p) => {
       }),
     );
   }
-
-  const rows = () => flatten(p.aggregates);
-  const cats = () => activeCategories();
 
   return (
     <Show

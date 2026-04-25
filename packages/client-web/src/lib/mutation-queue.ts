@@ -186,8 +186,11 @@ export async function refreshCountForWorkspace(
 // ─── Replay ────────────────────────────────────────────────────
 
 // Lock gegen Doppel-Replay (online-Event + manueller Klick gleich-
-// zeitig). Wenn replay laeuft, ignorieren wir weitere Aufrufe.
-let replayInFlight = false;
+// zeitig). Per-Workspace, NICHT global — ein User mit zwei Tabs auf
+// verschiedenen Workspaces wuerde sonst beim Replay des einen den
+// anderen blockieren (und im Staging mit BroadcastChannel-Replay-Sync
+// noch leichter zur Race-Condition werden).
+const replayInFlight = new Map<string, boolean>();
 
 export type ReplayResult = {
   succeeded: number;
@@ -197,10 +200,10 @@ export type ReplayResult = {
 };
 
 export async function replayQueue(workspaceId: string): Promise<ReplayResult> {
-  if (replayInFlight) {
+  if (replayInFlight.get(workspaceId)) {
     return { succeeded: 0, staled: 0, failed: 0, skippedBusy: true };
   }
-  replayInFlight = true;
+  replayInFlight.set(workspaceId, true);
   try {
     const inst = await db();
     const all = await inst.getAllFromIndex(
@@ -247,7 +250,7 @@ export async function replayQueue(workspaceId: string): Promise<ReplayResult> {
     await refreshPendingCount(workspaceId);
     return { succeeded, staled, failed, skippedBusy: false };
   } finally {
-    replayInFlight = false;
+    replayInFlight.delete(workspaceId);
   }
 }
 

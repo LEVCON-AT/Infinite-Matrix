@@ -37,6 +37,10 @@ export type AliasEntry = {
 type WsState = {
   entries: Accessor<AliasEntry[]>;
   setEntries: (v: AliasEntry[]) => void;
+  // Paralleler O(1)-Index ueber den canonical alias. Wird in
+  // commitEntries() in derselben Microtask wie setEntries gefuellt —
+  // lookupAlias() trifft also nie einen veralteten Stand.
+  byAlias: Map<string, AliasEntry>;
 };
 
 const states = new Map<string, WsState>();
@@ -45,9 +49,19 @@ function ensureState(wsId: string): WsState {
   const existing = states.get(wsId);
   if (existing) return existing;
   const [entries, setEntries] = createSignal<AliasEntry[]>([]);
-  const s: WsState = { entries, setEntries };
+  const s: WsState = { entries, setEntries, byAlias: new Map() };
   states.set(wsId, s);
   return s;
+}
+
+// Single-Source-of-Truth-Schreibpfad: Signal + Map werden gemeinsam
+// aktualisiert, damit lookupAlias O(1) bleibt und keine Drift entsteht.
+function commitEntries(s: WsState, entries: AliasEntry[]): void {
+  s.setEntries(entries);
+  s.byAlias.clear();
+  for (const e of entries) {
+    s.byAlias.set(e.alias, e);
+  }
 }
 
 // Parallele Fetches ueber alle 6 Alias-Tabellen. Ergebnis ueberschreibt
@@ -210,7 +224,8 @@ async function fetchAliasIndexLive(wsId: string, s: WsState): Promise<void> {
       .not('alias', 'is', null),
   ]);
 
-  s.setEntries(
+  commitEntries(
+    s,
     buildAliasEntries({
       nodes: (nodes.data ?? []) as AliasInput['nodes'],
       cells: (cells.data ?? []) as AliasInput['cells'],
@@ -234,7 +249,10 @@ async function fetchAliasIndexFromCache(wsId: string, s: WsState): Promise<void>
     getByWorkspace<LinkRow>('links', wsId),
     getByWorkspace<DocRow>('docs', wsId),
   ]);
-  s.setEntries(buildAliasEntries({ nodes, cells, cards, checklists, links, docs }));
+  commitEntries(
+    s,
+    buildAliasEntries({ nodes, cells, cards, checklists, links, docs }),
+  );
 }
 
 // Reactive Accessor — Komponenten koennen direkt auf Aenderungen reagieren.
@@ -266,13 +284,16 @@ export function getAliasMatches(
 }
 
 // Exakter Lookup ueber den canonical Alias. Fuer Chip-Rendering:
-// ist der geparste `^token` ein bekannter Alias, ja/nein?
+// ist der geparste `^token` ein bekannter Alias, ja/nein? O(1) ueber
+// den Map-Index aus commitEntries — bei wachsendem Workspace
+// (~500+ Aliases) verteilt sich der Aufwand pro Chip-Render statt mit
+// jedem Refresh linear zu wachsen.
 export function lookupAlias(wsId: string, alias: string): AliasEntry | null {
   const s = states.get(wsId);
   if (!s) return null;
   const a = alias.toLowerCase().trim().replace(/^\^+/, '');
   if (!a) return null;
-  return s.entries().find((e) => e.alias === a) ?? null;
+  return s.byAlias.get(a) ?? null;
 }
 
 // Reset (z.B. bei Workspace-Wechsel). Der Realtime-Refresh baut den
