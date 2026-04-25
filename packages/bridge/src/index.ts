@@ -24,10 +24,50 @@ const app = Fastify({
 // auf reflektiv-true bleibt erhalten, weil sonst der lokale Browser-
 // Test (localhost:3848) nicht laeuft. Prod: CORS_ORIGINS muss gesetzt
 // sein.
+//
+// Validierung: jeder Origin durchlaeuft den URL-Constructor. Schemas
+// werden auf http/https gewhitelistet — ohne diese Pruefung wuerde
+// ein versehentlich gepflegter Eintrag wie "evil.example" (kein
+// Schema) oder "javascript:alert(1)" als Origin durchgereicht. Auf
+// Match wirft @fastify/cors die Anfrage ab; ohne Match liegt kein
+// Schaden vor, aber ein Tippfehler wird hier sichtbar (warn-Log) und
+// nicht erst am Browser-Client.
+function sanitizeCorsAllowlist(raw: string): string[] {
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .filter((origin) => {
+      try {
+        const u = new URL(origin);
+        if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+          app.log.warn(
+            'CORS_ORIGINS: Eintrag "%s" mit nicht-http(s)-Schema ignoriert',
+            origin,
+          );
+          return false;
+        }
+        // URL("https://x.com/").origin === "https://x.com" — nur das
+        // Origin-Tripel (scheme + host + port) ist relevant. Ein Eintrag
+        // mit Pfad wuerde von @fastify/cors als Substring-Match anders
+        // behandelt; wir lehnen das hier explizit ab.
+        if (origin !== u.origin) {
+          app.log.warn(
+            'CORS_ORIGINS: Eintrag "%s" enthaelt Pfad/Trailing-Slash — nutze nur Origin "%s"',
+            origin,
+            u.origin,
+          );
+          return false;
+        }
+        return true;
+      } catch {
+        app.log.warn('CORS_ORIGINS: Eintrag "%s" ist keine valide URL', origin);
+        return false;
+      }
+    });
+}
 const corsOrigins = config.CORS_ORIGINS
-  ? config.CORS_ORIGINS.split(',')
-      .map((s) => s.trim())
-      .filter(Boolean)
+  ? sanitizeCorsAllowlist(config.CORS_ORIGINS)
   : null;
 // origin-Logik: Allowlist wenn gepflegt; sonst Prod=false (Lockdown),
 // Dev=true (reflektiv fuer localhost-Workflow).
