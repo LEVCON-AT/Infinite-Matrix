@@ -24,6 +24,18 @@ MIN_FREE_MB="${MIN_FREE_MB:-2048}"
 DRY_RUN=0
 [[ "${1:-}" == "--dry-run" ]] && DRY_RUN=1
 
+# STAGE wird in main() gesetzt. Cleanup-Trap unten greift drauf zu;
+# global definiert, damit der EXIT-Trap nach main()-Return nicht in
+# `unbound variable` (set -u) laeuft.
+STAGE=""
+
+cleanup() {
+  if [[ -n "${STAGE:-}" && -d "${STAGE:-}" ]]; then
+    rm -rf "$STAGE"
+  fi
+}
+trap cleanup EXIT
+
 log() {
   local msg="[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"
   echo "$msg" | tee -a "$LOG_FILE" >&2
@@ -164,29 +176,28 @@ main() {
   check_deps
   check_disk
 
-  local ts stage final
+  local ts final
   ts="$(date -u +%Y%m%dT%H%M%SZ)"
-  stage="$STATE_DIR/snapshot-$ts"
+  STAGE="$STATE_DIR/snapshot-$ts"
   final="$SNAPSHOT_DIR/${ts}.tar.zst"
 
   if (( DRY_RUN )); then
-    log "dry-run: would stage at $stage and produce $final"
+    log "dry-run: would stage at $STAGE and produce $final"
   fi
 
-  mkdir -p "$stage"
-  trap 'rm -rf "$stage"' EXIT
+  mkdir -p "$STAGE"
 
-  dump_postgres "$stage/postgres.dump"
-  dump_storage  "$stage/storage.tar.zst"
-  dump_bridge   "$stage/bridge.db"
-  dump_config   "$stage/config.tar.gz"
-  write_manifest "$stage/manifest.json" "$stage"
+  dump_postgres "$STAGE/postgres.dump"
+  dump_storage  "$STAGE/storage.tar.zst"
+  dump_bridge   "$STAGE/bridge.db"
+  dump_config   "$STAGE/config.tar.gz"
+  write_manifest "$STAGE/manifest.json" "$STAGE"
 
   log "bundling → $final"
   if (( DRY_RUN )); then
     log "dry-run: would tar+zstd $stage → $final"
   else
-    tar -C "$STATE_DIR" -cf - "snapshot-$ts" | zstd -3 -q -o "$final" -
+    tar -C "$STATE_DIR" -cf - "$(basename "$STAGE")" | zstd -3 -q -o "$final" -
     chmod 0600 "$final"
     chown root:root "$final"
     local size
