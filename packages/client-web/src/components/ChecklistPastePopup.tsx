@@ -11,6 +11,7 @@
 
 import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
 import { type ParsedPasteItem, parsePastedText } from '../lib/checklist-paste-parse';
+import { installFocusRestore } from '../lib/dialog';
 import Icon from './Icon';
 
 type Props = {
@@ -27,6 +28,7 @@ const ChecklistPastePopup: Component<Props> = (p) => {
   let textareaRef: HTMLTextAreaElement | undefined;
 
   onMount(() => {
+    onCleanup(installFocusRestore());
     // ESC in Capture-Phase, sonst schluckt der globale Back-Handler
     // (oder das dahinterliegende Overlay, z.B. Card-Modal).
     const onKey = (e: KeyboardEvent) => {

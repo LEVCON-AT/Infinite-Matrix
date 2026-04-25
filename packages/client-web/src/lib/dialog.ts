@@ -169,6 +169,34 @@ function getFocusable(container: HTMLElement): HTMLElement[] {
   });
 }
 
+// Focus-Restore (WCAG 2.4.3, Sprint AU-A4.3). Beim Modal-Open das
+// derzeit fokussierte Element merken; beim Modal-Close den Fokus
+// zuruecksetzen. Ohne Restore landet der Fokus nach Close auf <body>,
+// der naechste Tab springt nach ganz vorne — Tastatur-Flow bricht.
+//
+// Aufruf-Pattern (in jedem Modal):
+//   onMount(() => {
+//     const restore = installFocusRestore();
+//     onCleanup(restore);
+//   });
+//
+// Schutz gegen Edge-Cases:
+// - previous kann null sein (kein vorheriger Fokus, z.B. direkter
+//   Modal-Open via URL-Hash). Dann wird einfach nichts gemacht.
+// - previous kann inzwischen aus dem DOM entfernt worden sein
+//   (z.B. das Element war in einer geschlossenen Sub-Liste). Dann
+//   wuerde focus() ins Leere laufen — wir pruefen document.contains.
+// - .focus?.() optional, weil manche Pseudo-Elemente (svg, foreignObject)
+//   unter aelteren Browsern keine focus-Methode haben.
+export function installFocusRestore(): () => void {
+  const previous = document.activeElement as HTMLElement | null;
+  return () => {
+    if (previous && document.contains(previous)) {
+      previous.focus?.();
+    }
+  };
+}
+
 export function installFocusTrap(container: HTMLElement): () => void {
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key !== 'Tab') return;

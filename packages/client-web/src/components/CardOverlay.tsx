@@ -1,6 +1,6 @@
 import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
 import { validateAlias } from '../lib/alias';
-import { showConfirm } from '../lib/dialog';
+import { installFocusRestore, showConfirm } from '../lib/dialog';
 import { openDocsPopup } from '../lib/docs-ui';
 import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
@@ -73,7 +73,10 @@ const CardOverlay: Component<Props> = (p) => {
 
   // ESC schliesst; wir haengen den Handler in Capture, damit er
   // ueber globalen Back-Handlern greift (CLAUDE.md-Konvention).
+  // Plus Focus-Restore (Sprint AU-A4.3): beim Open den vorigen
+  // activeElement merken, beim Close zuruecksetzen.
   onMount(() => {
+    onCleanup(installFocusRestore());
     const h = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopImmediatePropagation();

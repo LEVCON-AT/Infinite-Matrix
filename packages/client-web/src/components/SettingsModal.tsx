@@ -5,7 +5,7 @@
 
 import { useParams } from '@solidjs/router';
 import { type Component, For, Show, onCleanup, onMount } from 'solid-js';
-import { showChoice } from '../lib/dialog';
+import { installFocusRestore, showChoice } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
 import { clearWorkspaceQueue, pendingMutationCount, replayQueue } from '../lib/mutation-queue';
 import { clearAll as clearOfflineCache } from '../lib/offline-cache';
@@ -32,6 +32,7 @@ const SettingsModal: Component<Props> = (p) => {
   let firstSelect: HTMLSelectElement | undefined;
 
   onMount(() => {
+    onCleanup(installFocusRestore());
     const h = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       e.stopImmediatePropagation();

@@ -24,6 +24,7 @@ import {
   parseCommand,
   reportOutcome,
 } from '../lib/commands';
+import { installFocusRestore } from '../lib/dialog';
 import { openDocsPopup } from '../lib/docs-ui';
 import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
@@ -72,7 +73,6 @@ const CommandPalette: Component<Props> = (p) => {
     return q === '' || q === 'help' || q === 'k';
   });
 
-  let prevFocus: HTMLElement | null = null;
   // Dead-Key-Grace: wenn der User die Palette via `^` oeffnet, liefert
   // das DE-Layout danach ein zusammengesetztes Zeichen (ê, ô, â, ...)
   // bzw. einen blanken `^` ans naechste Input-Feld. Wir verwerfen die
@@ -80,11 +80,8 @@ const CommandPalette: Component<Props> = (p) => {
   // einem Circumflex-Zeichen anfangen.
   const openedAt = Date.now();
   onMount(() => {
-    prevFocus = document.activeElement as HTMLElement | null;
+    onCleanup(installFocusRestore());
     setTimeout(() => inputRef?.focus(), 0);
-  });
-  onCleanup(() => {
-    prevFocus?.focus?.();
   });
 
   onMount(() => {

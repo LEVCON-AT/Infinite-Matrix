@@ -15,6 +15,7 @@ import {
   onCleanup,
   onMount,
 } from 'solid-js';
+import { installFocusRestore } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
 import { createCardFromChecklist } from '../lib/mutations';
 import { fetchBoardContent, fetchNodesForWorkspace } from '../lib/queries';
@@ -62,6 +63,7 @@ const ChecklistToCardPopup: Component<Props> = (p) => {
   });
 
   onMount(() => {
+    onCleanup(installFocusRestore());
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       e.stopImmediatePropagation();

@@ -29,7 +29,7 @@ import {
 import { validateAlias } from '../lib/alias';
 import { dispatchAliasResult } from '../lib/alias-dispatch';
 import { resolveAlias } from '../lib/alias-resolve';
-import { showConfirm } from '../lib/dialog';
+import { installFocusRestore, showConfirm } from '../lib/dialog';
 import { type Draft, getDrafts, newClientId, persistDrafts, removeDraft } from '../lib/docs-drafts';
 import { getPersistedTabIds, persistTabIds } from '../lib/docs-tab-restore';
 import { type OpenDocsRequest, clearDocsRequest } from '../lib/docs-ui';
@@ -176,9 +176,6 @@ const DocsPopup: Component<Props> = (p) => {
   let aliasRef: HTMLInputElement | undefined;
   let attachRef: HTMLInputElement | undefined;
 
-  // Focus-Restore (wie andere Modals).
-  let prevFocus: HTMLElement | null = null;
-
   // Recent-Liste — kann nach Insert/Update/Delete der offenen Tabs
   // veraltet sein. Wir refetchen bei jeder Top-Level-Aktion.
   const [recent, { refetch: refetchRecent }] = createResource(
@@ -272,7 +269,7 @@ const DocsPopup: Component<Props> = (p) => {
   // aktiven Tab aktivieren oder anhaengen. Wenn nichts geladen wird:
   // leerer Pending-Tab.
   onMount(async () => {
-    prevFocus = document.activeElement as HTMLElement | null;
+    onCleanup(installFocusRestore());
     const req = p.request;
     const persisted = getPersistedTabIds(p.workspaceId);
     const drafts = getDrafts(p.workspaceId);
@@ -404,7 +401,6 @@ const DocsPopup: Component<Props> = (p) => {
 
   onCleanup(() => {
     clearDocsRequest();
-    prevFocus?.focus?.();
   });
 
   // Reagiere auf neue Requests, waehrend das Popup bereits offen ist

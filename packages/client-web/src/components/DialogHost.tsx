@@ -14,7 +14,12 @@ import {
   onCleanup,
   onMount,
 } from 'solid-js';
-import { type DialogRequest, dialogQueue, installFocusTrap } from '../lib/dialog';
+import {
+  type DialogRequest,
+  dialogQueue,
+  installFocusRestore,
+  installFocusTrap,
+} from '../lib/dialog';
 import Icon from './Icon';
 
 const DialogHost: Component = () => {
@@ -60,6 +65,17 @@ const DialogHost: Component = () => {
     if (!d || !cardRef) return;
     const cleanup = installFocusTrap(cardRef);
     onCleanup(cleanup);
+  });
+
+  // Focus-Restore (WCAG 2.4.3, Sprint AU-A4.3). Beim Open des Dialogs
+  // den vorherigen activeElement merken — beim Cleanup zuruecksetzen.
+  // Pro Dialog (top-of-stack) eine eigene Restore-Closure, weil der
+  // User unterschiedliche Trigger fuer verschiedene Dialoge anstossen
+  // kann.
+  createEffect(() => {
+    const d = top();
+    if (!d) return;
+    onCleanup(installFocusRestore());
   });
 
   // ESC in Capture, um andere ESC-Handler nicht zu schlucken (die

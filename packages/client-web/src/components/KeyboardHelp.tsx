@@ -2,6 +2,7 @@
 // via ESC. Liste ist handgepflegt — waechst mit neuen Shortcuts.
 
 import { type Component, For, onCleanup, onMount } from 'solid-js';
+import { installFocusRestore } from '../lib/dialog';
 import Icon from './Icon';
 
 type Props = {
@@ -78,7 +79,9 @@ const SECTIONS: ShortcutSection[] = [
 
 const KeyboardHelp: Component<Props> = (p) => {
   // ESC capture — sonst schluckt die globale ESC-Nav das Event.
+  // Plus Focus-Restore (Sprint AU-A4.3).
   onMount(() => {
+    onCleanup(installFocusRestore());
     const h = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       e.stopImmediatePropagation();

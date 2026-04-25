@@ -23,6 +23,7 @@ import {
   onMount,
 } from 'solid-js';
 import { cellTarget } from '../lib/alias-dispatch';
+import { installFocusRestore } from '../lib/dialog';
 import { openDocsPopup } from '../lib/docs-ui';
 import { translateDbError } from '../lib/errors';
 import { rememberFocus } from '../lib/navigation-focus';
@@ -89,14 +90,10 @@ const GlobalSearch: Component<Props> = (p) => {
   const [selectedIdx, setSelectedIdx] = createSignal(0);
   let inputRef: HTMLInputElement | undefined;
 
-  // Focus-Restore (wie AliasQuicknav).
-  let prevFocus: HTMLElement | null = null;
+  // Focus-Restore via lib/dialog-Helper (Sprint AU-A4.3).
   onMount(() => {
-    prevFocus = document.activeElement as HTMLElement | null;
+    onCleanup(installFocusRestore());
     setTimeout(() => inputRef?.focus(), 0);
-  });
-  onCleanup(() => {
-    prevFocus?.focus?.();
   });
 
   // ESC in capture — sonst schluckt die globale ESC-Nav das Event.

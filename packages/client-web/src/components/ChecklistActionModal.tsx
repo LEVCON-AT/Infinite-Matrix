@@ -4,6 +4,7 @@
 
 import { type Component, Show, createSignal, onCleanup, onMount } from 'solid-js';
 import { type ChecklistAction, parseChecklistAction } from '../lib/checklist-action';
+import { installFocusRestore } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
 import { setChecklistAction } from '../lib/mutations';
 import { showToast } from '../lib/toasts';
@@ -33,6 +34,7 @@ const ChecklistActionModal: Component<Props> = (p) => {
   const [busy, setBusy] = createSignal(false);
 
   onMount(() => {
+    onCleanup(installFocusRestore());
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       e.stopImmediatePropagation();

@@ -1,5 +1,6 @@
 import { type Component, For, Show, createSignal, onCleanup, onMount } from 'solid-js';
 import { decryptPayload, isEncrypted } from '../lib/crypto';
+import { installFocusRestore } from '../lib/dialog';
 import { ImportParseError, buildImportPlan, parsePayload } from '../lib/import';
 import { ImportExecError, executeImport } from '../lib/import-exec';
 import type { ImportPlan, ImportStats } from '../lib/import-types';
@@ -28,6 +29,7 @@ const ImportDialog: Component<Props> = (p) => {
   const [decrypting, setDecrypting] = createSignal(false);
 
   onMount(() => {
+    onCleanup(installFocusRestore());
     const h = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && phase() !== 'running') {
         e.stopImmediatePropagation();
