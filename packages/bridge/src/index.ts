@@ -1,4 +1,5 @@
 import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
 import { registerAuth } from './auth.js';
 import { loadConfig } from './config.js';
@@ -20,6 +21,25 @@ const app = Fastify({
 });
 
 await app.register(cors, { origin: true });
+
+// Rate-Limit (ASVS V13.1.1) — Default fuer alle Routen, plus
+// strengere Caps auf /mcp und /ws-Handshake (siehe ws.ts/mcp.ts).
+// 50r/s pro IP fuer normale API-Calls, 200/Minute Burst-Buffer.
+// /healthz wird via skipOnError ignoriert (Monitoring-Tools sollen
+// nicht ausgesperrt werden).
+await app.register(rateLimit, {
+  max: 50,
+  timeWindow: '1 second',
+  // Burst-Cache: kurze Spitzen toleriert, dauerhaft hoch -> 429.
+  cache: 5000,
+  // Health-Checks ausnehmen — Uptimerobot soll den Endpoint poll'en
+  // koennen ohne in das Limit zu laufen.
+  allowList: (req) => req.url === '/healthz',
+  errorResponseBuilder: () => ({
+    error: 'rate_limited',
+    message: 'Zu viele Anfragen. Bitte kurz warten.',
+  }),
+});
 
 registerAuth(app, config);
 

@@ -4,6 +4,36 @@ import { flushDb, getDb } from './db.js';
 import { getSession, registerToolCall } from './state/session.js';
 import { sendMsg } from './ws.js';
 
+// Felder, die niemals im Audit-Log landen sollen (ASVS V7.3.3 — keine
+// sensitiven Daten in Logs). Aktuell hat kein Tool-Schema solche
+// Felder, aber das ist defense-in-depth fuer kuenftigen Ausbau:
+// neue Tools koennen Passwort/Token-Felder bekommen, ohne dass jemand
+// das Audit-Log-Verhalten anfasst.
+const REDACTED = '[REDACTED]';
+const SECRET_FIELDS = new Set([
+  'password',
+  'pw',
+  'passphrase',
+  'token',
+  'apikey',
+  'api_key',
+  'secret',
+  'authorization',
+]);
+
+function scrubArgs(value: unknown): unknown {
+  if (value == null) return value;
+  if (Array.isArray(value)) return value.map((v) => scrubArgs(v));
+  if (typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = SECRET_FIELDS.has(k.toLowerCase()) ? REDACTED : scrubArgs(v);
+    }
+    return out;
+  }
+  return value;
+}
+
 export interface ToolDef {
   name: string;
   description: string;
@@ -53,13 +83,18 @@ export async function invokeTool(name: string, rawArgs: unknown): Promise<unknow
   const resultPromise = registerToolCall(callId);
 
   const db = getDb();
+  // Args scrubben: bekannte Secret-Field-Namen werden vor dem
+  // Stringify durch [REDACTED] ersetzt. Result wird ebenfalls
+  // gescrubbt — wenn ein Tool z.B. einen frisch generierten Token
+  // zurueckgibt, soll der nicht in der Audit-DB liegen.
+  const scrubbedArgsJson = JSON.stringify(scrubArgs(rawArgs));
   try {
     const result = await resultPromise;
 
     // Audit-Log: Erfolg
     db.run(
       'INSERT INTO audit_log (session_id, tool_name, call_id, args, result, ok) VALUES (?, ?, ?, ?, ?, 1)',
-      [session.id, name, callId, JSON.stringify(rawArgs), JSON.stringify(result)],
+      [session.id, name, callId, scrubbedArgsJson, JSON.stringify(scrubArgs(result))],
     );
     flushDb();
 
@@ -69,7 +104,7 @@ export async function invokeTool(name: string, rawArgs: unknown): Promise<unknow
     const msg = err instanceof Error ? err.message : String(err);
     db.run(
       'INSERT INTO audit_log (session_id, tool_name, call_id, args, result, ok) VALUES (?, ?, ?, ?, ?, 0)',
-      [session.id, name, callId, JSON.stringify(rawArgs), msg],
+      [session.id, name, callId, scrubbedArgsJson, msg],
     );
     flushDb();
 

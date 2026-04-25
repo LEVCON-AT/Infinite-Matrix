@@ -2,6 +2,24 @@ import { createSignal, onCleanup } from 'solid-js';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 
+// Magic-Link-Redirect-URI: aus VITE_SITE_URL (Build-time-Konstante).
+// Bewusst NICHT window.location.origin — sonst kann ein gefaelschter
+// Origin den Redirect umleiten (ASVS V2.1.4). Falls die Env nicht
+// gesetzt ist, faellt's auf window.location.origin zurueck und logt
+// eine Warnung — Dev-Server (localhost) waere sonst unbenutzbar, aber
+// im Prod-Build sollte VITE_SITE_URL immer gesetzt sein.
+const SITE_URL = (() => {
+  const fromEnv = import.meta.env.VITE_SITE_URL as string | undefined;
+  if (fromEnv && fromEnv.trim()) return fromEnv;
+  if (typeof window !== 'undefined') {
+    console.warn(
+      '[auth] VITE_SITE_URL nicht gesetzt — Magic-Link-Redirect nutzt window.location.origin als Fallback. Im Prod-Build .env-Eintrag pflegen.',
+    );
+    return `${window.location.origin}/`;
+  }
+  return '/';
+})();
+
 // Globaler Session-State. Wird bei App-Start befuellt + bei onAuthStateChange aktualisiert.
 const [session, setSession] = createSignal<Session | null>(null);
 const [ready, setReady] = createSignal(false);
@@ -38,7 +56,7 @@ export function useUser(): () => User | null {
 export async function signInWithMagicLink(email: string): Promise<void> {
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: `${window.location.origin}/` },
+    options: { emailRedirectTo: SITE_URL },
   });
   if (error) throw error;
 }
