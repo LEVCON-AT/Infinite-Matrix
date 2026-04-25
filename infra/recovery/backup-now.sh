@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-SUPABASE_DIR="${SUPABASE_DIR:-/opt/supabase}"
+SUPABASE_DIR="${SUPABASE_DIR:-/opt/matrix-repo/infra/supabase}"
 BRIDGE_DIR="${BRIDGE_DIR:-/opt/matrix-bridge}"
 SNAPSHOT_DIR="${SNAPSHOT_DIR:-/opt/recovery/snapshots}"
 STATE_DIR="${STATE_DIR:-/opt/recovery/state}"

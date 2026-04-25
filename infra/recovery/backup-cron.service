@@ -4,13 +4,17 @@ Documentation=file:///opt/matrix-repo/infra/recovery/README.md
 Wants=docker.service
 After=docker.service
 
+# Failure-Notification: mailx an admin@levcon.at, falls vorhanden.
+# Wenn mailx fehlt: kein zusaetzlicher Fehler, nur Eintrag im journal.
+# OnFailure gehoert in [Unit], nicht [Service].
+OnFailure=backup-failure-notify@%n.service
+
 [Service]
 Type=oneshot
 User=root
 Group=root
 
 # Skript bricht eigenstaendig ab bei Fehler (set -euo pipefail).
-# OnFailure unten haengt mailx fuer Notification dran.
 ExecStart=/opt/recovery/scripts/backup-now.sh
 
 # Sollte nie ueber 30 Min brauchen — wenn doch, Bug.
@@ -20,10 +24,6 @@ TimeoutStartSec=30min
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=matrix-backup
-
-# Failure-Notification: mailx an admin@levcon.at, falls vorhanden.
-# Wenn mailx fehlt: kein zusaetzlicher Fehler, nur Eintrag im journal.
-OnFailure=backup-failure-notify@%n.service
 
 [Install]
 WantedBy=multi-user.target

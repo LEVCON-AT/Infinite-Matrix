@@ -7,7 +7,7 @@
 
 set -uo pipefail
 
-SUPABASE_DIR="${SUPABASE_DIR:-/opt/supabase}"
+SUPABASE_DIR="${SUPABASE_DIR:-/opt/matrix-repo/infra/supabase}"
 SNAPSHOT_DIR="${SNAPSHOT_DIR:-/opt/recovery/snapshots}"
 
 bold() { printf '\033[1m%s\033[0m\n' "$*"; }

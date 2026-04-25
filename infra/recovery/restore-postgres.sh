@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-SUPABASE_DIR="${SUPABASE_DIR:-/opt/supabase}"
+SUPABASE_DIR="${SUPABASE_DIR:-/opt/matrix-repo/infra/supabase}"
 STATE_DIR="${STATE_DIR:-/opt/recovery/state}"
 LOG_FILE="${LOG_FILE:-/var/log/matrix-recovery/matrix-recovery.log}"
 
