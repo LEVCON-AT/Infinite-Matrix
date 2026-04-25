@@ -232,17 +232,34 @@ jobs:
       - name: Deploy SaaS-Client (/app/ via /var/www/matrix-saas/)
         # Vite-Build aus packages/client-web/dist/ wandert nach
         # /var/www/matrix-saas/. nginx serviert das unter /app/
-        # (siehe infra/nginx/staging.matrix.levcon.at.conf). --delete
-        # raeumt alte Asset-Hashes auf, damit das Verzeichnis nicht
-        # zwischen Deploys volllaeuft.
+        # (siehe infra/nginx/staging.matrix.levcon.at.conf).
+        #
+        # Zwei-stufiger Pfad analog zum Bridge-Deploy: Stage in
+        # /tmp/matrix-saas-stage/ (Deploy-User schreibt dort frei),
+        # dann sudo rsync nach /var/www/matrix-saas/ — unabhaengig
+        # davon, wem das finale Verzeichnis gehoert (Owner kann root
+        # sein, auf einem frischen VPS noch nicht existieren, etc.).
+        # --chown=root:root setzt den finalen Eigentuemer einheitlich.
+        # --delete raeumt alte Asset-Hashes auf, damit das Verzeichnis
+        # zwischen Deploys nicht volllaeuft.
         env:
           HOST: ${{ secrets.DEPLOY_HOST }}
           USER: ${{ secrets.DEPLOY_USER }}
         run: |
+          set -euo pipefail
           rsync -az --delete \
             -e "ssh -i ~/.ssh/id_ed25519" \
             artifact/saas/ \
-            "$USER@$HOST:/var/www/matrix-saas/"
+            "$USER@$HOST:/tmp/matrix-saas-stage/"
+
+          ssh -i ~/.ssh/id_ed25519 "$USER@$HOST" bash -s <<'REMOTE'
+            set -euo pipefail
+            sudo mkdir -p /var/www/matrix-saas
+            sudo rsync -az --delete \
+              --chown=root:root \
+              /tmp/matrix-saas-stage/ \
+              /var/www/matrix-saas/
+          REMOTE
 
       - name: Deploy nginx config
         env:
