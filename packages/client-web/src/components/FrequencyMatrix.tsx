@@ -1,5 +1,5 @@
 // Intervallmatrix: Karten-Anzahl pro Zelle × Rhythmus-Kategorie.
-// Portiert renderFrequencyMatrix aus client/matrix_tool_beta.html
+// Portiert renderFrequencyMatrix aus packages/client-standalone/matrix.html
 // (Zeile 6280-6330).
 //
 // Input: aggregierte Cell-Tree mit Karten (siehe lib/aggregate.ts).

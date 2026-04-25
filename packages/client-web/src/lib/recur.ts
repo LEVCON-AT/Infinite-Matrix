@@ -1,6 +1,6 @@
 // Helpers fuer rekurrente Karten.
 //
-// Konvention aus dem HTML-Vorbild (client/matrix_tool_beta.html):
+// Konvention aus dem HTML-Vorbild (packages/client-standalone/matrix.html):
 //  - Eine Karte mit `recur.type !== 'none'` wird NIE auf `card.done=true`
 //    gesetzt. Stattdessen wird der heutige Tag (YYYY-MM-DD) in
 //    `card.done_occurrences[]` gepusht.

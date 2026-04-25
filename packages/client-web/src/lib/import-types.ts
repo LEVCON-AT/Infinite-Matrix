@@ -1,7 +1,7 @@
 // Shape eines Payload aus dem Alt-Client (getPayload()).
 // Nur die Felder, die wir fuer den Import lesen. Unbekannte Felder werden ignoriert.
 //
-// Quelle: client/matrix_tool_beta.html ~1721 (getPayload), ~1916 (loadData).
+// Quelle: packages/client-standalone/matrix.html ~1721 (getPayload), ~1916 (loadData).
 
 export type AltCellFeature = 'info' | 'board' | 'matrix' | 'checklists' | string;
 

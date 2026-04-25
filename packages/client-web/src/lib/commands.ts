@@ -1,4 +1,4 @@
-// Command-Palette: parseCommand portiert aus client/matrix_tool_beta.html
+// Command-Palette: parseCommand portiert aus packages/client-standalone/matrix.html
 // (dort `parseCommand` + `executeCommand`).
 //
 // Die Palette akzeptiert Commands ohne fuehrenden ^ — das Prefix ist

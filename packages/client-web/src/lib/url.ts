@@ -1,5 +1,5 @@
 // URL-Sanitization — verhindert XSS via javascript:/data:/vbscript:-URLs
-// in Link-Feldern. Port aus client/matrix_tool_beta.html:8660 mit der
+// in Link-Feldern. Port aus packages/client-standalone/matrix.html:8660 mit der
 // gleichen Liberal-Semantik: akzeptiert jede nicht-gefaehrliche URL inkl.
 // http/https/mailto/tel/relative — nur die drei bekannten Script-Schemes
 // werden abgelehnt.

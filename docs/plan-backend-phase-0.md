@@ -417,7 +417,7 @@ Erfolg: jede V-Verifikation aus dem bestehenden `CLAUDE.md` läuft auch im SaaS-
 
 ### 0g.1 — Standalone-Build einfrieren
 
-- `client/matrix_tool_beta.html` wird als `client-standalone/matrix.html` kopiert + verschoben.
+- `packages/client-standalone/matrix.html` wird als `client-standalone/matrix.html` kopiert + verschoben.
 - Separates Deployment-Target: `matrix.levcon.at/standalone/`.
 - Keine Weiterentwicklung dort — Bugfixes nur wenn kritisch.
 - Release-Notes-File `client-standalone/CHANGELOG.md` frozen-at V2.4.
@@ -472,7 +472,7 @@ Phase 0 ist abgeschlossen, wenn:
 
 1. Ich (User) kann mich auf `https://matrix.levcon.at` einloggen (alle drei Provider).
 2. Meine bestehende localStorage-Matrix ist importiert und sieht identisch aus.
-3. Alle Features aus `client/matrix_tool_beta.html@v0.3.0-checklist-v2` sind im SaaS-Client verfügbar.
+3. Alle Features aus `packages/client-standalone/matrix.html@v0.3.0-checklist-v2` sind im SaaS-Client verfügbar.
 4. Ein zweiter User kann eingeladen werden (manuell via DB-Insert in `memberships`) und sieht den geteilten Workspace live.
 5. PWA-Install funktioniert; Offline-Read + Reconnect-Queue funktioniert.
 6. Standalone-Client ist einfrieren und als Fallback deploybar.

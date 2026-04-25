@@ -1,7 +1,7 @@
 // Aggregat-Sektion unter der Matrix. Rendert (FREQ-1) die Intervall-
 // matrix, (FREQ-2) die Aufgabenuebersicht und (FREQ-3) den Toggle
 // zwischen beiden. Entspricht dem HTML-Vorbild-Flow in
-// client/matrix_tool_beta.html renderMatrixPage → renderTaskOverview /
+// packages/client-standalone/matrix.html renderMatrixPage → renderTaskOverview /
 // renderFrequencyMatrix.
 //
 // Die Sektion erscheint nur, wenn es unter der aktuellen Matrix

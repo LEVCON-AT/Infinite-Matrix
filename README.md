@@ -5,21 +5,30 @@ Ein rekursives Matrix-Organisations-System für strukturiertes Denken. Jede Zell
 ## Monorepo-Layout
 
 ```
-client/   Single-File-HTML-Client (matrix_tool_beta.html)
-bridge/   Node+TypeScript Backend (WebSocket + MCP-Server, ab Phase 1)
-infra/    nginx-Config, systemd-Unit, VPS-Setup-Scripts
-docs/     Pläne, Protokoll-Referenzen, Runbook
-V1/       Laufende User-Arbeitskopie der App (nicht deployt, nicht gelintet)
+packages/
+  client-web/         SolidJS + Vite SaaS-Client (Supabase-Backend, Multi-Tenant, PWA)
+  client-standalone/  Single-File-HTML-Client (frozen at v0.3.0-checklist-v2)
+  bridge/             Node+TypeScript Backend (WebSocket + MCP-Server)
+  shared/             Geteilte Typen
+infra/                nginx-Config, systemd-Unit, VPS-Setup-Scripts, Supabase-Migrations
+docs/                 Pläne, Protokoll-Referenzen, Runbook
 ```
 
 ## Start
 
-Lokaler Preview des Clients: `preview_start matrix` (via `.claude/launch.json` → Python http.server auf Port 3848, cwd `client/`).
+- **SaaS-Client (Dev):** `pnpm --filter @infinite-matrix/client-web dev` → `http://localhost:5173`
+- **Standalone-Preview:** Browser direkt auf `packages/client-standalone/matrix.html` zeigen lassen, oder via lokalem HTTP-Server.
+- **Bridge (Dev):** `pnpm --filter @infinite-matrix/bridge dev`
 
-Bridge und Deployment laufen ab Phase 1 des Plans — siehe [docs/plan-bridge.md](docs/plan-bridge.md).
+Deployment läuft via GitHub-Actions (`.github/workflows/deploy.yml`):
+- `https://matrix.levcon.at/` → Standalone (Legacy-Pfad, bleibt bis SaaS Live geht)
+- `https://matrix.levcon.at/standalone/` → Standalone (neuer permanenter Pfad)
+- `https://matrix.levcon.at/api/` → Supabase
+- `https://matrix.levcon.at/ws` + `/mcp` → Bridge
 
 ## Hintergrund
 
 - Konzept & Prinzipien: [CLAUDE.md](CLAUDE.md)
-- Aktueller Fahrplan: [docs/plan-bridge.md](docs/plan-bridge.md)
+- Backend-Phase-0-Plan: [docs/plan-backend-phase-0.md](docs/plan-backend-phase-0.md)
+- Bridge-Plan: [docs/plan-bridge.md](docs/plan-bridge.md)
 - Offene Themen: [BACKLOG.md](BACKLOG.md)

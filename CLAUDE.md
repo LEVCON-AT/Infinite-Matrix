@@ -32,9 +32,9 @@ Nutzerprofil: jemand, der strukturiert denkt und ein Werkzeug will, das seinen D
 
 ## Technik-Rahmen
 
-Eine Datei: `matrix_tool_beta.html`. Kein Build. Kein Framework. Keine npm-Dependencies. CSS inline, JS inline, Icons als Inline-SVG. Persistenz: localStorage als Primärspeicher + optional File System Access API mit Auto-Save.
+Eine Datei: `packages/client-standalone/matrix.html`. Kein Build. Kein Framework. Keine npm-Dependencies. CSS inline, JS inline, Icons als Inline-SVG. Persistenz: localStorage als Primärspeicher + optional File System Access API mit Auto-Save. Seit Phase 0g.1 eingefroren bei v0.3.0-checklist-v2 — neue Features wandern in `packages/client-web` (SaaS-Client).
 
-Konsequenz: Jede Änderung bleibt inline, bleibt portabel, bleibt eine Datei.
+Konsequenz: Jede Änderung am Standalone bleibt inline, bleibt portabel, bleibt eine Datei.
 
 Daneben: SolidJS-basierter `packages/client-web/` (Supabase-Backend, Multi-Tenant) + Bridge in `packages/bridge/`. Diese haben eigene Build-Pipelines.
 
@@ -44,7 +44,7 @@ Daneben: SolidJS-basierter `packages/client-web/` (Supabase-Backend, Multi-Tenan
 2. **Minimal-invasiv.** Eine Änderung fasst nur das an, was die Aufgabe löst. Keine Refactorings "weil ich eh hier bin". Keine spekulativen Optionen/Flags.
 3. **Bestehendes wiederverwenden.** Vor dem Neuschreiben prüfen: gibt es schon einen Helper, CSS-Klasse, State-Variable, Pattern?
 4. **Animated, wenn sichtbar.** Sichtbare State-Änderungen animieren, nie harte `display:none`/`visibility:hidden`-Swaps. Projekt-Standard: `220 ms cubic-bezier(.4, 0, .2, 1)` für Transitions, `180 ms cubic-bezier(.16, 1, .3, 1)` für Enter-Animationen. Bei scaleY-Animationen immer `transform-origin: left center` (damit SVG-Dots nicht verrutschen). Smooth-Scroll über `scrollIntoView({behavior:'smooth'})` — respektiert `prefers-reduced-motion`.
-5. **Single-File-Constraint (client/matrix_tool_beta.html).** Nichts extrahieren. CSS und JS bleiben in der HTML-Datei. Gilt **nicht** für den client-web (das ist der Vite/Solid-Build).
+5. **Single-File-Constraint (packages/client-standalone/matrix.html).** Nichts extrahieren. CSS und JS bleiben in der HTML-Datei. Gilt **nicht** für den client-web (das ist der Vite/Solid-Build).
 6. **Deutsch.** UI-Strings deutsch. Kommentare konsistent zur umgebenden Datei.
 7. **Datenhoheit beim User.** Im Offline-Modus: nichts geht je an einen Server. Im Bridge-Modus: Datenfluss ausschließlich zum **eigenen** Server (self-hosted VPS), authentifiziert mit einem Token, den der User selbst generiert. Kein Drittanbieter, kein Tracking. Verschlüsselung (AES-GCM, PBKDF2, 100k iterations) für sensible Exports. Bridge-Snapshot wird als JSON in der User-eigenen SQLite persistiert — gleiche Eigentumslogik wie localStorage.
 8. **Risiko-Aktionen bestätigen lassen.** Destruktives (git reset, rm, Branch-Delete) und Außenwirkung (push, PR, Comment) vorab abnicken lassen.
@@ -108,7 +108,7 @@ Diese Datei (CLAUDE.md) ist der **Single Entry Point**: Projektidentität, Arbei
 | Bridge-Deployment-Plan | `docs/plan-bridge.md` | Bei Bridge-/VPS-Arbeit, besonders Phase 2+ |
 | Backend-Phase-0-Plan | `docs/plan-backend-phase-0.md` | Bei client-web/Supabase-Arbeit |
 | MCP-Tool-Beispiele | `packages/bridge/src/tools/*.ts` | Als Pattern beim Neubau |
-| Client-Handler-Patterns | `client/matrix_tool_beta.html` — suche `MATRIX_TOOLS={` | Beim Hinzufügen neuer Tool-Handler |
+| Client-Handler-Patterns | `packages/client-standalone/matrix.html` — suche `MATRIX_TOOLS={` | Beim Hinzufügen neuer Tool-Handler |
 | nginx/systemd-Config | `infra/nginx/matrix.conf`, `infra/systemd/matrix-bridge.service` | Bei Deploy/Infra-Arbeit |
 | CI/CD-Workflow | `.github/workflows/deploy.yml`, `pr.yml` | Bei CI-Anpassungen |
 | Memory-Files (Session-Wissen) | `~/.claude/projects/…/memory/` | Automatisch beim Session-Start gelesen |

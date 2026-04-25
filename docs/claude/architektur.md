@@ -11,7 +11,7 @@ Ab Phase 4 ist der **Bridge-Pfad** produktiv: externe AI-Clients (Claude Desktop
 Jedes MATRIX_TOOL hat **drei Artefakte** — fehlt eins, ist das Tool nicht merge-ready:
 
 1. **Bridge-Schema** in `packages/bridge/src/tools/<gruppe>.ts`: Zod-Objekt + `zodToJsonSchema()` für MCP, registriert in `packages/bridge/src/tools/index.ts`
-2. **Client-Handler** in `client/matrix_tool_beta.html` (`MATRIX_TOOLS`-Registry): liest `args`, mutiert `nodes`/`aliasIndex`/etc., ruft `save()` + `render()`, gibt strukturiertes Ergebnis zurück
+2. **Client-Handler** in `packages/client-standalone/matrix.html` (`MATRIX_TOOLS`-Registry): liest `args`, mutiert `nodes`/`aliasIndex`/etc., ruft `save()` + `render()`, gibt strukturiertes Ergebnis zurück
 3. **Vitest** in `packages/bridge/test/<gruppe>.test.ts`: `safeParse` mit valid + invalid Args, Enum-Grenzen, required-Felder-Check — plus Integration via `packages/bridge/test/tool-registry.test.ts` (Gesamtzahl)
 
 ### Feature → MCP-Mapping-Pflicht

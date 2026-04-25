@@ -6,7 +6,7 @@ on:
     paths:
       - 'packages/bridge/**'
       - 'packages/shared/**'
-      - 'client/**'
+      - 'packages/client-standalone/**'
       - 'infra/**'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
@@ -64,8 +64,16 @@ jobs:
           echo "=== Wichtige Transitiven ==="
           ls artifact/bridge/node_modules/@hono 2>&1 || echo "@hono FEHLT"
           ls artifact/bridge/node_modules/zod-to-json-schema 2>&1 || echo "zod-to-json-schema FEHLT"
-          mkdir -p artifact/client
-          cp client/matrix_tool_beta.html artifact/client/
+          # Single-File-Client — wandert seit Phase 0g.1 in
+          # packages/client-standalone/matrix.html. Wir deployen das
+          # Artifact zusaetzlich an /standalone/ — root / wird vom
+          # SaaS-Client ueberlagert, sobald der live geht. Bis dahin
+          # wird matrix.html UND als /matrix_tool_beta.html (Legacy-
+          # Pfad) UND unter /standalone/matrix.html serviert; siehe
+          # nginx-Config + Deploy-Step unten.
+          mkdir -p artifact/client artifact/standalone
+          cp packages/client-standalone/matrix.html artifact/client/matrix_tool_beta.html
+          cp packages/client-standalone/matrix.html artifact/standalone/matrix.html
 
       - uses: actions/upload-artifact@v4
         with:
@@ -155,15 +163,28 @@ jobs:
             curl -fsS http://127.0.0.1:3849/healthz || (sudo journalctl -u matrix-bridge -n 50 && exit 1)
           REMOTE
 
-      - name: Deploy client
+      - name: Deploy client (Legacy-Root)
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          # rsync auf das Web-Root. --exclude='standalone/' verhindert,
+          # dass --delete den /standalone/-Subordner abraeumt (der
+          # naechste Step befuellt ihn).
+          rsync -az --delete --exclude='standalone/' \
+            -e "ssh -i ~/.ssh/id_ed25519" \
+            artifact/client/ \
+            "$USER@$HOST:/var/www/matrix/"
+
+      - name: Deploy standalone (/standalone/)
         env:
           HOST: ${{ secrets.DEPLOY_HOST }}
           USER: ${{ secrets.DEPLOY_USER }}
         run: |
           rsync -az --delete \
             -e "ssh -i ~/.ssh/id_ed25519" \
-            artifact/client/ \
-            "$USER@$HOST:/var/www/matrix/"
+            artifact/standalone/ \
+            "$USER@$HOST:/var/www/matrix/standalone/"
 
       - name: Smoke test
         env:
@@ -172,3 +193,4 @@ jobs:
           set -euo pipefail
           curl -fsS "https://$HOST/healthz" | grep -q '"ok":true'
           curl -fsS -o /dev/null -w "%{http_code}\n" "https://$HOST/" | grep -q 200
+          curl -fsS -o /dev/null -w "%{http_code}\n" "https://$HOST/standalone/" | grep -q 200

@@ -1,7 +1,7 @@
 // Matrix-Subtree-Aggregation fuer Intervallmatrix (Frequency) und
 // Aufgabenuebersicht (TaskOverview). Portiert _freqAggregateCell /
 // _freqBuildAggregates / renderTaskOverview-collectBoards aus dem
-// HTML-Vorbild (client/matrix_tool_beta.html Zeile 6210-6470).
+// HTML-Vorbild (packages/client-standalone/matrix.html Zeile 6210-6470).
 //
 // Kernmodell:
 //  - Ausgangspunkt ist eine Matrix-Node. Die "Zellen" dieser Matrix

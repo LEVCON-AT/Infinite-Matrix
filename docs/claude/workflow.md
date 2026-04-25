@@ -6,7 +6,7 @@
 
 ## Kontext-Window & Sprint-Aufteilung
 
-Die Codebasis: **Client ~8.5k LOC** in `client/matrix_tool_beta.html` (Single-File), plus **Bridge ~900 LOC TypeScript** in `packages/bridge/src/`, plus der neue SolidJS-Client in `packages/client-web/`. Ein Review- oder Refactor-Durchgang am Client kann das Kontext-Fenster sprengen. Deshalb:
+Die Codebasis: **Client ~8.5k LOC** in `packages/client-standalone/matrix.html` (Single-File), plus **Bridge ~900 LOC TypeScript** in `packages/bridge/src/`, plus der neue SolidJS-Client in `packages/client-web/`. Ein Review- oder Refactor-Durchgang am Client kann das Kontext-Fenster sprengen. Deshalb:
 
 ### Kontext-Awareness während der Session
 

@@ -1,0 +1,10 @@
+{
+  "name": "@infinite-matrix/client-standalone",
+  "version": "0.3.0-checklist-v2",
+  "private": true,
+  "description": "Standalone Single-File-Client (frozen). Wird unter /standalone/ deployed. Keine Weiterentwicklung — Bugfixes nur wenn kritisch.",
+  "main": "matrix.html",
+  "scripts": {
+    "test": "echo \"(no tests; standalone is feature-frozen)\""
+  }
+}
