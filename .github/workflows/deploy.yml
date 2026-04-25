@@ -57,6 +57,20 @@ jobs:
           pnpm test -- --run
           pnpm build
 
+      - name: Lint + Typecheck + Build (client-web, base=/app/)
+        # Live-Deploy laeuft unter staging.matrix.levcon.at/app/ (Phase 1).
+        # VITE_BASE_PATH stellt sicher, dass Vite asset-URLs mit /app/
+        # praefixt — sonst zieht der Browser sie absolut von / und
+        # nginx serviert die Landing-Page als Asset (Memory
+        # feedback_spa_subpath_router).
+        env:
+          VITE_BASE_PATH: /app/
+        working-directory: packages/client-web
+        run: |
+          pnpm lint
+          pnpm typecheck
+          pnpm build
+
       - name: Hash build
         id: hash
         working-directory: packages/bridge
@@ -83,9 +97,14 @@ jobs:
           # wird matrix.html UND als /matrix_tool_beta.html (Legacy-
           # Pfad) UND unter /standalone/matrix.html serviert; siehe
           # nginx-Config + Deploy-Step unten.
-          mkdir -p artifact/client artifact/standalone
+          mkdir -p artifact/client artifact/standalone artifact/saas
           cp packages/client-standalone/matrix.html artifact/client/matrix_tool_beta.html
           cp packages/client-standalone/matrix.html artifact/standalone/matrix.html
+          # SaaS-Client (SolidJS-Build) — landet auf VPS unter
+          # /var/www/matrix-saas/ und wird von nginx unter /app/
+          # ausgeliefert. Trailing slash am Source-Pfad damit rsync
+          # den Inhalt synchronisiert, nicht den dist/-Ordner darunter.
+          rsync -a packages/client-web/dist/ artifact/saas/
 
       - uses: actions/upload-artifact@v4
         with:
@@ -209,6 +228,21 @@ jobs:
             -e "ssh -i ~/.ssh/id_ed25519" \
             artifact/standalone/ \
             "$USER@$HOST:/var/www/matrix/standalone/"
+
+      - name: Deploy SaaS-Client (/app/ via /var/www/matrix-saas/)
+        # Vite-Build aus packages/client-web/dist/ wandert nach
+        # /var/www/matrix-saas/. nginx serviert das unter /app/
+        # (siehe infra/nginx/staging.matrix.levcon.at.conf). --delete
+        # raeumt alte Asset-Hashes auf, damit das Verzeichnis nicht
+        # zwischen Deploys volllaeuft.
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/id_ed25519" \
+            artifact/saas/ \
+            "$USER@$HOST:/var/www/matrix-saas/"
 
       - name: Deploy nginx config
         env:
