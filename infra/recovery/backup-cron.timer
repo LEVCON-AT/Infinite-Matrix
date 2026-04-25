@@ -1,0 +1,18 @@
+[Unit]
+Description=Daily trigger for matrix backup-now.sh
+Documentation=file:///opt/matrix-repo/infra/recovery/README.md
+
+[Timer]
+# 03:17 UTC — off-peak, kollidiert nicht mit certbot (02:30) oder Logrotate (06:25).
+OnCalendar=*-*-* 03:17:00
+
+# Persistent: wenn der VPS waehrend der Trigger-Zeit aus war, holt es nach dem Boot nach.
+Persistent=true
+
+# Random-Delay: streut Last bei Mehrhost-Setups (hier nur ein VPS, aber Pattern bleibt).
+RandomizedDelaySec=5min
+
+Unit=backup-cron.service
+
+[Install]
+WantedBy=timers.target
