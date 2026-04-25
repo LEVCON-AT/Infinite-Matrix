@@ -1,0 +1,24 @@
+[Unit]
+Description=Notify on matrix backup failure (%i)
+Documentation=file:///opt/matrix-repo/infra/recovery/README.md
+
+[Service]
+Type=oneshot
+User=root
+
+# Versucht mailx zu nutzen. Wenn nicht vorhanden, schreibt Eintrag in journal —
+# mehr ist im V1-Setup ohne Mailer-Provider nicht moeglich. Phase-1.5 ergaenzt
+# Dead-Mans-Switch (healthchecks.io o.ae.).
+ExecStart=/bin/sh -c '\
+  set -u; \
+  HOST=$(hostname); \
+  TS=$(date -u +%Y-%m-%dT%H:%M:%SZ); \
+  BODY="Backup unit %i failed at $TS on $HOST. Check: journalctl -u %i -n 100"; \
+  echo "$BODY" | logger -t matrix-recovery -p user.err; \
+  if command -v mailx >/dev/null; then \
+    echo "$BODY" | mailx -s "[matrix-recovery] FAILED on $HOST" admin@levcon.at || true; \
+  fi'
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=matrix-backup-notify
