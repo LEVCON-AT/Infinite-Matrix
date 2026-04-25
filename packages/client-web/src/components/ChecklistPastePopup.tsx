@@ -121,7 +121,7 @@ const ChecklistPastePopup: Component<Props> = (p) => {
           </button>
           <button
             type="button"
-            class="btn-primary"
+            class="btn btn-p"
             onClick={commit}
             disabled={items().length === 0}
           >

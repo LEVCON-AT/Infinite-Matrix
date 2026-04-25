@@ -5399,8 +5399,142 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 }
 
 /* ── Import-Dialog ───────────────────────────────────────────── */
-.import-dialog {
+.import-card {
   width: min(560px, calc(100vw - 2rem));
+}
+
+.import-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  margin-top: var(--space-md);
+}
+
+.import-actions > button {
+  flex: 0 0 auto;
+}
+
+.import-file-label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  font-size: 13px;
+  color: var(--text2);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.import-file-label input[type='file'],
+.import-file-label input[type='password'] {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 6px 8px;
+  border: 1px solid var(--border2);
+  border-radius: var(--rs);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.import-file-label input[type='password']:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+.import-or {
+  font-size: 13px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.import-textarea {
+  width: 100%;
+  margin-top: var(--space-md);
+  font-family: monospace;
+  font-size: 13px;
+  padding: var(--space-sm);
+  border: 1px solid var(--border2);
+  border-radius: var(--rs);
+  background: var(--surface);
+  color: var(--text);
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.import-textarea:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+.import-password-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.import-stats {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-md) 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-xs) var(--space-md);
+}
+
+.import-stats li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 4px 8px;
+  border-radius: var(--rs);
+  background: var(--surface-hover);
+}
+
+.import-stat-label {
+  font-size: 13px;
+  color: var(--text2);
+}
+
+.import-stat-n {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.import-actions-bottom {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.import-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.import-progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text2);
+  font-variant-numeric: tabular-nums;
+}
+
+.import-progress-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border2);
+  overflow: hidden;
+}
+
+.import-progress-fill {
+  height: 100%;
+  background: var(--text);
+  transition: width var(--tr-std);
 }
 
 /* ── Responsive ──────────────────────────────────────────────── */

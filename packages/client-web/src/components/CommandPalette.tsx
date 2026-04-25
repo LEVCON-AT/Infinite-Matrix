@@ -415,7 +415,7 @@ const CommandPalette: Component<Props> = (p) => {
                 </button>
                 <button
                   type="button"
-                  class="btn-primary"
+                  class="btn btn-p"
                   onClick={onColPickConfirm}
                   disabled={busy()}
                 >
