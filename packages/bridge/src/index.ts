@@ -20,7 +20,26 @@ const app = Fastify({
   },
 });
 
-await app.register(cors, { origin: true });
+// CORS (ASVS V1.14.1) — Allowlist via CORS_ORIGINS-Env. Dev-Fallback
+// auf reflektiv-true bleibt erhalten, weil sonst der lokale Browser-
+// Test (localhost:3848) nicht laeuft. Prod: CORS_ORIGINS muss gesetzt
+// sein.
+const corsOrigins = config.CORS_ORIGINS
+  ? config.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean)
+  : null;
+await app.register(cors, {
+  origin:
+    corsOrigins && corsOrigins.length > 0
+      ? corsOrigins
+      : config.NODE_ENV === 'production'
+        ? false // Prod ohne Allowlist: kein Cross-Origin erlaubt.
+        : true, // Dev: reflektiv (localhost-Workflow).
+});
+if (!corsOrigins && config.NODE_ENV === 'production') {
+  app.log.warn(
+    'CORS_ORIGINS nicht gesetzt — CORS in Prod auf false. Wenn der Browser-Client unter einer anderen Origin laeuft, Allowlist explizit pflegen.',
+  );
+}
 
 // Rate-Limit (ASVS V13.1.1) — Default fuer alle Routen, plus
 // strengere Caps auf /mcp und /ws-Handshake (siehe ws.ts/mcp.ts).

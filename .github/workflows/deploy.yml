@@ -37,6 +37,15 @@ jobs:
       - name: Install (workspace)
         run: pnpm install --frozen-lockfile
 
+      - name: Audit prod-deps (ASVS V10.1.1 Supply-Chain)
+        # Bricht den Build ab, wenn eine Production-Dependency eine
+        # bekannte CVE >= high hat. Audit-Level "high" filtert
+        # Low/Moderate-Findings raus — die laufen typischerweise zu
+        # toten Pfaden in Tests/Build-Tools und blockieren den Deploy
+        # nicht. Bei einem high/critical-Finding muss die Dep
+        # aktualisiert werden, sonst kein Live-Push.
+        run: pnpm audit --prod --audit-level=high
+
       - name: Lint + Typecheck + Test + Build (bridge)
         working-directory: packages/bridge
         run: |
@@ -185,6 +194,46 @@ jobs:
             -e "ssh -i ~/.ssh/id_ed25519" \
             artifact/standalone/ \
             "$USER@$HOST:/var/www/matrix/standalone/"
+
+      - name: Deploy nginx config
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+          # nginx-Configs liegen schon im Repo-Mirror (/opt/matrix-repo)
+          # nach dem fetch+ff-merge im "Apply DB migrations"-Step. Wir
+          # symlinken sie an die richtigen Stellen + reload nginx.
+          # Idempotent: ln -sf ueberschreibt bestehende Symlinks.
+          ssh -i ~/.ssh/id_ed25519 "$USER@$HOST" bash -s <<'REMOTE'
+            set -euo pipefail
+            REPO=/opt/matrix-repo
+
+            # Site-Config: matrix.conf nach sites-available/ + symlink
+            # in sites-enabled/. Bei Erst-Setup ist der Symlink in
+            # sites-enabled noch nicht da — wir legen ihn an.
+            sudo install -m 0644 -o root -g root \
+              "$REPO/infra/nginx/matrix.conf" \
+              /etc/nginx/sites-available/matrix.conf
+            sudo ln -sf /etc/nginx/sites-available/matrix.conf \
+              /etc/nginx/sites-enabled/matrix.conf
+
+            # http-Context-Configs (rate-limit-Zonen etc.) nach
+            # /etc/nginx/conf.d/. nginx-Default inkludiert das Verzeichnis.
+            sudo rsync -a --delete-after \
+              "$REPO/infra/nginx/conf.d/" \
+              /etc/nginx/conf.d/matrix/
+            # Trick: einzelnes Include-Snippet, das alle unsere conf.d-
+            # Files liest. So vermischen wir uns nicht mit anderen Eintraegen
+            # in /etc/nginx/conf.d/. Datei mit .conf-Endung wird automatisch
+            # geladen.
+            cat <<'EOF' | sudo tee /etc/nginx/conf.d/00-matrix-include.conf >/dev/null
+            include /etc/nginx/conf.d/matrix/*.conf;
+            EOF
+
+            sudo nginx -t
+            sudo systemctl reload nginx
+          REMOTE
 
       - name: Smoke test
         env:
