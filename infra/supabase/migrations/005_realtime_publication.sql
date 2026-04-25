@@ -55,12 +55,21 @@ END $$;
 
 -- 3. REPLICA IDENTITY FULL pro Tabelle, damit DELETE-Events die
 --    komplette alte Row inkl. workspace_id broadcasten.
-ALTER TABLE public.nodes            REPLICA IDENTITY FULL;
-ALTER TABLE public.cells            REPLICA IDENTITY FULL;
-ALTER TABLE public.rows             REPLICA IDENTITY FULL;
-ALTER TABLE public.cols             REPLICA IDENTITY FULL;
-ALTER TABLE public.kb_cols          REPLICA IDENTITY FULL;
-ALTER TABLE public.kb_cards         REPLICA IDENTITY FULL;
-ALTER TABLE public.checklists       REPLICA IDENTITY FULL;
-ALTER TABLE public.checklist_items  REPLICA IDENTITY FULL;
-ALTER TABLE public.links            REPLICA IDENTITY FULL;
+--    ALTER TABLE ... REPLICA IDENTITY FULL ist re-runnable (PG
+--    akzeptiert mehrfaches Setzen); der DO-Block ist hier rein zur
+--    Konsistenz mit dem Idempotenz-Pattern der anderen Sektionen
+--    oben.
+DO $$
+DECLARE
+  tbl text;
+  tables text[] := ARRAY[
+    'nodes','cells','rows','cols',
+    'kb_cols','kb_cards',
+    'checklists','checklist_items',
+    'links'
+  ];
+BEGIN
+  FOREACH tbl IN ARRAY tables LOOP
+    EXECUTE format('ALTER TABLE public.%I REPLICA IDENTITY FULL', tbl);
+  END LOOP;
+END $$;

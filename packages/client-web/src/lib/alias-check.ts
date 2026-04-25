@@ -26,6 +26,12 @@ export const ALIAS_TABLE_LABEL: Record<AliasTable, string> = {
 
 // Liefert die Tabelle, in der der Alias schon vergeben ist — oder null.
 // Bei `exclude` (Selbst-Update) wird der eigene Datensatz ignoriert.
+//
+// Wildcard-Hinweis: alle Aufrufer reichen `args.alias` durch
+// `validateAliasFormat` (siehe lib/alias.ts) — ALIAS_RE = /^[a-z0-9]+$/
+// laesst weder `%` noch `_` durch. Die ilike()-Calls unten sind damit
+// ohne explizites escape sicher. Wer den Helper extern aufruft, muss
+// die Format-Garantie selbst halten.
 export async function findAliasConflict(args: {
   workspaceId: string;
   alias: string;
