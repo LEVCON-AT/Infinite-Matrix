@@ -4,8 +4,11 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'bridge/**'
-      - 'client/**'
+      - 'packages/bridge/**'
+      - 'packages/client-web/**'
+      - 'packages/shared/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
       - '.github/workflows/**'
 
 permissions:
@@ -14,20 +17,36 @@ permissions:
 jobs:
   bridge:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: bridge
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with: { version: 9 }
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: bridge/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm test -- --run
-      - run: pnpm build
+      - name: Lint + Typecheck + Test + Build (bridge)
+        working-directory: packages/bridge
+        run: |
+          pnpm lint
+          pnpm typecheck
+          pnpm test -- --run
+          pnpm build
+
+  client-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck + Build (client-web)
+        working-directory: packages/client-web
+        run: |
+          pnpm typecheck
+          pnpm build

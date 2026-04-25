@@ -45,6 +45,14 @@ fi
 echo -e "${YEL}Anwende Migrations aus $MIGRATIONS_DIR${RST}"
 echo ""
 
+# Migrations-Output landet im temporaeren Logfile mit mode 0600 (mktemp-
+# Default). KEIN /tmp/migrate.log — das war world-readable und konnte
+# bei einer fehlgeschlagenen Migration mit psql-Stderr Pfade,
+# DB-Inhalts-Snippets oder Verbindungsstrings durchreichen. Auf einem
+# Multi-User-VPS Information-Disclosure (ASVS V8.3.4 / V14.4.1).
+LOGFILE=$(mktemp -t matrix-migrate.XXXXXX)
+trap 'rm -f "$LOGFILE"' EXIT
+
 shopt -s nullglob
 FILES=("$MIGRATIONS_DIR"/*.sql)
 if [[ ${#FILES[@]} -eq 0 ]]; then
@@ -57,13 +65,13 @@ for f in "${FILES[@]}"; do
   info "Anwenden: $name"
   # psql via docker exec; PGPASSWORD als Env-Variable
   if docker compose -f "$SUPABASE_DIR/docker-compose.yml" exec -T -e "PGPASSWORD=$POSTGRES_PASSWORD" db \
-       psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 < "$f" >/tmp/migrate.log 2>&1; then
+       psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 < "$f" > "$LOGFILE" 2>&1; then
     ok "$name"
   else
     echo ""
     echo -e "${RED}FEHLER bei $name${RST}"
     echo "----- Log -----"
-    cat /tmp/migrate.log | tail -30
+    tail -30 "$LOGFILE"
     echo "----- /Log -----"
     exit 1
   fi
