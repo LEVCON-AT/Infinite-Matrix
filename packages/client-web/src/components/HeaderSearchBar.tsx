@@ -731,7 +731,12 @@ const HeaderSearchBar: Component<Props> = (p) => {
         </span>
       </Show>
       <Show when={showDropdown()}>
-        <div class="header-search-dropdown" role="listbox">
+        <div
+          class="header-search-dropdown"
+          // biome-ignore lint/a11y/useSemanticElements: bewusst <div role="listbox"> — Header-Dropdown rendert mehrere Match-Sektionen, kein nativer <select> moeglich.
+          role="listbox"
+          tabIndex={-1}
+        >
           <Switch>
             <Match when={colPick()}>
               {(state) => (

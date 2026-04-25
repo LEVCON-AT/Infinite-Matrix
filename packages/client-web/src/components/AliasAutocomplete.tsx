@@ -36,16 +36,20 @@ const AliasAutocomplete: Component = () => {
           'max-width': `${POPUP_MAX_W}px`,
           'z-index': '10000',
         }}
+        // biome-ignore lint/a11y/useSemanticElements: bewusst <div role="listbox"> — Popup wird absolut positioniert via Portal, kein nativer <select> moeglich.
         role="listbox"
         aria-label="Alias-Vorschlaege"
+        tabIndex={-1}
       >
         <For each={s().matches}>
           {(m, i) => (
             <div
               class="alias-ac-item"
               classList={{ active: s().activeIdx === i() }}
+              // biome-ignore lint/a11y/useSemanticElements: <div role="option"> — <option> ist nur in <select> valide.
               role="option"
               aria-selected={s().activeIdx === i()}
+              tabIndex={-1}
               onMouseDown={(e) => {
                 // onMouseDown (nicht onClick) + preventDefault: der Focus
                 // bleibt auf dem Input, onBlur feuert nicht, der Commit

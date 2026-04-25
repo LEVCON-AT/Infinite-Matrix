@@ -115,7 +115,12 @@ const ChecklistActionModal: Component<Props> = (p) => {
       }}
       onKeyDown={onFormKey}
     >
-      <div class="overlay-card cl-action-card" role="dialog" aria-modal="true">
+      <div
+        class="overlay-card cl-action-card"
+        // biome-ignore lint/a11y/useSemanticElements: <div role="dialog"> bewusst statt <dialog> — showModal() haette aufwendige Migration aller Modals zur Folge.
+        role="dialog"
+        aria-modal="true"
+      >
         <header class="overlay-head">
           <h3>Close-Aktion</h3>
           <button type="button" class="overlay-close" onClick={p.onClose} aria-label="Schliessen">

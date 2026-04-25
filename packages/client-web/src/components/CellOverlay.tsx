@@ -336,13 +336,19 @@ const CellOverlay: Component<Props> = (p) => {
   const breadcrumb = () => `${p.row.label || '(Zeile)'} × ${p.col.label || '(Spalte)'}`;
 
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: Backdrop-Klick — Tastatur via ESC-Capture im onMount.
     <div
       class="overlay-scrim"
       onClick={(e) => {
         if (e.target === e.currentTarget) p.onClose();
       }}
     >
-      <div class="overlay-card cell-overlay" role="dialog" aria-modal="true">
+      <div
+        class="overlay-card cell-overlay"
+        // biome-ignore lint/a11y/useSemanticElements: <div role="dialog"> bewusst statt <dialog> — showModal() haette aufwendige Migration aller Modals zur Folge.
+        role="dialog"
+        aria-modal="true"
+      >
         <header class="overlay-head">
           <div class="overlay-head-text">
             <h2>Zelle bearbeiten</h2>
@@ -376,7 +382,12 @@ const CellOverlay: Component<Props> = (p) => {
             />
           </label>
 
-          <div class="cell-feat-row" role="group" aria-label="Zellen-Features">
+          <div
+            class="cell-feat-row"
+            // biome-ignore lint/a11y/useSemanticElements: bewusst <div role="group"> — <fieldset> wuerde Browser-Default-Border + Margin einfuegen, das stylisch unpassend ist.
+            role="group"
+            aria-label="Zellen-Features"
+          >
             <For each={CELL_FEATURES}>
               {(def) => (
                 <button

@@ -92,6 +92,7 @@ const KeyboardHelp: Component<Props> = (p) => {
   });
 
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: Backdrop-Klick — Tastatur via ESC-Capture im onMount.
     <div
       class="overlay-scrim"
       onClick={(e) => {
@@ -100,6 +101,7 @@ const KeyboardHelp: Component<Props> = (p) => {
     >
       <div
         class="overlay-card kb-help-card"
+        // biome-ignore lint/a11y/useSemanticElements: <div role="dialog"> bewusst statt <dialog> — showModal() haette aufwendige Migration aller Modals zur Folge.
         role="dialog"
         aria-modal="true"
         aria-label="Tastatur-Shortcuts"

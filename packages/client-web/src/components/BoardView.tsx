@@ -970,6 +970,8 @@ const BoardView: Component<Props> = (p) => {
                                   }}
                                   style={card.color ? { '--kb-card-color': card.color } : undefined}
                                   data-has-color={card.color ? 'yes' : 'no'}
+                                  // biome-ignore lint/a11y/useSemanticElements: <li role="button"> — Karte enthaelt klickbare Aktions-Buttons (Move/Del) als nested children, <button>-in-<button> waere invalid.
+                                  // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: ARIA-Listitem-mit-button-Pattern fuer DnD-Karten.
                                   role="button"
                                   tabIndex={0}
                                   draggable={true}
@@ -1059,6 +1061,7 @@ const BoardView: Component<Props> = (p) => {
 
                                   {/* Karten-Aktionen (Move/Del) immer sichtbar —
                                       Karten sind keine strukturellen Daten. */}
+                                  {/* biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation-Wrapper, kein interaktives Element — verhindert dass Klick auf Move/Del-Buttons die Karte oeffnet. */}
                                   <div
                                     class="kb-card-edit-bar"
                                     onClick={(e) => e.stopPropagation()}

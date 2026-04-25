@@ -56,13 +56,19 @@ const ChecklistPastePopup: Component<Props> = (p) => {
   }
 
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: Backdrop-Klick — Tastatur via ESC-Capture im onMount.
     <div
       class="overlay-scrim"
       onClick={(e) => {
         if (e.target === e.currentTarget) p.onClose();
       }}
     >
-      <div class="overlay-card cl-paste-card" role="dialog" aria-modal="true">
+      <div
+        class="overlay-card cl-paste-card"
+        // biome-ignore lint/a11y/useSemanticElements: <div role="dialog"> bewusst statt <dialog> — showModal() haette aufwendige Migration aller Modals zur Folge.
+        role="dialog"
+        aria-modal="true"
+      >
         <header class="overlay-head">
           <h3>Aus Zwischenablage einfuegen</h3>
           <button type="button" class="overlay-close" onClick={p.onClose} aria-label="Schliessen">

@@ -727,6 +727,7 @@ const DocsPopup: Component<Props> = (p) => {
   }
 
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: Backdrop-Klick — Tastatur via ESC-Capture im onMount.
     <div
       class="overlay-scrim docs-popup-scrim"
       onClick={(e) => {
@@ -735,6 +736,7 @@ const DocsPopup: Component<Props> = (p) => {
     >
       <div
         class="overlay-card docs-popup-card"
+        // biome-ignore lint/a11y/useSemanticElements: <div role="dialog"> bewusst statt <dialog> — showModal() haette aufwendige Migration aller Modals zur Folge.
         role="dialog"
         aria-modal="true"
         aria-label="Dokumentation"
@@ -746,6 +748,8 @@ const DocsPopup: Component<Props> = (p) => {
                 const isActive = () => i() === activeIdx();
                 const label = () => t.title?.trim() || '(neu)';
                 return (
+                  // biome-ignore lint/a11y/useFocusableInteractive: Tab-Wechsel-Tastatur erfolgt im Hauptcontainer (Pfeiltasten) — Tabs selber ueber Klick erreichbar; native <button role="tab"> waere besser, wuerde Layout brechen (Close-Button-Nesting).
+                  // biome-ignore lint/a11y/useKeyWithClickEvents: Tab-Wechsel via globalem Pfeiltasten-Handler in onKeyDown des Cards.
                   <div
                     class="docs-popup-tab"
                     classList={{ 'docs-popup-tab-active': isActive() }}
@@ -907,6 +911,7 @@ const DocsPopup: Component<Props> = (p) => {
                   fallback={
                     <div
                       class="docs-popup-content-view"
+                      // biome-ignore lint/a11y/useSemanticElements: bewusst <div role="button"> — Inhalt rendert <MarkdownLightView> mit klickbaren Alias-Chips; nested <button>-in-<button> waere invalid.
                       role="button"
                       tabIndex={0}
                       title="Klicken oder Enter zum Bearbeiten"
@@ -950,6 +955,7 @@ const DocsPopup: Component<Props> = (p) => {
                         const isOpenTab = () =>
                           tabs().some((tb) => tb.docId === null && tb.clientId === d.clientId);
                         return (
+                          // biome-ignore lint/a11y/useKeyWithClickEvents: Sidebar-Liste; primaere Tastatur-Bedienung ueber Tab-Tastatur im Editor-Body. Sidebar dient als Quick-Access.
                           <li
                             class="docs-popup-recent-item docs-popup-draft-item"
                             classList={{
@@ -994,6 +1000,7 @@ const DocsPopup: Component<Props> = (p) => {
                       {(row) => {
                         const isOpenTab = () => tabs().some((tb) => tb.docId === row.id);
                         return (
+                          // biome-ignore lint/a11y/useKeyWithClickEvents: Sidebar-Liste; primaere Tastatur-Bedienung ueber Tab-Tastatur im Editor-Body.
                           <li
                             class="docs-popup-recent-item"
                             classList={{

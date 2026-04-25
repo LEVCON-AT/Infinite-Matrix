@@ -154,7 +154,7 @@ Einzige bekannte Ausnahme aus AU-A1.5 (ImportDialog): `font-size:13px/14px` — 
 | Sprint | Scope | Schätz | Risiko |
 |---|---|---|---|
 | **AU-A4.1** | `noNonNullAssertion`-Sweep (116 `!`-Stellen) | ~2h | mittel — pro Stelle Type-Annahme prüfen |
-| **AU-A4.2** | a11y-Sweep (64 Lint-Errors) | ~2h | mittel — manche `<div role="button">` brauchen Refactor zu `<button>`, andere brauchen explizite biome-disable mit Kommentar |
+| **AU-A4.2** | a11y-Sweep (64 Lint-Errors) | ~2h | mittel — manche `<div role="button">` brauchen Refactor zu `<button>`, andere brauchen explizite biome-disable mit Kommentar | ✅ **DONE** (siehe unten) |
 | **AU-A4.3** | Focus-Restore-Helper in `lib/dialog.ts` + 10 Modal-Migration + 3 Bestandsfälle adoptieren | ~1h | niedrig — Helper-Pattern bewährt (analog Focus-Trap aus AU-A3) |
 | **AU-A4.4** | Restliche Lint-Quick-Wins (`useTemplate`, `useNumberNamespace`, `noUnusedTemplateLiteral`, `useOptionalChain`, `useConst`, `useImportType`, `noRedundantRoles`, `noGlobalIsNan`, `noForEach`, `noImplicitAnyLet`) | ~30 min | niedrig — biome `--apply-unsafe` deckt viele |
 
@@ -166,5 +166,80 @@ Einzige bekannte Ausnahme aus AU-A1.5 (ImportDialog): `font-size:13px/14px` — 
 - `packages/client-web/src/styles.css:4932` — `transition: width 180ms cubic-bezier(.16, 1, .3, 1)` → `transition: width var(--tr-enter)`.
 
 **Findings-Report:** dieses Dokument.
+
+---
+
+## AU-A4.2 — a11y-Sweep ✅ (2026-04-25)
+
+**Resultat:** 64 → 0 a11y-Lint-Errors.
+
+### Strategie
+
+Drei Patterns identifiziert, jeweils anders behandelt:
+
+1. **Modal/Scrim-Pattern** (~38 Errors über 11 Modals — `<div class="overlay-scrim">` + `<div role="dialog" aria-modal="true">`)
+   - **Entscheidung:** `biome-ignore` mit fundierter Begründung statt Migration zu nativem `<dialog>`-Element
+   - **Grund:** Native `<dialog>`-API erfordert `showModal()`-Refactor aller 10 Modals + neue Focus-Mechanik. ARIA-Modal-Pattern (`role="dialog"` + `aria-modal="true"` + Focus-Trap aus AU-A3 + Focus-Restore aus AU-A4.3) ist semantisch äquivalent.
+   - **Pattern:**
+     ```tsx
+     // biome-ignore lint/a11y/useKeyWithClickEvents: Backdrop-Klick — Tastatur via ESC-Capture im onMount.
+     <div class="overlay-scrim" onClick={...}>
+       <div
+         class="overlay-card xxx-card"
+         // biome-ignore lint/a11y/useSemanticElements: <div role="dialog"> bewusst statt <dialog> — showModal() haette aufwendige Migration aller Modals zur Folge.
+         role="dialog"
+         aria-modal="true"
+       >
+     ```
+
+2. **Listbox/Option-Pattern** (~10 Errors — `AliasAutocomplete`, `WorkspaceSwitcher`, `GlobalSearch`, `HeaderSearchBar`)
+   - **Realer Bug** (`useFocusableInteractive`): listbox/option ohne `tabIndex` → `tabIndex={-1}` ergänzt (programmatisch fokussierbar, nicht im Tab-Flow). ARIA-konformes Combobox-Pattern.
+   - **Falsch-positiv** (`useSemanticElements` schlägt `<select>` vor): Custom-Dropdowns rendern Multi-Section-Matches, Badges, Multiline-Items — `<select>` kann das nicht. `biome-ignore` mit Begründung.
+
+3. **Refactor zu nativem Element**
+   - `CellDocsSection.tsx:88-89` — `<li role="button">` → `<li><button class="cell-docs-item">` (Wrapper-Pattern). CSS in `styles.css:2098` um `width:100%; color:inherit; font:inherit; text-align:left` ergänzt.
+   - `CommandPalette.tsx:336` — `<ul role="list">` → `<ul>` (redundantes role entfernt, FIXABLE).
+
+4. **Fall-spezifische `biome-ignore` mit Begründung:**
+   - `FrequencyMatrix.tsx` — `<th role="link">` (Klick-Anker auf Row-Header; `<a>` würde Tabellen-Semantik zerstören).
+   - `BoardView.tsx` — `<li role="button">` Karten-Container (enthält nested Move/Del-Buttons, `<button>`-in-`<button>` wäre invalid).
+   - `CardOverlay.tsx`, `DocsPopup.tsx` — `<div role="button">` für Note-View/Content-View (Inhalt ist `<AliasText>`/`<MarkdownLightView>` mit nested klickbaren Chips).
+   - `AliasChip.tsx` — `<span role="button">` (Inline-Kontext-Render).
+   - `Toasts.tsx`, `ProgressOverlay.tsx` — `<div role="status">` (Container für mehrere Items, role auf parent macht Live-Region für Screen-Reader).
+   - `MatrixView.tsx` — `<span class="mx-feat-chip">` mit onClick (Tastatur über Matrix-Navigation, dokumentiert in KeyboardHelp).
+   - `TaskOverview.tsx` — `<div role="link">` (Inhalt ist `<AliasText>`).
+
+### Wichtiger Befund: biome-ignore-Comment-Placement in JSX
+
+Biome v1.9.4 erkennt `{/* biome-ignore */}` zwischen Parent- und Child-JSX **nicht** als Suppression — der Kommentar wird als Text-Node-Child des Parents geparst, nicht als Sibling-Annotation.
+
+**Korrektes Pattern:**
+- **Vor JSX-Element auf JS-Expression-Ebene** (z.B. nach `return (` oder in `fallback={...}`-Position):
+  ```tsx
+  return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: ...
+    <div onClick={...}>
+  );
+  ```
+- **Inline als Attribut-Kommentar:**
+  ```tsx
+  <div
+    class="..."
+    // biome-ignore lint/a11y/useSemanticElements: ...
+    role="dialog"
+  >
+  ```
+
+Lokation der Suppression muss **direkt vor** dem Diagnostic-Reporting-Punkt liegen — biome reportet je nach Rule entweder beim Element-Start (z.B. `useKeyWithClickEvents`) oder beim Attribut (z.B. `useSemanticElements` beim `role="..."`).
+
+### Files geändert (16 Components + 1 CSS)
+
+`AliasAutocomplete.tsx`, `AliasChip.tsx`, `BoardView.tsx`, `CardOverlay.tsx`, `CellDocsSection.tsx`, `CellOverlay.tsx`, `ChecklistActionModal.tsx`, `ChecklistPastePopup.tsx`, `ChecklistToCardPopup.tsx`, `CommandPalette.tsx`, `DialogHost.tsx`, `DocsPopup.tsx`, `FrequencyMatrix.tsx`, `GlobalSearch.tsx`, `HeaderSearchBar.tsx`, `ImportDialog.tsx`, `KeyboardHelp.tsx`, `MatrixView.tsx`, `ProgressOverlay.tsx`, `SettingsModal.tsx`, `TaskOverview.tsx`, `Toasts.tsx`, `WorkspaceSwitcher.tsx` + `styles.css`.
+
+### Verifikation
+
+- `pnpm exec tsc --noEmit` grün
+- `pnpm exec vite build` grün (PWA precache + Dist-Output ok)
+- `pnpm exec biome lint src` — a11y-Errors: **64 → 0**, Gesamterror-Count: 144 (alle non-a11y, deferred AU-A4.1)
 
 **Commit:** `docs(audit): AU-A4 — Style-Konvention-Audit + Animation-Token-Fix`.

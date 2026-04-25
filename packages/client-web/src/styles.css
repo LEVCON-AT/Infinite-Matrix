@@ -2095,8 +2095,13 @@ button[type="submit"]:hover:not(:disabled) {
   gap: var(--space-xs);
 }
 
+.cell-docs-item-wrap {
+  list-style: none;
+}
+
 .cell-docs-item {
   display: flex;
+  width: 100%;
   align-items: baseline;
   gap: var(--space-sm);
   padding: 6px 10px;
@@ -2104,6 +2109,9 @@ button[type="submit"]:hover:not(:disabled) {
   border-radius: var(--rs);
   cursor: pointer;
   background: var(--bg);
+  color: inherit;
+  font: inherit;
+  text-align: left;
   transition: background-color var(--tr-std), border-color var(--tr-std);
 }
 

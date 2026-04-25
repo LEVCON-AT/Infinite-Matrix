@@ -272,6 +272,7 @@ const CommandPalette: Component<Props> = (p) => {
   }
 
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: Backdrop-Klick — Tastatur via ESC-Capture im onMount.
     <div
       class="overlay-scrim command-palette-scrim"
       onClick={(e) => {
@@ -280,6 +281,7 @@ const CommandPalette: Component<Props> = (p) => {
     >
       <div
         class="overlay-card command-palette-card"
+        // biome-ignore lint/a11y/useSemanticElements: <div role="dialog"> bewusst statt <dialog> — showModal() haette aufwendige Migration aller Modals zur Folge.
         role="dialog"
         aria-modal="true"
         aria-label="Command-Palette"
@@ -333,7 +335,7 @@ const CommandPalette: Component<Props> = (p) => {
               artig: User sieht was moeglich ist, ohne extra Modal zu
               oeffnen. Bei jeder anderen Eingabe wird es ausgeblendet. */}
           <Show when={showHelpList()}>
-            <ul class="command-palette-help" role="list" aria-label="Verfuegbare Commands">
+            <ul class="command-palette-help" aria-label="Verfuegbare Commands">
               <For each={COMMAND_VERBS}>
                 {(entry) => (
                   <li class="command-palette-help-row">

@@ -125,8 +125,11 @@ const WorkspaceSwitcher: Component<Props> = (props) => {
           <Portal mount={document.body}>
             <ul
               class="ws-switcher-menu"
+              // biome-ignore lint/a11y/useSemanticElements: bewusst <ul role="listbox"> statt <select> — nativer <select> kann nicht via Portal gerendert werden und stylet uneinheitlich.
+              // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: ARIA-Listbox auf ul ist Standard-Pattern fuer custom dropdowns.
               role="listbox"
               ref={menuEl}
+              tabIndex={-1}
               style={{
                 left: `${pos()!.left}px`,
                 top: `${pos()!.top}px`,
@@ -138,6 +141,7 @@ const WorkspaceSwitcher: Component<Props> = (props) => {
                   <li>
                     <button
                       type="button"
+                      // biome-ignore lint/a11y/useSemanticElements: bewusst <button role="option"> — option-element ist nur in <select> valide.
                       role="option"
                       aria-selected={ws.id === props.currentWorkspaceId}
                       classList={{ active: ws.id === props.currentWorkspaceId }}

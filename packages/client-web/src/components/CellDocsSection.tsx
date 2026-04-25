@@ -83,23 +83,14 @@ const CellDocsSection: Component<Props> = (p) => {
           <ul class="cell-docs-list">
             <For each={docs() ?? []}>
               {(d) => (
-                <li
-                  class="cell-docs-item"
-                  onClick={() => onOpenDoc(d)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      onOpenDoc(d);
-                    }
-                  }}
-                >
-                  <span class="cell-docs-date hint">{fmtDateShort(d.updated_at)}</span>
-                  <span class="cell-docs-item-title">{d.title || '(ohne Titel)'}</span>
-                  <Show when={d.alias}>
-                    <span class="cell-docs-alias">^{d.alias}</span>
-                  </Show>
+                <li class="cell-docs-item-wrap">
+                  <button type="button" class="cell-docs-item" onClick={() => onOpenDoc(d)}>
+                    <span class="cell-docs-date hint">{fmtDateShort(d.updated_at)}</span>
+                    <span class="cell-docs-item-title">{d.title || '(ohne Titel)'}</span>
+                    <Show when={d.alias}>
+                      <span class="cell-docs-alias">^{d.alias}</span>
+                    </Show>
+                  </button>
                 </li>
               )}
             </For>

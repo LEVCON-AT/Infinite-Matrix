@@ -4,7 +4,12 @@ import { dismissToast, useToasts } from '../lib/toasts';
 const Toasts: Component = () => {
   const toasts = useToasts();
   return (
-    <div class="toast-stack" role="status" aria-live="polite">
+    <div
+      class="toast-stack"
+      // biome-ignore lint/a11y/useSemanticElements: bewusst <div role="status"> — div ist Container fuer mehrere Toast-Karten, role auf parent macht alle Toasts fuer Screen-Reader live.
+      role="status"
+      aria-live="polite"
+    >
       <For each={toasts()}>
         {(t) => (
           <div class="toast" data-kind={t.kind}>

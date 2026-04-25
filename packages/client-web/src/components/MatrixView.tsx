@@ -696,6 +696,7 @@ const MatrixView: Component<Props> = (p) => {
                                     // Zell-Page.
                                     const chipClickable = () => !!cell();
                                     return (
+                                      // biome-ignore lint/a11y/useKeyWithClickEvents: Chip-Klick offen-Feature; Tastatur-Bedienung erfolgt via globaler Matrix-Navigation (Pfeiltasten + Enter auf Zelle, dann 1-9 fuer Features).
                                       <span
                                         class="mx-feat-chip"
                                         classList={{
@@ -711,6 +712,7 @@ const MatrixView: Component<Props> = (p) => {
                                   }}
                                 </For>
                                 <Show when={cell() && p.cellsWithDocs.has(cell()!.id)}>
+                                  {/* biome-ignore lint/a11y/useKeyWithClickEvents: Chip-Klick offen-Doku; Tastatur-Bedienung via Matrix-Navigation + 'd'-Shortcut (siehe KeyboardHelp). */}
                                   <span
                                     class="mx-feat-chip mx-feat-chip-link"
                                     data-feat="doc"

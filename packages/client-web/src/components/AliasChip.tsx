@@ -78,6 +78,7 @@ const AliasChip: Component<Props> = (p) => {
   return (
     <span
       class="alias-chip"
+      // biome-ignore lint/a11y/useSemanticElements: bewusst <span role="button"> — AliasChip wird oft im Inline-Text gerendert (z.B. "Siehe ^foo bar"), <button> wuerde Block-Layout-Quirks verursachen und nested-button-Konflikte mit aeusserem role="button" Note-View.
       role="button"
       tabIndex={0}
       onClick={(e) => {

@@ -125,13 +125,19 @@ const ImportDialog: Component<Props> = (p) => {
   }
 
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: Backdrop-Klick — Tastatur via ESC-Capture im onMount.
     <div
       class="overlay-scrim"
       onClick={(e) => {
         if (e.target === e.currentTarget && phase() !== 'running') p.onClose();
       }}
     >
-      <div class="overlay-card import-card" role="dialog" aria-modal="true">
+      <div
+        class="overlay-card import-card"
+        // biome-ignore lint/a11y/useSemanticElements: <div role="dialog"> bewusst statt <dialog> — showModal() haette aufwendige Migration aller Modals zur Folge.
+        role="dialog"
+        aria-modal="true"
+      >
         <header class="overlay-head">
           <h2>Import localStorage-JSON</h2>
           <button

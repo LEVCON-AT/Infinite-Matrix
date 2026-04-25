@@ -543,13 +543,19 @@ const CardOverlay: Component<Props> = (p) => {
   }
 
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: Backdrop-Klick — Tastatur via ESC-Capture im onMount.
     <div
       class="overlay-scrim"
       onClick={(e) => {
         if (e.target === e.currentTarget) p.onClose();
       }}
     >
-      <div class="overlay-card card-overlay" role="dialog" aria-modal="true">
+      <div
+        class="overlay-card card-overlay"
+        // biome-ignore lint/a11y/useSemanticElements: <div role="dialog"> bewusst statt <dialog> — showModal() haette aufwendige Migration aller Modals zur Folge.
+        role="dialog"
+        aria-modal="true"
+      >
         <header class="overlay-head card-overlay-head">
           {/* Done-Toggle direkt links vom Namen — primaere Aktion auf
               einer Karte, soll immer auffindbar sein. Bei Recur heisst
@@ -800,7 +806,12 @@ const CardOverlay: Component<Props> = (p) => {
             <Show when={recurVal().type === 'weekly'}>
               <div class="card-recur-block">
                 <span class="card-recur-block-label">Wochentage</span>
-                <div class="card-recur-weekday-grid" role="group" aria-label="Wochentage">
+                <div
+                  class="card-recur-weekday-grid"
+                  // biome-ignore lint/a11y/useSemanticElements: bewusst <div role="group"> — <fieldset> wuerde Browser-Default-Border + Margin einfuegen.
+                  role="group"
+                  aria-label="Wochentage"
+                >
                   <For each={['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']}>
                     {(lbl, i) => {
                       const wd = i();
@@ -1093,6 +1104,7 @@ const CardOverlay: Component<Props> = (p) => {
                 <div
                   class="overlay-note-view"
                   classList={{ 'overlay-note-empty': !p.card.note }}
+                  // biome-ignore lint/a11y/useSemanticElements: bewusst <div role="button"> — Inhalt rendert <AliasText> mit klickbaren Chips, nested <button>-in-<button> waere invalid.
                   role="button"
                   tabIndex={0}
                   title="Klicken zum Bearbeiten"

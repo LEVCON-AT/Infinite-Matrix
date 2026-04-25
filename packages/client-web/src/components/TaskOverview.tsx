@@ -229,6 +229,7 @@ const TaskOverview: Component<Props> = (p) => {
                         />
                         <div
                           class="di-name-wrap"
+                          // biome-ignore lint/a11y/useSemanticElements: bewusst <div role="link"> — Inhalt enthaelt klickbare Alias-Chips (AliasText), nested <a>-in-<a> waere invalid; Tastatur-Bedienung via tabIndex + onKeyDown vorhanden.
                           role="link"
                           tabIndex={0}
                           onClick={() => openCard(card)}

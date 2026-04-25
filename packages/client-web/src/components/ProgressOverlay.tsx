@@ -19,7 +19,13 @@ const ProgressOverlay: Component = () => {
           return Math.min(100, Math.round((s.current / t) * 100));
         };
         return (
-          <div class="progress-scrim" role="status" aria-live="polite" aria-busy="true">
+          <div
+            class="progress-scrim"
+            // biome-ignore lint/a11y/useSemanticElements: bewusst <div role="status"> — Scrim ist eine Vollflaechen-Sperrkomponente, role status macht den Fortschritt fuer Screen-Reader announcement-faehig.
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+          >
             <div class="progress-card">
               <div class="progress-title">{state().title}</div>
               <div class="progress-phase">{state().phase}</div>

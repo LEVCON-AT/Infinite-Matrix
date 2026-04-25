@@ -258,6 +258,7 @@ const GlobalSearch: Component<Props> = (p) => {
   }
 
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: Backdrop-Klick zum Schliessen — Tastatur-Schliessen via globalem ESC-Capture-Handler im onMount.
     <div
       class="overlay-scrim global-search-scrim"
       onClick={(e) => {
@@ -266,6 +267,7 @@ const GlobalSearch: Component<Props> = (p) => {
     >
       <div
         class="overlay-card global-search-card"
+        // biome-ignore lint/a11y/useSemanticElements: bewusst <div role="dialog"> — native <dialog>-API erfordert showModal()-Refactor aller 10 Modals + neue Focus-Mechanik. ARIA-Modal-Pattern korrekt umgesetzt (role+aria-modal+Focus-Trap+Focus-Restore).
         role="dialog"
         aria-modal="true"
         aria-label="Suche im Workspace"
@@ -292,7 +294,12 @@ const GlobalSearch: Component<Props> = (p) => {
           </Show>
         </div>
 
-        <div class="global-search-body" role="listbox">
+        <div
+          class="global-search-body"
+          // biome-ignore lint/a11y/useSemanticElements: <div role="listbox"> — natives <select> kann Match-Sektionen + Badges + Multiline-Items nicht rendern.
+          role="listbox"
+          tabIndex={-1}
+        >
           <Show when={query().trim().length < 2}>
             <p class="global-search-hint">
               Mindestens 2 Zeichen eingeben. ↑↓ waehlen, Enter oeffnen, Esc schliessen.
@@ -311,11 +318,15 @@ const GlobalSearch: Component<Props> = (p) => {
                       const gIdx = () => globalIdxOf(r, flat());
                       const isSelected = () => gIdx() === selectedIdx();
                       return (
+                        // biome-ignore lint/a11y/useKeyWithClickEvents: Tastatur-Bedienung erfolgt im Input via onKeyDown (↑↓ Enter Esc) — Selektion wird programmatisch per setSelectedIdx + Enter dispatched.
                         <li
                           class="global-search-item"
                           classList={{ 'global-search-item-selected': isSelected() }}
+                          // biome-ignore lint/a11y/useSemanticElements: <li role="option"> in einer ARIA-Listbox; <option> ist nur in <select> valide.
+                          // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: ARIA-Listbox-Pattern.
                           role="option"
                           aria-selected={isSelected()}
+                          tabIndex={-1}
                           onMouseEnter={() => setSelectedIdx(gIdx())}
                           onClick={() => {
                             try {

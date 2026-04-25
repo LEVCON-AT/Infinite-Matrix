@@ -168,6 +168,8 @@ const FrequencyMatrix: Component<Props> = (p) => {
                         'padding-left': `${FREQ_INDENT_BASE + agg.depth * FREQ_INDENT_PER_LEVEL}px`,
                       }}
                       onClick={() => navigateToCell(agg)}
+                      // biome-ignore lint/a11y/useSemanticElements: th wirkt hier als Row-Header + Klick-Anker — <a> unter th wuerde Tabellen-Semantik (rowheader) zerstoeren. Tastatur-Bedienung via tabIndex + onKeyDown vorhanden.
+                      // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: bewusster Klick-Anker auf row-header; siehe Kommentar oberhalb.
                       role="link"
                       tabIndex={0}
                       onKeyDown={(e) => {
@@ -233,6 +235,7 @@ const FrequencyMatrix: Component<Props> = (p) => {
 
       <Show when={flyout()}>
         {(f) => (
+          // biome-ignore lint/a11y/useKeyWithClickEvents: Backdrop-Klick — Tastatur via ESC-Capture im onMount.
           <div
             class="overlay-scrim freq-flyout-scrim"
             onClick={(e) => {
@@ -241,6 +244,7 @@ const FrequencyMatrix: Component<Props> = (p) => {
           >
             <div
               class="overlay-card freq-flyout-card"
+              // biome-ignore lint/a11y/useSemanticElements: <div role="dialog"> bewusst statt <dialog> — showModal() haette aufwendige Migration aller Modals zur Folge.
               role="dialog"
               aria-modal="true"
               aria-label={f().title}

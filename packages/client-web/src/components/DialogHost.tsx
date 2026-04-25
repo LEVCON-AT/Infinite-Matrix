@@ -129,6 +129,7 @@ const DialogHost: Component = () => {
       {(accessor) => {
         const d = () => accessor();
         return (
+          // biome-ignore lint/a11y/useKeyWithClickEvents: Backdrop-Klick — Tastatur via ESC-Capture im onMount.
           <div
             class="overlay-scrim"
             onClick={(e) => {
@@ -138,6 +139,7 @@ const DialogHost: Component = () => {
             <div
               ref={cardRef}
               class="overlay-card dialog-card"
+              // biome-ignore lint/a11y/useSemanticElements: <div role="dialog"> bewusst statt <dialog> — showModal() haette aufwendige Migration aller Modals zur Folge.
               role="dialog"
               aria-modal="true"
               aria-label={d().title}
