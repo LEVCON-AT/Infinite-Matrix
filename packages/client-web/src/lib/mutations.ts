@@ -3,38 +3,31 @@
 //   - Fehler: Original-PostgrestError wird weitergeworfen, der Caller
 //     uebersetzt mit translateDbError() + showToast().
 //
-// Offline-Verhalten (Plan 0g.2d/e):
+// Offline-Verhalten (Plan 0g.2d/e/f):
 //   - Simple update/insert/delete-Operationen gehen durch run-
 //     OptimisticUpdate / -Insert / -Delete aus safe-mutation.ts. Online-
 //     Path identisch zu vorher, offline patcht der Wrapper den IDB-
 //     Cache + queued die Spec fuer Replay.
-//   - mutateCellData / mutateNodeData lesen offline aus dem Cache und
-//     schreiben ueber updateCell/runOptimisticUpdate — JSONB-Mutationen
-//     (info-Fields, cell-links, card-inline-checklist-items, node.data
-//     fuer Beschreibungen) sind damit ebenfalls offline-tauglich.
+//   - mutateCellData / mutateNodeData / readChecklistHistory lesen
+//     offline aus dem Cache und schreiben ueber wrapped updateCell /
+//     updateChecklist / runOptimisticUpdate — JSONB-Mutationen (info-
+//     Fields, cell-links, card-inline-checklist-items, node.data fuer
+//     Beschreibungen, checklists.history-Snapshots) sind ebenfalls
+//     offline-tauglich.
+//   - Multi-Step-Operationen (createChildMatrix/Board, addCellChecklist,
+//     createCardFromChecklist, moveCard/moveCardToBoard, applyChecklist-
+//     Close, bulkAddChecklistItems, restore*-Pfade) loesen sich offline
+//     in mehrere Queue-Specs auf, die in FIFO-Reihenfolge replay'd
+//     werden — der Server stellt die korrekte Sequenz wieder her.
 //
-// Bewusst NICHT offline-tauglich (V1):
-//   - createCardFromChecklist (Multi-Step Read+Insert mit FK-Beziehung)
-//   - addCellChecklist (Cell-Feature-Patch + Insert in einer Atomic-
-//     Erwartung)
-//   - createChildMatrix / createChildBoard (insert nodes + update cell-
-//     features in einem Schritt)
-//   - insertCell (Cell wird typisch lazy server-seitig angelegt)
-//   - delCellRow (Cascade-Side-Effects nicht client-seitig replay-fest)
-//   - saveChecklistSnapshot / applyChecklistClose / restore-
-//     ChecklistSnapshot / delChecklistSnapshot / bulkAddChecklistItems
-//     (JSONB-history-Mutationen — Read-Modify-Write mit Concurrency-
-//     Risiko offline + bei Replay)
-//   - restore*-Pfade (Undo-Helfer): re-INSERT von Snapshots, das
-//     Cascade-Replay ist nicht garantierbar offline
-//   - moveCard / moveCardToBoard (cross-Board): nutzen nextBoardPosition
-//     auf Server — beim Reconnect koennen Positionen kollidieren. Bleibt
-//     fail-fast offline; cross-column Drag innerhalb Board geht ueber
-//     setCardColAndPosition durch updateCard und ist offline ok.
-//
-// Diese Funktionen werfen offline NetworkError. Der Caller fängt
-// translateDbError() + Toast — der User sieht "offline, nicht
-// verfügbar" und kann es online erneut versuchen.
+// Bekannte Concurrency-Limits (online wie offline):
+//   - JSONB-history-Read-Modify-Write: zwei parallele Writer auf
+//     dieselbe checklists.history koennen sich gegenseitig ueber-
+//     schreiben. Single-User-Fall unkritisch; Multi-User-Konflikt
+//     wuerde durch Realtime-Refetch sichtbar.
+//   - Position-Kollisionen: mehrere Karten/Spalten koennen offline
+//     auf dieselbe position+1 landen. Realtime-Refetch beim ersten
+//     Online-Sync normalisiert die Reihenfolge.
 
 import { supabase } from './supabase';
 import {
@@ -331,13 +324,29 @@ export async function insertCell(args: {
     board_id: args.patch?.board_id ?? null,
     data: args.patch?.data ?? {},
   };
-  const { data, error } = await supabase
-    .from('cells')
-    .insert(payload)
-    .select()
-    .single();
-  if (error) throw error;
-  return data as CellRow;
+  return runOptimisticInsert<CellRow>({
+    table: 'cells',
+    workspaceId: args.workspaceId,
+    label: 'Zelle anlegen',
+    run: async () => {
+      const { data, error } = await supabase
+        .from('cells')
+        .insert(payload)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as CellRow;
+    },
+    buildOffline: (id) => {
+      const now = new Date().toISOString();
+      return {
+        id,
+        ...payload,
+        created_at: now,
+        updated_at: now,
+      } as unknown as CellRow;
+    },
+  });
 }
 
 export async function updateCell(cellId: string, patch: CellPatch): Promise<CellRow> {
@@ -363,14 +372,32 @@ export async function updateCell(cellId: string, patch: CellPatch): Promise<Cell
 }
 
 export async function delCellRow(cellId: string): Promise<void> {
-  const { error } = await supabase.from('cells').delete().eq('id', cellId);
-  if (error) throw error;
+  // Cascade-Side-Effects (Sub-Matrix/Board, Cell-Daten) liegen DB-
+  // seitig und werden beim Replay automatisch ausgefuehrt. Cache-
+  // Cleanup wird best-effort: nur die Cell-Row weg, Sub-Strukturen
+  // bleiben evtl. orphan im Cache bis zum naechsten online-Refetch.
+  await runOptimisticDelete({
+    table: 'cells',
+    id: cellId,
+    label: 'Zelle leeren',
+    run: async () => {
+      const { error } = await supabase.from('cells').delete().eq('id', cellId);
+      if (error) throw error;
+    },
+  });
 }
 
 // ─── Structural Sub-Nodes (Matrix / Board an Zelle) ────────────
 // Two-Step: nodes-INSERT + cells-UPSERT. Atomar wird das erst in 0e.2
 // als Postgres-RPC. Fuer 0e.1.b: sequenziell, bei Fehler im 2. Schritt
 // bleibt ein verwaister nodes-Eintrag — Toast informiert, Cleanup manuell.
+//
+// Offline (0g.2f): runOptimisticInsert legt den Node mit client-UUID
+// an und queued den Insert-Spec. Der zweite Schritt (Cell-Patch mit
+// child_matrix_id/board_id) laeuft ueber updateCell und ist bereits
+// gewrappt — er queued einen separaten Update-Spec. Replay laeuft
+// dann in FIFO: erst Node-Insert, dann Cell-Update. Der Cell-Patch
+// referenziert die client-UUID, die der Server beim Replay anlegt.
 
 async function createChildNode(args: {
   workspaceId: string;
@@ -378,19 +405,40 @@ async function createChildNode(args: {
   type: 'matrix' | 'board';
   label: string;
 }): Promise<NodeRow> {
-  const { data, error } = await supabase
-    .from('nodes')
-    .insert({
-      workspace_id: args.workspaceId,
-      type: args.type,
-      label: args.label,
-      parent_cell_id: args.parentCellId,
-      data: {},
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return data as NodeRow;
+  return runOptimisticInsert<NodeRow>({
+    table: 'nodes',
+    workspaceId: args.workspaceId,
+    label: args.type === 'matrix' ? 'Sub-Matrix anlegen' : 'Sub-Board anlegen',
+    run: async () => {
+      const { data, error } = await supabase
+        .from('nodes')
+        .insert({
+          workspace_id: args.workspaceId,
+          type: args.type,
+          label: args.label,
+          parent_cell_id: args.parentCellId,
+          data: {},
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as NodeRow;
+    },
+    buildOffline: (id) => {
+      const now = new Date().toISOString();
+      return {
+        id,
+        workspace_id: args.workspaceId,
+        type: args.type,
+        label: args.label,
+        alias: null,
+        parent_cell_id: args.parentCellId,
+        data: {},
+        created_at: now,
+        updated_at: now,
+      } as unknown as NodeRow;
+    },
+  });
 }
 
 export async function createChildMatrix(args: {
@@ -717,26 +765,66 @@ export async function createCardFromChecklist(args: {
   targetBoardId: string;
   targetColId: string;
 }): Promise<KbCardRow> {
-  const pos = await nextBoardPosition(
-    'kb_cards',
-    args.targetBoardId,
-    args.workspaceId,
-    { col_id: args.targetColId },
-  );
-  const { data, error } = await supabase
-    .from('kb_cards')
-    .insert({
-      workspace_id: args.workspaceId,
-      board_id: args.targetBoardId,
-      col_id: args.targetColId,
-      name: args.name,
-      position: pos,
-      checklist_ref: args.checklistId,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return data as KbCardRow;
+  return runOptimisticInsert<KbCardRow>({
+    table: 'kb_cards',
+    workspaceId: args.workspaceId,
+    label: 'Karte aus Checkliste',
+    run: async () => {
+      const pos = await nextBoardPosition(
+        'kb_cards',
+        args.targetBoardId,
+        args.workspaceId,
+        { col_id: args.targetColId },
+      );
+      const { data, error } = await supabase
+        .from('kb_cards')
+        .insert({
+          workspace_id: args.workspaceId,
+          board_id: args.targetBoardId,
+          col_id: args.targetColId,
+          name: args.name,
+          position: pos,
+          checklist_ref: args.checklistId,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as KbCardRow;
+    },
+    buildOffline: async (id) => {
+      const pos = await nextPositionFromCache(
+        'kb_cards',
+        args.workspaceId,
+        (r) => r.board_id === args.targetBoardId && r.col_id === args.targetColId,
+      );
+      const now = new Date().toISOString();
+      return {
+        id,
+        workspace_id: args.workspaceId,
+        board_id: args.targetBoardId,
+        col_id: args.targetColId,
+        name: args.name,
+        note: '',
+        tags: [],
+        who: [],
+        deadline: null,
+        priority: null,
+        done: false,
+        archived: false,
+        recur: null,
+        position: pos,
+        alias: null,
+        source_cl_id: null,
+        source_label: null,
+        checklist_ref: args.checklistId,
+        checklist: null,
+        color: null,
+        done_occurrences: [],
+        created_at: now,
+        updated_at: now,
+      } as unknown as KbCardRow;
+    },
+  });
 }
 
 type CardPatch = Partial<
@@ -899,20 +987,28 @@ export async function moveCard(args: {
   workspaceId: string;
   toColId: string;
 }): Promise<KbCardRow> {
-  const pos = await nextBoardPosition(
-    'kb_cards',
-    args.boardId,
-    args.workspaceId,
-    { col_id: args.toColId },
-  );
-  const { data, error } = await supabase
-    .from('kb_cards')
-    .update({ col_id: args.toColId, position: pos })
-    .eq('id', args.cardId)
-    .select()
-    .single();
-  if (error) throw error;
-  return data as KbCardRow;
+  // Online: nextBoardPosition vom Server fuer korrektes Anhaengen.
+  // Offline: nextPositionFromCache liefert das letzte gecachte
+  // Maximum +1. Position-Konflikte bei Replay sind moeglich (zwei
+  // Karten landen evtl. gleich), aber Realtime-Refetch normalisiert.
+  // Updates gehen durch updateCard → runOptimisticUpdate.
+  let pos: number;
+  try {
+    pos = await nextBoardPosition(
+      'kb_cards',
+      args.boardId,
+      args.workspaceId,
+      { col_id: args.toColId },
+    );
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    pos = await nextPositionFromCache(
+      'kb_cards',
+      args.workspaceId,
+      (r) => r.board_id === args.boardId && r.col_id === args.toColId,
+    );
+  }
+  return updateCard(args.cardId, { col_id: args.toColId, position: pos });
 }
 
 export async function setCardPosition(
@@ -944,11 +1040,10 @@ export async function moveCardToBoard(
   toColId: string,
   position: number,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('kb_cards')
-    .update({ board_id: toBoardId, col_id: toColId, position })
-    .eq('id', cardId);
-  if (error) throw error;
+  // Geht durch updateCard, weil CardPatch board_id/col_id/position
+  // alle drei kennt — damit ist die Cross-Board-Verschiebung offline-
+  // tauglich identisch zu setCardColAndPosition.
+  await updateCard(cardId, { board_id: toBoardId, col_id: toColId, position });
 }
 
 export async function delCard(cardId: string): Promise<void> {
@@ -1047,23 +1142,53 @@ export async function addCellChecklist(args: {
   cellId: string;
   label?: string;
 }): Promise<ChecklistRow> {
-  const pos = await nextCellChecklistPosition(args.cellId, args.workspaceId);
-  const { data, error } = await supabase
-    .from('checklists')
-    .insert({
-      workspace_id: args.workspaceId,
-      cell_id: args.cellId,
-      label: args.label ?? '',
-      position: pos,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return data as ChecklistRow;
+  return runOptimisticInsert<ChecklistRow>({
+    table: 'checklists',
+    workspaceId: args.workspaceId,
+    label: 'Zellen-Checkliste anlegen',
+    run: async () => {
+      const pos = await nextCellChecklistPosition(args.cellId, args.workspaceId);
+      const { data, error } = await supabase
+        .from('checklists')
+        .insert({
+          workspace_id: args.workspaceId,
+          cell_id: args.cellId,
+          label: args.label ?? '',
+          position: pos,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as ChecklistRow;
+    },
+    buildOffline: async (id) => {
+      const pos = await nextPositionFromCache(
+        'checklists',
+        args.workspaceId,
+        (r) => r.cell_id === args.cellId,
+      );
+      const now = new Date().toISOString();
+      return {
+        id,
+        workspace_id: args.workspaceId,
+        board_id: null,
+        cell_id: args.cellId,
+        label: args.label ?? '',
+        position: pos,
+        recur: null,
+        close_mode: null,
+        action: null,
+        history: null,
+        alias: null,
+        created_at: now,
+        updated_at: now,
+      } as unknown as ChecklistRow;
+    },
+  });
 }
 
 type ChecklistPatch = Partial<
-  Pick<ChecklistRow, 'label' | 'alias' | 'close_mode'>
+  Pick<ChecklistRow, 'label' | 'alias' | 'close_mode' | 'recur' | 'action' | 'history'>
 >;
 
 async function updateChecklist(
@@ -1194,34 +1319,52 @@ export async function addChecklistItem(args: {
 // Parameter items: der aktuelle Item-Stand, wie ihn das ChecklistPanel
 // kennt. Wir speichern nur {text, done, level} — position ist fuer
 // Snapshots irrelevant (die Reihenfolge folgt dem uebergebenen Array).
+// Liest checklists.history mit Offline-Fallback aus dem Cache. Wird
+// von saveChecklistSnapshot/delChecklistSnapshot/restoreChecklist-
+// Snapshot benutzt, damit alle drei JSONB-history-Mutationen konsistent
+// online wie offline laufen. Concurrency-Hinweis: zwei parallele
+// Writer auf dieselbe history verlieren einen Snapshot — dieses
+// Risiko existiert online wie offline; akzeptiert.
+async function readChecklistHistory(
+  checklistId: string,
+  workspaceId: string,
+): Promise<Array<Record<string, unknown>>> {
+  try {
+    const { data: cur, error: readErr } = await supabase
+      .from('checklists')
+      .select('history')
+      .eq('id', checklistId)
+      .eq('workspace_id', workspaceId)
+      .single();
+    if (readErr) throw readErr;
+    return Array.isArray((cur as { history: unknown[] } | null)?.history)
+      ? ((cur as { history: unknown[] }).history as Array<Record<string, unknown>>)
+      : [];
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const cached = await getById<ChecklistRow>('checklists', checklistId);
+    if (!cached) throw err;
+    const h = (cached as { history?: unknown }).history;
+    return Array.isArray(h) ? (h as Array<Record<string, unknown>>) : [];
+  }
+}
+
 export async function saveChecklistSnapshot(args: {
   workspaceId: string;
   checklistId: string;
   items: Array<{ text: string; done: boolean; level: 0 | 1 | 2 }>;
 }): Promise<void> {
-  // Current history lesen.
-  const { data: cur, error: readErr } = await supabase
-    .from('checklists')
-    .select('history')
-    .eq('id', args.checklistId)
-    .eq('workspace_id', args.workspaceId)
-    .single();
-  if (readErr) throw readErr;
-  const history = Array.isArray((cur as { history: unknown[] } | null)?.history)
-    ? ((cur as { history: unknown[] }).history as Array<Record<string, unknown>>)
-    : [];
-
+  const history = await readChecklistHistory(args.checklistId, args.workspaceId);
   const snapshot = {
     closedAt: new Date().toISOString(),
     items: args.items.map((it) => ({ text: it.text, done: it.done, level: it.level })),
   };
   const next = [snapshot, ...history];
-
-  const { error: upErr } = await supabase
-    .from('checklists')
-    .update({ history: next })
-    .eq('id', args.checklistId);
-  if (upErr) throw upErr;
+  // Write durch updateChecklist (gewrappt) — JSONB-history-Update geht
+  // damit offline durch denselben Optimistic-Cache-Patch.
+  await updateChecklist(args.checklistId, {
+    history: next as unknown as ChecklistRow['history'],
+  });
 }
 
 // checklist.action als jsonb setzen (oder NULL bei type='none'). Der
@@ -1262,21 +1405,45 @@ export async function applyChecklistClose(args: {
   checklistId: string;
   recurring: boolean;
 }): Promise<void> {
-  if (args.recurring) {
+  // Online: ein einziger Bulk-Update / -Delete. Offline: pro-Item
+  // ueber den gewrappten updateItem / runOptimisticDelete — damit
+  // landet jede Aenderung als eigene Spec in der Queue. Etwas mehr
+  // Roundtrips, dafuer komplett offline-tauglich.
+  try {
+    if (args.recurring) {
+      const { error } = await supabase
+        .from('checklist_items')
+        .update({ done: false })
+        .eq('checklist_id', args.checklistId)
+        .eq('workspace_id', args.workspaceId);
+      if (error) throw error;
+      return;
+    }
     const { error } = await supabase
       .from('checklist_items')
-      .update({ done: false })
+      .delete()
       .eq('checklist_id', args.checklistId)
       .eq('workspace_id', args.workspaceId);
     if (error) throw error;
-    return;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    // Offline-Fallback: aus dem Cache die Items dieser Liste ziehen
+    // und einzeln durch den Wrapper schicken.
+    const items = await getByWorkspace<ChecklistItemRow>(
+      'checklist_items',
+      args.workspaceId,
+    );
+    const own = items.filter((it) => it.checklist_id === args.checklistId);
+    if (args.recurring) {
+      for (const it of own) {
+        if (it.done) await updateItem(it.id, { done: false });
+      }
+    } else {
+      for (const it of own) {
+        await delChecklistItem(it.id);
+      }
+    }
   }
-  const { error } = await supabase
-    .from('checklist_items')
-    .delete()
-    .eq('checklist_id', args.checklistId)
-    .eq('workspace_id', args.workspaceId);
-  if (error) throw error;
 }
 
 // Einzelnen Snapshot aus der History entfernen (identifiziert per
@@ -1287,22 +1454,11 @@ export async function delChecklistSnapshot(args: {
   checklistId: string;
   closedAt: string;
 }): Promise<void> {
-  const { data: cur, error: readErr } = await supabase
-    .from('checklists')
-    .select('history')
-    .eq('id', args.checklistId)
-    .eq('workspace_id', args.workspaceId)
-    .single();
-  if (readErr) throw readErr;
-  const history = Array.isArray((cur as { history: unknown[] } | null)?.history)
-    ? ((cur as { history: unknown[] }).history as Array<Record<string, unknown>>)
-    : [];
+  const history = await readChecklistHistory(args.checklistId, args.workspaceId);
   const next = history.filter((s) => s.closedAt !== args.closedAt);
-  const { error: upErr } = await supabase
-    .from('checklists')
-    .update({ history: next })
-    .eq('id', args.checklistId);
-  if (upErr) throw upErr;
+  await updateChecklist(args.checklistId, {
+    history: next as unknown as ChecklistRow['history'],
+  });
 }
 
 // Undo-Pendant zu delChecklistSnapshot: einzelnen Snapshot wieder in
@@ -1315,23 +1471,12 @@ export async function restoreChecklistSnapshot(args: {
   checklistId: string;
   snapshot: { closedAt: string; items: unknown[] };
 }): Promise<void> {
-  const { data: cur, error: readErr } = await supabase
-    .from('checklists')
-    .select('history')
-    .eq('id', args.checklistId)
-    .eq('workspace_id', args.workspaceId)
-    .single();
-  if (readErr) throw readErr;
-  const history = Array.isArray((cur as { history: unknown[] } | null)?.history)
-    ? ((cur as { history: unknown[] }).history as Array<Record<string, unknown>>)
-    : [];
+  const history = await readChecklistHistory(args.checklistId, args.workspaceId);
   if (history.some((s) => s.closedAt === args.snapshot.closedAt)) return;
   const next = [args.snapshot as unknown as Record<string, unknown>, ...history];
-  const { error: upErr } = await supabase
-    .from('checklists')
-    .update({ history: next })
-    .eq('id', args.checklistId);
-  if (upErr) throw upErr;
+  await updateChecklist(args.checklistId, {
+    history: next as unknown as ChecklistRow['history'],
+  });
 }
 
 // Bulk-Insert mehrerer Items am Ende der Checkliste. Wird vom Paste-
@@ -1344,20 +1489,38 @@ export async function bulkAddChecklistItems(args: {
   items: Array<{ text: string; level: 0 | 1 | 2 }>;
 }): Promise<ChecklistItemRow[]> {
   if (args.items.length === 0) return [];
-  const startPos = await nextItemPosition(args.checklistId, args.workspaceId);
-  const payload = args.items.map((it, i) => ({
-    workspace_id: args.workspaceId,
-    checklist_id: args.checklistId,
-    text: it.text,
-    level: it.level,
-    position: startPos + i,
-  }));
-  const { data, error } = await supabase
-    .from('checklist_items')
-    .insert(payload)
-    .select();
-  if (error) throw error;
-  return (data ?? []) as ChecklistItemRow[];
+  // Online: ein Bulk-Insert (1 Roundtrip). Offline: pro-Item ueber
+  // addChecklistItem (gewrappt). Bei grossen Pastes ist das mehr
+  // Queue-Last, aber jede Insert-Spec ist atomar replay-bar.
+  try {
+    const startPos = await nextItemPosition(args.checklistId, args.workspaceId);
+    const payload = args.items.map((it, i) => ({
+      workspace_id: args.workspaceId,
+      checklist_id: args.checklistId,
+      text: it.text,
+      level: it.level,
+      position: startPos + i,
+    }));
+    const { data, error } = await supabase
+      .from('checklist_items')
+      .insert(payload)
+      .select();
+    if (error) throw error;
+    return (data ?? []) as ChecklistItemRow[];
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const out: ChecklistItemRow[] = [];
+    for (const it of args.items) {
+      const row = await addChecklistItem({
+        workspaceId: args.workspaceId,
+        checklistId: args.checklistId,
+        text: it.text,
+        level: it.level,
+      });
+      out.push(row);
+    }
+    return out;
+  }
 }
 
 type ItemPatch = Partial<Pick<ChecklistItemRow, 'text' | 'done' | 'level' | 'position'>>;
@@ -1888,6 +2051,11 @@ type AnyRow = Record<string, unknown>;
 // Generisches re-INSERT. Entfernt timestamp-Felder damit der Server
 // sie neu vergibt (Undo-Zeitpunkt soll neuer Stand sein, nicht der
 // alte). Alle anderen Felder inkl. id landen zurueck.
+//
+// Offline (0g.2f): laeuft durch runOptimisticInsert. Die snapshot-id
+// wird beibehalten (kein crypto.randomUUID, weil Undo per Definition
+// die alte id zurueckhaben muss). buildOffline ignoriert das id-
+// Argument und nimmt den Snapshot wie er ist — Cache-Sync klappt.
 async function restoreRow(
   table:
     | 'kb_cards'
@@ -1903,8 +2071,33 @@ async function restoreRow(
   const clean = { ...row };
   delete clean.created_at;
   delete clean.updated_at;
-  const { error } = await supabase.from(table).insert(clean);
-  if (error) throw error;
+  const wsId = (clean.workspace_id as string) ?? '';
+  if (!wsId) {
+    // Snapshot ohne workspace_id (sollte nicht vorkommen) — direkt
+    // einreichen, ohne Queue-Scope koennen wir nicht arbeiten.
+    const { error } = await supabase.from(table).insert(clean);
+    if (error) throw error;
+    return;
+  }
+  await runOptimisticInsert({
+    table,
+    workspaceId: wsId,
+    label: 'Wiederherstellen',
+    run: async () => {
+      const { data, error } = await supabase
+        .from(table)
+        .insert(clean)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as { id: string; workspace_id: string };
+    },
+    // Snapshot als Synth-Row direkt zurueckgeben — der Caller
+    // hat die echte id (= snapshot.id), wir koennen sie 1:1
+    // weiterreichen, der Server akzeptiert die explizite id beim
+    // Insert (wie schon vorher).
+    buildOffline: () => clean as unknown as { id: string; workspace_id: string },
+  });
 }
 
 export async function restoreCard(snapshot: KbCardRow): Promise<void> {
