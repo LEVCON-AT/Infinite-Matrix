@@ -522,3 +522,31 @@ Sub-Sprint-Granularität wie in V2: ein Sprint = ein abgeschlossener Meilenstein
 4. **Staging-Umgebung**: zweiter VPS für Staging-Tests, oder separate Postgres-DB auf demselben VPS mit eigener Subdomain? Betrifft 0a.
 
 Offen → in Kick-Off-Session zu Phase 0a klären.
+
+---
+
+## Phase-0-Abschluss + Audit-Welle (2026-04-25)
+
+Phase 0 ist nach ~141 Commits abgeschlossen, Multi-User-Live-Verify durch (admin@levcon.at + albi.enric@gmail.com mit Cross-Membership). Die `feat/backend-phase-0`-Arbeit ist via `--no-ff`-Merge `2084676` lokal in `main` integriert (push pendet, Audit-Welle läuft durchstartet).
+
+Vor Phase 1 wurde eine Audit-Welle eingelegt — drei Hygiene-Sprints (Q1–Q3) und sechs tiefere Audit-Sprints (A1–A6) entlang `docs/claude/`-Standards:
+
+| Sprint | Output |
+|---|---|
+| AU-Q1 / Q2 / Q3 | Code-Hygiene Quick-Wins, Alias-Index dedupliziert, JSONB-Reader zentralisiert |
+| AU-A1 | [`docs/audit/A1-rollen-findings.md`](audit/A1-rollen-findings.md) — 7 Rollen-Reviews |
+| AU-A2 | [`docs/audit/A2-asvs-verify-report.md`](audit/A2-asvs-verify-report.md) — ASVS-L2 + CORS-URL-Validation |
+| AU-A3 | WCAG-AA Pass: Focus-Trap (`lib/dialog.ts:installFocusTrap`), `--text2`-Kontrast 4.7:1, `aria-modal` in 4 Modals |
+| AU-A4 | [`docs/audit/A4-style-findings.md`](audit/A4-style-findings.md) — Style-Konvention-Audit |
+| AU-A5 | [`docs/audit/A5-checklist-luecken.md`](audit/A5-checklist-luecken.md) — 14/14 Audit-Commits trigger-konform |
+| AU-A6 | Doku-Sync (CLAUDE.md + plan-backend-phase-0.md + claude/styles.md) |
+
+**Findings als Follow-up-Mini-Sprints festgehalten** (siehe `A4-style-findings.md`):
+- AU-A4.1: `noNonNullAssertion`-Sweep (~116 Stellen, ~2h)
+- AU-A4.2: a11y-Sweep (~64 Lint-Errors, ~2h)
+- AU-A4.3: Focus-Restore-Helper konsolidieren (~10 Modals, ~1h)
+- AU-A4.4: restliche Lint-Quick-Wins + `--fs-base`/`--fs-small`-Tokens (~30 min)
+
+Diese sind kein Phase-0-Blocker, sondern Eintritts-Karte für Phase 1.
+
+**Phase-0-Erfolgs-Kriterien:** 8 von 9 grün, #8 (automatisches Backup + Restore-Test) deferred per User („kein Produktivbetrieb"). Siehe `~/.claude/projects/.../memory/project_phase0_status.md`.

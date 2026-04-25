@@ -108,6 +108,7 @@ Diese Datei (CLAUDE.md) ist der **Single Entry Point**: Projektidentität, Arbei
 |---|---|---|
 | Bridge-Deployment-Plan | `docs/plan-bridge.md` | Bei Bridge-/VPS-Arbeit, besonders Phase 2+ |
 | Backend-Phase-0-Plan | `docs/plan-backend-phase-0.md` | Bei client-web/Supabase-Arbeit |
+| Pre-Phase-1-Audit-Reports | `docs/audit/A1..A5-*.md` | Bei Frage „was wurde im Audit 2026-04-25 gefunden / wie wurde es behoben" |
 | MCP-Tool-Beispiele | `packages/bridge/src/tools/*.ts` | Als Pattern beim Neubau |
 | Client-Handler-Patterns | `packages/client-standalone/matrix.html` — suche `MATRIX_TOOLS={` | Beim Hinzufügen neuer Tool-Handler |
 | nginx/systemd-Config | `infra/nginx/matrix.conf`, `infra/systemd/matrix-bridge.service` | Bei Deploy/Infra-Arbeit |
