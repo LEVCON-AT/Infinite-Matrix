@@ -54,9 +54,20 @@ function writeWorkspacesToLS(rows: WorkspaceWithRole[]): void {
 
 export async function fetchMyWorkspaces(): Promise<WorkspaceWithRole[]> {
   try {
+    // user_id-Filter explizit setzen — die memberships_select-RLS-
+    // Policy zeigt allen Workspace-Members auch die anderen
+    // Memberships im selben Workspace ("wer ist sonst noch da"). Hier
+    // wollen wir aber nur die EIGENEN Memberships, sonst doppeln sich
+    // Workspaces im Switcher (siehe 2026-04-25-Bug).
+    const { data: userData, error: userErr } = await supabase.auth.getUser();
+    if (userErr) throw userErr;
+    const userId = userData.user?.id;
+    if (!userId) throw new Error('Keine aktive Auth-Session.');
+
     const { data, error } = await supabase
       .from('memberships')
       .select('role, workspace:workspaces(*)')
+      .eq('user_id', userId)
       .order('role', { ascending: true });
 
     if (error) throw error;
