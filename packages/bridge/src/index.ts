@@ -41,10 +41,7 @@ function sanitizeCorsAllowlist(raw: string): string[] {
       try {
         const u = new URL(origin);
         if (u.protocol !== 'http:' && u.protocol !== 'https:') {
-          app.log.warn(
-            'CORS_ORIGINS: Eintrag "%s" mit nicht-http(s)-Schema ignoriert',
-            origin,
-          );
+          app.log.warn('CORS_ORIGINS: Eintrag "%s" mit nicht-http(s)-Schema ignoriert', origin);
           return false;
         }
         // URL("https://x.com/").origin === "https://x.com" — nur das
@@ -66,9 +63,7 @@ function sanitizeCorsAllowlist(raw: string): string[] {
       }
     });
 }
-const corsOrigins = config.CORS_ORIGINS
-  ? sanitizeCorsAllowlist(config.CORS_ORIGINS)
-  : null;
+const corsOrigins = config.CORS_ORIGINS ? sanitizeCorsAllowlist(config.CORS_ORIGINS) : null;
 // origin-Logik: Allowlist wenn gepflegt; sonst Prod=false (Lockdown),
 // Dev=true (reflektiv fuer localhost-Workflow).
 const corsOrigin =

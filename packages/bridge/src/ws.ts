@@ -3,8 +3,9 @@ import websocket from '@fastify/websocket';
 import type { FastifyInstance } from 'fastify';
 import type { Config } from './config.js';
 import { flushDb, getDb } from './db.js';
-import { type BridgeMsg, clientMsgSchema } from './protocol.js';
+import { type BridgeMsg, type ClientMsg, clientMsgSchema } from './protocol.js';
 import {
+  type Session,
   clearSession,
   createSession,
   getSession,
@@ -13,6 +14,87 @@ import {
   resolveToolCall,
 } from './state/session.js';
 import { storeSnapshot } from './state/snapshot.js';
+
+type Logger = FastifyInstance['log'];
+type Socket = import('@fastify/websocket').WebSocket;
+
+// Parsen + Schema-Validierung in einem Schritt. Bei Fehler wird der
+// Client per notice informiert und null zurueckgegeben — Caller bricht
+// dann ab.
+function parseAndValidate(raw: Buffer | string, socket: Socket, log: Logger): ClientMsg | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(String(raw));
+  } catch {
+    sendMsg(socket, { type: 'notice', level: 'error', message: 'Ungültiges JSON' });
+    return null;
+  }
+  const result = clientMsgSchema.safeParse(parsed);
+  if (!result.success) {
+    log.warn({ errors: result.error.issues }, 'Ungültige Client-Nachricht');
+    sendMsg(socket, {
+      type: 'notice',
+      level: 'warn',
+      message: `Ungültige Nachricht: ${result.error.issues[0]?.message}`,
+    });
+    return null;
+  }
+  return result.data;
+}
+
+// Erste Nachricht muss type:'hello' sein. Erfolgreiche Initialisierung
+// signalisiert der Caller via Rueckgabewert true.
+function tryEstablishSession(msg: ClientMsg, socket: Socket, log: Logger): boolean {
+  if (msg.type !== 'hello') {
+    sendMsg(socket, {
+      type: 'notice',
+      level: 'error',
+      message: 'Erste Nachricht muss type:hello sein',
+    });
+    socket.close(4003, 'Expected hello');
+    return false;
+  }
+  const sessionId = randomUUID();
+  createSession(sessionId, msg.clientId, socket, msg.protocolVersion);
+  const db = getDb();
+  db.run('INSERT INTO sessions (id, client_id, protocol_version) VALUES (?, ?, ?)', [
+    sessionId,
+    msg.clientId,
+    msg.protocolVersion,
+  ]);
+  flushDb();
+  log.info({ sessionId, clientId: msg.clientId }, 'Client verbunden');
+  sendMsg(socket, { type: 'hello.ack', sessionId, serverVersion: '0.1.0' });
+  sendMsg(socket, { type: 'state.request' });
+  return true;
+}
+
+// Post-Hello-Dispatch. Switch ist hier isoliert, damit der message-
+// Handler oben unter dem Komplexitaets-Limit bleibt (biome:
+// noExcessiveCognitiveComplexity).
+function dispatchClientMsg(msg: ClientMsg, session: Session, log: Logger): void {
+  switch (msg.type) {
+    case 'snapshot':
+      storeSnapshot(session.id, msg.version, msg.payload);
+      session.snapshotVersion = msg.version;
+      log.debug({ version: msg.version }, 'Snapshot empfangen');
+      break;
+    case 'tool.result':
+      resolveToolCall(msg.callId, msg.result);
+      log.debug({ callId: msg.callId }, 'Tool-Result empfangen');
+      break;
+    case 'tool.error':
+      rejectToolCall(msg.callId, new Error(msg.error.message));
+      log.warn({ callId: msg.callId, error: msg.error }, 'Tool-Error empfangen');
+      break;
+    case 'pong':
+      log.trace({ seq: msg.seq }, 'Pong empfangen');
+      break;
+    case 'hello':
+      // Doppeltes Hello ignorieren — Session laeuft bereits.
+      break;
+  }
+}
 
 export async function registerWs(app: FastifyInstance, config: Config): Promise<void> {
   await app.register(websocket);
@@ -44,92 +126,15 @@ export async function registerWs(app: FastifyInstance, config: Config): Promise<
     let helloReceived = false;
 
     socket.on('message', (raw: Buffer | string) => {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(String(raw));
-      } catch {
-        sendMsg(socket, { type: 'notice', level: 'error', message: 'Ungültiges JSON' });
-        return;
-      }
-
-      const result = clientMsgSchema.safeParse(parsed);
-      if (!result.success) {
-        app.log.warn({ errors: result.error.issues }, 'Ungültige Client-Nachricht');
-        sendMsg(socket, {
-          type: 'notice',
-          level: 'warn',
-          message: `Ungültige Nachricht: ${result.error.issues[0]?.message}`,
-        });
-        return;
-      }
-
-      const msg = result.data;
-
+      const msg = parseAndValidate(raw, socket, app.log);
+      if (!msg) return;
       if (!helloReceived) {
-        if (msg.type !== 'hello') {
-          sendMsg(socket, {
-            type: 'notice',
-            level: 'error',
-            message: 'Erste Nachricht muss type:hello sein',
-          });
-          socket.close(4003, 'Expected hello');
-          return;
-        }
-
-        helloReceived = true;
-        const sessionId = randomUUID();
-        createSession(sessionId, msg.clientId, socket, msg.protocolVersion);
-
-        // Session in DB loggen
-        const db = getDb();
-        db.run('INSERT INTO sessions (id, client_id, protocol_version) VALUES (?, ?, ?)', [
-          sessionId,
-          msg.clientId,
-          msg.protocolVersion,
-        ]);
-        flushDb();
-
-        app.log.info({ sessionId, clientId: msg.clientId }, 'Client verbunden');
-
-        sendMsg(socket, {
-          type: 'hello.ack',
-          sessionId,
-          serverVersion: '0.1.0',
-        });
-
-        // Sofort Snapshot anfordern
-        sendMsg(socket, { type: 'state.request' });
+        helloReceived = tryEstablishSession(msg, socket, app.log);
         return;
       }
-
       const session = getSession();
       if (!session) return;
-
-      switch (msg.type) {
-        case 'snapshot':
-          storeSnapshot(session.id, msg.version, msg.payload);
-          session.snapshotVersion = msg.version;
-          app.log.debug({ version: msg.version }, 'Snapshot empfangen');
-          break;
-
-        case 'tool.result':
-          resolveToolCall(msg.callId, msg.result);
-          app.log.debug({ callId: msg.callId }, 'Tool-Result empfangen');
-          break;
-
-        case 'tool.error':
-          rejectToolCall(msg.callId, new Error(msg.error.message));
-          app.log.warn({ callId: msg.callId, error: msg.error }, 'Tool-Error empfangen');
-          break;
-
-        case 'pong':
-          app.log.trace({ seq: msg.seq }, 'Pong empfangen');
-          break;
-
-        case 'hello':
-          // Doppeltes Hello ignorieren
-          break;
-      }
+      dispatchClientMsg(msg, session, app.log);
     });
 
     socket.on('close', () => {
