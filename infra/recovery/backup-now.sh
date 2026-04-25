@@ -36,7 +36,9 @@ die() {
 }
 
 check_deps() {
-  for bin in docker zstd tar pg_isready sqlite3; do
+  # pg_dump laeuft IN dem Postgres-Container via `docker compose exec`,
+  # daher braucht der Host pg_isready/pg_dump NICHT.
+  for bin in docker zstd tar sqlite3; do
     command -v "$bin" >/dev/null 2>&1 || die "missing dep: $bin" 2
   done
 }
