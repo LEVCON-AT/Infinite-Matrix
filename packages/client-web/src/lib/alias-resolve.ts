@@ -49,6 +49,11 @@ export async function resolveAlias(
   if (!fmt.ok) return { ok: false, msg: fmt.msg };
   if (!fmt.canonical) return { ok: false, msg: 'Alias ist leer.' };
   const a = fmt.canonical;
+  // Wildcard-Hinweis: `a` ist garantiert ALIAS_RE-konform (^[a-z0-9]+$),
+  // weil validateAliasFormat strikt durchfiltert. Damit sind die
+  // ilike()-Queries unten ohne escape sicher — '%' und '_' koennen
+  // nicht reinrutschen. Wenn jemand spaeter den Eingangs-Path lockert,
+  // muss hier ein Wildcard-Escape rein.
 
   const [nodes, cells, cards, checklists, links, docs] = await Promise.all([
     supabase

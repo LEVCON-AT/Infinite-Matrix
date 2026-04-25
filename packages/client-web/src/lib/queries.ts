@@ -18,71 +18,143 @@ import type {
   TreeNode,
   WorkspaceWithRole,
 } from './types';
+import { getById, getByWorkspace, mergeRows, withCache } from './offline-cache';
+import { markCacheFallback, markLiveSuccess } from './offline-state';
+import { isNetworkError } from './mutation-queue';
 
 // ─── Workspaces ──────────────────────────────────────────────────
 // Gibt alle Workspaces zurueck, in denen der aktuelle User Mitglied ist.
 // RLS-Query: memberships.user_id = auth.uid() greift automatisch.
+//
+// Offline-Cache: localStorage statt IDB — die Liste ist klein, aendert
+// sich selten, und wir brauchen sie schon beim ersten Render (vor IDB-
+// open). LS reicht voellig.
+const WS_LIST_LS_KEY = 'matrix:workspaces:cache';
+
+function readWorkspacesFromLS(): WorkspaceWithRole[] | null {
+  try {
+    const raw = localStorage.getItem(WS_LIST_LS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return null;
+    return parsed as WorkspaceWithRole[];
+  } catch {
+    return null;
+  }
+}
+
+function writeWorkspacesToLS(rows: WorkspaceWithRole[]): void {
+  try {
+    localStorage.setItem(WS_LIST_LS_KEY, JSON.stringify(rows));
+  } catch {
+    // Quota oder Disabled-Storage — schlucken, der Online-Pfad
+    // funktioniert weiter.
+  }
+}
+
 export async function fetchMyWorkspaces(): Promise<WorkspaceWithRole[]> {
-  const { data, error } = await supabase
-    .from('memberships')
-    .select('role, workspace:workspaces(*)')
-    .order('role', { ascending: true });
+  try {
+    const { data, error } = await supabase
+      .from('memberships')
+      .select('role, workspace:workspaces(*)')
+      .order('role', { ascending: true });
 
-  if (error) throw error;
-  if (!data) return [];
+    if (error) throw error;
 
-  return data
-    .filter((m) => m.workspace != null)
-    .map((m) => {
-      const ws = m.workspace as unknown as {
-        id: string;
-        name: string;
-        owner_id: string;
-        created_at: string;
-        updated_at: string;
-      };
-      return { ...ws, role: m.role };
-    });
+    const rows = (data ?? [])
+      .filter((m) => m.workspace != null)
+      .map((m) => {
+        const ws = m.workspace as unknown as {
+          id: string;
+          name: string;
+          owner_id: string;
+          created_at: string;
+          updated_at: string;
+        };
+        return { ...ws, role: m.role };
+      });
+    writeWorkspacesToLS(rows);
+    markLiveSuccess();
+    return rows;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const cached = readWorkspacesFromLS();
+    if (!cached || cached.length === 0) throw err;
+    markCacheFallback();
+    return cached;
+  }
 }
 
 // ─── Nodes + Cells fuer Tree-Aufbau ──────────────────────────────
-export async function fetchNodesForWorkspace(workspaceId: string): Promise<NodeRow[]> {
-  const { data, error } = await supabase
-    .from('nodes')
-    .select('*')
-    .eq('workspace_id', workspaceId)
-    .order('created_at', { ascending: true });
+//
+// Alle vier workspace-weiten Fetches laufen durch withCache: bei
+// Erfolg wandern die Rows in den IDB-Store, bei Netz-Fehler liefert
+// der Cache die zuletzt bekannten Daten. Das hebt den Sidebar-Tree +
+// Stack-Navigation auch offline.
+async function cachedList<T extends { id: string; workspace_id: string }>(
+  table:
+    | 'nodes'
+    | 'cells'
+    | 'rows'
+    | 'cols'
+    | 'kb_cols'
+    | 'kb_cards'
+    | 'checklists'
+    | 'checklist_items'
+    | 'links'
+    | 'docs',
+  workspaceId: string,
+  fetch: () => Promise<T[]>,
+): Promise<T[]> {
+  const res = await withCache<T>(table, workspaceId, fetch);
+  if (res.fromCache) markCacheFallback();
+  else markLiveSuccess();
+  return res.rows;
+}
 
-  if (error) throw error;
-  return (data ?? []) as NodeRow[];
+export async function fetchNodesForWorkspace(workspaceId: string): Promise<NodeRow[]> {
+  return cachedList<NodeRow>('nodes', workspaceId, async () => {
+    const { data, error } = await supabase
+      .from('nodes')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as NodeRow[];
+  });
 }
 
 export async function fetchCellsForWorkspace(workspaceId: string): Promise<CellRow[]> {
-  const { data, error } = await supabase
-    .from('cells')
-    .select('*')
-    .eq('workspace_id', workspaceId);
-
-  if (error) throw error;
-  return (data ?? []) as CellRow[];
+  return cachedList<CellRow>('cells', workspaceId, async () => {
+    const { data, error } = await supabase
+      .from('cells')
+      .select('*')
+      .eq('workspace_id', workspaceId);
+    if (error) throw error;
+    return (data ?? []) as CellRow[];
+  });
 }
 
 export async function fetchRowsForWorkspace(workspaceId: string): Promise<RowRow[]> {
-  const { data, error } = await supabase
-    .from('rows')
-    .select('*')
-    .eq('workspace_id', workspaceId);
-  if (error) throw error;
-  return (data ?? []) as RowRow[];
+  return cachedList<RowRow>('rows', workspaceId, async () => {
+    const { data, error } = await supabase
+      .from('rows')
+      .select('*')
+      .eq('workspace_id', workspaceId);
+    if (error) throw error;
+    return (data ?? []) as RowRow[];
+  });
 }
 
 export async function fetchColsForWorkspace(workspaceId: string): Promise<ColRow[]> {
-  const { data, error } = await supabase
-    .from('cols')
-    .select('*')
-    .eq('workspace_id', workspaceId);
-  if (error) throw error;
-  return (data ?? []) as ColRow[];
+  return cachedList<ColRow>('cols', workspaceId, async () => {
+    const { data, error } = await supabase
+      .from('cols')
+      .select('*')
+      .eq('workspace_id', workspaceId);
+    if (error) throw error;
+    return (data ?? []) as ColRow[];
+  });
 }
 
 // Laedt alle Karten der angegebenen Boards in einem Query. Genutzt
@@ -93,13 +165,25 @@ export async function fetchCardsForBoards(
   workspaceId: string,
 ): Promise<KbCardRow[]> {
   if (boardIds.length === 0) return [];
-  const { data, error } = await supabase
-    .from('kb_cards')
-    .select('*')
-    .in('board_id', boardIds)
-    .eq('workspace_id', workspaceId);
-  if (error) throw error;
-  return (data ?? []) as KbCardRow[];
+  try {
+    const { data, error } = await supabase
+      .from('kb_cards')
+      .select('*')
+      .in('board_id', boardIds)
+      .eq('workspace_id', workspaceId);
+    if (error) throw error;
+    const rows = (data ?? []) as KbCardRow[];
+    void mergeRows('kb_cards', rows).catch(() => {});
+    markLiveSuccess();
+    return rows;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const set = new Set(boardIds);
+    const all = await getByWorkspace<KbCardRow>('kb_cards', workspaceId);
+    const filtered = all.filter((c) => set.has(c.board_id));
+    markCacheFallback();
+    return filtered;
+  }
 }
 
 // ─── Matrix-Inhalt (rows + cols + cells) ─────────────────────────
@@ -111,35 +195,61 @@ export async function fetchMatrixContent(
   matrixId: string,
   workspaceId: string,
 ): Promise<MatrixContent> {
-  const [rowsRes, colsRes, cellsRes] = await Promise.all([
-    supabase
-      .from('rows')
-      .select('*')
-      .eq('matrix_id', matrixId)
-      .eq('workspace_id', workspaceId)
-      .order('position', { ascending: true }),
-    supabase
-      .from('cols')
-      .select('*')
-      .eq('matrix_id', matrixId)
-      .eq('workspace_id', workspaceId)
-      .order('position', { ascending: true }),
-    supabase
-      .from('cells')
-      .select('*')
-      .eq('matrix_id', matrixId)
-      .eq('workspace_id', workspaceId),
-  ]);
+  try {
+    const [rowsRes, colsRes, cellsRes] = await Promise.all([
+      supabase
+        .from('rows')
+        .select('*')
+        .eq('matrix_id', matrixId)
+        .eq('workspace_id', workspaceId)
+        .order('position', { ascending: true }),
+      supabase
+        .from('cols')
+        .select('*')
+        .eq('matrix_id', matrixId)
+        .eq('workspace_id', workspaceId)
+        .order('position', { ascending: true }),
+      supabase
+        .from('cells')
+        .select('*')
+        .eq('matrix_id', matrixId)
+        .eq('workspace_id', workspaceId),
+    ]);
 
-  if (rowsRes.error) throw rowsRes.error;
-  if (colsRes.error) throw colsRes.error;
-  if (cellsRes.error) throw cellsRes.error;
+    if (rowsRes.error) throw rowsRes.error;
+    if (colsRes.error) throw colsRes.error;
+    if (cellsRes.error) throw cellsRes.error;
 
-  return {
-    rows: (rowsRes.data ?? []) as RowRow[],
-    cols: (colsRes.data ?? []) as ColRow[],
-    cells: (cellsRes.data ?? []) as CellRow[],
-  };
+    const rows = (rowsRes.data ?? []) as RowRow[];
+    const cols = (colsRes.data ?? []) as ColRow[];
+    const cells = (cellsRes.data ?? []) as CellRow[];
+    // Merge in den Cache, damit Drill-Down beim naechsten Offline
+    // Stand verfuegbar bleibt. mergeRows ueberschreibt vorhandene
+    // Rows mit gleicher id (Last-Read-Wins).
+    void mergeRows('rows', rows).catch(() => {});
+    void mergeRows('cols', cols).catch(() => {});
+    void mergeRows('cells', cells).catch(() => {});
+    markLiveSuccess();
+    return { rows, cols, cells };
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    // Offline-Fallback: workspace-weite Caches filtern auf matrix_id.
+    const [allRows, allCols, allCells] = await Promise.all([
+      getByWorkspace<RowRow>('rows', workspaceId),
+      getByWorkspace<ColRow>('cols', workspaceId),
+      getByWorkspace<CellRow>('cells', workspaceId),
+    ]);
+    markCacheFallback();
+    return {
+      rows: allRows
+        .filter((r) => r.matrix_id === matrixId)
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+      cols: allCols
+        .filter((c) => c.matrix_id === matrixId)
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+      cells: allCells.filter((c) => c.matrix_id === matrixId),
+    };
+  }
 }
 
 // ─── Board-Inhalt (Kanban-Spalten + Karten + Checklisten + Links) ─
@@ -150,60 +260,96 @@ export async function fetchBoardContent(
   boardId: string,
   workspaceId: string,
 ): Promise<BoardContent> {
-  const [colsRes, cardsRes, checklistsRes, linksRes] = await Promise.all([
-    supabase
-      .from('kb_cols')
-      .select('*')
-      .eq('board_id', boardId)
-      .eq('workspace_id', workspaceId)
-      .order('position', { ascending: true }),
-    supabase
-      .from('kb_cards')
-      .select('*')
-      .eq('board_id', boardId)
-      .eq('workspace_id', workspaceId)
-      .order('position', { ascending: true }),
-    supabase
-      .from('checklists')
-      .select('*')
-      .eq('board_id', boardId)
-      .eq('workspace_id', workspaceId)
-      .order('position', { ascending: true }),
-    supabase
-      .from('links')
-      .select('*')
-      .eq('board_id', boardId)
-      .eq('workspace_id', workspaceId)
-      .order('position', { ascending: true }),
-  ]);
+  try {
+    const [colsRes, cardsRes, checklistsRes, linksRes] = await Promise.all([
+      supabase
+        .from('kb_cols')
+        .select('*')
+        .eq('board_id', boardId)
+        .eq('workspace_id', workspaceId)
+        .order('position', { ascending: true }),
+      supabase
+        .from('kb_cards')
+        .select('*')
+        .eq('board_id', boardId)
+        .eq('workspace_id', workspaceId)
+        .order('position', { ascending: true }),
+      supabase
+        .from('checklists')
+        .select('*')
+        .eq('board_id', boardId)
+        .eq('workspace_id', workspaceId)
+        .order('position', { ascending: true }),
+      supabase
+        .from('links')
+        .select('*')
+        .eq('board_id', boardId)
+        .eq('workspace_id', workspaceId)
+        .order('position', { ascending: true }),
+    ]);
 
-  if (colsRes.error) throw colsRes.error;
-  if (cardsRes.error) throw cardsRes.error;
-  if (checklistsRes.error) throw checklistsRes.error;
-  if (linksRes.error) throw linksRes.error;
+    if (colsRes.error) throw colsRes.error;
+    if (cardsRes.error) throw cardsRes.error;
+    if (checklistsRes.error) throw checklistsRes.error;
+    if (linksRes.error) throw linksRes.error;
 
-  const checklists = (checklistsRes.data ?? []) as ChecklistRow[];
+    const kbCols = (colsRes.data ?? []) as KbColRow[];
+    const kbCards = (cardsRes.data ?? []) as KbCardRow[];
+    const checklists = (checklistsRes.data ?? []) as ChecklistRow[];
+    const links = (linksRes.data ?? []) as LinkRow[];
 
-  let checklistItems: ChecklistItemRow[] = [];
-  if (checklists.length > 0) {
-    const ids = checklists.map((c) => c.id);
-    const itemsRes = await supabase
-      .from('checklist_items')
-      .select('*')
-      .in('checklist_id', ids)
-      .eq('workspace_id', workspaceId)
-      .order('position', { ascending: true });
-    if (itemsRes.error) throw itemsRes.error;
-    checklistItems = (itemsRes.data ?? []) as ChecklistItemRow[];
+    let checklistItems: ChecklistItemRow[] = [];
+    if (checklists.length > 0) {
+      const ids = checklists.map((c) => c.id);
+      const itemsRes = await supabase
+        .from('checklist_items')
+        .select('*')
+        .in('checklist_id', ids)
+        .eq('workspace_id', workspaceId)
+        .order('position', { ascending: true });
+      if (itemsRes.error) throw itemsRes.error;
+      checklistItems = (itemsRes.data ?? []) as ChecklistItemRow[];
+    }
+
+    void mergeRows('kb_cols', kbCols).catch(() => {});
+    void mergeRows('kb_cards', kbCards).catch(() => {});
+    void mergeRows('checklists', checklists).catch(() => {});
+    void mergeRows('links', links).catch(() => {});
+    void mergeRows('checklist_items', checklistItems).catch(() => {});
+    markLiveSuccess();
+
+    return { kbCols, kbCards, checklists, checklistItems, links };
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    // Offline: workspace-weite Caches filtern auf board_id.
+    const [allCols, allCards, allCl, allLinks, allItems] = await Promise.all([
+      getByWorkspace<KbColRow>('kb_cols', workspaceId),
+      getByWorkspace<KbCardRow>('kb_cards', workspaceId),
+      getByWorkspace<ChecklistRow>('checklists', workspaceId),
+      getByWorkspace<LinkRow>('links', workspaceId),
+      getByWorkspace<ChecklistItemRow>('checklist_items', workspaceId),
+    ]);
+    const checklists = allCl
+      .filter((c) => c.board_id === boardId)
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    const clIds = new Set(checklists.map((c) => c.id));
+    markCacheFallback();
+    return {
+      kbCols: allCols
+        .filter((c) => c.board_id === boardId)
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+      kbCards: allCards
+        .filter((c) => c.board_id === boardId)
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+      checklists,
+      checklistItems: allItems
+        .filter((it) => clIds.has(it.checklist_id))
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+      links: allLinks
+        .filter((l) => l.board_id === boardId)
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+    };
   }
-
-  return {
-    kbCols: (colsRes.data ?? []) as KbColRow[],
-    kbCards: (cardsRes.data ?? []) as KbCardRow[],
-    checklists,
-    checklistItems,
-    links: (linksRes.data ?? []) as LinkRow[],
-  };
 }
 
 // ─── Cell-Checklisten (cell_id=X, board_id=NULL) ──────────────────
@@ -213,29 +359,51 @@ export async function fetchCellChecklists(
   cellId: string,
   workspaceId: string,
 ): Promise<CellChecklistsContent> {
-  const { data: clData, error: clErr } = await supabase
-    .from('checklists')
-    .select('*')
-    .eq('cell_id', cellId)
-    .eq('workspace_id', workspaceId)
-    .order('position', { ascending: true });
-  if (clErr) throw clErr;
-
-  const checklists = (clData ?? []) as ChecklistRow[];
-  let checklistItems: ChecklistItemRow[] = [];
-  if (checklists.length > 0) {
-    const ids = checklists.map((c) => c.id);
-    const { data: itData, error: itErr } = await supabase
-      .from('checklist_items')
+  try {
+    const { data: clData, error: clErr } = await supabase
+      .from('checklists')
       .select('*')
-      .in('checklist_id', ids)
+      .eq('cell_id', cellId)
       .eq('workspace_id', workspaceId)
       .order('position', { ascending: true });
-    if (itErr) throw itErr;
-    checklistItems = (itData ?? []) as ChecklistItemRow[];
-  }
+    if (clErr) throw clErr;
 
-  return { checklists, checklistItems };
+    const checklists = (clData ?? []) as ChecklistRow[];
+    let checklistItems: ChecklistItemRow[] = [];
+    if (checklists.length > 0) {
+      const ids = checklists.map((c) => c.id);
+      const { data: itData, error: itErr } = await supabase
+        .from('checklist_items')
+        .select('*')
+        .in('checklist_id', ids)
+        .eq('workspace_id', workspaceId)
+        .order('position', { ascending: true });
+      if (itErr) throw itErr;
+      checklistItems = (itData ?? []) as ChecklistItemRow[];
+    }
+
+    void mergeRows('checklists', checklists).catch(() => {});
+    void mergeRows('checklist_items', checklistItems).catch(() => {});
+    markLiveSuccess();
+    return { checklists, checklistItems };
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const [allCl, allItems] = await Promise.all([
+      getByWorkspace<ChecklistRow>('checklists', workspaceId),
+      getByWorkspace<ChecklistItemRow>('checklist_items', workspaceId),
+    ]);
+    const checklists = allCl
+      .filter((c) => c.cell_id === cellId)
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    const clIds = new Set(checklists.map((c) => c.id));
+    markCacheFallback();
+    return {
+      checklists,
+      checklistItems: allItems
+        .filter((it) => clIds.has(it.checklist_id))
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+    };
+  }
 }
 
 // ─── Node-Leer-Probe (fuer Confirm-vor-Delete) ────────────────────
@@ -579,14 +747,26 @@ export async function fetchDocsRecent(
   workspaceId: string,
   limit = 20,
 ): Promise<DocRow[]> {
-  const { data, error } = await supabase
-    .from('docs')
-    .select('*')
-    .eq('workspace_id', workspaceId)
-    .order('updated_at', { ascending: false })
-    .limit(limit);
-  if (error) throw error;
-  return (data ?? []) as DocRow[];
+  try {
+    const { data, error } = await supabase
+      .from('docs')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .order('updated_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    const rows = (data ?? []) as DocRow[];
+    void mergeRows('docs', rows).catch(() => {});
+    markLiveSuccess();
+    return rows;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const all = await getByWorkspace<DocRow>('docs', workspaceId);
+    markCacheFallback();
+    return all
+      .sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''))
+      .slice(0, limit);
+  }
 }
 
 // Einzel-Doc fetch — fuer Tab-Restore via ^alias.
@@ -594,14 +774,25 @@ export async function fetchDocById(
   docId: string,
   workspaceId: string,
 ): Promise<DocRow | null> {
-  const { data, error } = await supabase
-    .from('docs')
-    .select('*')
-    .eq('id', docId)
-    .eq('workspace_id', workspaceId)
-    .maybeSingle();
-  if (error) throw error;
-  return (data as DocRow | null) ?? null;
+  try {
+    const { data, error } = await supabase
+      .from('docs')
+      .select('*')
+      .eq('id', docId)
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+    if (error) throw error;
+    const row = (data as DocRow | null) ?? null;
+    if (row) void mergeRows('docs', [row]).catch(() => {});
+    markLiveSuccess();
+    return row;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const cached = await getById<DocRow>('docs', docId);
+    markCacheFallback();
+    if (!cached || cached.workspace_id !== workspaceId) return null;
+    return cached;
+  }
 }
 
 // Alle Dokus, die an eine bestimmte Zelle angehaengt sind. Fuer die
@@ -612,14 +803,28 @@ export async function fetchDocsForCell(
   cellId: string,
   workspaceId: string,
 ): Promise<DocRow[]> {
-  const { data, error } = await supabase
-    .from('docs')
-    .select('*')
-    .eq('workspace_id', workspaceId)
-    .eq('attached_cell_id', cellId)
-    .order('updated_at', { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as DocRow[];
+  try {
+    const { data, error } = await supabase
+      .from('docs')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .eq('attached_cell_id', cellId)
+      .order('updated_at', { ascending: false });
+    if (error) throw error;
+    const rows = (data ?? []) as DocRow[];
+    void mergeRows('docs', rows).catch(() => {});
+    markLiveSuccess();
+    return rows;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const all = await getByWorkspace<DocRow>('docs', workspaceId);
+    markCacheFallback();
+    return all
+      .filter((d) => d.attached_cell_id === cellId)
+      .sort((a, b) =>
+        (b.updated_at ?? '').localeCompare(a.updated_at ?? ''),
+      );
+  }
 }
 
 // Alle Board-Links im Workspace. Fuer den Sidebar-Tree-Links-Chip
@@ -629,13 +834,15 @@ export async function fetchDocsForCell(
 export async function fetchWorkspaceLinks(
   workspaceId: string,
 ): Promise<LinkRow[]> {
-  const { data, error } = await supabase
-    .from('links')
-    .select('*')
-    .eq('workspace_id', workspaceId)
-    .order('position', { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as LinkRow[];
+  return cachedList<LinkRow>('links', workspaceId, async () => {
+    const { data, error } = await supabase
+      .from('links')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .order('position', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as LinkRow[];
+  });
 }
 
 // Alle Dokus mit attached_cell_id im Workspace. Fuer den Sidebar-
@@ -644,14 +851,31 @@ export async function fetchWorkspaceLinks(
 export async function fetchWorkspaceAttachedDocs(
   workspaceId: string,
 ): Promise<DocRow[]> {
-  const { data, error } = await supabase
-    .from('docs')
-    .select('*')
-    .eq('workspace_id', workspaceId)
-    .not('attached_cell_id', 'is', null)
-    .order('updated_at', { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as DocRow[];
+  // Wir cachen workspace-weit (alle Docs), filtern dann lokal.
+  // Lookups via fetchDocsForCell / fetchCellIdsWithDocs nutzen den
+  // gleichen Cache, daher konsistent.
+  try {
+    const { data, error } = await supabase
+      .from('docs')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .not('attached_cell_id', 'is', null)
+      .order('updated_at', { ascending: false });
+    if (error) throw error;
+    const rows = (data ?? []) as DocRow[];
+    void mergeRows('docs', rows).catch(() => {});
+    markLiveSuccess();
+    return rows;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const all = await getByWorkspace<DocRow>('docs', workspaceId);
+    markCacheFallback();
+    return all
+      .filter((d) => d.attached_cell_id != null)
+      .sort((a, b) =>
+        (b.updated_at ?? '').localeCompare(a.updated_at ?? ''),
+      );
+  }
 }
 
 // Set der cell_ids, an denen mindestens eine Doku haengt. Fuer die
@@ -662,15 +886,27 @@ export async function fetchWorkspaceAttachedDocs(
 export async function fetchCellIdsWithDocs(
   workspaceId: string,
 ): Promise<Set<string>> {
-  const { data, error } = await supabase
-    .from('docs')
-    .select('attached_cell_id')
-    .eq('workspace_id', workspaceId)
-    .not('attached_cell_id', 'is', null);
-  if (error) throw error;
-  const set = new Set<string>();
-  for (const row of (data ?? []) as Array<{ attached_cell_id: string | null }>) {
-    if (row.attached_cell_id) set.add(row.attached_cell_id);
+  try {
+    const { data, error } = await supabase
+      .from('docs')
+      .select('attached_cell_id')
+      .eq('workspace_id', workspaceId)
+      .not('attached_cell_id', 'is', null);
+    if (error) throw error;
+    const set = new Set<string>();
+    for (const row of (data ?? []) as Array<{ attached_cell_id: string | null }>) {
+      if (row.attached_cell_id) set.add(row.attached_cell_id);
+    }
+    markLiveSuccess();
+    return set;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const all = await getByWorkspace<DocRow>('docs', workspaceId);
+    const set = new Set<string>();
+    for (const d of all) {
+      if (d.attached_cell_id) set.add(d.attached_cell_id);
+    }
+    markCacheFallback();
+    return set;
   }
-  return set;
 }

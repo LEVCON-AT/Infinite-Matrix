@@ -11,6 +11,14 @@
 // Persistenz: localStorage unter `matrix-client-web-settings`. Die
 // in-memory Kopie ist ein SolidJS-Signal — Modal-Writes und
 // Consumer-Reads gehen ueber denselben reaktiven Pfad.
+//
+// Scope-Hinweis: der Storage-Key ist BEWUSST nicht workspace-scoped.
+// Die Settings hier (vis-Flags fuer Buttons/Edit-Mode-Pattern)
+// betreffen das UI-Verhalten, nicht die Daten — ein User, der die
+// "Daily-Col-Edit-immer-an"-Option in einem Workspace setzt, will
+// das selbe Verhalten typischerweise auch in seinen anderen
+// Workspaces. Wenn spaeter pro-Workspace-Settings dazukommen, sollte
+// das ein separater Storage-Slot sein, kein Sub-Tree dieses Schluessels.
 
 import { createEffect, createMemo, createSignal, onMount, type Accessor } from 'solid-js';
 import { useEditMode } from './edit-mode';

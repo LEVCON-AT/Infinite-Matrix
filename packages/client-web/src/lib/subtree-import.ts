@@ -570,7 +570,7 @@ export async function executeSubtreeImportIntoCell(args: {
     step('Sicherungs-Export…');
     const { exportCellSubtree, downloadSubtreeExport } = await import('./export');
     const current = await exportCellSubtree(targetCellId, workspaceId);
-    downloadSubtreeExport(current, `backup-ziel-zelle`);
+    await downloadSubtreeExport(current,`backup-ziel-zelle`);
   }
   if (mode === 'overwrite' || mode === 'export-overwrite') {
     step('Ziel-Zelle leeren…');
@@ -1244,7 +1244,7 @@ export async function executeFeatureInfoImport(args: {
     step('Sicherungs-Export…');
     const { exportFeatureInfo, downloadSubtreeExport } = await import('./export');
     const current = await exportFeatureInfo(targetCellId, args.workspaceId);
-    downloadSubtreeExport(current, `backup-info`);
+    await downloadSubtreeExport(current,`backup-info`);
   }
   if (mode === 'overwrite' || mode === 'export-overwrite') {
     step('Bisherige Info-Daten leeren…');
@@ -1354,7 +1354,7 @@ export async function executeFeatureChecklistsImport(args: {
       './export'
     );
     const current = await exportFeatureChecklists(targetCellId, workspaceId);
-    downloadSubtreeExport(current, `backup-checklists`);
+    await downloadSubtreeExport(current,`backup-checklists`);
   }
   if (mode === 'overwrite' || mode === 'export-overwrite') {
     step('Bisherige Checklisten leeren…');
@@ -1504,7 +1504,7 @@ export async function executeSubtreeImportIntoMatrix(args: {
     step('Sicherungs-Export…');
     const { exportSubtree, downloadSubtreeExport } = await import('./export');
     const current = await exportSubtree(targetMatrixId, workspaceId);
-    downloadSubtreeExport(current, 'backup-ziel-matrix');
+    await downloadSubtreeExport(current,'backup-ziel-matrix');
   }
   if (mode === 'overwrite' || mode === 'export-overwrite') {
     step('Ziel-Matrix leeren…');
@@ -1887,7 +1887,7 @@ export async function executeSubtreeImportIntoBoard(args: {
     step('Sicherungs-Export…');
     const { exportSubtree, downloadSubtreeExport } = await import('./export');
     const current = await exportSubtree(targetBoardId, workspaceId);
-    downloadSubtreeExport(current, 'backup-ziel-board');
+    await downloadSubtreeExport(current,'backup-ziel-board');
   }
   if (mode === 'overwrite' || mode === 'export-overwrite') {
     step('Ziel-Board leeren…');

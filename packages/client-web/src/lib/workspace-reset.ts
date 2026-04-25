@@ -169,27 +169,27 @@ async function exportForScope(
   switch (scope.kind) {
     case 'matrix': {
       const data = await exportSubtree(scope.matrixNodeId, workspaceId);
-      downloadSubtreeExport(data, 'backup-matrix');
+      await downloadSubtreeExport(data, 'backup-matrix');
       return;
     }
     case 'board': {
       const data = await exportSubtree(scope.boardNodeId, workspaceId);
-      downloadSubtreeExport(data, 'backup-board');
+      await downloadSubtreeExport(data, 'backup-board');
       return;
     }
     case 'cell': {
       const data = await exportCellSubtree(scope.cellId, workspaceId);
-      downloadSubtreeExport(data, 'backup-zelle');
+      await downloadSubtreeExport(data, 'backup-zelle');
       return;
     }
     case 'feature-info': {
       const data = await exportFeatureInfo(scope.cellId, workspaceId);
-      downloadSubtreeExport(data, 'backup-info');
+      await downloadSubtreeExport(data, 'backup-info');
       return;
     }
     case 'feature-checklists': {
       const data = await exportFeatureChecklists(scope.cellId, workspaceId);
-      downloadSubtreeExport(data, 'backup-checklists');
+      await downloadSubtreeExport(data, 'backup-checklists');
       return;
     }
   }
@@ -257,7 +257,7 @@ export async function runResetAll(args: {
     const wsName = typeof (data.workspace as { name?: unknown }).name === 'string'
       ? ((data.workspace as { name: string }).name)
       : 'workspace';
-    downloadWorkspaceExport(data, `backup-${wsName}`);
+    await downloadWorkspaceExport(data, `backup-${wsName}`);
   }
   return await resetAllWorkspace(workspaceId);
 }

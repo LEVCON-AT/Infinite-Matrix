@@ -12,6 +12,17 @@
 
 import { createSignal, type Accessor } from 'solid-js';
 import { supabase } from './supabase';
+import { getByWorkspace } from './offline-cache';
+import { isNetworkError } from './mutation-queue';
+import { markCacheFallback, markLiveSuccess } from './offline-state';
+import type {
+  CellRow,
+  ChecklistRow,
+  DocRow,
+  KbCardRow,
+  LinkRow,
+  NodeRow,
+} from './types';
 
 export type AliasKind = 'node' | 'cell' | 'card' | 'checklist' | 'link' | 'doc';
 
@@ -43,10 +54,25 @@ function ensureState(wsId: string): WsState {
 // den Cache komplett (kein Merge, kein Dedup). Bei Fehler in einem Shard
 // laeuft der Rest weiter — sonst wuerde ein einzelner RLS-Hickup alle
 // Dropdowns abschalten.
+//
+// Offline-Fallback: rebuilds aus den IDB-gecachten Workspace-Rows.
+// Solange irgendeine vorherige Online-Sitzung den Cache gefuellt hat,
+// liefert ^alias-Quicknav offline plausible Treffer.
 export async function fetchAliasIndex(wsId: string): Promise<void> {
   if (!wsId) return;
   const s = ensureState(wsId);
 
+  try {
+    await fetchAliasIndexLive(wsId, s);
+    markLiveSuccess();
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    await fetchAliasIndexFromCache(wsId, s);
+    markCacheFallback();
+  }
+}
+
+async function fetchAliasIndexLive(wsId: string, s: WsState): Promise<void> {
   const [nodes, cells, cards, checklists, links, docs] = await Promise.all([
     supabase
       .from('nodes')
@@ -167,6 +193,84 @@ export async function fetchAliasIndex(wsId: string): Promise<void> {
 
   // Sort alphabetisch fuer stabile Dropdown-Reihenfolge. Dropdown-Konsumenten
   // koennen eigene Sortierung anwenden, aber der Default ist vorhersehbar.
+  out.sort((a, b) => a.alias.localeCompare(b.alias));
+  s.setEntries(out);
+}
+
+// Offline-Variante: liest die sechs Tabellen aus dem IDB-Workspace-
+// Cache, filtert auf rows mit alias != null und baut dieselbe
+// Index-Shape wie der Live-Pfad zusammen. Wenn der Cache leer ist
+// (frische Tab-Sitzung, noch nie online), bleibt der Index leer.
+async function fetchAliasIndexFromCache(wsId: string, s: WsState): Promise<void> {
+  const [nodes, cells, cards, checklists, links, docs] = await Promise.all([
+    getByWorkspace<NodeRow>('nodes', wsId),
+    getByWorkspace<CellRow>('cells', wsId),
+    getByWorkspace<KbCardRow>('kb_cards', wsId),
+    getByWorkspace<ChecklistRow>('checklists', wsId),
+    getByWorkspace<LinkRow>('links', wsId),
+    getByWorkspace<DocRow>('docs', wsId),
+  ]);
+  const out: AliasEntry[] = [];
+  for (const r of nodes) {
+    if (!r.alias) continue;
+    out.push({
+      alias: r.alias.toLowerCase(),
+      kind: 'node',
+      id: r.id,
+      label: r.label ?? '',
+      subLabel: r.type === 'matrix' ? 'Matrix' : 'Board',
+    });
+  }
+  for (const r of cells) {
+    if (!r.alias) continue;
+    out.push({
+      alias: r.alias.toLowerCase(),
+      kind: 'cell',
+      id: r.id,
+      label: '',
+      subLabel: 'Zelle',
+    });
+  }
+  for (const r of cards) {
+    if (!r.alias) continue;
+    out.push({
+      alias: r.alias.toLowerCase(),
+      kind: 'card',
+      id: r.id,
+      label: r.name ?? '',
+      subLabel: 'Karte',
+    });
+  }
+  for (const r of checklists) {
+    if (!r.alias) continue;
+    out.push({
+      alias: r.alias.toLowerCase(),
+      kind: 'checklist',
+      id: r.id,
+      label: r.label ?? '',
+      subLabel: 'Checkliste',
+    });
+  }
+  for (const r of links) {
+    if (!r.alias) continue;
+    out.push({
+      alias: r.alias.toLowerCase(),
+      kind: 'link',
+      id: r.id,
+      label: r.label || r.url || '',
+      subLabel: 'Link',
+    });
+  }
+  for (const r of docs) {
+    if (!r.alias) continue;
+    out.push({
+      alias: r.alias.toLowerCase(),
+      kind: 'doc',
+      id: r.id,
+      label: r.title ?? '',
+      subLabel: 'Doku',
+    });
+  }
   out.sort((a, b) => a.alias.localeCompare(b.alias));
   s.setEntries(out);
 }

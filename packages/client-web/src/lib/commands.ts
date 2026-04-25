@@ -64,6 +64,12 @@ export type ParsedCommand =
   // skipConfirm=true (via -y-Flag): keine Rueckfrage, keine Export-
   // Nachfrage — fuer schnelles Testen.
   | { kind: 'reset-all'; skipConfirm: boolean }
+  // Workspace-weiter Export. encrypted=true → User wird Passphrase
+  // gefragt + .imx-Datei. Plain default.
+  | { kind: 'export-workspace'; encrypted: boolean }
+  // Workspace-weiter Import: oeffnet File-Picker. Mode-Wahl (add /
+  // overwrite / export-overwrite) passiert im UI-Hook nach File-Read.
+  | { kind: 'import-workspace' }
   // Implicit: wenn der User einfach ^alias tippt (nur ein Token, kein
   // Verb), landet das hier. Behaviour = Quicknav-Dispatch.
   | { kind: 'navigate'; alias: string }
@@ -96,6 +102,20 @@ export const COMMAND_VERBS: Array<{
     syntax: 'reset [-all] [-y]',
     description:
       'Inhalt der aktuellen Ebene leeren. `-all` = ganzer Workspace. `-y` = ohne Rueckfrage.',
+    supported: true,
+  },
+  {
+    verb: 'export',
+    syntax: 'export [-enc]',
+    description:
+      'Workspace komplett als JSON exportieren. `-enc` fuer verschluesseltes .imx mit Passphrase.',
+    supported: true,
+  },
+  {
+    verb: 'import',
+    syntax: 'import',
+    description:
+      'Workspace-Export einlesen (.json oder .imx). 3-Weg-Wahl: hinzufuegen / sichern+ersetzen / ersetzen.',
     supported: true,
   },
   { verb: 'help', syntax: 'help', description: 'Diese Uebersicht zeigen', supported: true },
@@ -184,6 +204,18 @@ export function parseCommand(raw: string): ParsedCommand | null {
     return { kind: 'reset-here' };
   }
 
+  // export [-enc]
+  if (verb === 'export') {
+    const flags = new Set(lower.slice(1));
+    const encrypted = flags.has('-enc') || flags.has('--enc');
+    return { kind: 'export-workspace', encrypted };
+  }
+
+  // import — File-Picker oeffnet sich, IMX-Detect im UI-Hook.
+  if (verb === 'import') {
+    return { kind: 'import-workspace' };
+  }
+
   // Known-but-unsupported verbs.
   const stubs = [
     'w',
@@ -240,6 +272,13 @@ export type CommandUiHooks = {
   // wenn ausgefuehrt, false wenn abgebrochen (Fehler gehen via throw).
   onResetHere: () => Promise<boolean>;
   onResetAll: (skipConfirm: boolean) => Promise<boolean>;
+  // Workspace-weiter Export: UI-Hook holt downloadWorkspaceExport,
+  // ggf. mit Passphrase-Prompt bei encrypted=true. Rueckgabe true =
+  // ausgefuehrt, false = abgebrochen.
+  onExportWorkspace: (encrypted: boolean) => Promise<boolean>;
+  // Workspace-weiter Import: oeffnet File-Picker, liest IMX/JSON,
+  // delegiert an die import-Pipeline. Rueckgabe analog.
+  onImportWorkspace: () => Promise<boolean>;
 };
 
 export type CommandContext = {
@@ -295,6 +334,27 @@ export async function executeCommand(
       const ok = await ctx.ui.onResetAll(cmd.skipConfirm);
       if (!ok) return { ok: false, message: 'Abgebrochen.' };
       return { ok: true, message: 'Workspace geleert.' };
+    } catch (err) {
+      return { ok: false, message: translateDbError(err) };
+    }
+  }
+  if (cmd.kind === 'export-workspace') {
+    try {
+      const ok = await ctx.ui.onExportWorkspace(cmd.encrypted);
+      if (!ok) return { ok: false, message: 'Abgebrochen.' };
+      return {
+        ok: true,
+        message: cmd.encrypted ? 'Verschluesselt exportiert.' : 'Exportiert.',
+      };
+    } catch (err) {
+      return { ok: false, message: translateDbError(err) };
+    }
+  }
+  if (cmd.kind === 'import-workspace') {
+    try {
+      const ok = await ctx.ui.onImportWorkspace();
+      if (!ok) return { ok: false, message: 'Abgebrochen.' };
+      return { ok: true, message: 'Importiert.' };
     } catch (err) {
       return { ok: false, message: translateDbError(err) };
     }

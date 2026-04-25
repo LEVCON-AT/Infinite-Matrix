@@ -44,6 +44,10 @@ import { flashError } from '../lib/flash';
 import { openDocsPopup } from '../lib/docs-ui';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
+import {
+  exportWorkspaceWithUi,
+  importWorkspaceWithUi,
+} from '../lib/workspace-io';
 
 type Props = {
   workspaceId: string;
@@ -204,6 +208,13 @@ const CommandPalette: Component<Props> = (p) => {
       }
       return false;
     },
+    onExportWorkspace: (encrypted) =>
+      exportWorkspaceWithUi({ workspaceId: p.workspaceId, encrypted }),
+    onImportWorkspace: () =>
+      importWorkspaceWithUi({
+        workspaceId: p.workspaceId,
+        currentNode: p.currentNode,
+      }),
   };
 
   async function onSubmit(e: SubmitEvent) {

@@ -64,6 +64,10 @@ import { openDocsPopup } from '../lib/docs-ui';
 import { showToast } from '../lib/toasts';
 import { translateDbError } from '../lib/errors';
 import {
+  exportWorkspaceWithUi,
+  importWorkspaceWithUi,
+} from '../lib/workspace-io';
+import {
   runResetAll,
   runResetScope,
   type ResetScope,
@@ -426,6 +430,13 @@ const HeaderSearchBar: Component<Props> = (p) => {
       }
       return false;
     },
+    onExportWorkspace: (encrypted) =>
+      exportWorkspaceWithUi({ workspaceId: p.workspaceId, encrypted }),
+    onImportWorkspace: () =>
+      importWorkspaceWithUi({
+        workspaceId: p.workspaceId,
+        currentNode: p.currentNode,
+      }),
   };
 
   async function applyCommand() {
