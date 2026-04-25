@@ -56,6 +56,7 @@ Daneben: SolidJS-basierter `packages/client-web/` (Supabase-Backend, Multi-Tenan
 14. **Tokens vor Literals.** Vor einem neuen Magic-Number / Hex-Color / ms-Duration: existiert ein Token in `:root` (`--space-*`, `--tr-*`, `--focus-*`, `--shadow-*`, `--fs-*`, `ICO_SIZE.*`)? Falls nicht und der Wert taucht ≥2× auf: neuen Token anlegen statt Inline-Literal.
 15. **Focus-Restore bei Modals.** Modal öffnen: `_pushFocusRestore()` + `_pushModal(closeFn)`. Modal schließen: `_popModal(closeFn)` + `_popFocusRestore()` (letzteres restauriert `document.activeElement` vor dem Öffnen). Ohne: Fokus landet im Void, Tastatur-Flow bricht.
 16. **Animations-Hygiene.** Jede State-Änderung, die das Auge sieht, läuft über `transform`/`opacity` + `--tr-std`/`--tr-enter`. Keine `setTimeout`-Animationen; CSS + `animationend` bleiben autoritativ. `@media (prefers-reduced-motion: reduce)` respektieren (smooth-scroll macht das automatisch).
+17. **Offline-Pfad gehört zur Mutation.** Im `client-web`: jede neue schreibende Funktion läuft durch den Optimistic-Wrapper aus `lib/safe-mutation.ts` (`runOptimisticUpdate` / `runOptimisticInsert` / `runOptimisticDelete`) **oder** über einen privaten `update*`/`mutateXData`-Helper, der bereits gewrappt ist. Jede neue lesende Funktion bekommt einen IDB-Cache-Fallback (Pattern: live fetch → bei Erfolg `mergeRows`/`putAll`, bei `isNetworkError` → `getByWorkspace`/`getById` + `markCacheFallback()`). Konsequenz: ein neues Feature ohne Offline-Pfad ist **kein fertiges Feature** — analog zur `pushUndo`/`showUndoToast`-Regel. Multi-Step-Operationen werden in einzelne Specs zerlegt; FIFO-Replay liefert die richtige Reihenfolge. Echte Concurrency-Limits (JSONB-Read-Modify-Write-Race, Position-Kollisionen) im Datei-Header dokumentieren statt offline auszublenden.
 
 ## Was NICHT tun
 
@@ -72,6 +73,7 @@ Daneben: SolidJS-basierter `packages/client-web/` (Supabase-Backend, Multi-Tenan
 - **Keine inline `font-size:17px` in Elementen, die `.ptitle`-ähnlich sind.** Stattdessen `font-size:var(--fs-title)`/`var(--fs-subtitle)` — sonst bricht das Responsive-Clamp.
 - **Keine `*:focus{outline:none}`-Regel.** Zu breit, tötet Accessibility. Scope: siehe [docs/claude/styles.md](docs/claude/styles.md).
 - **Keine destruktive Aktion ohne `pushUndo` + `showUndoToast`.** Wenn die Aktion Daten löscht und nicht reversibel ist, gehört sie nicht ausgeliefert.
+- **Keine neue `client-web`-Mutation ohne Offline-Pfad.** Jede schreibende Funktion fließt durch `safe-mutation.ts` oder einen bereits gewrappten Helper (`updateCard`/`updateCell`/`updateRow`/`updateCol`/`updateKbCol`/`updateChecklist`/`updateItem`/`updateBoardLink`/`updateDoc`/`mutateCellData`/`mutateNodeData`/`readChecklistHistory`). Direkte `supabase.from(...).insert/update/delete()` ohne Wrapper sind ein Review-Stop, analog zu `alert()`-Aufrufen.
 
 ## Praktischer Ablauf pro Task
 

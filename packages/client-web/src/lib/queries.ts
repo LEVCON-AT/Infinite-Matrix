@@ -18,34 +18,71 @@ import type {
   TreeNode,
   WorkspaceWithRole,
 } from './types';
-import { getByWorkspace, mergeRows, withCache } from './offline-cache';
+import { getById, getByWorkspace, mergeRows, withCache } from './offline-cache';
 import { markCacheFallback, markLiveSuccess } from './offline-state';
 import { isNetworkError } from './mutation-queue';
 
 // ─── Workspaces ──────────────────────────────────────────────────
 // Gibt alle Workspaces zurueck, in denen der aktuelle User Mitglied ist.
 // RLS-Query: memberships.user_id = auth.uid() greift automatisch.
+//
+// Offline-Cache: localStorage statt IDB — die Liste ist klein, aendert
+// sich selten, und wir brauchen sie schon beim ersten Render (vor IDB-
+// open). LS reicht voellig.
+const WS_LIST_LS_KEY = 'matrix:workspaces:cache';
+
+function readWorkspacesFromLS(): WorkspaceWithRole[] | null {
+  try {
+    const raw = localStorage.getItem(WS_LIST_LS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return null;
+    return parsed as WorkspaceWithRole[];
+  } catch {
+    return null;
+  }
+}
+
+function writeWorkspacesToLS(rows: WorkspaceWithRole[]): void {
+  try {
+    localStorage.setItem(WS_LIST_LS_KEY, JSON.stringify(rows));
+  } catch {
+    // Quota oder Disabled-Storage — schlucken, der Online-Pfad
+    // funktioniert weiter.
+  }
+}
+
 export async function fetchMyWorkspaces(): Promise<WorkspaceWithRole[]> {
-  const { data, error } = await supabase
-    .from('memberships')
-    .select('role, workspace:workspaces(*)')
-    .order('role', { ascending: true });
+  try {
+    const { data, error } = await supabase
+      .from('memberships')
+      .select('role, workspace:workspaces(*)')
+      .order('role', { ascending: true });
 
-  if (error) throw error;
-  if (!data) return [];
+    if (error) throw error;
 
-  return data
-    .filter((m) => m.workspace != null)
-    .map((m) => {
-      const ws = m.workspace as unknown as {
-        id: string;
-        name: string;
-        owner_id: string;
-        created_at: string;
-        updated_at: string;
-      };
-      return { ...ws, role: m.role };
-    });
+    const rows = (data ?? [])
+      .filter((m) => m.workspace != null)
+      .map((m) => {
+        const ws = m.workspace as unknown as {
+          id: string;
+          name: string;
+          owner_id: string;
+          created_at: string;
+          updated_at: string;
+        };
+        return { ...ws, role: m.role };
+      });
+    writeWorkspacesToLS(rows);
+    markLiveSuccess();
+    return rows;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const cached = readWorkspacesFromLS();
+    if (!cached || cached.length === 0) throw err;
+    markCacheFallback();
+    return cached;
+  }
 }
 
 // ─── Nodes + Cells fuer Tree-Aufbau ──────────────────────────────
@@ -710,14 +747,26 @@ export async function fetchDocsRecent(
   workspaceId: string,
   limit = 20,
 ): Promise<DocRow[]> {
-  const { data, error } = await supabase
-    .from('docs')
-    .select('*')
-    .eq('workspace_id', workspaceId)
-    .order('updated_at', { ascending: false })
-    .limit(limit);
-  if (error) throw error;
-  return (data ?? []) as DocRow[];
+  try {
+    const { data, error } = await supabase
+      .from('docs')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .order('updated_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    const rows = (data ?? []) as DocRow[];
+    void mergeRows('docs', rows).catch(() => {});
+    markLiveSuccess();
+    return rows;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const all = await getByWorkspace<DocRow>('docs', workspaceId);
+    markCacheFallback();
+    return all
+      .sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''))
+      .slice(0, limit);
+  }
 }
 
 // Einzel-Doc fetch — fuer Tab-Restore via ^alias.
@@ -725,14 +774,25 @@ export async function fetchDocById(
   docId: string,
   workspaceId: string,
 ): Promise<DocRow | null> {
-  const { data, error } = await supabase
-    .from('docs')
-    .select('*')
-    .eq('id', docId)
-    .eq('workspace_id', workspaceId)
-    .maybeSingle();
-  if (error) throw error;
-  return (data as DocRow | null) ?? null;
+  try {
+    const { data, error } = await supabase
+      .from('docs')
+      .select('*')
+      .eq('id', docId)
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+    if (error) throw error;
+    const row = (data as DocRow | null) ?? null;
+    if (row) void mergeRows('docs', [row]).catch(() => {});
+    markLiveSuccess();
+    return row;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const cached = await getById<DocRow>('docs', docId);
+    markCacheFallback();
+    if (!cached || cached.workspace_id !== workspaceId) return null;
+    return cached;
+  }
 }
 
 // Alle Dokus, die an eine bestimmte Zelle angehaengt sind. Fuer die
