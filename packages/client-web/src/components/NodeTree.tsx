@@ -26,6 +26,7 @@ import { supabase } from '../lib/supabase';
 import { showToast } from '../lib/toasts';
 import { showChoice, showPrompt } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
+import { decryptPayload, isEncrypted } from '../lib/crypto';
 import { useVis } from '../lib/settings';
 import { useEditMode } from '../lib/edit-mode';
 import { useSidebarChips } from '../lib/sidebar-chips';
@@ -37,6 +38,7 @@ import {
   exportFeatureInfo,
   exportSubtree,
   summarizeExport,
+  type WorkspaceExport,
 } from '../lib/export';
 import { runResetScope } from '../lib/workspace-reset';
 import { endProgress, startProgress } from '../lib/progress';
@@ -55,6 +57,41 @@ import {
 import ContextMenu, { type CtxMenuState } from './ContextMenu';
 import ChecklistPastePopup from './ChecklistPastePopup';
 import Icon, { type IconName } from './Icon';
+
+// Verschluesselter Export ueber Passphrase-Prompt. Wird vom Kontext-
+// menue der Node/Cell/Feature-Rows aufgerufen. Plain-Variante laeuft
+// weiter ueber den existierenden 'Exportieren'-Eintrag — IMX ist die
+// Zusatz-Option fuer Backups, die der User unverschluesselt nicht
+// aus der Hand geben will.
+async function runEncryptedExport(args: {
+  getData: () => Promise<WorkspaceExport>;
+  filenameLabel: string;
+  promptTitle?: string;
+}): Promise<void> {
+  const pw = await showPrompt({
+    title: args.promptTitle ?? 'Verschluesselt exportieren',
+    message:
+      'Passphrase fuer .imx-Datei. Ohne diese Passphrase ist der Export nicht mehr lesbar — sicher aufbewahren.',
+    placeholder: 'Passphrase…',
+    confirmLabel: 'Exportieren',
+    inputType: 'password',
+  });
+  if (pw === null) return;
+  if (!pw.trim()) {
+    showToast('Passphrase darf nicht leer sein.', 'error');
+    return;
+  }
+  try {
+    const data = await args.getData();
+    await downloadSubtreeExport(data, args.filenameLabel, { passphrase: pw });
+    showToast(
+      `Verschluesselt exportiert — ${summarizeExport(data)}`,
+      'success',
+    );
+  } catch (err) {
+    showToast(translateDbError(err), 'error');
+  }
+}
 
 type Props = {
   workspaceId: string;
@@ -521,7 +558,31 @@ const NodeTree: Component<Props> = (props) => {
     pendingImportTarget = null;
     if (!file || !target) return;
     try {
-      const text = await file.text();
+      let text = await file.text();
+      // IMX-Detection: Datei beginnt mit IMATRIX_ENC: → Passphrase-
+      // Prompt + decryptPayload bevor wir an parseImportPayload geben.
+      // Der User darf den Prompt abbrechen — dann silent-return.
+      if (isEncrypted(text)) {
+        const pw = await showPrompt({
+          title: 'Verschluesselter Import',
+          message:
+            'Diese Datei ist verschluesselt (.imx). Bitte Passphrase eingeben, mit der sie exportiert wurde.',
+          placeholder: 'Passphrase…',
+          confirmLabel: 'Entschluesseln',
+          inputType: 'password',
+        });
+        if (pw === null) {
+          input.value = '';
+          return;
+        }
+        try {
+          text = await decryptPayload(text, pw);
+        } catch (err) {
+          showToast(translateDbError(err), 'error');
+          input.value = '';
+          return;
+        }
+      }
       const payload = parseImportPayload(text);
       const mismatch = checkTypeCompatibility(payload, target);
       if (mismatch) {
@@ -1052,6 +1113,16 @@ const NodeTree: Component<Props> = (props) => {
             })();
           },
         });
+        items.push({
+          label: 'Exportieren (verschluesselt, .imx)',
+          icon: '🔒',
+          onClick: () => {
+            void runEncryptedExport({
+              getData: () => exportSubtree(entry.id, props.workspaceId),
+              filenameLabel: entry.node.label,
+            });
+          },
+        });
         // Import nur auf Matrix-Nodes (Boards haben keine Rows/Cols zum
         // mergen). Matrix-Matrix-Merge: Rows+Cols+Cells der Quelle
         // werden in die Ziel-Matrix integriert, Modus-Dialog steuert
@@ -1221,6 +1292,16 @@ const NodeTree: Component<Props> = (props) => {
           },
         });
         items.push({
+          label: 'Exportieren (verschluesselt, .imx)',
+          icon: '🔒',
+          onClick: () => {
+            void runEncryptedExport({
+              getData: () => exportCellSubtree(cell.id, props.workspaceId),
+              filenameLabel: labelGuess,
+            });
+          },
+        });
+        items.push({
           label: 'Importieren',
           icon: '↑',
           onClick: () => {
@@ -1374,6 +1455,19 @@ const NodeTree: Component<Props> = (props) => {
                 showToast(translateDbError(err), 'error');
               }
             })();
+          },
+        });
+        items.push({
+          label: 'Exportieren (verschluesselt, .imx)',
+          icon: '🔒',
+          onClick: () => {
+            void runEncryptedExport({
+              getData: () =>
+                entry.feature === 'info'
+                  ? exportFeatureInfo(cellId, props.workspaceId)
+                  : exportFeatureChecklists(cellId, props.workspaceId),
+              filenameLabel: entry.feature,
+            });
           },
         });
         items.push({
@@ -1666,7 +1760,7 @@ const NodeTree: Component<Props> = (props) => {
       <input
         ref={importInputRef}
         type="file"
-        accept="application/json,.json"
+        accept="application/json,.json,.imx"
         class="tree-import-hidden"
         onChange={(e) => void onImportFileChosen(e)}
       />
