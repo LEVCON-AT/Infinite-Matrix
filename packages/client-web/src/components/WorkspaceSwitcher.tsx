@@ -116,45 +116,45 @@ const WorkspaceSwitcher: Component<Props> = (props) => {
           onClick={toggle}
         >
           <span class="ws-name">{current()?.name ?? 'Auswaehlen'}</span>
-          <Show when={current()}>
-            <span class="ws-role">{roleLabel[current()!.role]}</span>
-          </Show>
+          <Show when={current()}>{(c) => <span class="ws-role">{roleLabel[c().role]}</span>}</Show>
           <Icon name={open() ? 'chevron-up' : 'chevron-down'} size={14} class="ws-switcher-chev" />
         </button>
         <Show when={open() && pos()}>
-          <Portal mount={document.body}>
-            <ul
-              class="ws-switcher-menu"
-              // biome-ignore lint/a11y/useSemanticElements: bewusst <ul role="listbox"> statt <select> — nativer <select> kann nicht via Portal gerendert werden und stylet uneinheitlich.
-              // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: ARIA-Listbox auf ul ist Standard-Pattern fuer custom dropdowns.
-              role="listbox"
-              ref={menuEl}
-              tabIndex={-1}
-              style={{
-                left: `${pos()!.left}px`,
-                top: `${pos()!.top}px`,
-                'min-width': `${pos()!.width}px`,
-              }}
-            >
-              <For each={props.workspaces}>
-                {(ws) => (
-                  <li>
-                    <button
-                      type="button"
-                      // biome-ignore lint/a11y/useSemanticElements: bewusst <button role="option"> — option-element ist nur in <select> valide.
-                      role="option"
-                      aria-selected={ws.id === props.currentWorkspaceId}
-                      classList={{ active: ws.id === props.currentWorkspaceId }}
-                      onClick={() => pick(ws.id)}
-                    >
-                      <span class="ws-name">{ws.name}</span>
-                      <span class="ws-role">{roleLabel[ws.role]}</span>
-                    </button>
-                  </li>
-                )}
-              </For>
-            </ul>
-          </Portal>
+          {(menuPos) => (
+            <Portal mount={document.body}>
+              <ul
+                class="ws-switcher-menu"
+                // biome-ignore lint/a11y/useSemanticElements: bewusst <ul role="listbox"> statt <select> — nativer <select> kann nicht via Portal gerendert werden und stylet uneinheitlich.
+                // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: ARIA-Listbox auf ul ist Standard-Pattern fuer custom dropdowns.
+                role="listbox"
+                ref={menuEl}
+                tabIndex={-1}
+                style={{
+                  left: `${menuPos().left}px`,
+                  top: `${menuPos().top}px`,
+                  'min-width': `${menuPos().width}px`,
+                }}
+              >
+                <For each={props.workspaces}>
+                  {(ws) => (
+                    <li>
+                      <button
+                        type="button"
+                        // biome-ignore lint/a11y/useSemanticElements: bewusst <button role="option"> — option-element ist nur in <select> valide.
+                        role="option"
+                        aria-selected={ws.id === props.currentWorkspaceId}
+                        classList={{ active: ws.id === props.currentWorkspaceId }}
+                        onClick={() => pick(ws.id)}
+                      >
+                        <span class="ws-name">{ws.name}</span>
+                        <span class="ws-role">{roleLabel[ws.role]}</span>
+                      </button>
+                    </li>
+                  )}
+                </For>
+              </ul>
+            </Portal>
+          )}
         </Show>
       </Show>
     </div>

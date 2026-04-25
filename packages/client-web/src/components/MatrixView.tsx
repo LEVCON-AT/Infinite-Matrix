@@ -444,20 +444,24 @@ const MatrixView: Component<Props> = (p) => {
   return (
     <div class="matrix-wrap">
       <Show when={overlayTarget()}>
-        <CellOverlay
-          workspaceId={p.workspaceId}
-          matrixId={p.matrixId}
-          row={overlayTarget()!.row}
-          col={overlayTarget()!.col}
-          cell={overlayTarget()!.cell}
-          onClose={() => setOverlayTarget(null)}
-          onChanged={() => p.onChanged?.()}
-        />
+        {(target) => (
+          <CellOverlay
+            workspaceId={p.workspaceId}
+            matrixId={p.matrixId}
+            row={target().row}
+            col={target().col}
+            cell={target().cell}
+            onClose={() => setOverlayTarget(null)}
+            onChanged={() => p.onChanged?.()}
+          />
+        )}
       </Show>
 
       <Show
         when={
           contentMatches() && (p.content?.rows.length ?? 0) > 0 && (p.content?.cols.length ?? 0) > 0
+            ? p.content
+            : null
         }
         fallback={
           <div class="matrix-empty">
@@ -480,9 +484,9 @@ const MatrixView: Component<Props> = (p) => {
           </div>
         }
       >
-        {(_) => {
-          const rows = () => p.content!.rows;
-          const cols = () => p.content!.cols;
+        {(content) => {
+          const rows = () => content().rows;
+          const cols = () => content().cols;
 
           // Eine Extra-Spalte rechts fuer "+ Spalte"-Button im Edit-Mode.
           const gridStyle = () => {
@@ -679,12 +683,13 @@ const MatrixView: Component<Props> = (p) => {
                             }}
                           >
                             <Show when={cell()?.alias}>
-                              <span class="mx-cell-alias">^{cell()!.alias}</span>
+                              {(alias) => <span class="mx-cell-alias">^{alias()}</span>}
                             </Show>
                             <Show
-                              when={
-                                features().length > 0 || (cell() && p.cellsWithDocs.has(cell()!.id))
-                              }
+                              when={(() => {
+                                const c = cell();
+                                return features().length > 0 || (c && p.cellsWithDocs.has(c.id));
+                              })()}
                             >
                               <div class="mx-cell-feats">
                                 <For each={features()}>
@@ -711,7 +716,12 @@ const MatrixView: Component<Props> = (p) => {
                                     );
                                   }}
                                 </For>
-                                <Show when={cell() && p.cellsWithDocs.has(cell()!.id)}>
+                                <Show
+                                  when={(() => {
+                                    const c = cell();
+                                    return c ? p.cellsWithDocs.has(c.id) : false;
+                                  })()}
+                                >
                                   {/* biome-ignore lint/a11y/useKeyWithClickEvents: Chip-Klick offen-Doku; Tastatur-Bedienung via Matrix-Navigation + 'd'-Shortcut (siehe KeyboardHelp). */}
                                   <span
                                     class="mx-feat-chip mx-feat-chip-link"

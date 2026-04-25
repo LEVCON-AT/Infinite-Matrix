@@ -15,16 +15,18 @@ const Toasts: Component = () => {
           <div class="toast" data-kind={t.kind}>
             <span class="toast-msg">{t.msg}</span>
             <Show when={t.action}>
-              <button
-                type="button"
-                class="toast-action"
-                onClick={() => {
-                  t.action!.onClick();
-                  dismissToast(t.id);
-                }}
-              >
-                {t.action!.label}
-              </button>
+              {(action) => (
+                <button
+                  type="button"
+                  class="toast-action"
+                  onClick={() => {
+                    action().onClick();
+                    dismissToast(t.id);
+                  }}
+                >
+                  {action().label}
+                </button>
+              )}
             </Show>
             <button
               type="button"

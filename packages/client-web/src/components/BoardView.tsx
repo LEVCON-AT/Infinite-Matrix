@@ -106,8 +106,8 @@ function sortComparator(
       const aHas = !!a.deadline;
       const bHas = !!b.deadline;
       if (aHas !== bHas) return aHas ? -1 : 1;
-      if (aHas && a.deadline !== b.deadline) {
-        return a.deadline! < b.deadline! ? -1 : 1;
+      if (aHas && a.deadline && b.deadline && a.deadline !== b.deadline) {
+        return a.deadline < b.deadline ? -1 : 1;
       }
     } else if (mode === 'priority') {
       const ap = a.priority;
@@ -629,12 +629,12 @@ const BoardView: Component<Props> = (p) => {
 
   return (
     <Show when={p.content} fallback={<p class="hint">Lade Board…</p>}>
-      {(_) => (
+      {(content) => (
         <div class="board">
           {/* Board-Header: Filter-Suche + Archiv-Toggle. Immer sichtbar,
               sobald das Board Karten hat — Suche sparen sich leere
               Boards. */}
-          <Show when={(p.content!.kbCards ?? []).length > 0}>
+          <Show when={(content().kbCards ?? []).length > 0}>
             <div class="board-header-bar">
               <div class="board-filter-wrap">
                 <span class="board-filter-icon" aria-hidden="true">
@@ -713,9 +713,9 @@ const BoardView: Component<Props> = (p) => {
 
           {/* Links-Leiste. Im View-Mode Chips als <a>, im Edit-Mode
               Inline-Edit: Typ, Label, URL + Delete. */}
-          <Show when={(p.content!.links ?? []).length > 0 || canAddInfoField()}>
+          <Show when={(content().links ?? []).length > 0 || canAddInfoField()}>
             <div class="board-links">
-              <For each={p.content!.links ?? []}>
+              <For each={content().links ?? []}>
                 {(link) => (
                   <Show
                     when={canAddInfoField()}
@@ -946,9 +946,7 @@ const BoardView: Component<Props> = (p) => {
                         <ul class="kb-cards">
                           <For each={list()}>
                             {(card, cardIdx) => {
-                              const progress = createMemo(() =>
-                                checklistProgress(card, p.content!),
-                              );
+                              const progress = createMemo(() => checklistProgress(card, content()));
                               const deadline = fmtDate(card.deadline);
                               const dropBefore = () =>
                                 dragOverCardId() === card.id &&
@@ -1049,12 +1047,14 @@ const BoardView: Component<Props> = (p) => {
                                         </span>
                                       </Show>
                                       <Show when={progress()}>
-                                        <span class="kb-cl-progress">
-                                          <Icon name="check-circle" size={11} />
-                                          <span>
-                                            {progress()!.done}/{progress()!.total}
+                                        {(prog) => (
+                                          <span class="kb-cl-progress">
+                                            <Icon name="check-circle" size={11} />
+                                            <span>
+                                              {prog().done}/{prog().total}
+                                            </span>
                                           </span>
-                                        </span>
+                                        )}
                                       </Show>
                                     </div>
                                   </Show>
@@ -1176,16 +1176,16 @@ const BoardView: Component<Props> = (p) => {
           {/* Standalone-Checklisten. Section wird gerendert, sobald
               Listen da sind ODER der Edit-Mode aktiv ist (damit der
               "+ Checkliste"-Button erreichbar bleibt). */}
-          <Show when={(p.content!.checklists ?? []).length > 0 || canAddInfoField()}>
+          <Show when={(content().checklists ?? []).length > 0 || canAddInfoField()}>
             <section class="board-checklists">
               <h3 class="board-section-title">Checklisten</h3>
-              <Show when={(p.content!.checklists ?? []).length > 0}>
+              <Show when={(content().checklists ?? []).length > 0}>
                 <ul class="cl-list">
-                  <For each={p.content!.checklists}>
+                  <For each={content().checklists}>
                     {(cl) => {
                       const items = () =>
-                        p
-                          .content!.checklistItems.filter((it) => it.checklist_id === cl.id)
+                        content()
+                          .checklistItems.filter((it) => it.checklist_id === cl.id)
                           .sort((a, b) => a.position - b.position);
                       return (
                         <ChecklistPanel
@@ -1214,12 +1214,14 @@ const BoardView: Component<Props> = (p) => {
           </Show>
 
           <Show when={selectedCard()}>
-            <CardOverlay
-              card={selectedCard()!}
-              content={p.content!}
-              onClose={() => setSelectedCardId(null)}
-              onChanged={() => p.onChanged?.()}
-            />
+            {(card) => (
+              <CardOverlay
+                card={card()}
+                content={content()}
+                onClose={() => setSelectedCardId(null)}
+                onChanged={() => p.onChanged?.()}
+              />
+            )}
           </Show>
         </div>
       )}

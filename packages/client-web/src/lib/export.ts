@@ -342,7 +342,8 @@ function collectSubtreeIds(
   };
   const stack = [rootNodeId];
   while (stack.length > 0) {
-    const id = stack.pop()!;
+    const id = stack.pop();
+    if (id === undefined) break;
     if (set.nodeIds.has(id)) continue;
     const node = nodeById.get(id);
     if (!node) continue;

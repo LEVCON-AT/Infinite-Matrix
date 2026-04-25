@@ -26,49 +26,51 @@ const AliasAutocomplete: Component = () => {
   });
 
   return (
-    <Show when={s().open && pos() && s().matches.length > 0}>
-      <div
-        class="alias-ac-popup"
-        style={{
-          position: 'fixed',
-          left: `${pos()!.left}px`,
-          top: `${pos()!.top}px`,
-          'max-width': `${POPUP_MAX_W}px`,
-          'z-index': '10000',
-        }}
-        // biome-ignore lint/a11y/useSemanticElements: bewusst <div role="listbox"> — Popup wird absolut positioniert via Portal, kein nativer <select> moeglich.
-        role="listbox"
-        aria-label="Alias-Vorschlaege"
-        tabIndex={-1}
-      >
-        <For each={s().matches}>
-          {(m, i) => (
-            <div
-              class="alias-ac-item"
-              classList={{ active: s().activeIdx === i() }}
-              // biome-ignore lint/a11y/useSemanticElements: <div role="option"> — <option> ist nur in <select> valide.
-              role="option"
-              aria-selected={s().activeIdx === i()}
-              tabIndex={-1}
-              onMouseDown={(e) => {
-                // onMouseDown (nicht onClick) + preventDefault: der Focus
-                // bleibt auf dem Input, onBlur feuert nicht, der Commit
-                // hinterher setzt den Cursor korrekt.
-                e.preventDefault();
-                commitAliasAutocomplete(i());
-              }}
-            >
-              <span class="alias-ac-name">^{m.alias}</span>
-              <Show when={m.label}>
-                <span class="alias-ac-label">{m.label}</span>
-              </Show>
-              <Show when={m.subLabel}>
-                <span class="alias-ac-kind">{m.subLabel}</span>
-              </Show>
-            </div>
-          )}
-        </For>
-      </div>
+    <Show when={s().open && s().matches.length > 0 && pos()}>
+      {(anchorPos) => (
+        <div
+          class="alias-ac-popup"
+          style={{
+            position: 'fixed',
+            left: `${anchorPos().left}px`,
+            top: `${anchorPos().top}px`,
+            'max-width': `${POPUP_MAX_W}px`,
+            'z-index': '10000',
+          }}
+          // biome-ignore lint/a11y/useSemanticElements: bewusst <div role="listbox"> — Popup wird absolut positioniert via Portal, kein nativer <select> moeglich.
+          role="listbox"
+          aria-label="Alias-Vorschlaege"
+          tabIndex={-1}
+        >
+          <For each={s().matches}>
+            {(m, i) => (
+              <div
+                class="alias-ac-item"
+                classList={{ active: s().activeIdx === i() }}
+                // biome-ignore lint/a11y/useSemanticElements: <div role="option"> — <option> ist nur in <select> valide.
+                role="option"
+                aria-selected={s().activeIdx === i()}
+                tabIndex={-1}
+                onMouseDown={(e) => {
+                  // onMouseDown (nicht onClick) + preventDefault: der Focus
+                  // bleibt auf dem Input, onBlur feuert nicht, der Commit
+                  // hinterher setzt den Cursor korrekt.
+                  e.preventDefault();
+                  commitAliasAutocomplete(i());
+                }}
+              >
+                <span class="alias-ac-name">^{m.alias}</span>
+                <Show when={m.label}>
+                  <span class="alias-ac-label">{m.label}</span>
+                </Show>
+                <Show when={m.subLabel}>
+                  <span class="alias-ac-kind">{m.subLabel}</span>
+                </Show>
+              </div>
+            )}
+          </For>
+        </div>
+      )}
     </Show>
   );
 };

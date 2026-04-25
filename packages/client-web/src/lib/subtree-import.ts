@@ -186,6 +186,18 @@ function remap(id: string | null | undefined, map: RemapMap): string | null {
   return mapped;
 }
 
+// Hard-remap: id MUSS in der Map sein, sonst Programmierfehler.
+// Wird genutzt fuer alle "wir haben gerade vorher ueber alle Rows
+// iteriert und neue UUIDs vergeben"-Fälle, in denen ein fehlender
+// Eintrag ein echter Bug waere.
+function mustRemap(id: string, map: RemapMap): string {
+  const mapped = map.get(id);
+  if (!mapped) {
+    throw new Error(`Import: remapMap fehlt Eintrag fuer "${id}" — Pre-Pass nicht durchgelaufen?`);
+  }
+  return mapped;
+}
+
 // Alias-Dedup: wenn alias in Target-Workspace schon existiert, Suffix
 // '-2', '-3' etc. anhaengen. Lookup via alias_index-Table (wenn
 // vorhanden) oder alternativ direktes Query.
@@ -416,7 +428,8 @@ async function collectDescendantNodeIds(rootMatrixId: string): Promise<string[]>
   const seen = new Set<string>([rootMatrixId]);
   const stack: string[] = [rootMatrixId];
   while (stack.length > 0) {
-    const id = stack.pop()!;
+    const id = stack.pop();
+    if (id === undefined) break;
     const { data: cells, error } = await supabase
       .from('cells')
       .select('child_matrix_id, board_id')
@@ -610,13 +623,13 @@ export async function executeSubtreeImportIntoCell(args: {
   // weil die gezielten cells erst in einer spaeteren Phase existieren
   // (FK-Schleife: nodes -> cells -> nodes). Die korrekten Parent-
   // Verweise werden nach den cells per UPDATE nachgezogen.
-  const rootNewId = remapMap.get(rootRow.id)!;
+  const rootNewId = mustRemap(rootRow.id, remapMap);
   const nodesOut = (payload.nodes as Array<Record<string, unknown>>).map((n) => {
     const id = (n as { id: string }).id;
     return applyAliasMap(
       {
         ...n,
-        id: remapMap.get(id)!,
+        id: mustRemap(id, remapMap),
         workspace_id: workspaceId,
         // Im Insert zunaechst NULL. Root-Node und alle Sub-Nodes
         // bekommen ihren parent_cell_id erst im UPDATE-Schritt
@@ -630,7 +643,7 @@ export async function executeSubtreeImportIntoCell(args: {
   // (Target-Cell fuer Root, remapped cell-id fuer Sub-Nodes).
   const nodeParentUpdates: Array<{ id: string; parent_cell_id: string }> = [];
   for (const n of payload.nodes as Array<{ id: string; parent_cell_id: string | null }>) {
-    const newId = remapMap.get(n.id)!;
+    const newId = mustRemap(n.id, remapMap);
     if (n.id === rootRow.id) {
       nodeParentUpdates.push({ id: newId, parent_cell_id: targetCellId });
     } else if (n.parent_cell_id) {
@@ -643,14 +656,14 @@ export async function executeSubtreeImportIntoCell(args: {
 
   const rowsOut = (payload.rows as Array<Record<string, unknown>>).map((r) => ({
     ...r,
-    id: remapMap.get((r as { id: string }).id)!,
+    id: mustRemap((r as { id: string }).id, remapMap),
     workspace_id: workspaceId,
     matrix_id: remap((r as { matrix_id: string }).matrix_id, remapMap),
   }));
 
   const colsOut = (payload.cols as Array<Record<string, unknown>>).map((c) => ({
     ...c,
-    id: remapMap.get((c as { id: string }).id)!,
+    id: mustRemap((c as { id: string }).id, remapMap),
     workspace_id: workspaceId,
     matrix_id: remap((c as { matrix_id: string }).matrix_id, remapMap),
   }));
@@ -667,7 +680,7 @@ export async function executeSubtreeImportIntoCell(args: {
     return applyAliasMap(
       {
         ...c,
-        id: remapMap.get(raw.id)!,
+        id: mustRemap(raw.id, remapMap),
         workspace_id: workspaceId,
         matrix_id: remap(raw.matrix_id, remapMap),
         row_id: remap(raw.row_id, remapMap),
@@ -681,7 +694,7 @@ export async function executeSubtreeImportIntoCell(args: {
 
   const kbColsOut = (payload.kb_cols as Array<Record<string, unknown>>).map((k) => ({
     ...k,
-    id: remapMap.get((k as { id: string }).id)!,
+    id: mustRemap((k as { id: string }).id, remapMap),
     workspace_id: workspaceId,
     board_id: remap((k as { board_id: string }).board_id, remapMap),
   }));
@@ -699,20 +712,20 @@ export async function executeSubtreeImportIntoCell(args: {
     // nach dem Import auf alte / nicht existierende Checklisten.
     const checklistRefMapped =
       raw.checklist_ref && remapMap.has(raw.checklist_ref)
-        ? remapMap.get(raw.checklist_ref)!
+        ? mustRemap(raw.checklist_ref, remapMap)
         : raw.checklist_ref
           ? null // Referenz zeigt aus dem Payload raus — sauber auf NULL setzen.
           : null;
     const sourceClMapped =
       raw.source_cl_id && remapMap.has(raw.source_cl_id)
-        ? remapMap.get(raw.source_cl_id)!
+        ? mustRemap(raw.source_cl_id, remapMap)
         : raw.source_cl_id
           ? null
           : null;
     return applyAliasMap(
       {
         ...k,
-        id: remapMap.get(raw.id)!,
+        id: mustRemap(raw.id, remapMap),
         workspace_id: workspaceId,
         board_id: remap(raw.board_id, remapMap),
         col_id: remap(raw.col_id, remapMap),
@@ -736,7 +749,7 @@ export async function executeSubtreeImportIntoCell(args: {
     let mappedCellId: string | null = null;
     if (raw.cell_id) {
       if (remapMap.has(raw.cell_id)) {
-        mappedCellId = remapMap.get(raw.cell_id)!;
+        mappedCellId = mustRemap(raw.cell_id, remapMap);
       } else {
         // cell_id gehoert zu einer Cell, die nicht im Export drin ist —
         // das ist die Container-Zelle des Exports. Ziel-Zelle nehmen.
@@ -746,7 +759,7 @@ export async function executeSubtreeImportIntoCell(args: {
     return applyAliasMap(
       {
         ...cl,
-        id: remapMap.get(raw.id)!,
+        id: mustRemap(raw.id, remapMap),
         workspace_id: workspaceId,
         board_id: remap(raw.board_id, remapMap),
         cell_id: mappedCellId,
@@ -758,7 +771,7 @@ export async function executeSubtreeImportIntoCell(args: {
   const checklistItemsOut = (payload.checklist_items as Array<Record<string, unknown>>).map(
     (it) => ({
       ...it,
-      id: remapMap.get((it as { id: string }).id)!,
+      id: mustRemap((it as { id: string }).id, remapMap),
       workspace_id: workspaceId,
       checklist_id: remap((it as { checklist_id: string }).checklist_id, remapMap),
     }),
@@ -769,7 +782,7 @@ export async function executeSubtreeImportIntoCell(args: {
     return applyAliasMap(
       {
         ...l,
-        id: remapMap.get(raw.id)!,
+        id: mustRemap(raw.id, remapMap),
         workspace_id: workspaceId,
         board_id: remap(raw.board_id, remapMap),
       },
@@ -790,13 +803,13 @@ export async function executeSubtreeImportIntoCell(args: {
     let attached: string | null = null;
     if (raw.attached_cell_id) {
       attached = remapMap.has(raw.attached_cell_id)
-        ? remapMap.get(raw.attached_cell_id)!
+        ? mustRemap(raw.attached_cell_id, remapMap)
         : targetCellId;
     }
     return applyAliasMap(
       {
         ...d,
-        id: remapMap.get(raw.id)!,
+        id: mustRemap(raw.id, remapMap),
         workspace_id: workspaceId,
         attached_cell_id: attached,
       },
@@ -1076,7 +1089,7 @@ async function executeCellContainerMerge(args: {
       return applyAliasMap(
         {
           ...cl,
-          id: remapMap.get(raw.id)!,
+          id: mustRemap(raw.id, remapMap),
           workspace_id: workspaceId,
           board_id: null,
           cell_id: targetCellId,
@@ -1087,7 +1100,7 @@ async function executeCellContainerMerge(args: {
     });
     const itemsOut = (payload.checklist_items as Array<Record<string, unknown>>).map((it) => ({
       ...it,
-      id: remapMap.get((it as { id: string }).id)!,
+      id: mustRemap((it as { id: string }).id, remapMap),
       workspace_id: workspaceId,
       checklist_id: remap((it as { checklist_id: string }).checklist_id, remapMap),
     }));
@@ -1281,7 +1294,7 @@ export async function executeFeatureChecklistsImport(args: {
     return applyAliasMap(
       {
         ...cl,
-        id: remapMap.get(raw.id)!,
+        id: mustRemap(raw.id, remapMap),
         workspace_id: workspaceId,
         board_id: null,
         cell_id: targetCellId,
@@ -1293,7 +1306,7 @@ export async function executeFeatureChecklistsImport(args: {
 
   const itemsOut = (payload.checklist_items as Array<Record<string, unknown>>).map((it) => ({
     ...it,
-    id: remapMap.get((it as { id: string }).id)!,
+    id: mustRemap((it as { id: string }).id, remapMap),
     workspace_id: workspaceId,
     checklist_id: remap((it as { checklist_id: string }).checklist_id, remapMap),
   }));
@@ -1454,7 +1467,7 @@ export async function executeSubtreeImportIntoMatrix(args: {
       applyAliasMap(
         {
           ...n,
-          id: remapMap.get((n as { id: string }).id)!,
+          id: mustRemap((n as { id: string }).id, remapMap),
           workspace_id: workspaceId,
           parent_cell_id: null,
         },
@@ -1472,7 +1485,7 @@ export async function executeSubtreeImportIntoMatrix(args: {
       const mapped = remapMap.get(n.parent_cell_id);
       if (mapped) {
         nodeParentUpdates.push({
-          id: remapMap.get(n.id)!,
+          id: mustRemap(n.id, remapMap),
           parent_cell_id: mapped,
         });
       }
@@ -1485,7 +1498,7 @@ export async function executeSubtreeImportIntoMatrix(args: {
     const raw = r as { id: string; position?: number };
     return {
       ...r,
-      id: remapMap.get(raw.id)!,
+      id: mustRemap(raw.id, remapMap),
       workspace_id: workspaceId,
       matrix_id: targetMatrixId,
       position: rowOffset + (raw.position ?? idx),
@@ -1495,7 +1508,7 @@ export async function executeSubtreeImportIntoMatrix(args: {
     const raw = c as { id: string; position?: number };
     return {
       ...c,
-      id: remapMap.get(raw.id)!,
+      id: mustRemap(raw.id, remapMap),
       workspace_id: workspaceId,
       matrix_id: targetMatrixId,
       position: colOffset + (raw.position ?? idx),
@@ -1514,7 +1527,7 @@ export async function executeSubtreeImportIntoMatrix(args: {
     return applyAliasMap(
       {
         ...c,
-        id: remapMap.get(raw.id)!,
+        id: mustRemap(raw.id, remapMap),
         workspace_id: workspaceId,
         matrix_id: remap(raw.matrix_id, remapMap),
         row_id: remap(raw.row_id, remapMap),
@@ -1528,7 +1541,7 @@ export async function executeSubtreeImportIntoMatrix(args: {
 
   const kbColsOut = (payload.kb_cols as Array<Record<string, unknown>>).map((k) => ({
     ...k,
-    id: remapMap.get((k as { id: string }).id)!,
+    id: mustRemap((k as { id: string }).id, remapMap),
     workspace_id: workspaceId,
     board_id: remap((k as { board_id: string }).board_id, remapMap),
   }));
@@ -1543,17 +1556,17 @@ export async function executeSubtreeImportIntoMatrix(args: {
     return applyAliasMap(
       {
         ...k,
-        id: remapMap.get(raw.id)!,
+        id: mustRemap(raw.id, remapMap),
         workspace_id: workspaceId,
         board_id: remap(raw.board_id, remapMap),
         col_id: remap(raw.col_id, remapMap),
         checklist_ref:
           raw.checklist_ref && remapMap.has(raw.checklist_ref)
-            ? remapMap.get(raw.checklist_ref)!
+            ? mustRemap(raw.checklist_ref, remapMap)
             : null,
         source_cl_id:
           raw.source_cl_id && remapMap.has(raw.source_cl_id)
-            ? remapMap.get(raw.source_cl_id)!
+            ? mustRemap(raw.source_cl_id, remapMap)
             : null,
       },
       aliasMap,
@@ -1568,7 +1581,7 @@ export async function executeSubtreeImportIntoMatrix(args: {
     return applyAliasMap(
       {
         ...cl,
-        id: remapMap.get(raw.id)!,
+        id: mustRemap(raw.id, remapMap),
         workspace_id: workspaceId,
         board_id: remap(raw.board_id, remapMap),
         cell_id: remap(raw.cell_id, remapMap),
@@ -1579,7 +1592,7 @@ export async function executeSubtreeImportIntoMatrix(args: {
   const checklistItemsOut = (payload.checklist_items as Array<Record<string, unknown>>).map(
     (it) => ({
       ...it,
-      id: remapMap.get((it as { id: string }).id)!,
+      id: mustRemap((it as { id: string }).id, remapMap),
       workspace_id: workspaceId,
       checklist_id: remap((it as { checklist_id: string }).checklist_id, remapMap),
     }),
@@ -1589,7 +1602,7 @@ export async function executeSubtreeImportIntoMatrix(args: {
     return applyAliasMap(
       {
         ...l,
-        id: remapMap.get(raw.id)!,
+        id: mustRemap(raw.id, remapMap),
         workspace_id: workspaceId,
         board_id: remap(raw.board_id, remapMap),
         url: sanitizeUrl(raw.url) ?? '',
@@ -1603,12 +1616,12 @@ export async function executeSubtreeImportIntoMatrix(args: {
     // workspace-freie Docs haengen im Matrix-Import ohne Zelle.
     const attached =
       raw.attached_cell_id && remapMap.has(raw.attached_cell_id)
-        ? remapMap.get(raw.attached_cell_id)!
+        ? mustRemap(raw.attached_cell_id, remapMap)
         : null;
     return applyAliasMap(
       {
         ...d,
-        id: remapMap.get(raw.id)!,
+        id: mustRemap(raw.id, remapMap),
         workspace_id: workspaceId,
         attached_cell_id: attached,
       },
@@ -1837,7 +1850,7 @@ export async function executeSubtreeImportIntoBoard(args: {
 
   const kbColsOut = kbColsSrc.map((k, idx) => ({
     ...(k as unknown as Record<string, unknown>),
-    id: remapMap.get(k.id)!,
+    id: mustRemap(k.id, remapMap),
     workspace_id: workspaceId,
     board_id: targetBoardId,
     position: colOffset + (k.position ?? idx),
@@ -1846,14 +1859,18 @@ export async function executeSubtreeImportIntoBoard(args: {
     applyAliasMap(
       {
         ...(k as unknown as Record<string, unknown>),
-        id: remapMap.get(k.id)!,
+        id: mustRemap(k.id, remapMap),
         workspace_id: workspaceId,
         board_id: targetBoardId,
         col_id: remap(k.col_id, remapMap),
         checklist_ref:
-          k.checklist_ref && remapMap.has(k.checklist_ref) ? remapMap.get(k.checklist_ref)! : null,
+          k.checklist_ref && remapMap.has(k.checklist_ref)
+            ? mustRemap(k.checklist_ref, remapMap)
+            : null,
         source_cl_id:
-          k.source_cl_id && remapMap.has(k.source_cl_id) ? remapMap.get(k.source_cl_id)! : null,
+          k.source_cl_id && remapMap.has(k.source_cl_id)
+            ? mustRemap(k.source_cl_id, remapMap)
+            : null,
       },
       aliasMap,
     ),
@@ -1862,7 +1879,7 @@ export async function executeSubtreeImportIntoBoard(args: {
     applyAliasMap(
       {
         ...(cl as unknown as Record<string, unknown>),
-        id: remapMap.get(cl.id)!,
+        id: mustRemap(cl.id, remapMap),
         workspace_id: workspaceId,
         board_id: targetBoardId,
         cell_id: null,
@@ -1872,7 +1889,7 @@ export async function executeSubtreeImportIntoBoard(args: {
   );
   const checklistItemsOut = itemsSrc.map((it) => ({
     ...(it as unknown as Record<string, unknown>),
-    id: remapMap.get(it.id)!,
+    id: mustRemap(it.id, remapMap),
     workspace_id: workspaceId,
     checklist_id: remap(it.checklist_id, remapMap),
   }));
@@ -1880,7 +1897,7 @@ export async function executeSubtreeImportIntoBoard(args: {
     applyAliasMap(
       {
         ...(l as unknown as Record<string, unknown>),
-        id: remapMap.get(l.id)!,
+        id: mustRemap(l.id, remapMap),
         workspace_id: workspaceId,
         board_id: targetBoardId,
         position: linkOffset + (l.position ?? idx),

@@ -622,12 +622,11 @@ const CardOverlay: Component<Props> = (p) => {
                 onChange={(e) => onDeadline(e.currentTarget.value)}
               />
               <Show when={!isCardDone(p.card) && deadlineWarning()}>
-                <span
-                  class="overlay-deadline-warning"
-                  data-deadline-state={deadlineWarning()!.state}
-                >
-                  {deadlineWarning()!.label}
-                </span>
+                {(warning) => (
+                  <span class="overlay-deadline-warning" data-deadline-state={warning().state}>
+                    {warning().label}
+                  </span>
+                )}
               </Show>
             </label>
 

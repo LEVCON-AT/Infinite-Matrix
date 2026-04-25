@@ -231,45 +231,49 @@ const ImportDialog: Component<Props> = (p) => {
           </Show>
 
           <Show when={phase() === 'preview' && stats()}>
-            <p class="hint">
-              Import-Plan erstellt. Folgende Daten werden in den aktuellen Workspace eingefuegt:
-            </p>
-            <ul class="import-stats">
-              <For
-                each={
-                  [
-                    ['Nodes', stats()!.nodes],
-                    ['Rows', stats()!.rows],
-                    ['Cols', stats()!.cols],
-                    ['Cells', stats()!.cells],
-                    ['Kanban-Spalten', stats()!.kbCols],
-                    ['Karten', stats()!.kbCards],
-                    ['Checklisten', stats()!.checklists],
-                    ['Checklist-Items', stats()!.checklistItems],
-                    ['Links', stats()!.links],
-                  ] as [string, number][]
-                }
-              >
-                {([label, n]) => (
-                  <li>
-                    <span class="import-stat-label">{label}</span>
-                    <span class="import-stat-n">{n}</span>
-                  </li>
-                )}
-              </For>
-            </ul>
-            <p class="hint">
-              Hinweis: bestehende Aliases im Workspace kollidieren ggf. — dann bricht der Import mit
-              Fehler ab.
-            </p>
-            <div class="import-actions-bottom">
-              <button type="button" class="btn-secondary" onClick={() => setPhase('select')}>
-                Zurueck
-              </button>
-              <button type="button" onClick={doRun}>
-                Import starten
-              </button>
-            </div>
+            {(s) => (
+              <>
+                <p class="hint">
+                  Import-Plan erstellt. Folgende Daten werden in den aktuellen Workspace eingefuegt:
+                </p>
+                <ul class="import-stats">
+                  <For
+                    each={
+                      [
+                        ['Nodes', s().nodes],
+                        ['Rows', s().rows],
+                        ['Cols', s().cols],
+                        ['Cells', s().cells],
+                        ['Kanban-Spalten', s().kbCols],
+                        ['Karten', s().kbCards],
+                        ['Checklisten', s().checklists],
+                        ['Checklist-Items', s().checklistItems],
+                        ['Links', s().links],
+                      ] as [string, number][]
+                    }
+                  >
+                    {([label, n]) => (
+                      <li>
+                        <span class="import-stat-label">{label}</span>
+                        <span class="import-stat-n">{n}</span>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+                <p class="hint">
+                  Hinweis: bestehende Aliases im Workspace kollidieren ggf. — dann bricht der Import
+                  mit Fehler ab.
+                </p>
+                <div class="import-actions-bottom">
+                  <button type="button" class="btn-secondary" onClick={() => setPhase('select')}>
+                    Zurueck
+                  </button>
+                  <button type="button" onClick={doRun}>
+                    Import starten
+                  </button>
+                </div>
+              </>
+            )}
           </Show>
 
           <Show when={phase() === 'running'}>

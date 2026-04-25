@@ -158,13 +158,15 @@ export function buildFrequencyAggregates(args: {
         row: rowById.get(c.row_id),
         col: colById.get(c.col_id),
       }))
-      .filter((d) => d.row && d.col);
+      .filter(
+        (d): d is { cell: CellRow; row: RowRow; col: ColRow } => d.row != null && d.col != null,
+      );
     decorated.sort((a, b) => {
-      const ra = a.row!.position ?? 0;
-      const rb = b.row!.position ?? 0;
+      const ra = a.row.position ?? 0;
+      const rb = b.row.position ?? 0;
       if (ra !== rb) return ra - rb;
-      const ca = a.col!.position ?? 0;
-      const cb = b.col!.position ?? 0;
+      const ca = a.col.position ?? 0;
+      const cb = b.col.position ?? 0;
       return ca - cb;
     });
 
@@ -179,7 +181,7 @@ export function buildFrequencyAggregates(args: {
         matrixId: mid,
         rowId: cell.row_id,
         colId: cell.col_id,
-        label: `${row!.label || '(Zeile)'} / ${col!.label || '(Spalte)'}`,
+        label: `${row.label || '(Zeile)'} / ${col.label || '(Spalte)'}`,
         alias: cell.alias,
         depth,
         cards: subCards,

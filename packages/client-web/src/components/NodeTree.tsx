@@ -847,8 +847,9 @@ const NodeTree: Component<Props> = (props) => {
       const cy = r.top + r.height / 2 - rootRect.top;
       meta.set(id, { cx, cy, depth, dotType, el });
       if (parent) {
-        if (!byParent.has(parent)) byParent.set(parent, []);
-        byParent.get(parent)!.push(id);
+        const list = byParent.get(parent) ?? [];
+        if (list.length === 0) byParent.set(parent, list);
+        list.push(id);
       }
     }
 
@@ -1714,16 +1715,16 @@ const NodeTree: Component<Props> = (props) => {
         onChange={(e) => void onImportFileChosen(e)}
       />
       <Show when={pasteTarget()}>
-        <ChecklistPastePopup
-          initialText={pasteTarget()!.text}
-          checklistLabel="Neue Checkliste"
-          onClose={() => setPasteTarget(null)}
-          onCommit={async (parsed) => {
-            const t = pasteTarget();
-            if (!t) return;
-            await commitPastedChecklist(t.cellId, parsed);
-          }}
-        />
+        {(target) => (
+          <ChecklistPastePopup
+            initialText={target().text}
+            checklistLabel="Neue Checkliste"
+            onClose={() => setPasteTarget(null)}
+            onCommit={async (parsed) => {
+              await commitPastedChecklist(target().cellId, parsed);
+            }}
+          />
+        )}
       </Show>
     </div>
   );

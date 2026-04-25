@@ -89,14 +89,15 @@ const ContextMenu: Component<Props> = (p) => {
   // oben/links. Die initiale Position basiert auf der Maus-Koordinate,
   // Korrektur hier via bounding-rect.
   onMount(() => {
-    if (!menuRef || !p.state) return;
+    const state = p.state;
+    if (!menuRef || !state) return;
     requestAnimationFrame(() => {
       if (!menuRef) return;
       const rect = menuRef.getBoundingClientRect();
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      let x = p.state!.x;
-      let y = p.state!.y;
+      let x = state.x;
+      let y = state.y;
       if (x + rect.width > vw - 8) x = Math.max(8, vw - rect.width - 8);
       if (y + rect.height > vh - 8) y = Math.max(8, vh - rect.height - 8);
       menuRef.style.left = `${x}px`;

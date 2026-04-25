@@ -610,13 +610,21 @@ async function execMoveCard(
     };
   }
 
+  // Hier ist targetCol garantiert gesetzt: cmd.colName-Branch hat bei
+  // not-found returned, cols.length===1-Branch setzt cols[0], und der
+  // Picker-Branch returned weiter oben.
+  if (!targetCol) {
+    return { ok: false, message: 'Interner Fehler: Spalte nicht aufloesbar.' };
+  }
+  const colId = targetCol.id;
+
   // Position ans Ende der Ziel-Spalte.
   const posInCol = content.kbCards
-    .filter((c) => c.col_id === targetCol!.id)
+    .filter((c) => c.col_id === colId)
     .reduce((max, c) => Math.max(max, c.position ?? 0), -1);
 
   try {
-    await moveCardToBoard(card.cardId, board.nodeId, targetCol.id, posInCol + 1);
+    await moveCardToBoard(card.cardId, board.nodeId, colId, posInCol + 1);
     return {
       ok: true,
       message: `Karte "${card.name}" in "${board.label}" / "${targetCol.label || '(leer)'}" verschoben.`,

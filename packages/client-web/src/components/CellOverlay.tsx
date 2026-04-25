@@ -80,7 +80,8 @@ const CellOverlay: Component<Props> = (p) => {
 
   function soleTargetNodeId(): string | null {
     if (navTargetCount() !== 1) return null;
-    const c = current()!;
+    const c = current();
+    if (!c) return null;
     return c.child_matrix_id ?? c.board_id ?? null;
   }
 

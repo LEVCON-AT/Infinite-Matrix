@@ -871,12 +871,14 @@ const Workspace: Component = () => {
                 }}
               />
             </Show>
-            <Show when={params.workspaceId && user()}>
-              <PresenceStack
-                workspaceId={params.workspaceId as string}
-                selfUserId={user()!.id}
-                selfEmail={user()!.email ?? '(anon)'}
-              />
+            <Show when={params.workspaceId ? user() : null}>
+              {(u) => (
+                <PresenceStack
+                  workspaceId={params.workspaceId as string}
+                  selfUserId={u().id}
+                  selfEmail={u().email ?? '(anon)'}
+                />
+              )}
             </Show>
             <Show when={offlineState()}>
               <span
@@ -969,100 +971,104 @@ const Workspace: Component = () => {
             fallback={<p class="hint">Waehle links eine Matrix oder ein Board.</p>}
           >
             <Show when={currentCell()}>
-              <section class="node-view">
-                <Show when={cellSection() === 'checklists'}>
-                  <CellChecklistsPage
-                    workspaceId={currentCell()!.workspace_id}
-                    cell={currentCell()!}
-                    row={cellRow()}
-                    col={cellCol()}
-                    realtimeVersion={rtCellChecklists()}
-                    realtimeDocsVersion={rtDocs()}
-                  />
-                </Show>
-                <Show when={cellSection() === 'info'}>
-                  <CellInfoPage
-                    workspaceId={currentCell()!.workspace_id}
-                    cell={currentCell()!}
-                    row={cellRow()}
-                    col={cellCol()}
-                    realtimeDocsVersion={rtDocs()}
-                    onChanged={() => {
-                      void refetchCells();
-                    }}
-                  />
-                </Show>
-                <Show when={cellSection() === 'docs'}>
-                  <CellDocsPage
-                    workspaceId={currentCell()!.workspace_id}
-                    cell={currentCell()!}
-                    row={cellRow()}
-                    col={cellCol()}
-                    realtimeDocsVersion={rtDocs()}
-                  />
-                </Show>
-              </section>
+              {(cell) => (
+                <section class="node-view">
+                  <Show when={cellSection() === 'checklists'}>
+                    <CellChecklistsPage
+                      workspaceId={cell().workspace_id}
+                      cell={cell()}
+                      row={cellRow()}
+                      col={cellCol()}
+                      realtimeVersion={rtCellChecklists()}
+                      realtimeDocsVersion={rtDocs()}
+                    />
+                  </Show>
+                  <Show when={cellSection() === 'info'}>
+                    <CellInfoPage
+                      workspaceId={cell().workspace_id}
+                      cell={cell()}
+                      row={cellRow()}
+                      col={cellCol()}
+                      realtimeDocsVersion={rtDocs()}
+                      onChanged={() => {
+                        void refetchCells();
+                      }}
+                    />
+                  </Show>
+                  <Show when={cellSection() === 'docs'}>
+                    <CellDocsPage
+                      workspaceId={cell().workspace_id}
+                      cell={cell()}
+                      row={cellRow()}
+                      col={cellCol()}
+                      realtimeDocsVersion={rtDocs()}
+                    />
+                  </Show>
+                </section>
+              )}
             </Show>
 
             <Show when={!currentCell() && currentNode()}>
-              <section class="node-view">
-                <div class="node-view-head">
-                  <h2>{currentNode()?.label || '(ohne Label)'}</h2>
-                  <Show when={currentNode()?.alias}>
-                    <span class="node-alias">^{currentNode()!.alias}</span>
+              {(node) => (
+                <section class="node-view">
+                  <div class="node-view-head">
+                    <h2>{node().label || '(ohne Label)'}</h2>
+                    <Show when={node().alias}>
+                      {(alias) => <span class="node-alias">^{alias()}</span>}
+                    </Show>
+                    <span class="node-type-badge" data-type={node().type}>
+                      {node().type}
+                    </span>
+                    <button
+                      type="button"
+                      class="btn-subtle node-view-head-doc-btn"
+                      onClick={() =>
+                        openDocsPopup({
+                          sourceAlias: node().alias ?? null,
+                        })
+                      }
+                      title="Neue Doku mit dieser Matrix/diesem Board als Quelle"
+                    >
+                      + In Doku erfassen
+                    </button>
+                  </div>
+
+                  <NodeDescription node={node()} onChanged={() => void refetchNodes()} />
+
+                  <Show when={node().type === 'matrix'}>
+                    <MatrixView
+                      workspaceId={node().workspace_id}
+                      matrixId={node().id}
+                      content={matrixContent()}
+                      cellsWithDocs={cellsWithDocs() ?? new Set<string>()}
+                      wsNodes={nodes() ?? []}
+                      wsCells={cells() ?? []}
+                      wsRows={rows() ?? []}
+                      wsCols={colsData() ?? []}
+                      cardsRealtimeVersion={rtCards()}
+                      onChanged={() => {
+                        // Nach strukturellen Aenderungen koennen neue/entfernte Sub-Nodes
+                        // im Tree sichtbar werden, und cells.child_matrix_id/board_id
+                        // aendern sich. Daher: nodes+cells auch refetchen.
+                        void refetchMatrix();
+                        void refetchNodes();
+                        void refetchCells();
+                      }}
+                    />
                   </Show>
-                  <span class="node-type-badge" data-type={currentNode()?.type}>
-                    {currentNode()?.type}
-                  </span>
-                  <button
-                    type="button"
-                    class="btn-subtle node-view-head-doc-btn"
-                    onClick={() =>
-                      openDocsPopup({
-                        sourceAlias: currentNode()?.alias ?? null,
-                      })
-                    }
-                    title="Neue Doku mit dieser Matrix/diesem Board als Quelle"
-                  >
-                    + In Doku erfassen
-                  </button>
-                </div>
 
-                <NodeDescription node={currentNode()!} onChanged={() => void refetchNodes()} />
-
-                <Show when={currentNode()?.type === 'matrix'}>
-                  <MatrixView
-                    workspaceId={currentNode()!.workspace_id}
-                    matrixId={currentNode()!.id}
-                    content={matrixContent()}
-                    cellsWithDocs={cellsWithDocs() ?? new Set<string>()}
-                    wsNodes={nodes() ?? []}
-                    wsCells={cells() ?? []}
-                    wsRows={rows() ?? []}
-                    wsCols={colsData() ?? []}
-                    cardsRealtimeVersion={rtCards()}
-                    onChanged={() => {
-                      // Nach strukturellen Aenderungen koennen neue/entfernte Sub-Nodes
-                      // im Tree sichtbar werden, und cells.child_matrix_id/board_id
-                      // aendern sich. Daher: nodes+cells auch refetchen.
-                      void refetchMatrix();
-                      void refetchNodes();
-                      void refetchCells();
-                    }}
-                  />
-                </Show>
-
-                <Show when={currentNode()?.type === 'board'}>
-                  <BoardView
-                    workspaceId={currentNode()!.workspace_id}
-                    boardId={currentNode()!.id}
-                    content={boardContent()}
-                    onChanged={() => {
-                      void refetchBoard();
-                    }}
-                  />
-                </Show>
-              </section>
+                  <Show when={node().type === 'board'}>
+                    <BoardView
+                      workspaceId={node().workspace_id}
+                      boardId={node().id}
+                      content={boardContent()}
+                      onChanged={() => {
+                        void refetchBoard();
+                      }}
+                    />
+                  </Show>
+                </section>
+              )}
             </Show>
           </Show>
         </Show>

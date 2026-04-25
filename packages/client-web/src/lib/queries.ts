@@ -597,13 +597,15 @@ export function buildSidebarTree(
         const col = colById.get(c.col_id);
         return { cell: c, row: r, col };
       })
-      .filter((d) => d.row && d.col);
+      .filter(
+        (d): d is { cell: CellRow; row: RowRow; col: ColRow } => d.row != null && d.col != null,
+      );
     decorated.sort((a, b) => {
-      const ra = a.row!.position ?? 0;
-      const rb = b.row!.position ?? 0;
+      const ra = a.row.position ?? 0;
+      const rb = b.row.position ?? 0;
       if (ra !== rb) return ra - rb;
-      const ca = a.col!.position ?? 0;
-      const cb = b.col!.position ?? 0;
+      const ca = a.col.position ?? 0;
+      const cb = b.col.position ?? 0;
       return ca - cb;
     });
 
@@ -688,8 +690,8 @@ export function buildSidebarTree(
         kind: 'cell',
         id: cell.id,
         cell,
-        rowLabel: row!.label || '(Zeile)',
-        colLabel: col!.label || '(Spalte)',
+        rowLabel: row.label || '(Zeile)',
+        colLabel: col.label || '(Spalte)',
         children: [...docChildren, ...featureChildren, ...orphanKids.map(buildNode)],
       };
       (entry.children as TreeEntry[]).push(cellEntry);
