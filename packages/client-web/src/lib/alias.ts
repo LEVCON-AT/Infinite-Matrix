@@ -14,7 +14,12 @@ import { ALIAS_TABLE_LABEL, findAliasConflict, type AliasTable } from './alias-c
 
 // Analog zum Alt-Client: 8 Zeichen, a-z/0-9, Reserved-Keywords.
 export const ALIAS_MAX_LEN = 8;
+// Validierungs-Form: matched ein KOMPLETTER Alias-String von Anfang bis Ende.
 export const ALIAS_RE = /^[a-z0-9]+$/;
+// Render-Form: matched ein `^alias`-Token im Fliesstext (g+i fuer alle Vorkommen,
+// case-insensitive Eingabe). Konsumenten setzen `lastIndex = 0` vor jedem
+// Iteration-Lauf — siehe AliasText/markdown-lite/alias-tokenizer.
+export const ALIAS_REF_RE = /\^([a-z0-9]+)/gi;
 export const RESERVED_ALIASES = ['n', 'fa', 'fi', 'fh', 'fc', 'home', 'w', 's'];
 
 export type AliasOwnerType = 'node' | 'cell' | 'card' | 'checklist' | 'link' | 'doc';

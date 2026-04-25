@@ -15,6 +15,11 @@ import { cellTarget } from '../lib/alias-dispatch';
 import type { CellRow, KbCardRow } from '../lib/types';
 import Icon from './Icon';
 
+// Hierarchische Indentation: Base-Padding + zusaetzliche Tiefe pro Level.
+// Werte aus dem HTML-Vorbild (renderFrequencyMatrix) uebernommen.
+const FREQ_INDENT_BASE = 9;
+const FREQ_INDENT_PER_LEVEL = 14;
+
 type Props = {
   workspaceId: string;
   aggregates: AggregateCell[];
@@ -135,7 +140,9 @@ const FrequencyMatrix: Component<Props> = (p) => {
                   <tr>
                     <th
                       class="freq-row-hd"
-                      style={{ 'padding-left': `${9 + agg.depth * 14}px` }}
+                      style={{
+                        'padding-left': `${FREQ_INDENT_BASE + agg.depth * FREQ_INDENT_PER_LEVEL}px`,
+                      }}
                       onClick={() => navigateToCell(agg)}
                       role="link"
                       tabIndex={0}

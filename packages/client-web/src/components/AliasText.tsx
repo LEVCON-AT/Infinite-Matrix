@@ -3,6 +3,7 @@
 // MarkdownLightView — der Parser dort erkennt Alias-Tokens ebenfalls.
 
 import { For, type Component } from 'solid-js';
+import { ALIAS_REF_RE } from '../lib/alias';
 import AliasChip from './AliasChip';
 
 type Props = {
@@ -12,14 +13,12 @@ type Props = {
 
 type Token = { kind: 'text'; value: string } | { kind: 'alias'; alias: string };
 
-const ALIAS_RE = /\^([a-z0-9]+)/gi;
-
 function tokenize(text: string): Token[] {
   const out: Token[] = [];
   let last = 0;
-  ALIAS_RE.lastIndex = 0;
+  ALIAS_REF_RE.lastIndex = 0;
   let m: RegExpExecArray | null;
-  while ((m = ALIAS_RE.exec(text)) !== null) {
+  while ((m = ALIAS_REF_RE.exec(text)) !== null) {
     if (m.index > last) out.push({ kind: 'text', value: text.slice(last, m.index) });
     out.push({ kind: 'alias', alias: m[1].toLowerCase() });
     last = m.index + m[0].length;
