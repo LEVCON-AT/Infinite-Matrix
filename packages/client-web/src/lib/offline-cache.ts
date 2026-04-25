@@ -151,6 +151,27 @@ export async function getById<T extends CacheRow = CacheRow>(
   return row ?? null;
 }
 
+// Schreibt eine einzelne Row in den Cache (Insert oder Replace via
+// keyPath=id). Verwendet von runOptimisticInsert + Optimistic-Patch
+// nach erfolgreichem Replay.
+export async function putOne<T extends CacheRow = CacheRow>(
+  table: CacheTable,
+  row: T,
+): Promise<void> {
+  const inst = await db();
+  await inst.put(table, row);
+}
+
+// Loescht eine Row aus dem Cache. Verwendet von runOptimisticDelete.
+// No-op wenn die Row nicht existiert.
+export async function deleteOne(
+  table: CacheTable,
+  id: string,
+): Promise<void> {
+  const inst = await db();
+  await inst.delete(table, id);
+}
+
 // Patcht eine einzelne Row im Cache. Gemerged wird flach (Object.
 // assign-Stil). Liefert die fertige Row zurueck — Aufrufer kann sie
 // als Optimistic-Result an die UI durchreichen. Wenn die Row noch

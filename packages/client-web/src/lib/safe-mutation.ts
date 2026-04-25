@@ -28,7 +28,13 @@ import {
   isNetworkError,
   type MutationSpec,
 } from './mutation-queue';
-import { getById, patchRow, type CacheTable } from './offline-cache';
+import {
+  deleteOne,
+  getById,
+  patchRow,
+  putOne,
+  type CacheTable,
+} from './offline-cache';
 import { showToast } from './toasts';
 
 export type RunMutationResult<T> =
@@ -82,6 +88,103 @@ export async function runOptimisticUpdate<
       'info',
     );
     return patched ?? ({ ...cached, ...args.patch } as T);
+  }
+}
+
+// Optimistic-Insert: client erzeugt die UUID + alle Pflichtfelder,
+// schiebt die Row in den Cache und queued einen Insert-Spec. Online
+// laeuft die Live-Insert-Funktion durch — return ist die Server-Row
+// (autoritativ inkl. created_at/updated_at). Offline reicht der
+// Aufrufer einen synthetischen Builder, der die Row aus den Args
+// + crypto.randomUUID() zusammensetzt. buildOffline darf async sein,
+// damit der Builder z.B. die Position aus dem Cache ableiten kann.
+export async function runOptimisticInsert<
+  T extends { id: string; workspace_id: string },
+>(args: {
+  table: CacheTable;
+  workspaceId: string;
+  buildOffline: (id: string) => T | Promise<T>;
+  label?: string;
+  run: () => Promise<T>;
+}): Promise<T> {
+  try {
+    const live = await args.run();
+    // Cache-Sync: damit nachfolgende Drill-Down-Reads die neue Row
+    // sofort sehen, schreiben wir die Server-Row in den Cache.
+    void putOne(args.table, live).catch(() => {});
+    return live;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const id = crypto.randomUUID();
+    const synth = await args.buildOffline(id);
+    await putOne(args.table, synth);
+    await enqueueMutation({
+      spec: {
+        kind: 'insert',
+        table: args.table,
+        values: synth as Record<string, unknown>,
+      },
+      workspaceId: args.workspaceId,
+      label: args.label,
+    });
+    showToast(
+      args.label
+        ? `Offline angelegt: ${args.label}.`
+        : 'Offline angelegt. Wird beim Reconnect synchronisiert.',
+      'info',
+    );
+    return synth;
+  }
+}
+
+// Optimistic-Delete: Cache-Row weg + Delete-Spec in die Queue. Online
+// laeuft die Live-Delete-Funktion durch + Cache wird ebenfalls
+// aufgeraeumt. Stale-Konflikt (Row schon weg) ist hier kein Problem,
+// das Endergebnis (weg) ist erreicht.
+//
+// workspaceId optional: wenn nicht uebergeben, wird sie aus dem
+// Cache gezogen (Row liegt da, weil sie aus einem vorherigen Read
+// stammt). Spart den Aufrufern der zig delX(id)-Helfer den expliziten
+// Workspace-Param.
+export async function runOptimisticDelete(args: {
+  table: CacheTable;
+  id: string;
+  workspaceId?: string;
+  label?: string;
+  run: () => Promise<void>;
+}): Promise<void> {
+  try {
+    await args.run();
+    await deleteOne(args.table, args.id);
+    return;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    let wsId = args.workspaceId;
+    if (!wsId) {
+      const cached = await getById(args.table, args.id);
+      wsId = cached?.workspace_id;
+    }
+    if (!wsId) {
+      // Ohne workspace_id koennen wir den Spec nicht scopen — Original-
+      // Fehler reichen wir durch (Row vermutlich schon weg).
+      throw err;
+    }
+    await deleteOne(args.table, args.id);
+    await enqueueMutation({
+      spec: {
+        kind: 'delete',
+        table: args.table,
+        match: { id: args.id },
+      },
+      workspaceId: wsId,
+      label: args.label,
+    });
+    showToast(
+      args.label
+        ? `Offline geloescht: ${args.label}.`
+        : 'Offline geloescht. Wird beim Reconnect synchronisiert.',
+      'info',
+    );
   }
 }
 

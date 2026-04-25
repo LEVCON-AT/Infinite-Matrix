@@ -10,7 +10,41 @@
 // Wird 0e.1 inkrementell fuer alle Tabellen erweitert.
 
 import { supabase } from './supabase';
-import { runOptimisticUpdate } from './safe-mutation';
+import {
+  runOptimisticDelete,
+  runOptimisticInsert,
+  runOptimisticUpdate,
+} from './safe-mutation';
+import { getById, getByWorkspace } from './offline-cache';
+import { isNetworkError } from './mutation-queue';
+
+// Offline-Helper: groesste Position im Scope finden, +1. Aufrufer
+// reicht den Filter-Pradicat, das aus dem Cache passende Rows raus-
+// zieht (z.B. board_id + col_id matchen). Liefert 0 wenn der Scope
+// noch leer ist.
+async function nextPositionFromCache(
+  table:
+    | 'rows'
+    | 'cols'
+    | 'kb_cols'
+    | 'kb_cards'
+    | 'checklists'
+    | 'links'
+    | 'checklist_items',
+  workspaceId: string,
+  filter: (r: Record<string, unknown> & { position?: number }) => boolean,
+): Promise<number> {
+  const rows = await getByWorkspace<
+    {
+      id: string;
+      position?: number;
+      workspace_id: string;
+    } & Record<string, unknown>
+  >(table, workspaceId);
+  const filtered = rows.filter(filter);
+  if (filtered.length === 0) return 0;
+  return filtered.reduce((m, r) => Math.max(m, r.position ?? -1), -1) + 1;
+}
 import type {
   CardRecur,
   CellRow,
@@ -75,46 +109,85 @@ export async function addRow(args: {
   matrixId: string;
   label?: string;
 }): Promise<RowRow> {
-  const pos = await nextPosition('rows', args.matrixId, args.workspaceId);
-  const { data, error } = await supabase
-    .from('rows')
-    .insert({
-      workspace_id: args.workspaceId,
-      matrix_id: args.matrixId,
-      label: args.label ?? '',
-      position: pos,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return data as RowRow;
+  return runOptimisticInsert<RowRow>({
+    table: 'rows',
+    workspaceId: args.workspaceId,
+    label: 'Zeile anlegen',
+    run: async () => {
+      const pos = await nextPosition('rows', args.matrixId, args.workspaceId);
+      const { data, error } = await supabase
+        .from('rows')
+        .insert({
+          workspace_id: args.workspaceId,
+          matrix_id: args.matrixId,
+          label: args.label ?? '',
+          position: pos,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as RowRow;
+    },
+    buildOffline: async (id) => {
+      const pos = await nextPositionFromCache(
+        'rows',
+        args.workspaceId,
+        (r) => r.matrix_id === args.matrixId,
+      );
+      return {
+        id,
+        workspace_id: args.workspaceId,
+        matrix_id: args.matrixId,
+        label: args.label ?? '',
+        position: pos,
+      } as unknown as RowRow;
+    },
+  });
 }
 
-export async function renameRow(rowId: string, label: string): Promise<RowRow> {
-  const { data, error } = await supabase
-    .from('rows')
-    .update({ label })
-    .eq('id', rowId)
-    .select()
-    .single();
-  if (error) throw error;
-  return data as RowRow;
+async function updateRow(
+  rowId: string,
+  patch: Partial<Pick<RowRow, 'label' | 'position'>>,
+): Promise<RowRow> {
+  return runOptimisticUpdate<RowRow>({
+    table: 'rows',
+    id: rowId,
+    patch: patch as Record<string, unknown>,
+    label: 'label' in patch ? 'Zeile umbenennen' : 'Zeile verschieben',
+    run: async () => {
+      const { data, error } = await supabase
+        .from('rows')
+        .update(patch)
+        .eq('id', rowId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as RowRow;
+    },
+  });
+}
+
+export function renameRow(rowId: string, label: string): Promise<RowRow> {
+  return updateRow(rowId, { label });
 }
 
 export async function setRowPosition(
   rowId: string,
   position: number,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('rows')
-    .update({ position })
-    .eq('id', rowId);
-  if (error) throw error;
+  await updateRow(rowId, { position });
 }
 
 export async function delRow(rowId: string): Promise<void> {
-  const { error } = await supabase.from('rows').delete().eq('id', rowId);
-  if (error) throw error;
+  await runOptimisticDelete({
+    table: 'rows',
+    id: rowId,
+    label: 'Zeile loeschen',
+    run: async () => {
+      const { error } = await supabase.from('rows').delete().eq('id', rowId);
+      if (error) throw error;
+    },
+  });
 }
 
 // ─── cols ──────────────────────────────────────────────────────
@@ -123,46 +196,85 @@ export async function addCol(args: {
   matrixId: string;
   label?: string;
 }): Promise<ColRow> {
-  const pos = await nextPosition('cols', args.matrixId, args.workspaceId);
-  const { data, error } = await supabase
-    .from('cols')
-    .insert({
-      workspace_id: args.workspaceId,
-      matrix_id: args.matrixId,
-      label: args.label ?? '',
-      position: pos,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return data as ColRow;
+  return runOptimisticInsert<ColRow>({
+    table: 'cols',
+    workspaceId: args.workspaceId,
+    label: 'Spalte anlegen',
+    run: async () => {
+      const pos = await nextPosition('cols', args.matrixId, args.workspaceId);
+      const { data, error } = await supabase
+        .from('cols')
+        .insert({
+          workspace_id: args.workspaceId,
+          matrix_id: args.matrixId,
+          label: args.label ?? '',
+          position: pos,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as ColRow;
+    },
+    buildOffline: async (id) => {
+      const pos = await nextPositionFromCache(
+        'cols',
+        args.workspaceId,
+        (r) => r.matrix_id === args.matrixId,
+      );
+      return {
+        id,
+        workspace_id: args.workspaceId,
+        matrix_id: args.matrixId,
+        label: args.label ?? '',
+        position: pos,
+      } as unknown as ColRow;
+    },
+  });
 }
 
-export async function renameCol(colId: string, label: string): Promise<ColRow> {
-  const { data, error } = await supabase
-    .from('cols')
-    .update({ label })
-    .eq('id', colId)
-    .select()
-    .single();
-  if (error) throw error;
-  return data as ColRow;
+async function updateCol(
+  colId: string,
+  patch: Partial<Pick<ColRow, 'label' | 'position'>>,
+): Promise<ColRow> {
+  return runOptimisticUpdate<ColRow>({
+    table: 'cols',
+    id: colId,
+    patch: patch as Record<string, unknown>,
+    label: 'label' in patch ? 'Spalte umbenennen' : 'Spalte verschieben',
+    run: async () => {
+      const { data, error } = await supabase
+        .from('cols')
+        .update(patch)
+        .eq('id', colId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as ColRow;
+    },
+  });
+}
+
+export function renameCol(colId: string, label: string): Promise<ColRow> {
+  return updateCol(colId, { label });
 }
 
 export async function setColPosition(
   colId: string,
   position: number,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('cols')
-    .update({ position })
-    .eq('id', colId);
-  if (error) throw error;
+  await updateCol(colId, { position });
 }
 
 export async function delCol(colId: string): Promise<void> {
-  const { error } = await supabase.from('cols').delete().eq('id', colId);
-  if (error) throw error;
+  await runOptimisticDelete({
+    table: 'cols',
+    id: colId,
+    label: 'Spalte loeschen',
+    run: async () => {
+      const { error } = await supabase.from('cols').delete().eq('id', colId);
+      if (error) throw error;
+    },
+  });
 }
 
 // ─── cells ─────────────────────────────────────────────────────
@@ -202,14 +314,25 @@ export async function insertCell(args: {
 }
 
 export async function updateCell(cellId: string, patch: CellPatch): Promise<CellRow> {
-  const { data, error } = await supabase
-    .from('cells')
-    .update(patch)
-    .eq('id', cellId)
-    .select()
-    .single();
-  if (error) throw error;
-  return data as CellRow;
+  // Geht durch runOptimisticUpdate — Cell-Patches (alias, features,
+  // data.infoFields, data.links etc.) sind haeufige User-Aktionen,
+  // entsprechend offline-tauglich gemacht.
+  return runOptimisticUpdate<CellRow>({
+    table: 'cells',
+    id: cellId,
+    patch: patch as Record<string, unknown>,
+    label: 'Zelle aktualisieren',
+    run: async () => {
+      const { data, error } = await supabase
+        .from('cells')
+        .update(patch)
+        .eq('id', cellId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as CellRow;
+    },
+  });
 }
 
 export async function delCellRow(cellId: string): Promise<void> {
@@ -329,61 +452,103 @@ export async function addKbCol(args: {
   label?: string;
   color?: string | null;
 }): Promise<KbColRow> {
-  const pos = await nextBoardPosition('kb_cols', args.boardId, args.workspaceId);
-  const { data, error } = await supabase
-    .from('kb_cols')
-    .insert({
-      workspace_id: args.workspaceId,
-      board_id: args.boardId,
-      label: args.label ?? '',
-      position: pos,
-      color: args.color ?? null,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return data as KbColRow;
+  return runOptimisticInsert<KbColRow>({
+    table: 'kb_cols',
+    workspaceId: args.workspaceId,
+    label: 'Kanban-Spalte anlegen',
+    run: async () => {
+      const pos = await nextBoardPosition(
+        'kb_cols',
+        args.boardId,
+        args.workspaceId,
+      );
+      const { data, error } = await supabase
+        .from('kb_cols')
+        .insert({
+          workspace_id: args.workspaceId,
+          board_id: args.boardId,
+          label: args.label ?? '',
+          position: pos,
+          color: args.color ?? null,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as KbColRow;
+    },
+    buildOffline: async (id) => {
+      const pos = await nextPositionFromCache(
+        'kb_cols',
+        args.workspaceId,
+        (r) => r.board_id === args.boardId,
+      );
+      return {
+        id,
+        workspace_id: args.workspaceId,
+        board_id: args.boardId,
+        label: args.label ?? '',
+        position: pos,
+        color: args.color ?? null,
+      } as unknown as KbColRow;
+    },
+  });
 }
 
-export async function renameKbCol(colId: string, label: string): Promise<KbColRow> {
-  const { data, error } = await supabase
-    .from('kb_cols')
-    .update({ label })
-    .eq('id', colId)
-    .select()
-    .single();
-  if (error) throw error;
-  return data as KbColRow;
+async function updateKbCol(
+  colId: string,
+  patch: Partial<Pick<KbColRow, 'label' | 'color' | 'position'>>,
+): Promise<KbColRow> {
+  return runOptimisticUpdate<KbColRow>({
+    table: 'kb_cols',
+    id: colId,
+    patch: patch as Record<string, unknown>,
+    label:
+      'label' in patch
+        ? 'Kanban-Spalte umbenennen'
+        : 'color' in patch
+          ? 'Spaltenfarbe setzen'
+          : 'Spalte verschieben',
+    run: async () => {
+      const { data, error } = await supabase
+        .from('kb_cols')
+        .update(patch)
+        .eq('id', colId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as KbColRow;
+    },
+  });
 }
 
-export async function setKbColColor(
+export function renameKbCol(colId: string, label: string): Promise<KbColRow> {
+  return updateKbCol(colId, { label });
+}
+
+export function setKbColColor(
   colId: string,
   color: string | null,
 ): Promise<KbColRow> {
-  const { data, error } = await supabase
-    .from('kb_cols')
-    .update({ color })
-    .eq('id', colId)
-    .select()
-    .single();
-  if (error) throw error;
-  return data as KbColRow;
+  return updateKbCol(colId, { color });
 }
 
 export async function setKbColPosition(
   colId: string,
   position: number,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('kb_cols')
-    .update({ position })
-    .eq('id', colId);
-  if (error) throw error;
+  await updateKbCol(colId, { position });
 }
 
 export async function delKbCol(colId: string): Promise<void> {
-  const { error } = await supabase.from('kb_cols').delete().eq('id', colId);
-  if (error) throw error;
+  await runOptimisticDelete({
+    table: 'kb_cols',
+    id: colId,
+    label: 'Kanban-Spalte loeschen',
+    run: async () => {
+      const { error } = await supabase.from('kb_cols').delete().eq('id', colId);
+      if (error) throw error;
+    },
+  });
 }
 
 // ─── Karten ────────────────────────────────────────────────────
@@ -396,22 +561,68 @@ export async function addCard(args: {
   colId: string;
   name?: string;
 }): Promise<KbCardRow> {
-  const pos = await nextBoardPosition('kb_cards', args.boardId, args.workspaceId, {
-    col_id: args.colId,
+  return runOptimisticInsert<KbCardRow>({
+    table: 'kb_cards',
+    workspaceId: args.workspaceId,
+    label: 'Karte anlegen',
+    run: async () => {
+      const pos = await nextBoardPosition(
+        'kb_cards',
+        args.boardId,
+        args.workspaceId,
+        { col_id: args.colId },
+      );
+      const { data, error } = await supabase
+        .from('kb_cards')
+        .insert({
+          workspace_id: args.workspaceId,
+          board_id: args.boardId,
+          col_id: args.colId,
+          name: args.name ?? '',
+          position: pos,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as KbCardRow;
+    },
+    buildOffline: async (id) => {
+      const pos = await nextPositionFromCache(
+        'kb_cards',
+        args.workspaceId,
+        (r) => r.board_id === args.boardId && r.col_id === args.colId,
+      );
+      const now = new Date().toISOString();
+      // Vollstaendige Default-Row, damit UI-Renderings nicht auf
+      // undefined-Felder laufen. Server vergibt beim Replay neue
+      // timestamps; wir setzen die clientseitigen jetzt.
+      return {
+        id,
+        workspace_id: args.workspaceId,
+        board_id: args.boardId,
+        col_id: args.colId,
+        name: args.name ?? '',
+        note: '',
+        tags: [],
+        who: [],
+        deadline: null,
+        priority: null,
+        done: false,
+        archived: false,
+        recur: null,
+        position: pos,
+        alias: null,
+        source_cl_id: null,
+        source_label: null,
+        checklist_ref: null,
+        checklist: null,
+        color: null,
+        done_occurrences: [],
+        created_at: now,
+        updated_at: now,
+      } as unknown as KbCardRow;
+    },
   });
-  const { data, error } = await supabase
-    .from('kb_cards')
-    .insert({
-      workspace_id: args.workspaceId,
-      board_id: args.boardId,
-      col_id: args.colId,
-      name: args.name ?? '',
-      position: pos,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return data as KbCardRow;
 }
 
 // Transform-to-Card: legt eine neue Karte auf dem Ziel-Board/Col an,
@@ -466,6 +677,9 @@ type CardPatch = Partial<
     | 'who'
     | 'archived'
     | 'color'
+    | 'position'
+    | 'col_id'
+    | 'board_id'
   >
 > & {
   recur?: CardRecur | null;
@@ -630,11 +844,7 @@ export async function setCardPosition(
   cardId: string,
   position: number,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('kb_cards')
-    .update({ position })
-    .eq('id', cardId);
-  if (error) throw error;
+  await updateCard(cardId, { position } as CardPatch);
 }
 
 // Cross-Col-Move mit exakter Position. Ein Update statt zweier. Wird
@@ -646,11 +856,7 @@ export async function setCardColAndPosition(
   toColId: string,
   position: number,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('kb_cards')
-    .update({ col_id: toColId, position })
-    .eq('id', cardId);
-  if (error) throw error;
+  await updateCard(cardId, { col_id: toColId, position });
 }
 
 // Cross-Board-Move: board_id + col_id + position in einem Update.
@@ -671,8 +877,18 @@ export async function moveCardToBoard(
 }
 
 export async function delCard(cardId: string): Promise<void> {
-  const { error } = await supabase.from('kb_cards').delete().eq('id', cardId);
-  if (error) throw error;
+  await runOptimisticDelete({
+    table: 'kb_cards',
+    id: cardId,
+    label: 'Karte loeschen',
+    run: async () => {
+      const { error } = await supabase
+        .from('kb_cards')
+        .delete()
+        .eq('id', cardId);
+      if (error) throw error;
+    },
+  });
 }
 
 // ─── Checklisten (standalone am Board) ─────────────────────────
@@ -684,19 +900,53 @@ export async function addChecklist(args: {
   boardId: string;
   label?: string;
 }): Promise<ChecklistRow> {
-  const pos = await nextBoardPosition('checklists', args.boardId, args.workspaceId);
-  const { data, error } = await supabase
-    .from('checklists')
-    .insert({
-      workspace_id: args.workspaceId,
-      board_id: args.boardId,
-      label: args.label ?? '',
-      position: pos,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return data as ChecklistRow;
+  return runOptimisticInsert<ChecklistRow>({
+    table: 'checklists',
+    workspaceId: args.workspaceId,
+    label: 'Checkliste anlegen',
+    run: async () => {
+      const pos = await nextBoardPosition(
+        'checklists',
+        args.boardId,
+        args.workspaceId,
+      );
+      const { data, error } = await supabase
+        .from('checklists')
+        .insert({
+          workspace_id: args.workspaceId,
+          board_id: args.boardId,
+          label: args.label ?? '',
+          position: pos,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as ChecklistRow;
+    },
+    buildOffline: async (id) => {
+      const pos = await nextPositionFromCache(
+        'checklists',
+        args.workspaceId,
+        (r) => r.board_id === args.boardId,
+      );
+      const now = new Date().toISOString();
+      return {
+        id,
+        workspace_id: args.workspaceId,
+        board_id: args.boardId,
+        cell_id: null,
+        label: args.label ?? '',
+        position: pos,
+        recur: null,
+        close_mode: null,
+        action: null,
+        history: null,
+        alias: null,
+        created_at: now,
+        updated_at: now,
+      } as unknown as ChecklistRow;
+    },
+  });
 }
 
 // Zellen-Checkliste: cell_id statt board_id. Position innerhalb der
@@ -745,14 +995,22 @@ async function updateChecklist(
   clId: string,
   patch: ChecklistPatch,
 ): Promise<ChecklistRow> {
-  const { data, error } = await supabase
-    .from('checklists')
-    .update(patch)
-    .eq('id', clId)
-    .select()
-    .single();
-  if (error) throw error;
-  return data as ChecklistRow;
+  return runOptimisticUpdate<ChecklistRow>({
+    table: 'checklists',
+    id: clId,
+    patch: patch as Record<string, unknown>,
+    label: 'label' in patch ? 'Liste umbenennen' : 'Liste aktualisieren',
+    run: async () => {
+      const { data, error } = await supabase
+        .from('checklists')
+        .update(patch)
+        .eq('id', clId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as ChecklistRow;
+    },
+  });
 }
 
 export function renameChecklist(
@@ -777,8 +1035,18 @@ export function setChecklistCloseMode(
 }
 
 export async function delChecklist(clId: string): Promise<void> {
-  const { error } = await supabase.from('checklists').delete().eq('id', clId);
-  if (error) throw error;
+  await runOptimisticDelete({
+    table: 'checklists',
+    id: clId,
+    label: 'Checkliste loeschen',
+    run: async () => {
+      const { error } = await supabase
+        .from('checklists')
+        .delete()
+        .eq('id', clId);
+      if (error) throw error;
+    },
+  });
 }
 
 // ─── Checklist-Items ───────────────────────────────────────────
@@ -804,20 +1072,43 @@ export async function addChecklistItem(args: {
   text?: string;
   level?: 0 | 1 | 2;
 }): Promise<ChecklistItemRow> {
-  const pos = await nextItemPosition(args.checklistId, args.workspaceId);
-  const { data, error } = await supabase
-    .from('checklist_items')
-    .insert({
-      workspace_id: args.workspaceId,
-      checklist_id: args.checklistId,
-      text: args.text ?? '',
-      level: args.level ?? 0,
-      position: pos,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return data as ChecklistItemRow;
+  return runOptimisticInsert<ChecklistItemRow>({
+    table: 'checklist_items',
+    workspaceId: args.workspaceId,
+    label: 'Eintrag anlegen',
+    run: async () => {
+      const pos = await nextItemPosition(args.checklistId, args.workspaceId);
+      const { data, error } = await supabase
+        .from('checklist_items')
+        .insert({
+          workspace_id: args.workspaceId,
+          checklist_id: args.checklistId,
+          text: args.text ?? '',
+          level: args.level ?? 0,
+          position: pos,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as ChecklistItemRow;
+    },
+    buildOffline: async (id) => {
+      const pos = await nextPositionFromCache(
+        'checklist_items',
+        args.workspaceId,
+        (r) => r.checklist_id === args.checklistId,
+      );
+      return {
+        id,
+        workspace_id: args.workspaceId,
+        checklist_id: args.checklistId,
+        text: args.text ?? '',
+        done: false,
+        level: args.level ?? 0,
+        position: pos,
+      } as unknown as ChecklistItemRow;
+    },
+  });
 }
 
 // Close-Snapshot fuer History: liest die aktuelle history, prepended
@@ -1046,8 +1337,18 @@ export function setChecklistItemPosition(
 }
 
 export async function delChecklistItem(itemId: string): Promise<void> {
-  const { error } = await supabase.from('checklist_items').delete().eq('id', itemId);
-  if (error) throw error;
+  await runOptimisticDelete({
+    table: 'checklist_items',
+    id: itemId,
+    label: 'Eintrag loeschen',
+    run: async () => {
+      const { error } = await supabase
+        .from('checklist_items')
+        .delete()
+        .eq('id', itemId);
+      if (error) throw error;
+    },
+  });
 }
 
 // ─── Info-Felder (cell.data.infoFields[]) ──────────────────────
@@ -1059,19 +1360,33 @@ async function mutateCellData<T>(
   cellId: string,
   mutator: (data: Record<string, unknown>) => { data: Record<string, unknown>; result: T },
 ): Promise<T> {
-  const { data: cur, error: readErr } = await supabase
-    .from('cells')
-    .select('data')
-    .eq('id', cellId)
-    .single();
-  if (readErr) throw readErr;
-  const cellData = (cur?.data ?? {}) as Record<string, unknown>;
+  // Read-Step: bei Server-Erreichbarkeit live lesen, sonst aus dem
+  // IDB-Cache. Andernfalls waere jede info-Field/Link-Aenderung
+  // offline blockiert (Read scheitert vor dem Write). Cache liefert
+  // den letzten bekannten Stand der cell.data.
+  let cellData: Record<string, unknown> = {};
+  try {
+    const { data: cur, error: readErr } = await supabase
+      .from('cells')
+      .select('data')
+      .eq('id', cellId)
+      .single();
+    if (readErr) throw readErr;
+    cellData = (cur?.data ?? {}) as Record<string, unknown>;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const cached = await getById<CellRow>('cells', cellId);
+    if (!cached) throw err;
+    cellData = ((cached as { data?: unknown }).data ?? {}) as Record<
+      string,
+      unknown
+    >;
+  }
   const { data: nextData, result } = mutator(cellData);
-  const { error: writeErr } = await supabase
-    .from('cells')
-    .update({ data: nextData })
-    .eq('id', cellId);
-  if (writeErr) throw writeErr;
+  // Write-Step laeuft ueber updateCell — das ist bereits gewrappt
+  // und queued bei Network-Error + patcht den Cache, damit naechste
+  // mutateCellData-Aufrufe den frischen Stand sehen.
+  await updateCell(cellId, { data: nextData });
   return result;
 }
 
@@ -1374,36 +1689,81 @@ export async function addBoardLink(args: {
 }): Promise<LinkRow> {
   const safeUrl = sanitizeUrl(args.url);
   if (!safeUrl) throw new InvalidUrlError();
-  const position = await nextBoardPosition(
-    'links',
-    args.boardId,
-    args.workspaceId,
-  );
-  const { data, error } = await supabase
-    .from('links')
-    .insert({
-      workspace_id: args.workspaceId,
-      board_id: args.boardId,
-      type: args.type,
-      label: (args.label ?? '').trim() || safeUrl,
-      url: safeUrl,
-      position,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return data as LinkRow;
+  return runOptimisticInsert<LinkRow>({
+    table: 'links',
+    workspaceId: args.workspaceId,
+    label: 'Link anlegen',
+    run: async () => {
+      const position = await nextBoardPosition(
+        'links',
+        args.boardId,
+        args.workspaceId,
+      );
+      const { data, error } = await supabase
+        .from('links')
+        .insert({
+          workspace_id: args.workspaceId,
+          board_id: args.boardId,
+          type: args.type,
+          label: (args.label ?? '').trim() || safeUrl,
+          url: safeUrl,
+          position,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as LinkRow;
+    },
+    buildOffline: async (id) => {
+      const position = await nextPositionFromCache(
+        'links',
+        args.workspaceId,
+        (r) => r.board_id === args.boardId,
+      );
+      const now = new Date().toISOString();
+      return {
+        id,
+        workspace_id: args.workspaceId,
+        board_id: args.boardId,
+        type: args.type,
+        label: (args.label ?? '').trim() || safeUrl,
+        url: safeUrl,
+        alias: null,
+        position,
+        data: null,
+        created_at: now,
+      } as unknown as LinkRow;
+    },
+  });
+}
+
+async function updateBoardLink(
+  linkId: string,
+  patch: Partial<Pick<LinkRow, 'label' | 'url' | 'type' | 'position' | 'alias'>>,
+): Promise<LinkRow> {
+  return runOptimisticUpdate<LinkRow>({
+    table: 'links',
+    id: linkId,
+    patch: patch as Record<string, unknown>,
+    label: 'Link aktualisieren',
+    run: async () => {
+      const { data, error } = await supabase
+        .from('links')
+        .update(patch)
+        .eq('id', linkId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as LinkRow;
+    },
+  });
 }
 
 export async function setBoardLinkLabel(
   linkId: string,
   label: string,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('links')
-    .update({ label: label.trim() })
-    .eq('id', linkId);
-  if (error) throw error;
+  await updateBoardLink(linkId, { label: label.trim() });
 }
 
 export async function setBoardLinkUrl(
@@ -1412,38 +1772,33 @@ export async function setBoardLinkUrl(
 ): Promise<void> {
   const safe = sanitizeUrl(url);
   if (!safe) throw new InvalidUrlError();
-  const { error } = await supabase
-    .from('links')
-    .update({ url: safe })
-    .eq('id', linkId);
-  if (error) throw error;
+  await updateBoardLink(linkId, { url: safe });
 }
 
 export async function setBoardLinkType(
   linkId: string,
   type: LinkType,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('links')
-    .update({ type })
-    .eq('id', linkId);
-  if (error) throw error;
+  await updateBoardLink(linkId, { type });
 }
 
 export async function setBoardLinkPosition(
   linkId: string,
   position: number,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('links')
-    .update({ position })
-    .eq('id', linkId);
-  if (error) throw error;
+  await updateBoardLink(linkId, { position });
 }
 
 export async function delBoardLink(linkId: string): Promise<void> {
-  const { error } = await supabase.from('links').delete().eq('id', linkId);
-  if (error) throw error;
+  await runOptimisticDelete({
+    table: 'links',
+    id: linkId,
+    label: 'Link loeschen',
+    run: async () => {
+      const { error } = await supabase.from('links').delete().eq('id', linkId);
+      if (error) throw error;
+    },
+  });
 }
 
 // ─── Undo-Restore-Helfer ───────────────────────────────────────
@@ -1536,20 +1891,41 @@ export async function createDoc(args: {
   source_alias?: string | null;
   attached_cell_id?: string | null;
 }): Promise<DocRow> {
-  const { data, error } = await supabase
-    .from('docs')
-    .insert({
-      workspace_id: args.workspaceId,
-      title: args.title ?? '',
-      content: args.content ?? '',
-      alias: args.alias ?? null,
-      source_alias: args.source_alias ?? null,
-      attached_cell_id: args.attached_cell_id ?? null,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return data as DocRow;
+  return runOptimisticInsert<DocRow>({
+    table: 'docs',
+    workspaceId: args.workspaceId,
+    label: 'Dokumentation anlegen',
+    run: async () => {
+      const { data, error } = await supabase
+        .from('docs')
+        .insert({
+          workspace_id: args.workspaceId,
+          title: args.title ?? '',
+          content: args.content ?? '',
+          alias: args.alias ?? null,
+          source_alias: args.source_alias ?? null,
+          attached_cell_id: args.attached_cell_id ?? null,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as DocRow;
+    },
+    buildOffline: (id) => {
+      const now = new Date().toISOString();
+      return {
+        id,
+        workspace_id: args.workspaceId,
+        alias: args.alias ?? null,
+        title: args.title ?? '',
+        content: args.content ?? '',
+        source_alias: args.source_alias ?? null,
+        attached_cell_id: args.attached_cell_id ?? null,
+        created_at: now,
+        updated_at: now,
+      } as unknown as DocRow;
+    },
+  });
 }
 
 async function updateDoc(
@@ -1558,14 +1934,27 @@ async function updateDoc(
     Pick<DocRow, 'title' | 'content' | 'alias' | 'source_alias' | 'attached_cell_id'>
   >,
 ): Promise<DocRow> {
-  const { data, error } = await supabase
-    .from('docs')
-    .update(patch)
-    .eq('id', docId)
-    .select()
-    .single();
-  if (error) throw error;
-  return data as DocRow;
+  return runOptimisticUpdate<DocRow>({
+    table: 'docs',
+    id: docId,
+    patch: patch as Record<string, unknown>,
+    label:
+      'title' in patch
+        ? 'Doku-Titel speichern'
+        : 'content' in patch
+          ? 'Doku-Inhalt speichern'
+          : 'Doku aktualisieren',
+    run: async () => {
+      const { data, error } = await supabase
+        .from('docs')
+        .update(patch)
+        .eq('id', docId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as DocRow;
+    },
+  });
 }
 
 export function setDocTitle(docId: string, title: string): Promise<DocRow> {
@@ -1591,8 +1980,15 @@ export function setDocAttachedCell(
 }
 
 export async function delDoc(docId: string): Promise<void> {
-  const { error } = await supabase.from('docs').delete().eq('id', docId);
-  if (error) throw error;
+  await runOptimisticDelete({
+    table: 'docs',
+    id: docId,
+    label: 'Dokumentation loeschen',
+    run: async () => {
+      const { error } = await supabase.from('docs').delete().eq('id', docId);
+      if (error) throw error;
+    },
+  });
 }
 
 export async function restoreDoc(snap: DocRow): Promise<void> {
