@@ -72,9 +72,9 @@ const AccountVisibility = () => {
       </section>
 
       <For each={VIS_GROUPS}>
-        {(group) => (
+        {(group, idx) => (
           <section class="settings-form-section">
-            <h3>{group.title}</h3>
+            <h3 id={idx() === 0 ? 'vis-groups-head' : undefined}>{group.title}</h3>
             <dl class="settings-list">
               <For each={group.keys}>
                 {(key) => (
@@ -107,7 +107,7 @@ const AccountVisibility = () => {
 
       <Show when={pendingMutationCount() > 0 && params.workspaceId}>
         <section class="settings-form-section">
-          <h3>Synchronisation</h3>
+          <h3 id="sync-section-head">Synchronisation</h3>
           <p class="hint">
             {pendingMutationCount()} offline-Aenderungen warten auf Synchronisation. Beim naechsten
             Online-Event laufen sie automatisch durch — du kannst aber auch direkt anstossen.
@@ -171,7 +171,7 @@ const AccountVisibility = () => {
       </Show>
 
       <section class="settings-form-section">
-        <h3>Wartung</h3>
+        <h3 id="maintenance-head">Wartung</h3>
         <div class="settings-foot">
           <button
             type="button"

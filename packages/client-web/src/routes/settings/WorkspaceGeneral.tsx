@@ -106,7 +106,7 @@ const WorkspaceGeneral = () => {
 
             <Show when={ws().role === 'owner'}>
               <section class="settings-form-section settings-danger-zone">
-                <h3>Gefahren-Zone</h3>
+                <h3 id="danger-zone-head">Gefahren-Zone</h3>
                 <p class="hint">
                   Beide Aktionen sind nur fuer den Eigentuemer verfuegbar und brauchen eine
                   zusaetzliche Bestaetigung.

@@ -6076,6 +6076,114 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   }
 }
 
+/* Settings-Suchbar im Header (P1.S). Zwischen Title und WS-Chip-
+   Cluster eingehaengt; Letzteres hat margin-left:auto und schiebt
+   sich + userchip nach rechts, der Search-Bereich sitzt also
+   linksbuendig nach dem Title. */
+.settings-search {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 0 var(--space-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  height: 32px;
+  min-width: 220px;
+  max-width: 320px;
+  color: var(--text2);
+  transition: border-color var(--tr-std), box-shadow var(--tr-std);
+}
+.settings-search:focus-within {
+  border-color: var(--focus-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-color) 18%, transparent);
+}
+.settings-search-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+/* Browser-natives X (Chrome/Edge) ausblenden — wir haben unseren eigenen. */
+.settings-search-input::-webkit-search-cancel-button {
+  display: none;
+}
+.settings-search-input::-webkit-search-decoration {
+  display: none;
+}
+.settings-search-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: var(--surface-hover);
+  color: var(--text2);
+  cursor: pointer;
+  padding: 0;
+  transition: background var(--tr-std), color var(--tr-std);
+}
+.settings-search-clear:hover,
+.settings-search-clear:focus-visible {
+  background: color-mix(in srgb, var(--text2) 18%, var(--surface));
+  color: var(--text);
+}
+
+@media (max-width: 960px) {
+  /* Mobile: Suche faltet auf eigene Zeile. flex-basis 100% + grow
+     ueber den Header, damit alle anderen Elemente neu fliessen. */
+  .settings-search {
+    flex-basis: 100%;
+    order: 99;
+    max-width: 100%;
+  }
+}
+
+.settings-search-empty {
+  margin: var(--space-sm) var(--space-xs);
+  color: var(--text3);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+/* Trefferliste im Such-Modus (statt Default-Tabs). Nutzt die gleichen
+   .settings-nav-item-Reihen, nur visuell etwas dichter zusammengeruckt
+   weil Hits stark variieren in der Anzahl. */
+.settings-nav-results {
+  gap: 1px;
+}
+
+/* Highlight-Pulse beim Hash-Scroll: 1.5s box-shadow-Glow auf das
+   getroffene <h3>. Reduziertes Motion-Setting deaktiviert die
+   Animation komplett — kein abrupter Color-Change-Fallback noetig,
+   der State macht sich auch ohne Pulse durch das scrollIntoView
+   bemerkbar. */
+.settings-search-highlight {
+  animation: settings-search-pulse 1.5s ease-out;
+}
+@keyframes settings-search-pulse {
+  0% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 36%, transparent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent);
+    background: transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-search-highlight {
+    animation: none;
+  }
+}
+
 .settings-body-shell {
   display: grid;
   grid-template-columns: 220px 1fr;

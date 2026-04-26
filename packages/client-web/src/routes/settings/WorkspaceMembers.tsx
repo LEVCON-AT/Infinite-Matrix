@@ -104,14 +104,14 @@ const WorkspaceMembers = () => {
 
       <Show when={canInvite()}>
         <section class="settings-form-section">
-          <h3>Neue Person einladen</h3>
+          <h3 id="invite-form-head">Neue Person einladen</h3>
           <InviteForm workspaceId={params.workspaceId} onCreated={handleInviteCreated} />
         </section>
       </Show>
 
       <section class="settings-form-section">
         <header class="settings-section-head">
-          <h3>Aktuelle Mitglieder</h3>
+          <h3 id="members-list-head">Aktuelle Mitglieder</h3>
           <button
             type="button"
             class="btn-subtle"

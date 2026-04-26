@@ -44,6 +44,7 @@ import {
 } from '../lib/commands';
 import { openDocsPopup } from '../lib/docs-ui';
 import { translateDbError } from '../lib/errors';
+import { highlightSubstring } from '../lib/match-highlight';
 import { moveCardToBoard } from '../lib/mutations';
 import { rememberFocus } from '../lib/navigation-focus';
 import { type SearchResult, matchExcerpt, searchWorkspace } from '../lib/search';
@@ -129,26 +130,6 @@ function badgeDataType(r: SearchResult): string {
   if (r.kind === 'checklist-board' || r.kind === 'checklist-cell') return 'checklist';
   if (r.kind === 'doc') return 'doc';
   return 'cell';
-}
-
-// Simple highlight — Parts-Liste mit { text, mark }-Flags. Case-insensitiv.
-function highlight(text: string, term: string): Array<{ text: string; mark: boolean }> {
-  if (!term || !text) return [{ text, mark: false }];
-  const lower = text.toLowerCase();
-  const needle = term.toLowerCase();
-  const out: Array<{ text: string; mark: boolean }> = [];
-  let pos = 0;
-  while (pos < text.length) {
-    const hit = lower.indexOf(needle, pos);
-    if (hit < 0) {
-      out.push({ text: text.slice(pos), mark: false });
-      break;
-    }
-    if (hit > pos) out.push({ text: text.slice(pos, hit), mark: false });
-    out.push({ text: text.slice(hit, hit + term.length), mark: true });
-    pos = hit + term.length;
-  }
-  return out;
 }
 
 const HeaderSearchBar: Component<Props> = (p) => {
@@ -951,7 +932,7 @@ const HeaderSearchBar: Component<Props> = (p) => {
                               </span>
                               <span class="header-search-row-text">
                                 <span class="header-search-row-title">
-                                  <For each={highlight(r.title, query())}>
+                                  <For each={highlightSubstring(r.title, query())}>
                                     {(part) =>
                                       part.mark ? (
                                         <mark class="sr-mark">{part.text}</mark>
@@ -966,7 +947,7 @@ const HeaderSearchBar: Component<Props> = (p) => {
                                 </span>
                                 <Show when={excerpt}>
                                   <span class="header-search-row-sub">
-                                    <For each={highlight(excerpt as string, query())}>
+                                    <For each={highlightSubstring(excerpt as string, query())}>
                                       {(part) =>
                                         part.mark ? (
                                           <mark class="sr-mark">{part.text}</mark>

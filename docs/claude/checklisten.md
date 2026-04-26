@@ -53,6 +53,7 @@ Die `Settings.tsx`-Sub-Nav ist heute ein einfaches Array. Erweiterungen kosten z
 - [ ] **Keine Stub-Tabs vorab anlegen** ("coming soon"-Tabs versprechen einen Termin, den wir nicht halten).
 - [ ] **Architektur-Hooks vorbereiten statt Stubs**: `workspace_id`-Scope ist natürlicher Anker für Webhook-Trigger / Billing-Kontext / Audit-Forwarding. Wenn ein Sprint diese Hooks ohnehin anlegt, daran denken.
 - [ ] **Bottom-Sektionen für Lifecycle-Aktionen**: Owner-only-destruktive Aktionen (Delete, Transfer) gehören unter `<workspace>/general` als visuell abgesetzte "Gefahren-Zone", nicht als eigener Sub-Tab — überkomplex für 1-2 Buttons.
+- [ ] **Suchbar-Index pflegen**: jeder neue Sub-Tab oder jede neue `<h3>`-Sektion → Eintrag in `packages/client-web/src/lib/settings-search.ts` `SETTINGS_SEARCH_INDEX`. Stabile DOM-`id` auf den `<h3>` setzen + im Index als `anchorId` referenzieren. Sonst findet die F-Hotkey-Suche im Settings-Header den neuen Bereich nicht.
 
 ## Trigger: Neues UI-Element (Button, Row, Modal, Chip, …)
 
