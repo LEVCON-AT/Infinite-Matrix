@@ -48,6 +48,7 @@ import { useTreeExpand } from '../lib/tree-expand';
 import type { CellFeature, CellRow, TreeEntry } from '../lib/types';
 import { sanitizeUrl } from '../lib/url';
 import { runResetScope } from '../lib/workspace-reset';
+import { useViewerActive } from '../lib/workspace-role';
 import ChecklistPastePopup from './ChecklistPastePopup';
 import ContextMenu, { type CtxMenuState } from './ContextMenu';
 import Icon, { type IconName } from './Icon';
@@ -469,6 +470,7 @@ const NodeTree: Component<Props> = (props) => {
   const expand = useTreeExpand(props.workspaceId);
   const deepChips = useSidebarChips(props.workspaceId);
   const navigate = useNavigate();
+  const viewerActive = useViewerActive();
   const [query, setQuery] = createSignal('');
   const [chips, setChips] = createSignal<Set<FilterChip>>(new Set());
   const [ctxMenu, setCtxMenu] = createSignal<CtxMenuState | null>(null);
@@ -927,6 +929,10 @@ const NodeTree: Component<Props> = (props) => {
     const cardId =
       e.dataTransfer.getData('text/matrix-card-id') || e.dataTransfer.getData('text/plain');
     if (!cardId) return;
+    if (viewerActive()) {
+      showToast('Read-only: Karten verschieben ist als Viewer nicht moeglich.', 'info');
+      return;
+    }
 
     try {
       // Ziel-Spalten + hoechste Position in deren ersten Spalte laden.

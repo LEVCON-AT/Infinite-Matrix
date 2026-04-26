@@ -32,7 +32,7 @@ import { aliasChipMenuState, closeAliasChipMenu } from '../lib/alias-chip-menu';
 import { clearAliasIndex, fetchAliasIndex, scheduleAliasRefresh } from '../lib/alias-index';
 import { signOut, useUser } from '../lib/auth';
 import { clearDocsRequest, openDocsPopup, useDocsRequest } from '../lib/docs-ui';
-import { toggleEditMode, useEditMode } from '../lib/edit-mode';
+import { setEditModeValue, toggleEditMode, useEditMode } from '../lib/edit-mode';
 import { pendingMutationCount, refreshCountForWorkspace, replayQueue } from '../lib/mutation-queue';
 import { offlineState } from '../lib/offline-state';
 import { installPromptSignal, triggerInstallPrompt } from '../lib/pwa';
@@ -58,6 +58,7 @@ import { toggleTheme, useTheme } from '../lib/theme';
 import { showToast } from '../lib/toasts';
 import { useTreeExpand } from '../lib/tree-expand';
 import type { DocRow, LinkRow } from '../lib/types';
+import { canWrite, isViewer, setViewerActiveValue } from '../lib/workspace-role';
 
 const Workspace: Component = () => {
   const user = useUser();
@@ -218,6 +219,38 @@ const Workspace: Component = () => {
     const list = workspaces();
     if (!list || !params.workspaceId) return undefined;
     return list.find((w) => w.id === params.workspaceId);
+  });
+
+  // Phase 1 P1.B.3: Rolle des Users im aktuellen Workspace. Quelle ist das
+  // bestehende workspaces-Resource (mit role per Membership-Join). undefined
+  // bedeutet "noch nicht geladen / keine Membership". Wird per Prop an
+  // NodeTree, MatrixView, BoardView, CellInfoPage etc. weitergereicht; die
+  // Helpers canWrite() / isViewer() entscheiden ueber Edit-UI-Sichtbarkeit.
+  const myRole = createMemo(() => currentWs()?.role);
+
+  // Sicherheitsnetz: wenn die eigene Rolle auf viewer wechselt (z.B. nach
+  // Demote durch Admin + workspaces-Refetch), Edit-Mode-Signal hart
+  // aussetzen. Sonst kann eine alte editMode=true die UI verwirren —
+  // Body bekommt die .edit-mode-Klasse, obwohl alle Edit-Buttons hidden
+  // sind. RLS blockt ohnehin, das ist reine UX-Hygiene.
+  createEffect(() => {
+    if (isViewer(myRole())) {
+      setEditModeValue(false);
+    }
+  });
+
+  // Body-Klasse + Module-Signal fuer Tiefen-Komponenten (CardOverlay,
+  // CellOverlay, NodeTree-Drag-Drop), wo Prop-Drilling der myRole zu
+  // invasiv waere. Beide spiegeln dieselbe Information — Body-Klasse
+  // fuer CSS-Selektoren, Signal fuer JS-Guards. RLS bleibt authoritativ.
+  createEffect(() => {
+    const viewer = isViewer(myRole());
+    document.body.classList.toggle('workspace-viewer', viewer);
+    setViewerActiveValue(viewer);
+  });
+  onCleanup(() => {
+    document.body.classList.remove('workspace-viewer');
+    setViewerActiveValue(false);
   });
 
   const [nodes, { refetch: refetchNodes }] = createResource(
@@ -799,6 +832,15 @@ const Workspace: Component = () => {
 
       <main class="ws-main">
         <Show when={currentWs()} fallback={<p class="hint">Workspace waehlen.</p>}>
+          <Show when={isViewer(myRole())}>
+            <output class="workspace-readonly-banner" aria-live="polite">
+              <Icon name="eye" size={16} />
+              <span>
+                Read-only: du bist Viewer in diesem Workspace. Owner und Admins koennen dich
+                jederzeit zum Editor heraufstufen.
+              </span>
+            </output>
+          </Show>
           <header class="ws-main-header">
             <nav class="ws-breadcrumb" aria-label="Breadcrumb">
               {/* Workspace-Ebene entfernt — der WorkspaceSwitcher-Chip
@@ -952,16 +994,18 @@ const Workspace: Component = () => {
             >
               <Icon name={theme() === 'dark' ? 'sun' : 'moon'} size={18} />
             </button>
-            <button
-              type="button"
-              class="edit-mode-btn"
-              classList={{ active: editMode() }}
-              onClick={() => toggleEditMode()}
-              title="Edit-Mode (Shift+E)"
-              aria-pressed={editMode()}
-            >
-              {editMode() ? 'Edit: an' : 'Edit: aus'}
-            </button>
+            <Show when={canWrite(myRole())}>
+              <button
+                type="button"
+                class="edit-mode-btn"
+                classList={{ active: editMode() }}
+                onClick={() => toggleEditMode()}
+                title="Edit-Mode (Shift+E)"
+                aria-pressed={editMode()}
+              >
+                {editMode() ? 'Edit: an' : 'Edit: aus'}
+              </button>
+            </Show>
           </header>
 
           <Show

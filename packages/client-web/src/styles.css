@@ -6482,6 +6482,26 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 .members-row-deactivated {
   opacity: 0.6;
 }
+
+/* Read-only-Banner (P1.B.3). Sticky oben in der ws-main-Spalte, sichtbar
+   nur fuer viewer. Tone matching members-deactivated-badge (redbg/redtxt)
+   damit der Read-only-Status klar als Einschraenkung erkennbar ist. */
+.workspace-readonly-banner {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--redbg);
+  color: var(--redtxt);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+.workspace-readonly-banner svg {
+  flex: 0 0 auto;
+}
 .members-row-deactivated .members-name {
   text-decoration: line-through;
   text-decoration-color: var(--text3);

@@ -16,6 +16,7 @@ import {
 import { isNodeEmpty } from '../lib/queries';
 import { showToast } from '../lib/toasts';
 import type { CellRow, ColRow, RowRow } from '../lib/types';
+import { useViewerActive } from '../lib/workspace-role';
 import Icon from './Icon';
 
 type Props = {
@@ -33,6 +34,7 @@ const CellOverlay: Component<Props> = (p) => {
   const [current, setCurrent] = createSignal<CellRow | undefined>(p.cell);
   const [aliasDraft, setAliasDraft] = createSignal(p.cell?.alias ?? '');
   const [busy, setBusy] = createSignal<string | null>(null);
+  const viewerActive = useViewerActive();
   let aliasInput: HTMLInputElement | undefined;
 
   // Zellen-Row-Helper: legt Row an falls noch nicht da, sonst UPDATE.
@@ -87,6 +89,10 @@ const CellOverlay: Component<Props> = (p) => {
 
   async function wrap<T>(key: string, fn: () => Promise<T>) {
     if (busy()) return;
+    if (viewerActive()) {
+      showToast('Read-only: Zellen-Aenderungen sind als Viewer nicht moeglich.', 'info');
+      return;
+    }
     setBusy(key);
     try {
       await fn();
@@ -171,6 +177,7 @@ const CellOverlay: Component<Props> = (p) => {
   // Links/Nodes) laeuft ueber den zentralen validateAlias-Helper.
   async function onAliasBlur() {
     if (busy()) return;
+    if (viewerActive()) return;
     const cur = current();
     const currentAlias = cur?.alias ?? null;
     setBusy('alias');

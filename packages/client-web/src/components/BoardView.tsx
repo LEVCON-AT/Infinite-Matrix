@@ -31,6 +31,7 @@ import { useVis } from '../lib/settings';
 import { showToast, showUndoToast } from '../lib/toasts';
 import type { BoardContent, KbCardRow, KbColRow, LinkRow, LinkType } from '../lib/types';
 import { sanitizeUrl } from '../lib/url';
+import { useViewerActive } from '../lib/workspace-role';
 import CardOverlay from './CardOverlay';
 import ChecklistPanel from './ChecklistPanel';
 import Icon from './Icon';
@@ -126,6 +127,7 @@ function sortComparator(
 }
 
 const BoardView: Component<Props> = (p) => {
+  const viewerActive = useViewerActive();
   // Kanban-Struktur: + Spalte / Link-Leiste / Checklisten-Anlage, Color-
   // Picker, Spalte umbenennen, Spalte verschieben, Spalte loeschen.
   // Karten-Aktionen (Move/Del) bleiben immer sichtbar — Karten sind kein
@@ -410,6 +412,10 @@ const BoardView: Component<Props> = (p) => {
 
   async function wrap<T>(fn: () => Promise<T>, successMsg?: string) {
     if (busy()) return;
+    if (viewerActive()) {
+      showToast('Read-only: Board-Aenderungen sind als Viewer nicht moeglich.', 'info');
+      return;
+    }
     setBusy(true);
     try {
       await fn();

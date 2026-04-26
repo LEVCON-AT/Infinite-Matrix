@@ -44,6 +44,7 @@ import type {
   KbCardRow,
 } from '../lib/types';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
+import { useViewerActive } from '../lib/workspace-role';
 import AliasText from './AliasText';
 import Icon from './Icon';
 
@@ -69,6 +70,7 @@ const CardOverlay: Component<Props> = (p) => {
   // Note-View/Edit-Toggle: Default View mit Alias-Chips, Klick → Textarea.
   const [noteEditing, setNoteEditing] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
+  const viewerActive = useViewerActive();
   let aliasInputRef: HTMLInputElement | undefined;
 
   // ESC schliesst; wir haengen den Handler in Capture, damit er
@@ -89,6 +91,13 @@ const CardOverlay: Component<Props> = (p) => {
 
   async function wrap<T>(fn: () => Promise<T>, successMsg?: string) {
     if (busy()) return;
+    // Viewer-Read-only-Guard (P1.B.3). RLS lehnt die Mutation ohnehin
+    // ab, aber der Toast hier ist freundlicher als der generic
+    // RLS-Error.
+    if (viewerActive()) {
+      showToast('Read-only: Karten-Aenderungen sind als Viewer nicht moeglich.', 'info');
+      return;
+    }
     setBusy(true);
     try {
       await fn();
@@ -121,6 +130,7 @@ const CardOverlay: Component<Props> = (p) => {
 
   async function onAlias(newAlias: string) {
     if (busy()) return;
+    if (viewerActive()) return;
     const current = p.card.alias ?? null;
     setBusy(true);
     try {
@@ -436,6 +446,10 @@ const CardOverlay: Component<Props> = (p) => {
   }
 
   async function onDelete() {
+    if (viewerActive()) {
+      showToast('Read-only: Karten-Loeschen ist als Viewer nicht moeglich.', 'info');
+      return;
+    }
     const ok = await showConfirm({
       title: 'Karte loeschen?',
       message: `Karte "${p.card.name || '(ohne Titel)'}" loeschen?`,

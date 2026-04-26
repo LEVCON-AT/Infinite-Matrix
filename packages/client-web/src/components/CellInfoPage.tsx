@@ -36,6 +36,7 @@ import { showToast } from '../lib/toasts';
 import type { CellRow, ColRow, InfoField, InfoLink, RowRow } from '../lib/types';
 import { sanitizeUrl } from '../lib/url';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
+import { useViewerActive } from '../lib/workspace-role';
 import AliasText from './AliasText';
 import CellDocsSection from './CellDocsSection';
 
@@ -51,6 +52,7 @@ type Props = {
 const CellInfoPage: Component<Props> = (p) => {
   const navigate = useNavigate();
   const editMode = useEditMode();
+  const viewerActive = useViewerActive();
   const [busy, setBusy] = createSignal(false);
 
   const fields = () => readInfoFieldsFromCell(p.cell);
@@ -58,6 +60,10 @@ const CellInfoPage: Component<Props> = (p) => {
 
   async function wrap<T>(fn: () => Promise<T>, successMsg?: string) {
     if (busy()) return;
+    if (viewerActive()) {
+      showToast('Read-only: Info-Aenderungen sind als Viewer nicht moeglich.', 'info');
+      return;
+    }
     setBusy(true);
     try {
       await fn();

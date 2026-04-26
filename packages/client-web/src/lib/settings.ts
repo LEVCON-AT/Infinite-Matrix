@@ -22,6 +22,7 @@
 
 import { type Accessor, createEffect, createMemo, createSignal, onMount } from 'solid-js';
 import { useEditMode } from './edit-mode';
+import { useViewerActive } from './workspace-role';
 
 export type VisValue = 'edit' | 'always' | 'never';
 
@@ -180,7 +181,13 @@ export function resetSettings(): void {
 // useEditMode() greift auf das SolidJS-Signal zu.
 export function useVis(key: VisKey): Accessor<boolean> {
   const editMode = useEditMode();
+  const viewerActive = useViewerActive();
   return createMemo(() => {
+    // Phase 1 P1.B.3: Viewer hat keine schreibenden Edit-UI, egal was
+    // der User unter "Sichtbarkeit" eingestellt hat (auch 'always').
+    // RLS blockt Writes ohnehin — diese Sperre vermeidet die Verwirrung
+    // sichtbarer-aber-nicht-funktionierender Edit-Buttons.
+    if (viewerActive()) return false;
     const v = settings().vis[key] ?? 'edit';
     if (v === 'always') return true;
     if (v === 'never') return false;

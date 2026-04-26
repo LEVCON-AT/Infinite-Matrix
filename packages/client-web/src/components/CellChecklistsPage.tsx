@@ -12,6 +12,7 @@ import { addCellChecklist } from '../lib/mutations';
 import { fetchCellChecklists } from '../lib/queries';
 import { showToast } from '../lib/toasts';
 import type { CellRow, ColRow, RowRow } from '../lib/types';
+import { useViewerActive } from '../lib/workspace-role';
 import CellDocsSection from './CellDocsSection';
 import ChecklistPanel from './ChecklistPanel';
 
@@ -31,6 +32,7 @@ type Props = {
 const CellChecklistsPage: Component<Props> = (p) => {
   const navigate = useNavigate();
   const editMode = useEditMode();
+  const viewerActive = useViewerActive();
   const [busy, setBusy] = createSignal(false);
 
   const [content, { refetch }] = createResource(
@@ -56,6 +58,10 @@ const CellChecklistsPage: Component<Props> = (p) => {
 
   async function onAddChecklist() {
     if (busy()) return;
+    if (viewerActive()) {
+      showToast('Read-only: Neue Checkliste als Viewer nicht moeglich.', 'info');
+      return;
+    }
     setBusy(true);
     try {
       await addCellChecklist({
