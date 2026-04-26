@@ -271,6 +271,11 @@ GRANT EXECUTE ON FUNCTION public.remove_member(uuid, uuid) TO authenticated, ser
 -- Bisher liefert die RPC ALLE Memberships. Wir behalten das Verhalten
 -- (deaktivierte sehen + Status anzeigen), ergaenzen aber das Feld
 -- damit das Frontend zwischen aktiv/deaktiviert unterscheiden kann.
+--
+-- DROP FUNCTION zuerst, weil RETURNS TABLE-Schema sich aendert
+-- (deactivated_at-Spalte neu). CREATE OR REPLACE funktioniert nicht
+-- bei Aenderungen am out-parameter-row-type.
+DROP FUNCTION IF EXISTS public.list_workspace_members(uuid);
 CREATE OR REPLACE FUNCTION public.list_workspace_members(p_workspace_id uuid)
 RETURNS TABLE (
   user_id        uuid,

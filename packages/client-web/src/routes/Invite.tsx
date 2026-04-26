@@ -14,7 +14,7 @@
 import { useNavigate, useParams } from '@solidjs/router';
 import { Show, createResource, createSignal, onMount } from 'solid-js';
 import Icon from '../components/Icon';
-import { signInWithMagicLink, useSession } from '../lib/auth';
+import { signInWithMagicLink, signOut, useSession } from '../lib/auth';
 import { translateDbError } from '../lib/errors';
 import { redeemInvite, translateInviteError } from '../lib/invites';
 import { showToast } from '../lib/toasts';
@@ -112,13 +112,39 @@ const Invite = () => {
                       <Icon name="x-circle" size={24} />
                       <h1>Einladung ungueltig</h1>
                       <p class="hint">{r().kind === 'err' ? r().message : 'Unbekannter Fehler.'}</p>
-                      <button
-                        type="button"
-                        class="btn-c"
-                        onClick={() => navigate('/', { replace: true })}
-                      >
-                        Zur Workspace-Auswahl
-                      </button>
+                      <div class="invite-action-row">
+                        <button
+                          type="button"
+                          class="btn-c"
+                          onClick={() => {
+                            void (async () => {
+                              try {
+                                await signOut();
+                              } catch {
+                                // Logout darf nicht blocken — auch ohne sauberen
+                                // signOut den Token zwischenparken + zur Login-
+                                // Page schicken.
+                              }
+                              try {
+                                sessionStorage.setItem('matrix:pending-invite-token', params.token);
+                              } catch {
+                                // ignore
+                              }
+                              navigate('/login', { replace: true });
+                            })();
+                          }}
+                        >
+                          <Icon name="arrow-uturn-left" size={14} />
+                          <span>Mit anderer E-Mail anmelden</span>
+                        </button>
+                        <button
+                          type="button"
+                          class="btn-subtle"
+                          onClick={() => navigate('/', { replace: true })}
+                        >
+                          Zur Workspace-Auswahl
+                        </button>
+                      </div>
                     </div>
                   }
                 >
