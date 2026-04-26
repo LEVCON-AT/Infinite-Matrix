@@ -63,6 +63,7 @@ export type IconName =
   | 'arrow-left'
   | 'lock-closed'
   | 'eye'
+  | 'eye-slash'
   | 'users'
   | 'list-bullet'
   | 'shield-check';
@@ -356,6 +357,15 @@ const ICONS: Record<IconName, () => JSX.Element> = {
     <>
       <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
       <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  // Sichtbarkeit aus: durchgestrichenes Auge (Incognito)
+  'eye-slash': () => (
+    <>
+      <path d="M3 3l18 18" />
+      <path d="M10.5 10.5a2 2 0 0 0 2.8 2.8" />
+      <path d="M9.4 6.4A10 10 0 0 1 12 6c7 0 10 6 10 6a16 16 0 0 1-2.7 3.5" />
+      <path d="M6.5 7.5A16 16 0 0 0 2 12s3 6 10 6c1.6 0 3-.3 4.2-.7" />
     </>
   ),
   // Mitglieder: zwei Personen

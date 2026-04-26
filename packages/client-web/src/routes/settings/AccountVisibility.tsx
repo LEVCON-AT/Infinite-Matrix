@@ -13,11 +13,14 @@ import { clearWorkspaceQueue, pendingMutationCount, replayQueue } from '../../li
 import { clearAll as clearOfflineCache } from '../../lib/offline-cache';
 import { resetOfflineState } from '../../lib/offline-state';
 import {
+  ACTIVITY_OPTIONS,
+  type ActivityLevel,
   VIS_GROUPS,
   VIS_LABELS,
   VIS_OPTIONS,
   type VisKey,
   resetSettings,
+  setActivityLevel,
   setVis,
   useSettings,
 } from '../../lib/settings';
@@ -36,6 +39,38 @@ const AccountVisibility = () => {
           man mit <kbd>Shift</kbd>+<kbd>E</kbd>.
         </p>
       </header>
+
+      <section class="settings-form-section" aria-labelledby="activity-level-head">
+        <h3 id="activity-level-head">Aktivitaets-Sichtbarkeit</h3>
+        <p class="hint">
+          Steuert, was andere Workspace-Mitglieder von dir sehen. Den schnellen Ein/Aus-Schalter
+          findest du oben rechts in der Workspace-Leiste.
+        </p>
+        <div class="settings-radio-group" role="radiogroup" aria-labelledby="activity-level-head">
+          <For each={ACTIVITY_OPTIONS}>
+            {([value, label, desc]) => (
+              <label class="settings-radio">
+                <input
+                  type="radio"
+                  name="activity-level"
+                  value={value}
+                  checked={settings().activity.level === value}
+                  onChange={(e) => {
+                    if (e.currentTarget.checked) {
+                      setActivityLevel(e.currentTarget.value as ActivityLevel);
+                    }
+                  }}
+                />
+                <span class="settings-radio-body">
+                  <span class="settings-radio-title">{label}</span>
+                  <span class="settings-radio-desc">{desc}</span>
+                </span>
+              </label>
+            )}
+          </For>
+        </div>
+      </section>
+
       <For each={VIS_GROUPS}>
         {(group) => (
           <section class="settings-form-section">

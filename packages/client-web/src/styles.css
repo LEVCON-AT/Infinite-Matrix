@@ -965,6 +965,43 @@ button[type="submit"]:hover:not(:disabled) {
   outline-offset: var(--focus-offset);
 }
 
+/* Phase-1.C: Incognito-Toggle. Selbe Form wie .theme-toggle-btn,
+   aktiver Zustand bekommt einen Amber-Akzent — sichtbar genug damit
+   man sich erinnert, nicht so laut dass es ablenkt. */
+.incognito-toggle {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border2);
+  background: var(--surface);
+  color: var(--text2);
+  border-radius: var(--rs);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  transition: background var(--tr-std), color var(--tr-std), border-color var(--tr-std);
+}
+.incognito-toggle:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+  border-color: var(--text3);
+}
+.incognito-toggle:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: var(--focus-offset);
+}
+.incognito-toggle.incognito-active {
+  background: color-mix(in srgb, var(--amber) 15%, var(--surface));
+  border-color: var(--amber);
+  color: var(--amber);
+}
+.incognito-toggle.incognito-active:hover {
+  background: color-mix(in srgb, var(--amber) 25%, var(--surface));
+  color: var(--amber);
+}
+
 /* ── Command-Palette (^) ──────────────────────────────────────── */
 /* Einheitliche Palette (frueher getrennt als alias-quicknav + command-
    palette). Breiterer Input fuer Commands, Amber-^ als Kontext-Anker.
@@ -6179,6 +6216,50 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 .settings-form-section h3 {
   margin: 0 0 var(--space-md);
   font-size: 1rem;
+}
+
+.settings-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin-top: var(--space-md);
+}
+.settings-radio {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color var(--tr-std), background var(--tr-std);
+}
+.settings-radio:hover {
+  border-color: var(--accent);
+  background: var(--surface-hover);
+}
+.settings-radio input[type="radio"] {
+  margin-top: 3px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.settings-radio:has(input[type="radio"]:checked) {
+  border-color: var(--accent);
+  background: var(--surface-hover);
+}
+.settings-radio-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.settings-radio-title {
+  font-weight: 600;
+  color: var(--text);
+}
+.settings-radio-desc {
+  font-size: 0.875rem;
+  color: var(--text2);
 }
 
 .settings-section-head {

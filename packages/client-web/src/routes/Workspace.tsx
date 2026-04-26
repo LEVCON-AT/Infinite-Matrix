@@ -33,8 +33,10 @@ import { clearAliasIndex, fetchAliasIndex, scheduleAliasRefresh } from '../lib/a
 import { signOut, useUser } from '../lib/auth';
 import { clearDocsRequest, openDocsPopup, useDocsRequest } from '../lib/docs-ui';
 import { setEditModeValue, toggleEditMode, useEditMode } from '../lib/edit-mode';
+import { toggleIncognito, useIncognito } from '../lib/incognito';
 import { pendingMutationCount, refreshCountForWorkspace, replayQueue } from '../lib/mutation-queue';
 import { offlineState } from '../lib/offline-state';
+import type { PresenceUser } from '../lib/presence';
 import { installPromptSignal, triggerInstallPrompt } from '../lib/pwa';
 import {
   type SidebarChipData,
@@ -70,6 +72,7 @@ const Workspace: Component = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const editMode = useEditMode();
+  const incognito = useIncognito();
   const theme = useTheme();
   // PWA-Install: deferredPrompt ist nur gesetzt, wenn der Browser die
   // App fuer Install kandidiert (Chromium-/Edge-basierte Desktops +
@@ -392,6 +395,45 @@ const Workspace: Component = () => {
     if (!params.cellId) return undefined;
     return (cells() ?? []).find((c) => c.id === params.cellId);
   });
+
+  // Phase-1.C: Position-Label fuer PresenceStack-Tooltips. Nimmt die
+  // im Presence-Payload geteilten {nodeId, cellId, feature} und baut
+  // einen menschen-lesbaren String "schaut: <Matrix> · <Cell> · <Section>".
+  // Reagiert reaktiv auf nodes/cells/rows/cols-Resources — wenn der
+  // gesuchte Node im lokalen Cache (noch) fehlt, liefert "(im Workspace)"
+  // als Fallback. Der Empfaenger hat ggf. eine andere Sub-Matrix offen
+  // und das Backend hat sie noch nicht in seinen Cache geholt — kein
+  // Fehler, nur etwas weniger spezifisch.
+  const FEATURE_LABELS: Record<string, string> = {
+    info: 'Info',
+    checklists: 'Checklisten',
+    docs: 'Anhaenge',
+  };
+  const resolvePresenceLabel = (u: PresenceUser): string | undefined => {
+    if (!u.nodeId && !u.cellId) return undefined;
+    const parts: string[] = [];
+    const nodesList = nodes() ?? [];
+    const cellsList = cells() ?? [];
+    const rowsList = rows() ?? [];
+    const colsList = colsData() ?? [];
+    const node = u.nodeId ? nodesList.find((n) => n.id === u.nodeId) : undefined;
+    if (node) parts.push(node.label);
+    if (u.cellId) {
+      const cell = cellsList.find((c) => c.id === u.cellId);
+      if (cell) {
+        const row = rowsList.find((r) => r.id === cell.row_id);
+        const col = colsList.find((c) => c.id === cell.col_id);
+        if (row && col) parts.push(`${row.label} / ${col.label}`);
+        else parts.push('Cell');
+      }
+    }
+    if (u.feature) {
+      const featureLabel = FEATURE_LABELS[u.feature];
+      if (featureLabel) parts.push(featureLabel);
+    }
+    if (parts.length === 0) return 'im Workspace';
+    return `schaut: ${parts.join(' · ')}`;
+  };
 
   // Breadcrumb vom aktuellen Node aufwaerts. Geht von Node zu Parent-
   // Cell (via node.parent_cell_id) und von dort zur Parent-Matrix
@@ -913,8 +955,31 @@ const Workspace: Component = () => {
                   workspaceId={params.workspaceId as string}
                   selfUserId={u().id}
                   selfEmail={u().email ?? '(anon)'}
+                  position={() => ({
+                    nodeId: currentNode()?.id,
+                    cellId: params.cellId,
+                    feature: cellSection() ?? undefined,
+                  })}
+                  resolveLabel={resolvePresenceLabel}
                 />
               )}
+            </Show>
+            <Show when={params.workspaceId}>
+              <button
+                type="button"
+                class="incognito-toggle"
+                classList={{ 'incognito-active': incognito() }}
+                title={
+                  incognito()
+                    ? 'Incognito aktiv — fuer andere unsichtbar. Klick beendet den Modus.'
+                    : 'Incognito an — fuer andere kurz unsichtbar werden.'
+                }
+                aria-pressed={incognito()}
+                aria-label="Incognito-Modus umschalten"
+                onClick={() => toggleIncognito()}
+              >
+                <Icon name={incognito() ? 'eye-slash' : 'eye'} size={14} />
+              </button>
             </Show>
             <Show when={offlineState()}>
               <span

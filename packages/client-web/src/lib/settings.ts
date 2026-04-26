@@ -26,6 +26,12 @@ import { useViewerActive } from './workspace-role';
 
 export type VisValue = 'edit' | 'always' | 'never';
 
+// Phase-1.C: Aktivitaets-Sichtbarkeit fuer Multi-User-Awareness.
+// 'off'      — Channel wird nicht subscribed, User ist fuer andere unsichtbar.
+// 'present'  — wie bisher: nur Avatar im Online-Stack.
+// 'full'     — zusaetzlich Position (nodeId/cellId/feature) im Track-Payload.
+export type ActivityLevel = 'off' | 'present' | 'full';
+
 export type VisKey =
   | 'addRowCol'
   | 'deleteRowCol'
@@ -45,6 +51,7 @@ export type VisKey =
 
 export type AppSettings = {
   vis: Record<VisKey, VisValue>;
+  activity: { level: ActivityLevel };
 };
 
 export const VIS_LABELS: Record<VisKey, string> = {
@@ -69,6 +76,12 @@ export const VIS_OPTIONS: ReadonlyArray<readonly [VisValue, string]> = [
   ['edit', 'Nur Edit-Modus'],
   ['always', 'Immer sichtbar'],
   ['never', 'Ausgeblendet'],
+] as const;
+
+export const ACTIVITY_OPTIONS: ReadonlyArray<readonly [ActivityLevel, string, string]> = [
+  ['full', 'Vollstaendig', 'Avatar im Online-Stack + aktuelle Position (Matrix/Cell).'],
+  ['present', 'Anwesend', 'Nur Avatar im Online-Stack — keine Position.'],
+  ['off', 'Aus', 'Komplett unsichtbar fuer andere — kein Avatar, kein Hinweis.'],
 ] as const;
 
 // Gruppierung fuer die Modal-Darstellung. Reine Kosmetik — die Keys
@@ -118,12 +131,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
     sbCtxFeature: 'edit',
     sbCtxContent: 'always',
   },
+  activity: { level: 'present' },
 };
 
 const STORAGE_KEY = 'matrix-client-web-settings';
 
 function clone(s: AppSettings): AppSettings {
-  return { vis: { ...s.vis } };
+  return { vis: { ...s.vis }, activity: { ...s.activity } };
 }
 
 function loadFromStorage(): AppSettings {
@@ -139,6 +153,12 @@ function loadFromStorage(): AppSettings {
         if (v === 'edit' || v === 'always' || v === 'never') {
           merged.vis[k] = v;
         }
+      }
+    }
+    if (parsed?.activity && typeof parsed.activity === 'object') {
+      const lvl = (parsed.activity as Record<string, unknown>).level;
+      if (lvl === 'off' || lvl === 'present' || lvl === 'full') {
+        merged.activity.level = lvl;
       }
     }
     return merged;
@@ -168,6 +188,17 @@ export function setVis(key: VisKey, value: VisValue): void {
   next.vis[key] = value;
   setSettings(next);
   persistToStorage(next);
+}
+
+export function setActivityLevel(level: ActivityLevel): void {
+  const next = clone(settings());
+  next.activity.level = level;
+  setSettings(next);
+  persistToStorage(next);
+}
+
+export function useActivityLevel(): Accessor<ActivityLevel> {
+  return createMemo(() => settings().activity.level);
 }
 
 export function resetSettings(): void {
@@ -209,6 +240,9 @@ export function useSettingsBodyClassSync() {
         body.classList.toggle(`vis-${k}-always`, v === 'always');
         body.classList.toggle(`vis-${k}-never`, v === 'never');
       }
+      body.classList.toggle('activity-off', s.activity.level === 'off');
+      body.classList.toggle('activity-present', s.activity.level === 'present');
+      body.classList.toggle('activity-full', s.activity.level === 'full');
     });
   });
 }

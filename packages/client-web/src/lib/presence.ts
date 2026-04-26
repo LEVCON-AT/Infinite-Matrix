@@ -3,6 +3,14 @@
 // hoert 'sync' auf den ganzen Presence-State, der vom Supabase-Server
 // gebroadcastet wird.
 //
+// Phase-1.C: Erweiterung um Position-Tracking (nodeId/cellId/feature)
+// und Activity-Level-Gating. Drei Stufen:
+//   - 'off'     -> Channel wird gar nicht subscribed, User taucht nicht auf.
+//   - 'present' -> wie zuvor: nur {email, joinedAt}.
+//   - 'full'    -> zusaetzlich Position aus dem Route-Stand.
+// Incognito-Signal (lib/incognito.ts) ueberschreibt den Level temporaer
+// auf 'off'.
+//
 // Design: eigener Channel `presence:<wsId>`, NICHT der postgres-
 // changes-Channel aus realtime.ts — beides am selben Channel zu
 // mischen geht zwar, macht das Debugging aber deutlich muehsamer.
@@ -12,22 +20,56 @@
 // den Channel teardownen + neu aufbauen. Der createEffect-Rebuild
 // haengt an den gelesenen Accessors; onCleanup im Effect entfernt
 // den alten Channel bevor der neue entsteht.
+//
+// Position-Update beim Route-Wechsel triggert KEINEN Channel-Rebuild.
+// Stattdessen wird channel.track(payload) erneut gefeuert — Supabase
+// merged das per Presence-Key. Throttle (200 ms) verhindert WS-Spam
+// bei schnellem Klick-durch im Tree.
 
 import { type Accessor, createEffect, createMemo, createSignal, onCleanup } from 'solid-js';
+import { useIncognito } from './incognito';
+import { useActivityLevel } from './settings';
 import { supabase } from './supabase';
+
+// Feature-Section innerhalb einer Cell. Spiegelt cellSection() in
+// Workspace.tsx (Z. 140). Wenn man nur auf einem Matrix/Board-Knoten
+// steht (kein Drill in eine Cell), bleibt feature undefined und nur
+// nodeId ist gesetzt.
+export type PresenceFeature = 'info' | 'checklists' | 'docs';
+
+export type PresencePosition = {
+  nodeId?: string;
+  cellId?: string;
+  feature?: PresenceFeature;
+};
 
 export type PresenceUser = {
   userId: string;
   email: string;
   joinedAt: string;
+  nodeId?: string;
+  cellId?: string;
+  feature?: PresenceFeature;
 };
+
+const POSITION_THROTTLE_MS = 200;
+
+function isFeature(v: unknown): v is PresenceFeature {
+  return v === 'info' || v === 'checklists' || v === 'docs';
+}
 
 export function usePresence(
   workspaceId: Accessor<string>,
   selfUserId: Accessor<string>,
   selfEmail: Accessor<string>,
+  position: Accessor<PresencePosition>,
 ): Accessor<PresenceUser[]> {
   const [users, setUsers] = createSignal<PresenceUser[]>([]);
+  const activityLevel = useActivityLevel();
+  const incognito = useIncognito();
+
+  // Effektiver Sichtbarkeits-Level: Incognito ueberschreibt Settings.
+  const effectiveLevel = createMemo(() => (incognito() ? 'off' : activityLevel()));
 
   // Supabase emittiert `onAuthStateChange` auch bei reinen Token-Refreshs
   // (TOKEN_REFRESHED ohne Identity-Wechsel). Das produziert ein neues
@@ -46,7 +88,8 @@ export function usePresence(
     const wsId = wsIdMemo();
     const selfId = selfIdMemo();
     const email = emailMemo();
-    if (!wsId || !selfId) {
+    const level = effectiveLevel();
+    if (!wsId || !selfId || level === 'off') {
       setUsers([]);
       return;
     }
@@ -62,10 +105,30 @@ export function usePresence(
       config: { presence: { key: selfId } },
     });
 
+    const buildPayload = (): Record<string, unknown> => {
+      const payload: Record<string, unknown> = {
+        email,
+        joinedAt: sessionJoinedAt,
+      };
+      if (effectiveLevel() === 'full') {
+        const pos = position();
+        if (pos.nodeId) payload.nodeId = pos.nodeId;
+        if (pos.cellId) payload.cellId = pos.cellId;
+        if (pos.feature) payload.feature = pos.feature;
+      }
+      return payload;
+    };
+
     const rebuild = () => {
       const raw = channel.presenceState() as Record<
         string,
-        Array<{ email?: string; joinedAt?: string }>
+        Array<{
+          email?: string;
+          joinedAt?: string;
+          nodeId?: string;
+          cellId?: string;
+          feature?: string;
+        }>
       >;
       // Stale-State-Filter: Auf Staging feuert der Realtime-Server
       // periodisch CHANNEL_ERROR → SUBSCRIBED (~1 s-Takt). In dem Re-
@@ -82,11 +145,15 @@ export function usePresence(
       for (const [userId, metas] of Object.entries(raw)) {
         const meta = metas[0];
         if (!meta) continue;
-        list.push({
+        const entry: PresenceUser = {
           userId,
           email: typeof meta.email === 'string' ? meta.email : '(unbekannt)',
           joinedAt: typeof meta.joinedAt === 'string' ? meta.joinedAt : sessionJoinedAt,
-        });
+        };
+        if (typeof meta.nodeId === 'string') entry.nodeId = meta.nodeId;
+        if (typeof meta.cellId === 'string') entry.cellId = meta.cellId;
+        if (isFeature(meta.feature)) entry.feature = meta.feature;
+        list.push(entry);
       }
       list.sort((a, b) => {
         if (a.userId === selfId) return -1;
@@ -96,15 +163,22 @@ export function usePresence(
       // Identitaets-Check: Supabase feuert 'sync' als Heartbeat alle
       // ~30s im Normalbetrieb, aber bei Reconnect/Flaky-WS haeufiger.
       // joinedAt ignorieren — wird nie gerendert, und Server-Payloads
-      // koennen es minimal anders serialisieren. Nur userId + email
-      // bestimmen die Identitaet fuer die UI.
+      // koennen es minimal anders serialisieren. Identitaet besteht aus
+      // userId/email/Position-Trio — wenn sich nichts davon aendert,
+      // setUsers ueberspringen.
       const current = users();
       if (current.length === list.length) {
         let same = true;
         for (let i = 0; i < list.length; i++) {
           const a = current[i];
           const b = list[i];
-          if (a.userId !== b.userId || a.email !== b.email) {
+          if (
+            a.userId !== b.userId ||
+            a.email !== b.email ||
+            a.nodeId !== b.nodeId ||
+            a.cellId !== b.cellId ||
+            a.feature !== b.feature
+          ) {
             same = false;
             break;
           }
@@ -114,20 +188,50 @@ export function usePresence(
       setUsers(list);
     };
 
+    let throttleTimer: ReturnType<typeof setTimeout> | null = null;
+    let isSubscribed = false;
+
+    const flushTrack = () => {
+      throttleTimer = null;
+      if (!isSubscribed) return;
+      void channel.track(buildPayload());
+    };
+
+    const scheduleTrack = () => {
+      if (!isSubscribed) return;
+      if (throttleTimer) return;
+      throttleTimer = setTimeout(flushTrack, POSITION_THROTTLE_MS);
+    };
+
     channel
       .on('presence', { event: 'sync' }, rebuild)
       .on('presence', { event: 'join' }, rebuild)
       .on('presence', { event: 'leave' }, rebuild)
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-          void channel.track({
-            email,
-            joinedAt: sessionJoinedAt,
-          });
+          isSubscribed = true;
+          void channel.track(buildPayload());
         }
       });
 
+    // Reaktiver Position-Update-Pfad: bei 'full' triggert jede
+    // position()/effectiveLevel()-Aenderung einen throttled track().
+    // Bei 'present' lesen wir position() bewusst nicht — keine
+    // unnoetigen Updates.
+    createEffect(() => {
+      const lvl = effectiveLevel();
+      if (lvl !== 'full') return;
+      // Position lesen damit der Effect bei Aenderung re-runs.
+      position();
+      scheduleTrack();
+    });
+
     onCleanup(() => {
+      if (throttleTimer) {
+        clearTimeout(throttleTimer);
+        throttleTimer = null;
+      }
+      isSubscribed = false;
       void channel.untrack();
       void supabase.removeChannel(channel);
       setUsers([]);
