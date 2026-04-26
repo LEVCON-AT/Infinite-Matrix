@@ -7,6 +7,7 @@ on:
       - 'packages/bridge/**'
       - 'packages/shared/**'
       - 'packages/client-standalone/**'
+      - 'packages/client-web/**'
       - 'infra/**'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
