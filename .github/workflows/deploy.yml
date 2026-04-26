@@ -63,8 +63,16 @@ jobs:
         # praefixt — sonst zieht der Browser sie absolut von / und
         # nginx serviert die Landing-Page als Asset (Memory
         # feedback_spa_subpath_router).
+        #
+        # VITE_SITE_URL wird vom Auth-Modul fuer Magic-Link-Redirects
+        # genutzt (emailRedirectTo). Ohne explicit set faellt es auf
+        # window.location.origin zurueck — was zu falschen Redirects
+        # ohne /app/-Prefix fuehrt (z.B. Invite-Mail-Link zeigt auf
+        # /invite/<token> statt /app/invite/<token>). Trailing-Slash
+        # ist Pflicht (Auth-Modul haengt 'invite/<token>' direkt an).
         env:
           VITE_BASE_PATH: /app/
+          VITE_SITE_URL: https://staging.matrix.levcon.at/app/
         working-directory: packages/client-web
         run: |
           pnpm lint
