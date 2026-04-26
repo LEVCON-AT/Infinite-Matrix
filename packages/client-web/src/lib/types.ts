@@ -18,7 +18,14 @@ export type Membership = {
   created_at: string;
 };
 
-export type WorkspaceWithRole = Workspace & { role: WorkspaceRole };
+export type WorkspaceWithRole = Workspace & {
+  role: WorkspaceRole;
+  // Phase 1.A.4: Owner-Email per get_workspace_owners-RPC nachgeladen,
+  // damit der WorkspaceSwitcher fuer fremde Workspaces "Owner: ..."
+  // einblenden kann. Null wenn der Lookup nicht durchkam (offline oder
+  // RPC fehlt).
+  owner_email?: string | null;
+};
 
 export type NodeType = 'matrix' | 'board';
 

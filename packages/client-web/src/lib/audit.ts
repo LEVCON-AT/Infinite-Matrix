@@ -9,14 +9,15 @@
 
 import { supabase } from './supabase';
 
-// Action-Typen, die Migration 011 in workspace_audit_log.action ablegt.
-// P1.B erweitert die Liste um member.role_changed + member.removed.
+// Action-Typen, die Migration 011 + 013 in workspace_audit_log.action ablegen.
 export type AuditAction =
   | 'invite.created'
   | 'invite.accepted'
   | 'invite.revoked'
   | 'member.role_changed'
-  | 'member.removed';
+  | 'member.removed'
+  | 'member.deactivated'
+  | 'member.reactivated';
 
 export type AuditEntry = {
   id: string;
@@ -81,6 +82,10 @@ export function describeAuditAction(action: string): string {
       return 'Rolle geaendert';
     case 'member.removed':
       return 'Mitglied entfernt';
+    case 'member.deactivated':
+      return 'Mitglied deaktiviert';
+    case 'member.reactivated':
+      return 'Mitglied reaktiviert';
     default:
       return action;
   }

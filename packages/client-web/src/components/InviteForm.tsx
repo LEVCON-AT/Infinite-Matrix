@@ -12,6 +12,7 @@ import {
   type InviteRole,
   buildInviteLink,
   createInvite,
+  sendInviteMail,
   translateInviteError,
 } from '../lib/invites';
 import { showToast } from '../lib/toasts';
@@ -19,8 +20,17 @@ import Icon from './Icon';
 
 export type InviteFormProps = {
   workspaceId: string;
-  // Caller bekommt Result + fertigen Mail-Link — InviteSuccessModal zeigen.
-  onCreated: (result: CreateInviteResult & { link: string }) => void;
+  // Caller bekommt Result + fertigen Mail-Link + invitedEmail (kann null sein
+  // wenn nur Link erstellt) + ob Mail-Send erfolgreich war (true = SMTP-Pfad
+  // lief, false = nur Klartext-Link verfuegbar). InviteSuccessModal zeigt
+  // damit eine "Mail gesendet"- oder "manuell senden"-Variante.
+  onCreated: (
+    result: CreateInviteResult & {
+      link: string;
+      invitedEmail: string | null;
+      mailSent: boolean;
+    },
+  ) => void;
 };
 
 const InviteForm: Component<InviteFormProps> = (p) => {
@@ -33,9 +43,36 @@ const InviteForm: Component<InviteFormProps> = (p) => {
     if (busy()) return;
     setBusy(true);
     try {
-      const result = await createInvite(p.workspaceId, role(), email().trim() || null);
+      const trimmedEmail = email().trim();
+      const result = await createInvite(p.workspaceId, role(), trimmedEmail || null);
       const link = buildInviteLink(result.token);
-      p.onCreated({ ...result, link });
+
+      // Wenn Email gesetzt: parallel Magic-Link-Mail senden. Failure
+      // ist non-fatal — Modal zeigt dann den manuellen Pfad.
+      let mailSent = false;
+      if (trimmedEmail) {
+        try {
+          await sendInviteMail(result.token, trimmedEmail);
+          mailSent = true;
+          showToast(`Einladungs-Mail an ${trimmedEmail} gesendet.`, 'success');
+        } catch (mailErr) {
+          // Mail-Send ist Bonus — nicht blockend. Modal zeigt mailto-Fallback.
+          showToast(
+            translateDbError(
+              mailErr,
+              'Mail-Versand fehlgeschlagen — Link bitte manuell aus dem Modal kopieren.',
+            ),
+            'info',
+          );
+        }
+      }
+
+      p.onCreated({
+        ...result,
+        link,
+        invitedEmail: trimmedEmail || null,
+        mailSent,
+      });
       setEmail('');
     } catch (err) {
       showToast(

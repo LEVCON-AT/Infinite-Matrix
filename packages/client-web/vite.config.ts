@@ -30,13 +30,16 @@ export default defineConfig({
         theme_color: '#0f172a',
         icons: [
           {
-            src: '/icon.svg',
+            // BASE-Praefix damit /app/-Deploy korrekt aufloest. Ohne den
+            // Prefix sucht der Browser /icon.svg und nginx liefert 404
+            // weil die Asset im /app/-Subordner liegt.
+            src: `${BASE}icon.svg`,
             sizes: 'any',
             type: 'image/svg+xml',
             purpose: 'any',
           },
           {
-            src: '/icon-maskable.svg',
+            src: `${BASE}icon-maskable.svg`,
             sizes: 'any',
             type: 'image/svg+xml',
             purpose: 'maskable',
@@ -46,8 +49,10 @@ export default defineConfig({
       workbox: {
         // SPA-Fallback: alle Navigationen auf index.html. Nicht fuer
         // Supabase-API-Calls (die laufen ueber fetch() und liegen
-        // ausserhalb der Navigations-Route).
-        navigateFallback: '/index.html',
+        // ausserhalb der Navigations-Route). BASE-Praefix damit
+        // /app/-Deploy auf /app/index.html zeigt — sonst sucht der
+        // SW non-precached `/index.html` und schmeisst Console-Error.
+        navigateFallback: `${BASE}index.html`,
         // Auth- und API-Requests NIE cachen: Token-Refresh, Realtime-
         // Handshake und RLS-gescopte Reads muessen den echten Server
         // treffen. Supabase liegt am selben Host unter /auth, /rest,

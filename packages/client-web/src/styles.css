@@ -2344,6 +2344,17 @@ button[type="submit"]:hover:not(:disabled) {
   flex: 0 0 auto;
 }
 
+.ws-owner-sub {
+  flex: 1 1 100%;
+  font-size: 10px;
+  color: var(--text3);
+  font-style: italic;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .ws-empty,
 .tree-empty {
   color: var(--text3);
@@ -5947,6 +5958,12 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   font-weight: 500;
 }
 
+.settings-owner-hint {
+  font-size: 0.8rem;
+  color: var(--text3);
+  font-style: italic;
+}
+
 .settings-body-shell {
   display: grid;
   grid-template-columns: 220px 1fr;
@@ -6306,6 +6323,41 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   font-size: 0.7rem;
 }
 
+.members-deactivated-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: var(--space-xs);
+  padding: 2px var(--space-xs);
+  border-radius: 4px;
+  background: var(--redbg);
+  color: var(--redtxt);
+  font-size: 0.7rem;
+}
+
+.members-self-badge {
+  display: inline-block;
+  margin-left: var(--space-xs);
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--bluebg);
+  color: var(--bluetxt);
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  vertical-align: middle;
+}
+
+.members-row-deactivated {
+  opacity: 0.6;
+}
+.members-row-deactivated .members-name {
+  text-decoration: line-through;
+  text-decoration-color: var(--text3);
+  text-decoration-thickness: 1px;
+}
+
 /* ════════════════════════════════════════════════════════════════
    Invite-Form + Success-Modal (Phase 1 P1.A)
    ════════════════════════════════════════════════════════════════ */
@@ -6400,6 +6452,42 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 .invite-link-input:focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: 1px;
+}
+
+.invite-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+.invite-action-row > a.btn-subtle,
+.invite-action-row > button.btn-subtle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  text-decoration: none;
+}
+
+.invite-mail-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  margin-right: var(--space-sm);
+  padding: 2px var(--space-xs);
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.invite-mail-status-ok {
+  background: var(--tealbg);
+  color: var(--tealtxt);
+}
+.invite-mail-status-pending {
+  background: var(--amberbg);
+  color: var(--ambertxt);
 }
 
 /* ════════════════════════════════════════════════════════════════

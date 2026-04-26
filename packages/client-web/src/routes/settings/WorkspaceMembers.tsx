@@ -58,16 +58,35 @@ const WorkspaceMembers = () => {
     },
   );
 
-  type SuccessState = { link: string; expiresAt: string };
+  type SuccessState = {
+    token: string;
+    link: string;
+    expiresAt: string;
+    invitedEmail: string | null;
+    mailSent: boolean;
+  };
   const [success, setSuccess] = createSignal<SuccessState | null>(null);
 
-  const handleInviteCreated = (result: { link: string; expires_at: string }) => {
-    setSuccess({ link: result.link, expiresAt: result.expires_at });
+  const handleInviteCreated = (result: {
+    token: string;
+    link: string;
+    expires_at: string;
+    invitedEmail: string | null;
+    mailSent: boolean;
+  }) => {
+    setSuccess({
+      token: result.token,
+      link: result.link,
+      expiresAt: result.expires_at,
+      invitedEmail: result.invitedEmail,
+      mailSent: result.mailSent,
+    });
     void refetchInvites();
     showToast('Einladung erstellt.', 'success');
   };
 
-  const handleInviteChanged = () => {
+  const handleListChanged = () => {
+    void refetchMembers();
     void refetchInvites();
   };
 
@@ -105,17 +124,23 @@ const WorkspaceMembers = () => {
           </button>
         </header>
         <MembersList
+          workspaceId={params.workspaceId}
           members={members() ?? []}
           invites={invites() ?? []}
-          onInviteChanged={handleInviteChanged}
+          myRole={myRole()}
+          myUserId={session()?.user?.id}
+          onChanged={handleListChanged}
         />
       </section>
 
       <Show when={success()}>
         {(s) => (
           <InviteSuccessModal
+            token={s().token}
             link={s().link}
+            invitedEmail={s().invitedEmail}
             expiresAt={s().expiresAt}
+            mailSent={s().mailSent}
             onClose={() => setSuccess(null)}
           />
         )}
