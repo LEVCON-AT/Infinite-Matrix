@@ -6,11 +6,13 @@
 // Workspace ist die Workspace-Section irrelevant, aber das Account-
 // Section bleibt benutzbar.
 
-import { A, useParams } from '@solidjs/router';
-import { For, type ParentComponent, Show, createResource } from 'solid-js';
+import { A, useNavigate, useParams } from '@solidjs/router';
+import { For, type ParentComponent, Show, createMemo, createResource } from 'solid-js';
 import Icon, { type IconName } from '../components/Icon';
-import { useSession } from '../lib/auth';
+import { signOut, useSession } from '../lib/auth';
+import { translateDbError } from '../lib/errors';
 import { fetchMyWorkspaces } from '../lib/queries';
+import { showToast } from '../lib/toasts';
 import type { WorkspaceWithRole } from '../lib/types';
 
 type NavItem = {
@@ -23,6 +25,26 @@ type NavItem = {
 const Settings: ParentComponent = (props) => {
   const params = useParams<{ workspaceId: string }>();
   const session = useSession();
+  const navigate = useNavigate();
+
+  // Identitaet fuer den User-Chip oben rechts. Email ist die zuverlaessige
+  // Quelle (display_name kann leer sein); Avatar-Initial ist 1. Zeichen
+  // davon. Bei fehlender Session laeuft das Layout durch — Auth-Guard auf
+  // App-Ebene fangt das ab.
+  const userEmail = createMemo<string | null>(() => session()?.user?.email ?? null);
+  const userInitial = createMemo<string>(() => {
+    const email = userEmail();
+    return (email?.[0] ?? '?').toUpperCase();
+  });
+
+  const handleSignOut = async (): Promise<void> => {
+    try {
+      await signOut();
+      navigate('/login');
+    } catch (err) {
+      showToast(translateDbError(err, 'Abmelden fehlgeschlagen.'), 'error');
+    }
+  };
 
   // Workspace-Liste fuer den Switcher in der Sub-Nav. Read-only Trigger
   // — fetchMyWorkspaces hat eigenes localStorage-Cache-Fallback.
@@ -92,13 +114,35 @@ const Settings: ParentComponent = (props) => {
         <h1 class="settings-title">Einstellungen</h1>
         <Show when={currentWorkspace()}>
           {(ws) => (
-            <>
+            <div class="settings-shell-head-ws">
               <span class="settings-ws-chip">{ws().name}</span>
               <span class={`settings-role-chip role-${ws().role}`}>{ws().role}</span>
               <Show when={ws().role !== 'owner' && ws().owner_email}>
                 <span class="settings-owner-hint">Owner: {ws().owner_email}</span>
               </Show>
-            </>
+            </div>
+          )}
+        </Show>
+        <Show when={userEmail()}>
+          {(email) => (
+            <div class="settings-userchip" aria-label="Eingeloggt als">
+              <span class="settings-userchip-avatar" aria-hidden="true">
+                {userInitial()}
+              </span>
+              <span class="settings-userchip-email" title={email()}>
+                {email()}
+              </span>
+              <button
+                type="button"
+                class="settings-userchip-signout"
+                onClick={() => void handleSignOut()}
+                title="Abmelden"
+                aria-label="Abmelden"
+              >
+                <Icon name="arrow-left" size={14} />
+                <span>Abmelden</span>
+              </button>
+            </div>
           )}
         </Show>
       </header>

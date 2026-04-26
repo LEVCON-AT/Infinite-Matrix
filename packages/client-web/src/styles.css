@@ -2305,6 +2305,12 @@ button[type="submit"]:hover:not(:disabled) {
 .ws-switcher-menu button {
   width: 100%;
   display: flex;
+  /* flex-wrap: wrap erlaubt der ws-owner-sub-Zeile (flex-basis 100%)
+     auf eine zweite Reihe unter name+role zu fallen. Ohne wrap quetscht
+     sich owner-sub als 3. Inline-Item zwischen name und role und
+     verschiebt das Layout — User hat Inkonsistenz im Screenshot
+     gemeldet (Rolle mal links, mal rechts). */
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: var(--space-xs);
@@ -5948,8 +5954,17 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   font-weight: 600;
 }
 
-.settings-ws-chip {
+/* Wrapper-Cluster fuer den Workspace-Kontext (Name + Rolle +
+   Owner-Hint). margin-left: auto schiebt das Cluster nach rechts;
+   der userchip kommt direkt dahinter und schliesst rechts ab. */
+.settings-shell-head-ws {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
   margin-left: auto;
+}
+
+.settings-ws-chip {
   padding: var(--space-xs) var(--space-sm);
   border-radius: 999px;
   background: var(--bluebg);
@@ -5962,6 +5977,66 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   font-size: 0.8rem;
   color: var(--text3);
   font-style: italic;
+}
+
+/* User-Identitaet oben rechts im Settings-Header. Avatar-Initial +
+   Email + Sign-out-Button. Steht hinter dem ws-chip-Cluster, damit
+   der Workspace-Kontext links bleibt und die Identitaet ganz rechts
+   anliegt. margin-left auf den ws-chip (auto) trennt links/rechts. */
+.settings-userchip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 4px 4px 4px var(--space-xs);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  margin-left: var(--space-md);
+}
+.settings-userchip-avatar {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bluebg);
+  color: var(--bluetxt);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.settings-userchip-email {
+  font-size: 0.85rem;
+  color: var(--text2);
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.settings-userchip-signout {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px var(--space-sm);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text3);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: var(--tr-std);
+}
+.settings-userchip-signout:hover,
+.settings-userchip-signout:focus-visible {
+  background: var(--redbg);
+  color: var(--redtxt);
+  border-color: var(--redbg);
+}
+@media (max-width: 720px) {
+  .settings-userchip-email {
+    display: none;
+  }
 }
 
 .settings-body-shell {
@@ -6207,7 +6282,12 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 
 .members-row {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+  /* 4 Spalten: Mitglied | Rolle | Beigetreten | Aktionen.
+     Aktionen-Spalte hat min-width damit der Slot bei "Self"-Zeilen
+     (keine Buttons) nicht kollabiert und die anderen Spalten zwischen
+     Header- und Body-Reihen auseinanderlaufen. 200px deckt die breitste
+     Owner-Action ab (Deaktivieren + Entfernen nebeneinander). */
+  grid-template-columns: minmax(0, 2.4fr) minmax(110px, 1fr) minmax(110px, 1fr) minmax(200px, auto);
   gap: var(--space-md);
   align-items: center;
   padding: var(--space-sm) var(--space-xs);
