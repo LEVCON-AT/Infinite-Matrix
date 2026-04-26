@@ -261,9 +261,7 @@ const MembersList: Component<MembersListProps> = (p) => {
               <td>
                 <Show
                   when={canChangeRole(m)}
-                  fallback={
-                    <span class={`settings-role-chip role-${m.role}`}>{m.role}</span>
-                  }
+                  fallback={<span class={`settings-role-chip role-${m.role}`}>{m.role}</span>}
                 >
                   <select
                     class={`members-role-select role-${m.role}`}
@@ -279,9 +277,7 @@ const MembersList: Component<MembersListProps> = (p) => {
                       void handleRoleChange(m, next);
                     }}
                   >
-                    <For each={allowedRoles(m)}>
-                      {(r) => <option value={r}>{r}</option>}
-                    </For>
+                    <For each={allowedRoles(m)}>{(r) => <option value={r}>{r}</option>}</For>
                   </select>
                 </Show>
                 <Show when={m.deactivated_at != null}>
