@@ -335,6 +335,14 @@ GRANT EXECUTE ON FUNCTION public.revoke_invite(uuid) TO authenticated, service_r
 -- bekommt 'forbidden'. Reihenfolge: owner zuerst, dann admin/editor/
 -- viewer alphabetisch nach Rolle, innerhalb gleicher Rolle nach
 -- Beitritt-Datum.
+--
+-- DROP FUNCTION IF EXISTS davor weil eine spaetere Migration (013)
+-- den RETURNS-TABLE-Schema um deactivated_at erweitert. Wenn 011 nach
+-- 013 nochmal angewendet wird (CI-Idempotenz oder Re-Deploy), schlaegt
+-- CREATE OR REPLACE sonst mit "cannot change return type" fehl. Mit
+-- DROP IF EXISTS bleibt 011 + 013 in beliebiger Reihenfolge anwendbar:
+-- 013 redefiniert die Funktion immer als finalen Zustand.
+DROP FUNCTION IF EXISTS public.list_workspace_members(uuid);
 CREATE OR REPLACE FUNCTION public.list_workspace_members(p_workspace_id uuid)
 RETURNS TABLE (
   user_id      uuid,
