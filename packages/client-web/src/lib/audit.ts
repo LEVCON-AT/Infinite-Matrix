@@ -9,7 +9,7 @@
 
 import { supabase } from './supabase';
 
-// Action-Typen, die Migration 011 + 013 in workspace_audit_log.action ablegen.
+// Action-Typen, die Migration 011 + 013 + 015 in workspace_audit_log.action ablegen.
 export type AuditAction =
   | 'invite.created'
   | 'invite.accepted'
@@ -17,7 +17,8 @@ export type AuditAction =
   | 'member.role_changed'
   | 'member.removed'
   | 'member.deactivated'
-  | 'member.reactivated';
+  | 'member.reactivated'
+  | 'workspace.ownership_transferred';
 
 export type AuditEntry = {
   id: string;
@@ -86,6 +87,8 @@ export function describeAuditAction(action: string): string {
       return 'Mitglied deaktiviert';
     case 'member.reactivated':
       return 'Mitglied reaktiviert';
+    case 'workspace.ownership_transferred':
+      return 'Eigentum uebertragen';
     default:
       return action;
   }

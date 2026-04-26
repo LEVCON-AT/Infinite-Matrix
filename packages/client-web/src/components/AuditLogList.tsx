@@ -34,6 +34,7 @@ const actionToToneClass = (action: string): string => {
   if (action === 'invite.revoked') return 'audit-tone-warn';
   if (action === 'member.role_changed') return 'audit-tone-warn';
   if (action === 'member.removed') return 'audit-tone-danger';
+  if (action === 'workspace.ownership_transferred') return 'audit-tone-warn';
   return 'audit-tone-neutral';
 };
 

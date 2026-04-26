@@ -18,6 +18,42 @@ Konventionen beschreiben *was* gilt, Prüfroutinen *wann* was zu prüfen ist. Vo
 - [ ] **Focus-Restore**: öffnet die Änderung ein Modal? → `_pushFocusRestore()` beim Open, `_popFocusRestore()` beim Close. Plus `_pushModal(closeFn)`/`_popModal`.
 - [ ] **Tokens vor Literals**: neue Magic-Number / Hex-Color / ms-Duration → existiert Token in `:root`? Falls ≥2× verwendet, neuen Token anlegen.
 
+## Trigger: Fehlermeldung / Toast-String hinzugefügt
+
+Endkunden-tauglichkeit ist nicht verhandelbar. Tech-Jargon im Toast macht die App unprofessionell — und ohne Tech-Detail im Console-Log ist Debugging hart. Die Trennung ist mechanisch.
+
+- [ ] **Doppel-Pattern**: jede `catch`-Branch hat `console.error('<funktionsname>:', err)` **vor** dem `showToast(...)`. Funktions-Name als Prefix damit Devtools-Search filtern kann.
+- [ ] **Toast-Sprache**: DE, voll-sätzig, lösungsorientiert ("Bitte erneut einloggen.", "Workspace nicht gefunden — wurde er evtl. gelöscht?"). Kein generisches "Fehler beim XYZ" ohne Konsequenz für den User.
+- [ ] **Verbotene Tech-Begriffe im Toast**: RLS, FK, JSONB, CASCADE, SECURITY DEFINER, RPC, Postgres, HTTP-Codes, SQL-Error-Codes, Stack-Traces. Auch nicht "schemaverletzung" oder ähnliche DB-Wörter.
+- [ ] **`translate*Error`-Funktion** statt Inline-Strings. Bei neuer Mutation eine eigene Translator-Funktion (analog `translateMemberError`/`translateInviteError`/`translateLifecycleError`).
+- [ ] **Sweep im Vorbei**: berührt der Sprint einen `catch`-Block, der heute noch tech-jargon im Toast hat oder kein `console.error` vorab? → mitsanieren. "Bessere bestehende aus, wo du am Weg drüber kommst" (User-Direktive 2026-04-26).
+
+## Trigger: Cascade-Delete / FK auf Aggregat-Wurzel
+
+Aggregat-Wurzeln (`workspaces`, später `users`) haben einen Strudel an Tabellen, die mitsterben. FK-Cascade ist die Versicherung dafür — aber nur wenn lückenlos. Eine SET NULL/RESTRICT-Stelle blockiert den Delete still.
+
+- [ ] **`pg_constraint`-Sweep vor der Migration**: alle FKs auf das Ziel-Aggregat enumerieren:
+  ```sql
+  SELECT conname, conrelid::regclass, confrelid::regclass, confdeltype
+    FROM pg_constraint
+   WHERE confrelid = 'public.<aggregat>'::regclass
+     AND contype = 'f';
+  -- Erwartet: alle confdeltype = 'c' (CASCADE).
+  ```
+- [ ] **Lücken in derselben Migration schließen** mit `ALTER TABLE ... DROP CONSTRAINT ... ADD CONSTRAINT ... ON DELETE CASCADE` — bevor die neue Delete-Logik kommt, sonst FK-Violation bei jeder Cascade-Welle.
+- [ ] **Welche Tabellen sterben mit?** Im Migration-Header explizit auflisten (memberships, nodes, cells, …) — Reviewer sieht den Blast-Radius.
+- [ ] **Audit-/Forensik-Frage**: cascadiert das `*_audit_log` mit? Gewollt für die meisten Workspace-scoped Logs — falls Forensik-Anforderung anders, eigener `system_audit_log` (nicht workspace-scoped).
+- [ ] **Smoke-Verifikation**: nach Migration & Delete `SELECT count(*) FROM <jede-cascadende-tabelle> WHERE <fk> = '<deleted-id>'` — alle 0.
+
+## Trigger: Settings/IA-Erweiterung denkbar
+
+Die `Settings.tsx`-Sub-Nav ist heute ein einfaches Array. Erweiterungen kosten zwei Zeilen — aber leere Stub-Tabs sind Lieblosigkeit, der User merkt das.
+
+- [ ] **Vor Phase-2+ Sprints fragen**: passen typische SaaS-Bereiche (Plan & Billing, Integrations, Webhooks, API-Keys, Notifications, GDPR-Export) als Sub-Tabs in die bestehende Struktur? Wenn ja, in welche Sub-Nav-Gruppe (`account/` vs. `workspace/`)?
+- [ ] **Keine Stub-Tabs vorab anlegen** ("coming soon"-Tabs versprechen einen Termin, den wir nicht halten).
+- [ ] **Architektur-Hooks vorbereiten statt Stubs**: `workspace_id`-Scope ist natürlicher Anker für Webhook-Trigger / Billing-Kontext / Audit-Forwarding. Wenn ein Sprint diese Hooks ohnehin anlegt, daran denken.
+- [ ] **Bottom-Sektionen für Lifecycle-Aktionen**: Owner-only-destruktive Aktionen (Delete, Transfer) gehören unter `<workspace>/general` als visuell abgesetzte "Gefahren-Zone", nicht als eigener Sub-Tab — überkomplex für 1-2 Buttons.
+
 ## Trigger: Neues UI-Element (Button, Row, Modal, Chip, …)
 
 - [ ] **Tastatur**: `tabindex="0"` wenn interaktiv erreichbar, `-1` wenn über Kontextmenü zugänglich. `onclick` + `onkeydown` für Enter/Space (rolle­spezifisch).

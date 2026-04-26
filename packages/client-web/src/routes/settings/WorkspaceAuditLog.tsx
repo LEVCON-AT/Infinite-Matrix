@@ -11,18 +11,20 @@ import { translateDbError } from '../../lib/errors';
 import { fetchMembers } from '../../lib/members';
 import { showToast } from '../../lib/toasts';
 
-type FilterPreset = 'all' | 'invites' | 'members';
+type FilterPreset = 'all' | 'invites' | 'members' | 'workspace';
 
 const FILTER_ACTIONS: Record<FilterPreset, ReadonlyArray<AuditAction>> = {
   all: [],
   invites: ['invite.created', 'invite.accepted', 'invite.revoked'],
   members: ['member.role_changed', 'member.removed', 'member.deactivated', 'member.reactivated'],
+  workspace: ['workspace.ownership_transferred'],
 };
 
 const FILTER_LABELS: Record<FilterPreset, string> = {
   all: 'Alle',
   invites: 'Einladungen',
   members: 'Mitglieder',
+  workspace: 'Workspace',
 };
 
 const WorkspaceAuditLog: Component = () => {
@@ -50,6 +52,7 @@ const WorkspaceAuditLog: Component = () => {
           actions: actions.length === 0 ? undefined : actions,
         });
       } catch (err) {
+        console.error('fetchAuditLog:', err);
         showToast(translateDbError(err, 'Audit-Log konnte nicht geladen werden.'), 'error');
         return [] as AuditEntry[];
       }

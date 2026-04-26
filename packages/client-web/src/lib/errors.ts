@@ -1,5 +1,10 @@
-// PostgREST / Supabase-Fehler in deutsche, verstaendliche Toasts uebersetzen.
-// Orientierung am Alt-Client: translateError(err, fallback).
+// Datenbank-Fehler in endkundentaugliche Toasts uebersetzen.
+//
+// Regel (Memory feedback_user_facing_toasts): Toast-Text muss ohne
+// Tech-Jargon (RLS, FK, JSONB, constraint, SQLSTATE) auskommen. Das
+// technische Detail (e.code, e.status) gehoert in den begleitenden
+// console.error('<funktionsname>:', err) — die Aufrufer sind dafuer
+// zustaendig.
 
 type SbError = {
   code?: string;
@@ -13,24 +18,25 @@ export function translateDbError(err: unknown, fallback = 'Unerwarteter Fehler.'
   if (!err) return fallback;
   const e = err as SbError;
 
-  // PostgreSQL-SQLSTATE-Codes (via PostgREST durchgereicht)
+  // PostgreSQL-SQLSTATE-Codes (via PostgREST durchgereicht). Texte
+  // sind bewusst Konsequenz-orientiert formuliert, nicht technisch.
   switch (e.code) {
     case '23505':
-      return aliasHint(e) ?? 'Wert ist bereits vergeben (unique constraint).';
+      return aliasHint(e) ?? 'Dieser Wert ist hier bereits vergeben.';
     case '23503':
-      return 'Verweis existiert nicht oder wurde geloescht.';
+      return 'Verknuepfter Eintrag existiert nicht mehr — wahrscheinlich wurde er geloescht.';
     case '23514':
-      return 'Eingabe verletzt eine Regel (check constraint).';
+      return 'Eingabe ist nicht gueltig — bitte pruefe das Format.';
     case '42501':
-      return 'Keine Berechtigung — RLS blockiert.';
+      return 'Keine Berechtigung fuer diese Aktion.';
     case 'PGRST116':
-      return 'Kein Datensatz gefunden.';
+      return 'Eintrag nicht gefunden.';
   }
 
-  if (e.status === 401) return 'Nicht eingeloggt.';
-  if (e.status === 403) return 'Keine Berechtigung.';
-  if (e.status === 404) return 'Ressource nicht gefunden.';
-  if (e.status && e.status >= 500) return 'Server-Fehler, bitte kurz warten.';
+  if (e.status === 401) return 'Bitte erneut einloggen.';
+  if (e.status === 403) return 'Keine Berechtigung fuer diese Aktion.';
+  if (e.status === 404) return 'Eintrag nicht gefunden.';
+  if (e.status && e.status >= 500) return 'Server-Problem. Bitte gleich erneut probieren.';
 
   if (err instanceof Error) return err.message || fallback;
   if (typeof e.message === 'string' && e.message) return e.message;

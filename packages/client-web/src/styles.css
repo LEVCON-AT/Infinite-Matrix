@@ -6312,6 +6312,76 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   gap: var(--space-sm);
 }
 
+/* Generischer Text-Input fuer Settings-Forms (P1.B.4+B.5).
+   Companion zu .settings-select — gleicher Look, wide-default. */
+.settings-input {
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--space-sm);
+  font-size: 13px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  color: var(--text);
+  font-family: inherit;
+  transition: border-color var(--tr-std), box-shadow var(--tr-std);
+}
+
+.settings-input:hover {
+  border-color: var(--border2);
+}
+
+.settings-input:focus-visible {
+  border-color: var(--focus-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-color) 18%, transparent);
+  outline: none;
+}
+
+/* Lifecycle-Modal-Felder (P1.B.4+B.5). Stack: Label oben, Input unten,
+   konsistenter Spacing. Generisch genug, damit andere Modals das auch
+   nutzen koennen — nicht modal-spezifisch benannt. */
+.lifecycle-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin-top: var(--space-md);
+}
+
+.lifecycle-field-label {
+  font-size: 0.875rem;
+  color: var(--text2);
+  line-height: 1.45;
+}
+
+.lifecycle-field-label code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.95em;
+  background: var(--surface-hover);
+  padding: 1px var(--space-xs);
+  border-radius: 3px;
+  color: var(--text);
+}
+
+.lifecycle-field-error {
+  margin-top: var(--space-xs);
+  color: var(--redtxt);
+  font-size: 0.85rem;
+}
+
+/* Gefahren-Zone am Bottom von Workspace-General (P1.B.4+B.5).
+   Visueller Bruch zur normalen Stammdaten-Liste, damit das Auge
+   den Owner-only-Charakter sofort erkennt. Token-basiert (--red,
+   --redbg) — Dark-Mode-Override greift automatisch. */
+.settings-danger-zone {
+  border: 1px solid color-mix(in srgb, var(--red) 32%, var(--border));
+  background: color-mix(in srgb, var(--red) 4%, var(--surface));
+  margin-top: var(--space-xl);
+}
+
+.settings-danger-zone h3 {
+  color: var(--redtxt);
+}
+
 /* ── Role-Chips ─────────────────────────────────────────────── */
 .settings-role-chip {
   display: inline-flex;

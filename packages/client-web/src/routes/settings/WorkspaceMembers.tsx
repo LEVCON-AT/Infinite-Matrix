@@ -39,6 +39,7 @@ const WorkspaceMembers = () => {
       try {
         return await fetchMembers(wsId);
       } catch (err) {
+        console.error('fetchMembers:', err);
         showToast(translateDbError(err, 'Mitglieder konnten nicht geladen werden.'), 'error');
         return [];
       }
@@ -52,6 +53,7 @@ const WorkspaceMembers = () => {
       try {
         return await fetchInvites(wsId);
       } catch (err) {
+        console.error('fetchInvites:', err);
         showToast(translateDbError(err, 'Einladungen konnten nicht geladen werden.'), 'error');
         return [];
       }
