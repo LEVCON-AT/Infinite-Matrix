@@ -70,9 +70,18 @@ jobs:
         # ohne /app/-Prefix fuehrt (z.B. Invite-Mail-Link zeigt auf
         # /invite/<token> statt /app/invite/<token>). Trailing-Slash
         # ist Pflicht (Auth-Modul haengt 'invite/<token>' direkt an).
+        #
+        # VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY werden vom Supabase-
+        # JS-Client zur Build-Zeit eingebrannt (Vite-`import.meta.env`).
+        # Ohne sie wirft der Client beim Start eine Exception. ANON_KEY
+        # ist ein "public" JWT (sichtbar in jedem Frontend), wird aber
+        # ueber GitHub Secrets gepflegt damit Repo-Klone keinen Default
+        # ohne Quelle erhalten.
         env:
           VITE_BASE_PATH: /app/
           VITE_SITE_URL: https://staging.matrix.levcon.at/app/
+          VITE_SUPABASE_URL: https://staging.matrix.levcon.at
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
         working-directory: packages/client-web
         run: |
           pnpm lint

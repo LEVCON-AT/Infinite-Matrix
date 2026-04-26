@@ -91,7 +91,15 @@ const Settings: ParentComponent = (props) => {
         </A>
         <h1 class="settings-title">Einstellungen</h1>
         <Show when={currentWorkspace()}>
-          {(ws) => <span class="settings-ws-chip">{ws().name}</span>}
+          {(ws) => (
+            <>
+              <span class="settings-ws-chip">{ws().name}</span>
+              <span class={`settings-role-chip role-${ws().role}`}>{ws().role}</span>
+              <Show when={ws().role !== 'owner' && ws().owner_email}>
+                <span class="settings-owner-hint">Owner: {ws().owner_email}</span>
+              </Show>
+            </>
+          )}
         </Show>
       </header>
 

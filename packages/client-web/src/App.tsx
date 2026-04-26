@@ -3,9 +3,10 @@ import { type JSX, type ParentComponent, Show, createEffect } from 'solid-js';
 import DialogHost from './components/DialogHost';
 import ProgressOverlay from './components/ProgressOverlay';
 import Toasts from './components/Toasts';
-import { bootstrapAuth, useAuthReady, useSession } from './lib/auth';
+import { bootstrapAuth, useAccountInvalid, useAuthReady, useSession } from './lib/auth';
 import { useEditModeHotkey } from './lib/edit-mode';
 import { useThemeBootstrap } from './lib/theme';
+import { showToast } from './lib/toasts';
 import { PENDING_INVITE_KEY } from './routes/Invite';
 
 bootstrapAuth();
@@ -20,11 +21,29 @@ function isPublicRoute(pathname: string): boolean {
 const App: ParentComponent = (props): JSX.Element => {
   const ready = useAuthReady();
   const session = useSession();
+  const accountInvalid = useAccountInvalid();
   const location = useLocation();
   const navigate = useNavigate();
 
   useEditModeHotkey();
   useThemeBootstrap();
+
+  // Account-Health-Toast: wenn die JWT-Session lokal noch existiert, der
+  // serverseitige User aber weg ist (geloeschter Account), hat lib/auth
+  // bereits local-only signOut + accountInvalid=true gesetzt. Wir zeigen
+  // einen Toast genau einmal pro Boot, damit der User versteht warum er
+  // ploetzlich auf der Login-Page landet.
+  let accountInvalidToastShown = false;
+  createEffect(() => {
+    if (accountInvalid() && !accountInvalidToastShown) {
+      accountInvalidToastShown = true;
+      showToast(
+        'Dein Account wurde entfernt. Bitte mit einer gueltigen Adresse neu anmelden.',
+        'error',
+        { ms: 10000 },
+      );
+    }
+  });
 
   // Route-Guard: ohne Session -> /login (ausser auf public-Routen),
   // mit Session auf /login -> Pending-Invite-Redeem oder /.

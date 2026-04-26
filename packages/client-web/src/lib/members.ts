@@ -1,12 +1,12 @@
-// Workspace-Members — Phase 1 (P1.A).
+// Workspace-Members — Phase 1 (P1.A) + Member-Aktionen (P1.A.4).
 //
 // Read-Pfad ueber SECURITY DEFINER RPC `list_workspace_members`
-// (Migration 011), die memberships mit auth.users joinen kann
-// (auth-Schema ist via PostgREST nicht direkt erreichbar).
+// (Migration 011, erweitert in 013 um deactivated_at).
 //
-// Schreib-Aktionen (Rolle aendern, entfernen, Eigentum uebertragen)
-// kommen in P1.B. P1.A liefert nur die read-only Liste fuer die
-// Settings-Members-Page.
+// Mutation-Pfad ueber RPCs `deactivate_member`, `reactivate_member`,
+// `remove_member` (Migration 013). Synchron-online ohne safe-mutation-
+// Wrapper, weil Security-Mutations explizit kein Offline-Replay haben
+// duerfen (Anti-Pattern Memory feedback_saas_security_no_offline).
 
 import { supabase } from './supabase';
 import type { WorkspaceRole } from './types';
@@ -17,6 +17,7 @@ export type WorkspaceMember = {
   display_name: string | null;
   role: WorkspaceRole;
   joined_at: string;
+  deactivated_at: string | null;
 };
 
 // Live-Fetch via RPC. Kein IDB-Cache — die Liste ist klein, der Read
@@ -28,6 +29,79 @@ export async function fetchMembers(workspaceId: string): Promise<WorkspaceMember
   });
   if (error) throw error;
   return (data ?? []) as WorkspaceMember[];
+}
+
+// ─── Member-Aktionen ─────────────────────────────────────────────
+export type DeactivateResult = {
+  workspace_id: string;
+  user_id: string;
+  changed: boolean;
+  previous_state: 'active' | 'deactivated';
+};
+
+export async function deactivateMember(
+  workspaceId: string,
+  userId: string,
+): Promise<DeactivateResult> {
+  const { data, error } = await supabase.rpc('deactivate_member', {
+    p_workspace_id: workspaceId,
+    p_user_id: userId,
+  });
+  if (error) throw error;
+  return data as DeactivateResult;
+}
+
+export async function reactivateMember(
+  workspaceId: string,
+  userId: string,
+): Promise<DeactivateResult> {
+  const { data, error } = await supabase.rpc('reactivate_member', {
+    p_workspace_id: workspaceId,
+    p_user_id: userId,
+  });
+  if (error) throw error;
+  return data as DeactivateResult;
+}
+
+export type RemoveResult = {
+  workspace_id: string;
+  user_id: string;
+  removed_role: WorkspaceRole;
+};
+
+export async function removeMember(workspaceId: string, userId: string): Promise<RemoveResult> {
+  const { data, error } = await supabase.rpc('remove_member', {
+    p_workspace_id: workspaceId,
+    p_user_id: userId,
+  });
+  if (error) throw error;
+  return data as RemoveResult;
+}
+
+// ─── Fehler-Uebersetzung ─────────────────────────────────────────
+export function translateMemberError(err: unknown, fallback: string): string {
+  if (err && typeof err === 'object' && 'message' in err) {
+    const msg = String((err as { message?: string }).message ?? '').toLowerCase();
+    if (msg.includes('cannot_deactivate_self')) {
+      return 'Du kannst dich nicht selbst deaktivieren.';
+    }
+    if (msg.includes('cannot_remove_self')) {
+      return 'Du kannst dich nicht selbst entfernen — uebertrage zuerst die Eigentuemerschaft.';
+    }
+    if (msg.includes('cannot_deactivate_last_owner') || msg.includes('cannot_remove_last_owner')) {
+      return 'Letzter aktiver Owner kann nicht entfernt oder deaktiviert werden.';
+    }
+    if (msg.includes('member_not_found')) {
+      return 'Mitglied wurde nicht gefunden.';
+    }
+    if (msg.includes('forbidden')) {
+      return 'Keine Berechtigung — owner oder admin erforderlich.';
+    }
+    if (msg.includes('unauthenticated')) {
+      return 'Bitte erneut einloggen.';
+    }
+  }
+  return fallback;
 }
 
 // Anzeige-Helfer: wenn display_name leer ist, das @-Prefix der Email

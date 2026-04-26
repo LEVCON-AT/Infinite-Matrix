@@ -11,6 +11,7 @@
 // Fallback fuer die Settings-Members-Page — Phase-1-Komfort, keine
 // kritische Funktionalitaet.
 
+import { signInWithMagicLink } from './auth';
 import { isNetworkError } from './mutation-queue';
 import { getByWorkspace, putAll } from './offline-cache';
 import { markCacheFallback, markLiveSuccess } from './offline-state';
@@ -138,6 +139,32 @@ export function buildInviteLink(token: string): string {
   return `${location.origin}${normalized}invite/${encodeURIComponent(token)}`;
 }
 
+// Mail-Versand via GoTrue Magic-Link (P1.A.4).
+// Nutzt die existierende Supabase-Auth-SMTP-Konfig (Ionos). Mail laeuft
+// als signInWithOtp -> User bekommt Magic-Link, klickt, landet eingeloggt
+// auf /app/invite/<token>, redeem feuert automatisch.
+//
+// Subject + Body sind die GoTrue-Default-Magic-Link-Mail (Studio-Aufgabe
+// fuer Custom-Template). Bei SMTP-Fehler: Caller faengt Exception ab und
+// zeigt mailto-Fallback.
+export async function sendInviteMail(token: string, invitedEmail: string): Promise<void> {
+  const trimmed = invitedEmail.trim();
+  if (!trimmed) throw new Error('invited_email_empty');
+  await signInWithMagicLink(trimmed, `invite/${token}`);
+}
+
+// mailto:-Fallback fuer Mail-Client-basierten Versand. Kein SMTP-Pfad,
+// User schickt selbst aus seinem Account. Subject + Body sind fest, der
+// Link wird angehaengt.
+export function buildInviteMailto(token: string, invitedEmail: string): string {
+  const link = buildInviteLink(token);
+  const subject = encodeURIComponent('Workspace-Einladung — Matrix');
+  const body = encodeURIComponent(
+    `Hallo,\n\ndu wurdest in einen Matrix-Workspace eingeladen. Klick den folgenden Link, um beizutreten:\n\n${link}\n\nDer Link ist 7 Tage gueltig und kann nur einmal verwendet werden.\n`,
+  );
+  return `mailto:${encodeURIComponent(invitedEmail)}?subject=${subject}&body=${body}`;
+}
+
 // ─── Fehler-Uebersetzung ──────────────────────────────────────────
 // Die RPCs werfen plpgsql-Exceptions mit identifizierender message
 // ('invite_invalid', 'forbidden', 'unauthenticated', 'invite_not_found',
@@ -145,6 +172,12 @@ export function buildInviteLink(token: string): string {
 export function translateInviteError(err: unknown, fallback: string): string {
   if (err && typeof err === 'object' && 'message' in err) {
     const msg = String((err as { message?: string }).message ?? '').toLowerCase();
+    if (msg.includes('invite_email_mismatch')) {
+      return 'Diese Einladung gilt fuer eine andere E-Mail-Adresse. Logge dich mit der eingeladenen Adresse ein.';
+    }
+    if (msg.includes('already_member')) {
+      return 'Du bist bereits Mitglied dieses Workspaces.';
+    }
     if (msg.includes('invite_invalid')) {
       return 'Einladungs-Link ist ungueltig, abgelaufen oder schon eingeloest.';
     }

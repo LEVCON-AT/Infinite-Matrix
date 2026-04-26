@@ -72,7 +72,7 @@ export async function fetchMyWorkspaces(): Promise<WorkspaceWithRole[]> {
 
     if (error) throw error;
 
-    const rows = (data ?? [])
+    const baseRows = (data ?? [])
       .filter((m) => m.workspace != null)
       .map((m) => {
         const ws = m.workspace as unknown as {
@@ -82,11 +82,36 @@ export async function fetchMyWorkspaces(): Promise<WorkspaceWithRole[]> {
           created_at: string;
           updated_at: string;
         };
-        return { ...ws, role: m.role };
+        return { ...ws, role: m.role, owner_email: null as string | null };
       });
-    writeWorkspacesToLS(rows);
+
+    // Owner-Email per RPC nachladen, nur fuer Workspaces, in denen der
+    // Caller NICHT selber Owner ist (eigene Workspaces brauchen den
+    // Hinweis nicht). Failure ist non-fatal — Switcher zeigt dann eben
+    // keinen Owner-Sub-Label.
+    const foreignIds = baseRows.filter((r) => r.role !== 'owner').map((r) => r.id);
+    if (foreignIds.length > 0) {
+      try {
+        const { data: ownersData } = await supabase.rpc('get_workspace_owners', {
+          p_workspace_ids: foreignIds,
+        });
+        if (Array.isArray(ownersData)) {
+          const ownerMap = new Map<string, string>();
+          for (const row of ownersData as { workspace_id: string; owner_email: string }[]) {
+            ownerMap.set(row.workspace_id, row.owner_email);
+          }
+          for (const r of baseRows) {
+            if (ownerMap.has(r.id)) r.owner_email = ownerMap.get(r.id) ?? null;
+          }
+        }
+      } catch {
+        // Owner-Email-Lookup ist Bonus-Info — fail silent.
+      }
+    }
+
+    writeWorkspacesToLS(baseRows);
     markLiveSuccess();
-    return rows;
+    return baseRows;
   } catch (err) {
     if (!isNetworkError(err)) throw err;
     const cached = readWorkspacesFromLS();

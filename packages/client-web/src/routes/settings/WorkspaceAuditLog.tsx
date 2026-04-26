@@ -16,7 +16,7 @@ type FilterPreset = 'all' | 'invites' | 'members';
 const FILTER_ACTIONS: Record<FilterPreset, ReadonlyArray<AuditAction>> = {
   all: [],
   invites: ['invite.created', 'invite.accepted', 'invite.revoked'],
-  members: ['member.role_changed', 'member.removed'],
+  members: ['member.role_changed', 'member.removed', 'member.deactivated', 'member.reactivated'],
 };
 
 const FILTER_LABELS: Record<FilterPreset, string> = {

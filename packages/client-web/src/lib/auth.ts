@@ -24,21 +24,69 @@ const SITE_URL = (() => {
 const [session, setSession] = createSignal<Session | null>(null);
 const [ready, setReady] = createSignal(false);
 
+// Account-Health-Signal: true wenn die JWT-Session lokal existiert, der
+// Server-side User aber nicht mehr (admin removed, account-deletion etc.).
+// App.tsx zeigt einen Toast + redirect zu /login. Wird beim naechsten
+// erfolgreichen SIGN_IN-Event wieder zurueckgesetzt.
+const [accountInvalid, setAccountInvalid] = createSignal(false);
+
 // Einmaliger Bootstrap: vorhandene Session aus Storage lesen + Subscription starten.
 let bootstrapped = false;
 export function bootstrapAuth(): void {
   if (bootstrapped) return;
   bootstrapped = true;
 
-  supabase.auth.getSession().then(({ data }) => {
+  void (async () => {
+    const { data } = await supabase.auth.getSession();
     setSession(data.session);
     setReady(true);
-  });
+    if (data.session) {
+      void validateUserExists();
+    }
+  })();
 
-  supabase.auth.onAuthStateChange((_event, s) => {
+  supabase.auth.onAuthStateChange((event, s) => {
     setSession(s);
     setReady(true);
+    if (event === 'SIGNED_OUT') {
+      setAccountInvalid(false);
+    } else if (
+      s &&
+      (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED')
+    ) {
+      // Bei jedem neuen oder aufgefrischten Token gegenchecken, ob der
+      // User serverseitig noch existiert. TOKEN_REFRESHED feuert auch
+      // periodisch (alle ~50 min default) — gibt uns eine quasi-periodische
+      // Health-Check ohne expliziten Timer.
+      void validateUserExists();
+    }
   });
+}
+
+// Pruefe, ob der User aus der aktuellen JWT-Session serverseitig noch
+// existiert. supabase.auth.getUser() validiert den Token gegen GoTrue
+// (und damit gegen auth.users) — bei geloeschtem User kommt error oder
+// data.user=null zurueck.
+//
+// Bei "Account weg": local-only signOut (kein Network-Round-Trip, weil
+// der Server uns sowieso 403en wuerde) + accountInvalid-Flag setzen,
+// damit App.tsx einen Toast zeigt + zur Login-Page schickt.
+async function validateUserExists(): Promise<void> {
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data?.user) {
+      setAccountInvalid(true);
+      try {
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch {
+        // Lokaler signOut darf nicht haengen — Storage-Fehler ignorieren.
+      }
+      setSession(null);
+    }
+  } catch {
+    // Netzfehler — wir sind offline; Session bleibt erhalten, accountInvalid
+    // bleibt false. Beim naechsten Online-Roundtrip wird neu validiert.
+  }
 }
 
 export function useSession() {
@@ -47,6 +95,12 @@ export function useSession() {
 
 export function useAuthReady() {
   return ready;
+}
+
+// True, sobald validateUserExists einen geloeschten Account erkannt hat.
+// Wird beim naechsten erfolgreichen SIGN_IN-Event auf false zurueckgesetzt.
+export function useAccountInvalid() {
+  return accountInvalid;
 }
 
 export function useUser(): () => User | null {

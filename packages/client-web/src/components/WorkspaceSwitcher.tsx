@@ -148,6 +148,9 @@ const WorkspaceSwitcher: Component<Props> = (props) => {
                       >
                         <span class="ws-name">{ws.name}</span>
                         <span class="ws-role">{roleLabel[ws.role]}</span>
+                        <Show when={ws.role !== 'owner' && ws.owner_email}>
+                          <span class="ws-owner-sub">Owner: {ws.owner_email}</span>
+                        </Show>
                       </button>
                     </li>
                   )}

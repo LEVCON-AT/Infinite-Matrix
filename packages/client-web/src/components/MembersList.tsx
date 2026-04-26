@@ -1,13 +1,15 @@
-// MembersList — Phase 1 (P1.A).
+// MembersList — Phase 1 (P1.A) + Member-Aktionen (P1.A.4).
 //
 // Tabellenartige Liste aller Workspace-Mitglieder + offene Einladungen
 // in einer einheitlichen Ansicht ("unified members view"). Pending-
 // Eintraege haben einen abgegrauten Avatar-Placeholder + Sub-Label
 // "Einladung offen".
 //
-// Aktionen pro Zeile (P1.B):
-//   - Member-Aktionen-Kebab (Rolle aendern, entfernen) — disabled in P1.A.
-//   - Pending-Aktionen: Widerrufen, Link kopieren — Widerrufen ist live.
+// Aktionen pro Zeile:
+//   - Member-Aktionen: Deaktivieren / Reaktivieren (admin+) und
+//     Entfernen (owner only). Per Inline-Buttons im Aktionen-Slot.
+//   - Pending-Aktionen: Widerrufen.
+//   - Self: keine Aktionen (man kann sich nicht selbst rauswerfen).
 
 import { type Component, For, Show } from 'solid-js';
 import { showChoice } from '../lib/dialog';
@@ -18,15 +20,26 @@ import {
   revokeInvite,
   translateInviteError,
 } from '../lib/invites';
-import { type WorkspaceMember, memberDisplayLabel } from '../lib/members';
+import {
+  type WorkspaceMember,
+  deactivateMember,
+  memberDisplayLabel,
+  reactivateMember,
+  removeMember,
+  translateMemberError,
+} from '../lib/members';
 import { showToast } from '../lib/toasts';
+import type { WorkspaceRole } from '../lib/types';
 import Icon from './Icon';
 
 export type MembersListProps = {
+  workspaceId: string;
   members: WorkspaceMember[];
   invites: WorkspaceInviteRow[];
-  // Caller invalidiert die Listen nach erfolgreichem Revoke.
-  onInviteChanged: () => void;
+  myRole: WorkspaceRole | undefined;
+  myUserId: string | undefined;
+  // Caller invalidiert die Listen nach Mutationen.
+  onChanged: () => void;
 };
 
 const formatRelative = (iso: string): string => {
@@ -43,6 +56,10 @@ const formatRelative = (iso: string): string => {
 };
 
 const MembersList: Component<MembersListProps> = (p) => {
+  const canManage = () => p.myRole === 'owner' || p.myRole === 'admin';
+  const canRemove = () => p.myRole === 'owner';
+  const isSelf = (userId: string) => p.myUserId === userId;
+
   const handleRevoke = async (inviteId: string, label: string) => {
     const ok = await showChoice({
       title: 'Einladung widerrufen',
@@ -57,14 +74,78 @@ const MembersList: Component<MembersListProps> = (p) => {
       const res = await revokeInvite(inviteId);
       if (res.changed) {
         showToast('Einladung widerrufen.', 'success');
-        p.onInviteChanged();
       } else {
         showToast(`Einladung war bereits ${res.previous_state}.`, 'info');
-        p.onInviteChanged();
       }
+      p.onChanged();
     } catch (err) {
       showToast(
         translateInviteError(err, translateDbError(err, 'Widerruf fehlgeschlagen.')),
+        'error',
+      );
+    }
+  };
+
+  const handleDeactivate = async (m: WorkspaceMember) => {
+    const ok = await showChoice({
+      title: 'Mitglied deaktivieren',
+      message: `${memberDisplayLabel(m)} deaktivieren? Der Zugriff auf den Workspace wird sofort entzogen, der Eintrag bleibt fuer eventuelle Reaktivierung erhalten.`,
+      choices: [
+        { id: 'deactivate', label: 'Deaktivieren', variant: 'danger' },
+        { id: 'cancel', label: 'Abbrechen', variant: 'default' },
+      ],
+    });
+    if (ok !== 'deactivate') return;
+    try {
+      const res = await deactivateMember(p.workspaceId, m.user_id);
+      if (res.changed) {
+        showToast(`${memberDisplayLabel(m)} deaktiviert.`, 'success');
+      } else {
+        showToast('Mitglied war bereits deaktiviert.', 'info');
+      }
+      p.onChanged();
+    } catch (err) {
+      showToast(
+        translateMemberError(err, translateDbError(err, 'Deaktivierung fehlgeschlagen.')),
+        'error',
+      );
+    }
+  };
+
+  const handleReactivate = async (m: WorkspaceMember) => {
+    try {
+      const res = await reactivateMember(p.workspaceId, m.user_id);
+      if (res.changed) {
+        showToast(`${memberDisplayLabel(m)} reaktiviert.`, 'success');
+      } else {
+        showToast('Mitglied war bereits aktiv.', 'info');
+      }
+      p.onChanged();
+    } catch (err) {
+      showToast(
+        translateMemberError(err, translateDbError(err, 'Reaktivierung fehlgeschlagen.')),
+        'error',
+      );
+    }
+  };
+
+  const handleRemove = async (m: WorkspaceMember) => {
+    const ok = await showChoice({
+      title: 'Mitglied entfernen',
+      message: `${memberDisplayLabel(m)} dauerhaft aus dem Workspace entfernen? Der Eintrag wird geloescht. Bei Bedarf muss eine neue Einladung verschickt werden.`,
+      choices: [
+        { id: 'remove', label: 'Endgueltig entfernen', variant: 'danger' },
+        { id: 'cancel', label: 'Abbrechen', variant: 'default' },
+      ],
+    });
+    if (ok !== 'remove') return;
+    try {
+      await removeMember(p.workspaceId, m.user_id);
+      showToast(`${memberDisplayLabel(m)} entfernt.`, 'success');
+      p.onChanged();
+    } catch (err) {
+      showToast(
+        translateMemberError(err, translateDbError(err, 'Entfernen fehlgeschlagen.')),
         'error',
       );
     }
@@ -98,13 +179,21 @@ const MembersList: Component<MembersListProps> = (p) => {
           }
         >
           {(m) => (
-            <tr class="members-row">
+            <tr
+              class="members-row"
+              classList={{ 'members-row-deactivated': m.deactivated_at != null }}
+            >
               <td class="members-cell-name">
                 <div class="members-avatar" aria-hidden="true">
                   {memberDisplayLabel(m).slice(0, 1).toUpperCase()}
                 </div>
                 <div class="members-name-stack">
-                  <span class="members-name">{memberDisplayLabel(m)}</span>
+                  <span class="members-name">
+                    {memberDisplayLabel(m)}
+                    <Show when={isSelf(m.user_id)}>
+                      <span class="members-self-badge">du</span>
+                    </Show>
+                  </span>
                   <Show when={m.email && m.email !== memberDisplayLabel(m)}>
                     <span class="members-sub">{m.email}</span>
                   </Show>
@@ -118,17 +207,52 @@ const MembersList: Component<MembersListProps> = (p) => {
                     <span>locked</span>
                   </span>
                 </Show>
+                <Show when={m.deactivated_at != null}>
+                  <span class="members-deactivated-badge" title="Membership deaktiviert">
+                    <Icon name="no-symbol" size={12} />
+                    <span>deaktiviert</span>
+                  </span>
+                </Show>
               </td>
               <td class="members-meta">{formatRelative(m.joined_at)}</td>
               <td class="members-row-actions">
-                <button
-                  type="button"
-                  class="btn-subtle"
-                  disabled
-                  title="Rollen-Aenderung kommt in P1.B"
-                >
-                  <Icon name="ellipsis-horizontal" size={14} />
-                </button>
+                <Show when={canManage() && !isSelf(m.user_id)}>
+                  <Show
+                    when={m.deactivated_at != null}
+                    fallback={
+                      <button
+                        type="button"
+                        class="btn-subtle btn-danger-subtle"
+                        onClick={() => void handleDeactivate(m)}
+                        title="Mitglied deaktivieren"
+                      >
+                        <Icon name="no-symbol" size={14} />
+                        <span>Deaktivieren</span>
+                      </button>
+                    }
+                  >
+                    <button
+                      type="button"
+                      class="btn-subtle"
+                      onClick={() => void handleReactivate(m)}
+                      title="Mitglied reaktivieren"
+                    >
+                      <Icon name="check" size={14} />
+                      <span>Reaktivieren</span>
+                    </button>
+                  </Show>
+                </Show>
+                <Show when={canRemove() && !isSelf(m.user_id)}>
+                  <button
+                    type="button"
+                    class="btn-subtle btn-danger-subtle"
+                    onClick={() => void handleRemove(m)}
+                    title="Mitglied dauerhaft entfernen"
+                  >
+                    <Icon name="trash" size={14} />
+                    <span>Entfernen</span>
+                  </button>
+                </Show>
               </td>
             </tr>
           )}
@@ -163,17 +287,22 @@ const MembersList: Component<MembersListProps> = (p) => {
                   Laeuft ab am {new Date(inv.expires_at).toLocaleDateString()}
                 </td>
                 <td class="members-row-actions">
-                  <button
-                    type="button"
-                    class="btn-subtle btn-danger-subtle"
-                    onClick={() =>
-                      void handleRevoke(inv.id, inv.invited_email ?? `Invite ${inv.id.slice(0, 8)}`)
-                    }
-                    title="Einladung widerrufen"
-                  >
-                    <Icon name="no-symbol" size={14} />
-                    <span>Widerrufen</span>
-                  </button>
+                  <Show when={canManage()}>
+                    <button
+                      type="button"
+                      class="btn-subtle btn-danger-subtle"
+                      onClick={() =>
+                        void handleRevoke(
+                          inv.id,
+                          inv.invited_email ?? `Invite ${inv.id.slice(0, 8)}`,
+                        )
+                      }
+                      title="Einladung widerrufen"
+                    >
+                      <Icon name="no-symbol" size={14} />
+                      <span>Widerrufen</span>
+                    </button>
+                  </Show>
                 </td>
               </tr>
             )}
