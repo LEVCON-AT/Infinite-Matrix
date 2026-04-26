@@ -11,7 +11,7 @@
 //   - Pending-Aktionen: Widerrufen.
 //   - Self: keine Aktionen (man kann sich nicht selbst rauswerfen).
 
-import { type Component, For, Show } from 'solid-js';
+import { type Component, For, Show, createSignal } from 'solid-js';
 import { showChoice } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
 import {
@@ -22,6 +22,7 @@ import {
 } from '../lib/invites';
 import {
   type WorkspaceMember,
+  changeMemberRole,
   deactivateMember,
   memberDisplayLabel,
   reactivateMember,
@@ -59,6 +60,64 @@ const MembersList: Component<MembersListProps> = (p) => {
   const canManage = () => p.myRole === 'owner' || p.myRole === 'admin';
   const canRemove = () => p.myRole === 'owner';
   const isSelf = (userId: string) => p.myUserId === userId;
+
+  // pro user_id ein Pending-Flag, damit das <select> waehrend des RPC
+  // disabled bleibt + nicht gleich nochmal getriggert werden kann.
+  const [pendingRole, setPendingRole] = createSignal<Set<string>>(new Set());
+  const isPending = (uid: string) => pendingRole().has(uid);
+  const markPending = (uid: string, on: boolean) => {
+    setPendingRole((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(uid);
+      else next.delete(uid);
+      return next;
+    });
+  };
+
+  // Welche Rollen-Optionen darf der Caller fuer dieses Target setzen?
+  // Backend setzt die Regeln zwingend — dies ist nur die UI-Vorschau,
+  // damit der User nicht in offene RPC-Errors laeuft.
+  //
+  //   owner  : alle 4 Rollen.
+  //   admin  : nur editor|viewer, nur fuer editor|viewer-Targets.
+  //   sonst  : keine (Dropdown wird gar nicht gerendert).
+  const allowedRoles = (target: WorkspaceMember): WorkspaceRole[] => {
+    if (p.myRole === 'owner') return ['owner', 'admin', 'editor', 'viewer'];
+    if (p.myRole === 'admin') {
+      if (target.role === 'owner' || target.role === 'admin') return [];
+      return ['editor', 'viewer'];
+    }
+    return [];
+  };
+
+  // Dropdown nur anzeigen wenn:
+  //  - canManage(), nicht self, target nicht deaktiviert
+  //  - allowedRoles liefert mind. 2 Werte (sonst kein Wechsel moeglich)
+  const canChangeRole = (m: WorkspaceMember) =>
+    canManage() && !isSelf(m.user_id) && m.deactivated_at == null && allowedRoles(m).length >= 2;
+
+  const handleRoleChange = async (m: WorkspaceMember, newRole: WorkspaceRole) => {
+    if (newRole === m.role) return;
+    markPending(m.user_id, true);
+    try {
+      const res = await changeMemberRole(p.workspaceId, m.user_id, newRole);
+      if (res.changed) {
+        showToast(`Rolle: ${memberDisplayLabel(m)} -> ${newRole}.`, 'success');
+      } else {
+        showToast('Rolle unveraendert.', 'info');
+      }
+      p.onChanged();
+    } catch (err) {
+      showToast(
+        translateMemberError(err, translateDbError(err, 'Rollen-Aenderung fehlgeschlagen.')),
+        'error',
+      );
+      // Re-Fetch im onChanged-Caller setzt das Select zurueck;
+      // hier reichts den Pending-Flag zu loesen.
+    } finally {
+      markPending(m.user_id, false);
+    }
+  };
 
   const handleRevoke = async (inviteId: string, label: string) => {
     const ok = await showChoice({
@@ -200,12 +259,30 @@ const MembersList: Component<MembersListProps> = (p) => {
                 </div>
               </td>
               <td>
-                <span class={`settings-role-chip role-${m.role}`}>{m.role}</span>
-                <Show when={m.role === 'owner'}>
-                  <span class="members-locked-badge" title="Owner-Rolle ist gesperrt">
-                    <Icon name="lock-closed" size={12} />
-                    <span>locked</span>
-                  </span>
+                <Show
+                  when={canChangeRole(m)}
+                  fallback={
+                    <span class={`settings-role-chip role-${m.role}`}>{m.role}</span>
+                  }
+                >
+                  <select
+                    class={`members-role-select role-${m.role}`}
+                    value={m.role}
+                    disabled={isPending(m.user_id)}
+                    aria-label={`Rolle von ${memberDisplayLabel(m)} aendern`}
+                    onChange={(e) => {
+                      const next = e.currentTarget.value as WorkspaceRole;
+                      // Optimistic UI uebernimmt der onChanged-Refetch;
+                      // hier setzen wir das Dropdown nur zurueck wenn der
+                      // RPC fehlschlaegt — Browser zeigt waehrenddessen
+                      // schon die neue Auswahl, was OK ist.
+                      void handleRoleChange(m, next);
+                    }}
+                  >
+                    <For each={allowedRoles(m)}>
+                      {(r) => <option value={r}>{r}</option>}
+                    </For>
+                  </select>
                 </Show>
                 <Show when={m.deactivated_at != null}>
                   <span class="members-deactivated-badge" title="Membership deaktiviert">

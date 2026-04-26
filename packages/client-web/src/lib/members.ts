@@ -78,6 +78,29 @@ export async function removeMember(workspaceId: string, userId: string): Promise
   return data as RemoveResult;
 }
 
+// ─── Rolle aendern (P1.B.1) ──────────────────────────────────────
+export type ChangeRoleResult = {
+  workspace_id: string;
+  user_id: string;
+  old_role: WorkspaceRole;
+  new_role: WorkspaceRole;
+  changed: boolean;
+};
+
+export async function changeMemberRole(
+  workspaceId: string,
+  userId: string,
+  newRole: WorkspaceRole,
+): Promise<ChangeRoleResult> {
+  const { data, error } = await supabase.rpc('change_member_role', {
+    p_workspace_id: workspaceId,
+    p_user_id: userId,
+    p_new_role: newRole,
+  });
+  if (error) throw error;
+  return data as ChangeRoleResult;
+}
+
 // ─── Fehler-Uebersetzung ─────────────────────────────────────────
 export function translateMemberError(err: unknown, fallback: string): string {
   if (err && typeof err === 'object' && 'message' in err) {
@@ -90,6 +113,15 @@ export function translateMemberError(err: unknown, fallback: string): string {
     }
     if (msg.includes('cannot_deactivate_last_owner') || msg.includes('cannot_remove_last_owner')) {
       return 'Letzter aktiver Owner kann nicht entfernt oder deaktiviert werden.';
+    }
+    if (msg.includes('cannot_demote_last_owner')) {
+      return 'Letzter aktiver Owner kann nicht zu einer anderen Rolle geaendert werden.';
+    }
+    if (msg.includes('admin_cannot_set_owner_or_admin')) {
+      return 'Als Admin kannst du nur zwischen Editor und Viewer wechseln.';
+    }
+    if (msg.includes('member_deactivated')) {
+      return 'Mitglied ist deaktiviert — bitte erst reaktivieren.';
     }
     if (msg.includes('member_not_found')) {
       return 'Mitglied wurde nicht gefunden.';
