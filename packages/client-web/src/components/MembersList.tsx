@@ -239,6 +239,7 @@ const MembersList: Component<MembersListProps> = (p) => {
         >
           {(m) => (
             <tr
+              id={`user-${m.user_id}`}
               class="members-row"
               classList={{ 'members-row-deactivated': m.deactivated_at != null }}
             >

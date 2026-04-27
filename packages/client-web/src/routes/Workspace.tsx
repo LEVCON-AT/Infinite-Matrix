@@ -34,6 +34,7 @@ import { signOut, useUser } from '../lib/auth';
 import { clearDocsRequest, openDocsPopup, useDocsRequest } from '../lib/docs-ui';
 import { setEditModeValue, toggleEditMode, useEditMode } from '../lib/edit-mode';
 import { toggleIncognito, useIncognito } from '../lib/incognito';
+import { fetchMembers } from '../lib/members';
 import { pendingMutationCount, refreshCountForWorkspace, replayQueue } from '../lib/mutation-queue';
 import { offlineState } from '../lib/offline-state';
 import { type PresencePosition, type PresenceUser, usePresence } from '../lib/presence';
@@ -452,6 +453,22 @@ const Workspace: Component = () => {
     presencePosition,
   );
 
+  // NT.3: Workspace-Members einmal laden — fuer den Creator-Avatar im
+  // NodeTree (Resolver: created_by-uuid -> Member-Record fuer Initial+
+  // Tooltip+Color). fetchMembers hat localStorage-Read-Cache; offline
+  // kommt der zuletzt gesehene Snapshot durch.
+  const [workspaceMembers] = createResource(
+    () => params.workspaceId ?? null,
+    async (wsId) => {
+      try {
+        return await fetchMembers(wsId);
+      } catch (err) {
+        console.error('fetchMembers (Workspace):', err);
+        return [];
+      }
+    },
+  );
+
   // Breadcrumb vom aktuellen Node aufwaerts. Geht von Node zu Parent-
   // Cell (via node.parent_cell_id) und von dort zur Parent-Matrix
   // (cell.matrix_id = Node-ID der Matrix, in der die Cell lebt).
@@ -817,6 +834,7 @@ const Workspace: Component = () => {
             currentFeature={cellSection() ?? undefined}
             presence={presenceUsers}
             selfUserId={user()?.id}
+            members={() => workspaceMembers() ?? []}
             onChanged={() => {
               void refetchCells();
               void refetchCellsWithDocs();

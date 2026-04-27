@@ -17,6 +17,7 @@ import {
   exportSubtree,
   summarizeExport,
 } from '../lib/export';
+import type { WorkspaceMember } from '../lib/members';
 import {
   addCellChecklist,
   addCellInfoField,
@@ -54,6 +55,7 @@ import { useViewerActive } from '../lib/workspace-role';
 import ChecklistPastePopup from './ChecklistPastePopup';
 import ContextMenu, { type CtxMenuState } from './ContextMenu';
 import Icon, { type IconName } from './Icon';
+import TreeAvatar from './TreeAvatar';
 import TreeAvatarStack from './TreeAvatarStack';
 
 // Verschluesselter Export ueber Passphrase-Prompt. Wird vom Kontext-
@@ -105,6 +107,9 @@ type Props = {
   // Mini-Avatar-Stack rechts neben dem Alias-Chip.
   presence?: () => PresenceUser[];
   selfUserId?: string;
+  // NT.3: Workspace-Members fuer den Creator-Avatar (Lookup von
+  // node.created_by-uuid -> Member-Record).
+  members?: () => WorkspaceMember[];
 };
 
 // Icon-Lookup nach Entry-Kind / Node-Type. Feature-Rows gibt es nur
@@ -288,6 +293,7 @@ const TreeItem: Component<{
   onCardDrop: (boardId: string, e: DragEvent) => void;
   presence?: () => PresenceUser[];
   selfUserId?: string;
+  members?: () => WorkspaceMember[];
 }> = (p) => {
   // Presence-User die gerade in genau dieser Row sind. Selbst raus —
   // den eigenen Avatar im Tree zu sehen waere visueller Lärm, der
@@ -296,6 +302,18 @@ const TreeItem: Component<{
     const all = p.presence?.() ?? [];
     if (all.length === 0) return [];
     return all.filter((u) => u.userId !== p.selfUserId && presenceMatchesEntry(u, p.entry));
+  });
+
+  // Creator-Avatar nur fuer kind:'node' (Matrix/Board-Knoten haben
+  // created_by). Cells/Features/Links/Docs haben kein Erstellungs-User-
+  // Tracking — wuerde mit der gleichen Strenge mehr Markup als Nutzen
+  // geben.
+  const creator = createMemo<WorkspaceMember | null>(() => {
+    if (p.entry.kind !== 'node') return null;
+    const uid = p.entry.node.created_by;
+    if (!uid) return null;
+    const list = p.members?.() ?? [];
+    return list.find((m) => m.user_id === uid) ?? null;
   });
   const hasChildren = () => p.entry.children.length > 0;
   // Expand-Regeln in Reihenfolge (HTML-Parity, siehe sbExpanded-Logik
@@ -454,6 +472,9 @@ const TreeItem: Component<{
             <span class="tree-alias">^{aliasOf(p.entry)}</span>
           </Show>
         </Dynamic>
+        <Show when={p.entry.kind === 'node'}>
+          <TreeAvatar member={creator()} workspaceId={p.workspaceId} />
+        </Show>
         <TreeAvatarStack users={presenceForRow()} />
       </div>
       <Show when={hasChildren() && expanded()}>
@@ -478,6 +499,7 @@ const TreeItem: Component<{
                 onCardDrop={p.onCardDrop}
                 presence={p.presence}
                 selfUserId={p.selfUserId}
+                members={p.members}
               />
             )}
           </For>
@@ -1726,6 +1748,7 @@ const NodeTree: Component<Props> = (props) => {
                   onCardDrop={onCardDrop}
                   presence={props.presence}
                   selfUserId={props.selfUserId}
+                  members={props.members}
                 />
               )}
             </For>

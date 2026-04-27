@@ -920,6 +920,46 @@ button[type="submit"]:hover:not(:disabled) {
   letter-spacing: -0.5px;
 }
 
+/* NT.3: Static Creator-Avatar pro node-Row. Klein (--avatar-sm),
+   klickbar — navigiert zur Members-Page mit Anker auf den Member. */
+.tree-avatar-creator {
+  width: var(--avatar-sm);
+  height: var(--avatar-sm);
+  margin-left: var(--space-xs);
+  padding: 0;
+  font-size: 8px;
+  cursor: pointer;
+  transition: transform var(--tr-std), filter var(--tr-std);
+}
+
+.tree-avatar-creator:hover:not(:disabled) {
+  transform: scale(1.15);
+  filter: brightness(1.05);
+}
+
+.tree-avatar-creator:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: var(--focus-offset);
+}
+
+.tree-avatar-creator:disabled,
+.tree-avatar-unknown {
+  cursor: default;
+  opacity: 0.5;
+  background: var(--bg2);
+  color: var(--text3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tree-avatar-creator {
+    transition: none;
+  }
+  .tree-avatar-creator:hover:not(:disabled) {
+    transform: none;
+    filter: none;
+  }
+}
+
 /* Edit-Mode-Toggle (Pill) */
 .edit-mode-btn {
   padding: 4px 12px;

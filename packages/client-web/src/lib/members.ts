@@ -7,7 +7,15 @@
 // `remove_member` (Migration 013). Synchron-online ohne safe-mutation-
 // Wrapper, weil Security-Mutations explizit kein Offline-Replay haben
 // duerfen (Anti-Pattern Memory feedback_saas_security_no_offline).
+//
+// NT.3: Read-Cache via localStorage pro Workspace. Members werden jetzt
+// auch im NodeTree fuer Creator-Avatare gebraucht — ohne Cache zeigt der
+// Tree offline ein leeres Avatar-Feld. localStorage statt IDB, weil die
+// Liste klein ist (< 50) und der existierende offline-cache.ts ein
+// id+workspace_id-Schema erwartet (Members haben user_id als PK).
 
+import { isNetworkError } from './mutation-queue';
+import { markCacheFallback } from './offline-state';
 import { supabase } from './supabase';
 import type { WorkspaceRole } from './types';
 
@@ -20,15 +28,51 @@ export type WorkspaceMember = {
   deactivated_at: string | null;
 };
 
-// Live-Fetch via RPC. Kein IDB-Cache — die Liste ist klein, der Read
-// laeuft selten (nur auf der Settings-Members-Page), und wir wollen
-// hier den live-Zustand sehen, nicht moeglicherweise stale Daten.
+// Read-Cache: localStorage pro Workspace. Online-Reads schreiben durch,
+// Offline-Reads lesen aus dem Cache und markieren via markCacheFallback().
+const CACHE_KEY = (wsId: string) => `members-cache:${wsId}`;
+
+function readCache(wsId: string): WorkspaceMember[] | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY(wsId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as WorkspaceMember[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(wsId: string, members: WorkspaceMember[]): void {
+  try {
+    localStorage.setItem(CACHE_KEY(wsId), JSON.stringify(members));
+  } catch {
+    // QuotaExceededError o.ae. — leise schlucken, Cache ist Bonus.
+  }
+}
+
+// Live-Fetch via RPC mit Read-Cache-Fallback. Online schreibt durch,
+// offline liest die zuletzt bekannte Member-Liste aus localStorage und
+// markiert den Cache-Fallback-State (zeigt das Offline-Badge).
 export async function fetchMembers(workspaceId: string): Promise<WorkspaceMember[]> {
-  const { data, error } = await supabase.rpc('list_workspace_members', {
-    p_workspace_id: workspaceId,
-  });
-  if (error) throw error;
-  return (data ?? []) as WorkspaceMember[];
+  try {
+    const { data, error } = await supabase.rpc('list_workspace_members', {
+      p_workspace_id: workspaceId,
+    });
+    if (error) throw error;
+    const members = (data ?? []) as WorkspaceMember[];
+    writeCache(workspaceId, members);
+    return members;
+  } catch (err) {
+    if (isNetworkError(err)) {
+      const cached = readCache(workspaceId);
+      if (cached) {
+        markCacheFallback();
+        return cached;
+      }
+    }
+    throw err;
+  }
 }
 
 // ─── Member-Aktionen ─────────────────────────────────────────────
