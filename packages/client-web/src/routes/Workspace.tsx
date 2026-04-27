@@ -36,7 +36,7 @@ import { setEditModeValue, toggleEditMode, useEditMode } from '../lib/edit-mode'
 import { toggleIncognito, useIncognito } from '../lib/incognito';
 import { pendingMutationCount, refreshCountForWorkspace, replayQueue } from '../lib/mutation-queue';
 import { offlineState } from '../lib/offline-state';
-import type { PresenceUser } from '../lib/presence';
+import { type PresencePosition, type PresenceUser, usePresence } from '../lib/presence';
 import { installPromptSignal, triggerInstallPrompt } from '../lib/pwa';
 import {
   type SidebarChipData,
@@ -435,6 +435,23 @@ const Workspace: Component = () => {
     return `schaut: ${parts.join(' · ')}`;
   };
 
+  // NT.1: Presence-Subscription wird hier *einmal* angelegt und an
+  // PresenceStack (Header) + NodeTree (Sidebar-Avatare) gereicht. Vorher
+  // hat PresenceStack selbst subscribed; ein zweiter Aufruf in NodeTree
+  // wuerde einen zweiten Channel pro User erzeugen — unnoetig + gegen
+  // Supabase-Quota.
+  const presencePosition = createMemo<PresencePosition>(() => ({
+    nodeId: currentNode()?.id,
+    cellId: params.cellId,
+    feature: cellSection() ?? undefined,
+  }));
+  const presenceUsers = usePresence(
+    () => params.workspaceId ?? '',
+    () => user()?.id ?? '',
+    () => user()?.email ?? '',
+    presencePosition,
+  );
+
   // Breadcrumb vom aktuellen Node aufwaerts. Geht von Node zu Parent-
   // Cell (via node.parent_cell_id) und von dort zur Parent-Matrix
   // (cell.matrix_id = Node-ID der Matrix, in der die Cell lebt).
@@ -798,6 +815,8 @@ const Workspace: Component = () => {
             tree={tree()}
             currentNodeId={params.nodeId ?? params.cellId}
             currentFeature={cellSection() ?? undefined}
+            presence={presenceUsers}
+            selfUserId={user()?.id}
             onChanged={() => {
               void refetchCells();
               void refetchCellsWithDocs();
@@ -952,14 +971,8 @@ const Workspace: Component = () => {
             <Show when={params.workspaceId ? user() : null}>
               {(u) => (
                 <PresenceStack
-                  workspaceId={params.workspaceId as string}
+                  users={presenceUsers}
                   selfUserId={u().id}
-                  selfEmail={u().email ?? '(anon)'}
-                  position={() => ({
-                    nodeId: currentNode()?.id,
-                    cellId: params.cellId,
-                    feature: cellSection() ?? undefined,
-                  })}
                   resolveLabel={resolvePresenceLabel}
                 />
               )}

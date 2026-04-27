@@ -1,28 +1,23 @@
-// Kleiner Avatar-Stack fuer die Online-Nutzer im aktuellen Workspace.
-// Maximal 4 sichtbare Avatars, der Rest wird als "+N"-Chip gebuendelt.
+// Avatar-Stack fuer die Online-Nutzer im aktuellen Workspace (Header).
+// Maximal 4 sichtbare Avatars, der Rest als "+N"-Chip gebuendelt.
 // Self (erster Eintrag) traegt eine dezente zweite Border-Linie, damit
 // man sich selbst unter anderen wiederfindet.
 //
 // Phase-1.C: Tooltip zeigt zusaetzlich, wo der User gerade ist
 // ("schaut: <Matrix-Name>"). Den Label-Aufloeser uebergibt der
 // Parent — PresenceStack kennt nur die userIds/emails, nicht die
-// node/cell-Tabellen. Workspace.tsx hat die Resources bereits geladen
-// und reicht eine resolveLabel(user)-Funktion durch.
+// node/cell-Tabellen.
+//
+// NT.1: Subscription wurde nach Workspace.tsx gehoist — `users` kommt
+// jetzt als Pflicht-Prop, nicht mehr aus eigenem usePresence(). Dieselbe
+// Subscription versorgt jetzt auch die Tree-Avatare.
 
 import { type Component, Index, Show } from 'solid-js';
-import {
-  type PresencePosition,
-  type PresenceUser,
-  avatarColorFor,
-  avatarInitial,
-  usePresence,
-} from '../lib/presence';
+import { type PresenceUser, avatarColorFor, avatarInitial } from '../lib/presence';
 
 type Props = {
-  workspaceId: string;
+  users: () => PresenceUser[];
   selfUserId: string;
-  selfEmail: string;
-  position: () => PresencePosition;
   resolveLabel?: (user: PresenceUser) => string | undefined;
 };
 
@@ -55,14 +50,8 @@ const Avatar: Component<{
 };
 
 const PresenceStack: Component<Props> = (p) => {
-  const users = usePresence(
-    () => p.workspaceId,
-    () => p.selfUserId,
-    () => p.selfEmail,
-    () => p.position(),
-  );
-  const visible = () => users().slice(0, MAX_VISIBLE);
-  const overflow = () => Math.max(0, users().length - MAX_VISIBLE);
+  const visible = () => p.users().slice(0, MAX_VISIBLE);
+  const overflow = () => Math.max(0, p.users().length - MAX_VISIBLE);
 
   return (
     <div class="presence-stack" aria-label="Online-Nutzer">

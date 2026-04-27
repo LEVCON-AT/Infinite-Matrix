@@ -27,6 +27,8 @@ import {
   renameNode,
   updateCell,
 } from '../lib/mutations';
+import type { PresenceUser } from '../lib/presence';
+import { presenceMatchesEntry } from '../lib/presence-filter';
 import { endProgress, startProgress } from '../lib/progress';
 import { useVis } from '../lib/settings';
 import { useSidebarChips } from '../lib/sidebar-chips';
@@ -52,6 +54,7 @@ import { useViewerActive } from '../lib/workspace-role';
 import ChecklistPastePopup from './ChecklistPastePopup';
 import ContextMenu, { type CtxMenuState } from './ContextMenu';
 import Icon, { type IconName } from './Icon';
+import TreeAvatarStack from './TreeAvatarStack';
 
 // Verschluesselter Export ueber Passphrase-Prompt. Wird vom Kontext-
 // menue der Node/Cell/Feature-Rows aufgerufen. Plain-Variante laeuft
@@ -97,6 +100,11 @@ type Props = {
   // Kontextmenue (neue Felder, Checklisten, Feature-Flags). Parent
   // weiss, welche Queries invalidiert werden muessen.
   onChanged?: () => void;
+  // NT.1: Presence-Accessor aus Workspace.tsx-Hoist. Pro Tree-Row
+  // matchen wir die User auf den Knoten/Cell/Feature und rendern einen
+  // Mini-Avatar-Stack rechts neben dem Alias-Chip.
+  presence?: () => PresenceUser[];
+  selfUserId?: string;
 };
 
 // Icon-Lookup nach Entry-Kind / Node-Type. Feature-Rows gibt es nur
@@ -278,7 +286,17 @@ const TreeItem: Component<{
   onCardDragOver: (boardId: string, e: DragEvent) => void;
   onCardDragLeave: (boardId: string) => void;
   onCardDrop: (boardId: string, e: DragEvent) => void;
+  presence?: () => PresenceUser[];
+  selfUserId?: string;
 }> = (p) => {
+  // Presence-User die gerade in genau dieser Row sind. Selbst raus —
+  // den eigenen Avatar im Tree zu sehen waere visueller Lärm, der
+  // grosse PresenceStack im Header zeigt einen schon.
+  const presenceForRow = createMemo<PresenceUser[]>(() => {
+    const all = p.presence?.() ?? [];
+    if (all.length === 0) return [];
+    return all.filter((u) => u.userId !== p.selfUserId && presenceMatchesEntry(u, p.entry));
+  });
   const hasChildren = () => p.entry.children.length > 0;
   // Expand-Regeln in Reihenfolge (HTML-Parity, siehe sbExpanded-Logik
   // matrix_tool_beta.html Z2654):
@@ -436,6 +454,7 @@ const TreeItem: Component<{
             <span class="tree-alias">^{aliasOf(p.entry)}</span>
           </Show>
         </Dynamic>
+        <TreeAvatarStack users={presenceForRow()} />
       </div>
       <Show when={hasChildren() && expanded()}>
         <ul>
@@ -457,6 +476,8 @@ const TreeItem: Component<{
                 onCardDragOver={p.onCardDragOver}
                 onCardDragLeave={p.onCardDragLeave}
                 onCardDrop={p.onCardDrop}
+                presence={p.presence}
+                selfUserId={p.selfUserId}
               />
             )}
           </For>
@@ -1703,6 +1724,8 @@ const NodeTree: Component<Props> = (props) => {
                   onCardDragOver={onCardDragOver}
                   onCardDragLeave={onCardDragLeave}
                   onCardDrop={onCardDrop}
+                  presence={props.presence}
+                  selfUserId={props.selfUserId}
                 />
               )}
             </For>
