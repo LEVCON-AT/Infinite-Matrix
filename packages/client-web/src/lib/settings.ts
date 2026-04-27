@@ -20,8 +20,17 @@
 // Workspaces. Wenn spaeter pro-Workspace-Settings dazukommen, sollte
 // das ein separater Storage-Slot sein, kein Sub-Tree dieses Schluessels.
 
-import { type Accessor, createEffect, createMemo, createSignal, onMount } from 'solid-js';
+import {
+  type Accessor,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  onMount,
+} from 'solid-js';
+import { useSession } from './auth';
 import { useEditMode } from './edit-mode';
+import { type UserPrefs, loadUserPrefs, saveUserPrefs } from './user-prefs';
 import { useViewerActive } from './workspace-role';
 
 export type VisValue = 'edit' | 'always' | 'never';
@@ -223,6 +232,94 @@ export function useVis(key: VisKey): Accessor<boolean> {
     if (v === 'always') return true;
     if (v === 'never') return false;
     return editMode();
+  });
+}
+
+// ─── DB-Sync (Sprint US) ─────────────────────────────────────
+// Beim Login die DB-Praeferenzen pullen und in den lokalen Store
+// mergen. Bei Aenderung debounced zurueckschreiben.
+//
+// Strategie: Last-Write-Wins via updated_at-Trigger in DB. Beim Mount
+// gewinnt die DB (User hat sich gerade neu authentisiert, Server-State
+// ist kanonisch). Lokale Aenderungen pushen wir mit 500ms Debounce —
+// damit ein "Slider 5x verschieben" nicht 5 RPC-Calls erzeugt.
+
+function applyRemoteToSettings(remote: UserPrefs): AppSettings {
+  // Identisches Parse-Pattern wie loadFromStorage — fehlende/ungueltige
+  // Keys fallen auf Default zurueck. Validieren-statt-Vertrauen, weil
+  // jsonb potentiell alles sein koennte (z.B. von alter Client-Version).
+  const merged = clone(DEFAULT_SETTINGS);
+  if (remote.vis && typeof remote.vis === 'object') {
+    for (const k of Object.keys(DEFAULT_SETTINGS.vis) as VisKey[]) {
+      const v = (remote.vis as Record<string, unknown>)[k];
+      if (v === 'edit' || v === 'always' || v === 'never') merged.vis[k] = v;
+    }
+  }
+  if (remote.activity && typeof remote.activity === 'object') {
+    const lvl = (remote.activity as Record<string, unknown>).level;
+    if (lvl === 'off' || lvl === 'present' || lvl === 'full') {
+      merged.activity.level = lvl;
+    }
+  }
+  return merged;
+}
+
+export function useUserPrefsSync(): void {
+  const session = useSession();
+  let prefsHydrated = false;
+  let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Hydration: bei Session-Aenderung (Login) DB-Snapshot pullen.
+  // Bei Logout den hydrated-Flag zuruecksetzen, damit ein erneutes
+  // Login wieder pullt statt direkt mit dem Vor-Logout-State zu saven.
+  createEffect(() => {
+    const s = session();
+    if (!s) {
+      prefsHydrated = false;
+      return;
+    }
+    void (async () => {
+      try {
+        const remote = await loadUserPrefs();
+        if (remote) {
+          const merged = applyRemoteToSettings(remote.prefs);
+          setSettings(merged);
+          persistToStorage(merged);
+        }
+      } finally {
+        prefsHydrated = true;
+      }
+    })();
+  });
+
+  // Save: nach jeder Settings-Aenderung debounced pushen. Gate
+  // ueber prefsHydrated, damit Initial-State nicht VOR dem Pull
+  // den DB-Snapshot ueberschreibt.
+  createEffect(() => {
+    const cur = settings();
+    if (!prefsHydrated) return;
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      void saveUserPrefs(cur as unknown as UserPrefs);
+    }, 500);
+  });
+
+  // Online-Recovery: bei einer Offline->Online-Transition den aktuellen
+  // State erneut pushen. Sonst wuerde eine Offline-Aenderung lokal
+  // bleiben, bis der User das naechste Mal etwas im Setting aendert.
+  const onOnline = () => {
+    if (!prefsHydrated) return;
+    void saveUserPrefs(settings() as unknown as UserPrefs);
+  };
+  if (typeof window !== 'undefined') {
+    window.addEventListener('online', onOnline);
+  }
+
+  onCleanup(() => {
+    if (saveTimer) clearTimeout(saveTimer);
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('online', onOnline);
+    }
   });
 }
 

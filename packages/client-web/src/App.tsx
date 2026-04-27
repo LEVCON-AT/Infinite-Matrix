@@ -5,6 +5,7 @@ import ProgressOverlay from './components/ProgressOverlay';
 import Toasts from './components/Toasts';
 import { bootstrapAuth, useAccountInvalid, useAuthReady, useSession } from './lib/auth';
 import { useEditModeHotkey } from './lib/edit-mode';
+import { useUserPrefsSync } from './lib/settings';
 import { useThemeBootstrap } from './lib/theme';
 import { showToast } from './lib/toasts';
 import { PENDING_INVITE_KEY } from './routes/Invite';
@@ -27,6 +28,7 @@ const App: ParentComponent = (props): JSX.Element => {
 
   useEditModeHotkey();
   useThemeBootstrap();
+  useUserPrefsSync();
 
   // Account-Health-Toast: wenn die JWT-Session lokal noch existiert, der
   // serverseitige User aber weg ist (geloeschter Account), hat lib/auth
