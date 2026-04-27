@@ -39,6 +39,10 @@ export type NodeRow = {
   data: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+  // NT.2: User der den Knoten angelegt hat. Per DEFAULT auth.uid()
+  // automatisch gesetzt; NULL nach User-Delete (ON DELETE SET NULL)
+  // oder bei Service-Role-Inserts ohne explicit-Param (Bridge).
+  created_by: string | null;
 };
 
 export type CellRow = {

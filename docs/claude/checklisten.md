@@ -79,6 +79,8 @@ Schema-Änderungen dürfen nicht isoliert bleiben. Für jede strukturelle Änder
   - [ ] Neues Cell-Feature: prüfen ob ein eigener `feature-<name>`-Export/Import nötig ist.
   - [ ] JSONB-Felder mit embedded IDs: Remap auch dort (wie `kb_cards.checklist_ref` in `kb_cards.checklist[].id` wäre der Pattern).
   - [ ] `formatExportStats` / `summarizeExport`: Count für den neuen Typ anzeigen.
+- [ ] **Insert-Default via `auth.uid()`**: Wenn die neue Spalte einen `DEFAULT auth.uid()` hat, greift dieser nur für JWT-Inserts. Bridge-Tools mit Service-Role bekommen `auth.uid() = NULL` → entweder explicit-Param in Tool-Signatur ergänzen oder NULL-Akzeptanz im UI dokumentieren (z.B. "Ersteller unbekannt"-Avatar).
+- [ ] **Import-Identitäts-Felder**: Felder die User-Identität tragen (`created_by`, `actor_id`, ...) müssen im `subtree-import.ts` aus dem Payload entfernt werden, damit der Default für den importierenden User greift — nicht 1:1 vom Ursprungs-Workspace übernehmen.
 
 Merksatz: *Jede strukturelle Änderung braucht den Vier-Artefakte-Durchlauf — Schema + Mutations + MCP + Export/Import.*
 

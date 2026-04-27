@@ -626,9 +626,14 @@ export async function executeSubtreeImportIntoCell(args: {
   const rootNewId = mustRemap(rootRow.id, remapMap);
   const nodesOut = (payload.nodes as Array<Record<string, unknown>>).map((n) => {
     const id = (n as { id: string }).id;
+    // NT.2: created_by aus dem Payload entfernen — importierte Knoten
+    // gehoeren dem importierenden User (Default auth.uid() greift),
+    // nicht dem urspruenglichen Ersteller eines fremden Workspaces.
+    const { created_by: _imported, ...rest } = n;
+    void _imported;
     return applyAliasMap(
       {
-        ...n,
+        ...rest,
         id: mustRemap(id, remapMap),
         workspace_id: workspaceId,
         // Im Insert zunaechst NULL. Root-Node und alle Sub-Nodes
@@ -1461,19 +1466,24 @@ export async function executeSubtreeImportIntoMatrix(args: {
   for (const d of payload.docs) remap((d as { id: string }).id, remapMap);
 
   // Nodes ohne Root einfuegen, parent_cell_id=NULL (Phase D setzt um).
+  // NT.2: created_by aus dem Payload entfernen — importierte Knoten
+  // gehoeren dem importierenden User (Default auth.uid() greift), nicht
+  // dem urspruenglichen Ersteller eines fremden Workspaces.
   const nodesOut = (payload.nodes as Array<Record<string, unknown>>)
     .filter((n) => (n as { id: string }).id !== rootRow.id)
-    .map((n) =>
-      applyAliasMap(
+    .map((n) => {
+      const { created_by: _imported, ...rest } = n;
+      void _imported;
+      return applyAliasMap(
         {
-          ...n,
+          ...rest,
           id: mustRemap((n as { id: string }).id, remapMap),
           workspace_id: workspaceId,
           parent_cell_id: null,
         },
         aliasMap,
-      ),
-    );
+      );
+    });
 
   const nodeParentUpdates: Array<{ id: string; parent_cell_id: string }> = [];
   for (const n of payload.nodes as Array<{
