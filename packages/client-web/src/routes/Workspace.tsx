@@ -441,10 +441,25 @@ const Workspace: Component = () => {
   // hat PresenceStack selbst subscribed; ein zweiter Aufruf in NodeTree
   // wuerde einen zweiten Channel pro User erzeugen — unnoetig + gegen
   // Supabase-Quota.
+  //
+  // P1.D: Live-Cursor-Hover-Signals. Vier separate Felder, weil sich
+  // die Hover-Targets pro Page-Typ unterscheiden — Matrix hat Cells,
+  // Board hat Cards, Cell hat Checklist-Items oder Info-Felder. Jede
+  // Page meldet via ihrem onXxxHover-Callback, andere Felder bleiben
+  // dabei NICHT geleert (man kann zwar nur auf einer Page sein, aber
+  // das Cleanup macht das jeweilige Component beim Unmount).
+  const [hoverCellId, setHoverCellId] = createSignal<string | undefined>(undefined);
+  const [hoverCardId, setHoverCardId] = createSignal<string | undefined>(undefined);
+  const [hoverItemId, setHoverItemId] = createSignal<string | undefined>(undefined);
+  const [hoverFieldId, setHoverFieldId] = createSignal<string | undefined>(undefined);
   const presencePosition = createMemo<PresencePosition>(() => ({
     nodeId: currentNode()?.id,
     cellId: params.cellId,
     feature: cellSection() ?? undefined,
+    hoverCellId: hoverCellId(),
+    hoverCardId: hoverCardId(),
+    hoverItemId: hoverItemId(),
+    hoverFieldId: hoverFieldId(),
   }));
   const presenceUsers = usePresence(
     () => params.workspaceId ?? '',
@@ -1119,6 +1134,9 @@ const Workspace: Component = () => {
                       col={cellCol()}
                       realtimeVersion={rtCellChecklists()}
                       realtimeDocsVersion={rtDocs()}
+                      presence={presenceUsers}
+                      selfUserId={user()?.id}
+                      onItemHover={setHoverItemId}
                     />
                   </Show>
                   <Show when={cellSection() === 'info'}>
@@ -1128,6 +1146,9 @@ const Workspace: Component = () => {
                       row={cellRow()}
                       col={cellCol()}
                       realtimeDocsVersion={rtDocs()}
+                      presence={presenceUsers}
+                      selfUserId={user()?.id}
+                      onFieldHover={setHoverFieldId}
                       onChanged={() => {
                         void refetchCells();
                       }}
@@ -1184,6 +1205,9 @@ const Workspace: Component = () => {
                       wsRows={rows() ?? []}
                       wsCols={colsData() ?? []}
                       cardsRealtimeVersion={rtCards()}
+                      presence={presenceUsers}
+                      selfUserId={user()?.id}
+                      onCellHover={setHoverCellId}
                       onChanged={() => {
                         // Nach strukturellen Aenderungen koennen neue/entfernte Sub-Nodes
                         // im Tree sichtbar werden, und cells.child_matrix_id/board_id
@@ -1200,6 +1224,9 @@ const Workspace: Component = () => {
                       workspaceId={node().workspace_id}
                       boardId={node().id}
                       content={boardContent()}
+                      presence={presenceUsers}
+                      selfUserId={user()?.id}
+                      onCardHover={setHoverCardId}
                       onChanged={() => {
                         void refetchBoard();
                       }}

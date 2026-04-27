@@ -27,12 +27,14 @@ import {
   setRowPosition,
 } from '../lib/mutations';
 import { rememberFocus, useLastFocus } from '../lib/navigation-focus';
+import type { PresenceUser } from '../lib/presence';
 import { useVis } from '../lib/settings';
 import { showToast, showUndoToast } from '../lib/toasts';
 import type { CellFeature, CellRow, ColRow, MatrixContent, NodeRow, RowRow } from '../lib/types';
 import CellOverlay from './CellOverlay';
 import Icon, { type IconName } from './Icon';
 import MatrixAggregateSection from './MatrixAggregateSection';
+import PresenceMini from './PresenceMini';
 
 const FEATURE_ORDER: CellFeature[] = ['matrix', 'board', 'info', 'checklists'];
 
@@ -68,6 +70,12 @@ type Props = {
   // Realtime-Version fuer Cards-Fetch in der Aggregat-Sektion.
   cardsRealtimeVersion: number;
   onChanged?: () => void;
+  // P1.D: Live-Cursor-Indikator. presence/selfUserId aus Workspace.tsx-
+  // Hoist, onCellHover meldet die aktuelle Hover-Cell zurueck (in den
+  // Presence-Payload).
+  presence?: () => PresenceUser[];
+  selfUserId?: string;
+  onCellHover?: (cellId: string | undefined) => void;
 };
 
 type OverlayTarget = { row: RowRow; col: ColRow; cell: CellRow | undefined };
@@ -76,6 +84,30 @@ const MatrixView: Component<Props> = (p) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const editMode = useEditMode();
+
+  // P1.D: Live-Cursor-Map. Bei jedem Presence-Update einmal eine
+  // Map<cellId, PresenceUser[]> aufbauen statt pro Cell zu filtern —
+  // sonst sind das bei 200 Cells × 10 Usern 200 createMemos.
+  const presenceByCell = createMemo<Map<string, PresenceUser[]>>(() => {
+    const map = new Map<string, PresenceUser[]>();
+    const all = p.presence?.() ?? [];
+    for (const u of all) {
+      if (u.userId === p.selfUserId) continue;
+      const cid = u.hoverCellId;
+      if (!cid) continue;
+      const arr = map.get(cid);
+      if (arr) arr.push(u);
+      else map.set(cid, [u]);
+    }
+    return map;
+  });
+
+  // Cleanup: bei Component-Unmount eigenen Hover clearen, sonst bleibt
+  // der Cursor fuer andere User auf der letzten Cell stehen — auch
+  // nach Page-Wechsel.
+  onCleanup(() => {
+    p.onCellHover?.(undefined);
+  });
 
   // Fein granulierte Sichtbarkeits-Flags — Default 'edit' verhaelt sich
   // identisch zu editMode(), User kann aber per Settings-Modal einzeln
@@ -671,6 +703,17 @@ const MatrixView: Component<Props> = (p) => {
                               // oder 1/2-Hotkey-Setter.
                               rememberCellFocus(row.id, col.id);
                             }}
+                            onMouseEnter={() => {
+                              // P1.D: Live-Cursor — broadcaste die
+                              // gehoverte Cell-ID. Leere Zellen haben
+                              // keine cell()?.id, dort bleibt der Indi-
+                              // kator aus.
+                              const cid = cell()?.id;
+                              if (cid) p.onCellHover?.(cid);
+                            }}
+                            onMouseLeave={() => {
+                              p.onCellHover?.(undefined);
+                            }}
                             onClick={() => {
                               if (editMode()) onCellEdit(row, col, cell());
                             }}
@@ -682,6 +725,12 @@ const MatrixView: Component<Props> = (p) => {
                               }
                             }}
                           >
+                            <PresenceMini
+                              users={(() => {
+                                const c = cell();
+                                return c ? (presenceByCell().get(c.id) ?? []) : [];
+                              })()}
+                            />
                             <Show when={cell()?.alias}>
                               {(alias) => <span class="mx-cell-alias">^{alias()}</span>}
                             </Show>

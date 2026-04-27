@@ -1,5 +1,13 @@
 import { useSearchParams } from '@solidjs/router';
-import { type Component, For, Show, createEffect, createMemo, createSignal } from 'solid-js';
+import {
+  type Component,
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+} from 'solid-js';
 import { useBoardUi } from '../lib/board-ui-state';
 import { showConfirm, showPrompt } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
@@ -26,6 +34,7 @@ import {
   setKbColPosition,
   toggleCardDone,
 } from '../lib/mutations';
+import type { PresenceUser } from '../lib/presence';
 import { isCardDone, isRecurCard, todayIso, toggleOccurrence } from '../lib/recur';
 import { useVis } from '../lib/settings';
 import { showToast, showUndoToast } from '../lib/toasts';
@@ -35,12 +44,17 @@ import { useViewerActive } from '../lib/workspace-role';
 import CardOverlay from './CardOverlay';
 import ChecklistPanel from './ChecklistPanel';
 import Icon from './Icon';
+import PresenceMini from './PresenceMini';
 
 type Props = {
   workspaceId: string;
   boardId: string;
   content: BoardContent | undefined;
   onChanged?: () => void;
+  // P1.D Live-Cursor.
+  presence?: () => PresenceUser[];
+  selfUserId?: string;
+  onCardHover?: (cardId: string | undefined) => void;
 };
 
 // Liefert N/M fuer eine Karte — inline-Checkliste oder resolved via ref.
@@ -128,6 +142,25 @@ function sortComparator(
 
 const BoardView: Component<Props> = (p) => {
   const viewerActive = useViewerActive();
+
+  // P1.D Live-Cursor-Map: Card-ID -> User-Liste (gehoverte Cards).
+  const presenceByCard = createMemo<Map<string, PresenceUser[]>>(() => {
+    const map = new Map<string, PresenceUser[]>();
+    const all = p.presence?.() ?? [];
+    for (const u of all) {
+      if (u.userId === p.selfUserId) continue;
+      const cid = u.hoverCardId;
+      if (!cid) continue;
+      const arr = map.get(cid);
+      if (arr) arr.push(u);
+      else map.set(cid, [u]);
+    }
+    return map;
+  });
+
+  onCleanup(() => {
+    p.onCardHover?.(undefined);
+  });
   // Kanban-Struktur: + Spalte / Link-Leiste / Checklisten-Anlage, Color-
   // Picker, Spalte umbenennen, Spalte verschieben, Spalte loeschen.
   // Karten-Aktionen (Move/Del) bleiben immer sichtbar — Karten sind kein
@@ -983,6 +1016,8 @@ const BoardView: Component<Props> = (p) => {
                                   onDragEnd={onCardDragEnd}
                                   onDragOver={(e) => onCardDragOver(card, e)}
                                   onDrop={(e) => onCardDrop(card, e)}
+                                  onMouseEnter={() => p.onCardHover?.(card.id)}
+                                  onMouseLeave={() => p.onCardHover?.(undefined)}
                                   onClick={() => setSelectedCardId(card.id)}
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter' || e.key === ' ') {
@@ -991,6 +1026,7 @@ const BoardView: Component<Props> = (p) => {
                                     }
                                   }}
                                 >
+                                  <PresenceMini users={presenceByCard().get(card.id) ?? []} />
                                   <div class="kb-card-name">
                                     <input
                                       type="checkbox"

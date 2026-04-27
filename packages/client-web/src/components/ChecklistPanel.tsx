@@ -5,7 +5,15 @@
 // Flips.
 
 import { useNavigate } from '@solidjs/router';
-import { type Component, For, Show, createEffect, createSignal, onCleanup } from 'solid-js';
+import {
+  type Component,
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+} from 'solid-js';
 import { validateAlias } from '../lib/alias';
 import { executeChecklistAction, parseChecklistAction } from '../lib/checklist-action';
 import type { ParsedPasteItem } from '../lib/checklist-paste-parse';
@@ -32,6 +40,7 @@ import {
   setChecklistRecur,
   toggleChecklistItemDone,
 } from '../lib/mutations';
+import type { PresenceUser } from '../lib/presence';
 import { showToast, showUndoToast } from '../lib/toasts';
 import type { ChecklistCloseMode, ChecklistItemRow, ChecklistRow } from '../lib/types';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
@@ -40,17 +49,46 @@ import ChecklistActionModal from './ChecklistActionModal';
 import ChecklistPastePopup from './ChecklistPastePopup';
 import ChecklistToCardPopup from './ChecklistToCardPopup';
 import Icon from './Icon';
+import PresenceMini from './PresenceMini';
 
 type Props = {
   checklist: ChecklistRow;
   items: ChecklistItemRow[]; // bereits nach position sortiert
   workspaceId: string;
   onChanged: () => void;
+  // P1.D: optional aktivierter Live-Cursor pro Item. Wenn gesetzt,
+  // pflegt die Component mouseenter/leave + Avatar-Indikatoren je
+  // Item. Bei Aufrufen aus BoardView (Card-interne Checklisten)
+  // werden die Props weggelassen — kein Hover-Tracking dort.
+  presence?: () => PresenceUser[];
+  selfUserId?: string;
+  onItemHover?: (itemId: string | undefined) => void;
 };
 
 const ChecklistPanel: Component<Props> = (p) => {
   const editMode = useEditMode();
   const [busy, setBusy] = createSignal(false);
+
+  // P1.D Live-Cursor-Map. Pro Render des Panels einmal aufgebaut — nur
+  // Items aus *dieser* Liste werden beruecksichtigt, andere Listen
+  // haben ihre eigenen Maps.
+  const presenceByItem = createMemo<Map<string, PresenceUser[]>>(() => {
+    const map = new Map<string, PresenceUser[]>();
+    const all = p.presence?.() ?? [];
+    for (const u of all) {
+      if (u.userId === p.selfUserId) continue;
+      const iid = u.hoverItemId;
+      if (!iid) continue;
+      const arr = map.get(iid);
+      if (arr) arr.push(u);
+      else map.set(iid, [u]);
+    }
+    return map;
+  });
+
+  onCleanup(() => {
+    p.onItemHover?.(undefined);
+  });
   // Paste-Popup-State: enthaelt den rohen Zwischenablage-Text, wenn beim
   // Paste-Event ein multi-line-Text erkannt wurde. null = Popup zu.
   const [pasteText, setPasteText] = createSignal<string | null>(null);
@@ -452,7 +490,10 @@ const ChecklistPanel: Component<Props> = (p) => {
               class="cl-it"
               classList={{ 'cl-it-done': it.done }}
               style={{ '--cl-level': it.level }}
+              onMouseEnter={() => p.onItemHover?.(it.id)}
+              onMouseLeave={() => p.onItemHover?.(undefined)}
             >
+              <PresenceMini users={presenceByItem().get(it.id) ?? []} />
               <input
                 type="checkbox"
                 class="cl-checkbox-input"

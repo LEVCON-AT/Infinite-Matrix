@@ -41,6 +41,17 @@ export type PresencePosition = {
   nodeId?: string;
   cellId?: string;
   feature?: PresenceFeature;
+  // P1.D: Live-Cursor-Indikatoren. Aendern sich oft (mouseenter/leave),
+  // bleiben aber im selben 200ms-Throttle-Fenster wie der Rest. Pro
+  // Page-Typ ein eigenes Hover-Feld:
+  //   hoverCellId  — auf der Matrix-Page (welche Cell wird gehovered)
+  //   hoverCardId  — auf der Board-Page (welche Card)
+  //   hoverItemId  — in CellChecklistsPage (welches Checklist-Item)
+  //   hoverFieldId — in CellInfoPage (welches Feld oder welcher Link)
+  hoverCellId?: string;
+  hoverCardId?: string;
+  hoverItemId?: string;
+  hoverFieldId?: string;
 };
 
 export type PresenceUser = {
@@ -50,6 +61,10 @@ export type PresenceUser = {
   nodeId?: string;
   cellId?: string;
   feature?: PresenceFeature;
+  hoverCellId?: string;
+  hoverCardId?: string;
+  hoverItemId?: string;
+  hoverFieldId?: string;
 };
 
 const POSITION_THROTTLE_MS = 200;
@@ -115,6 +130,10 @@ export function usePresence(
         if (pos.nodeId) payload.nodeId = pos.nodeId;
         if (pos.cellId) payload.cellId = pos.cellId;
         if (pos.feature) payload.feature = pos.feature;
+        if (pos.hoverCellId) payload.hoverCellId = pos.hoverCellId;
+        if (pos.hoverCardId) payload.hoverCardId = pos.hoverCardId;
+        if (pos.hoverItemId) payload.hoverItemId = pos.hoverItemId;
+        if (pos.hoverFieldId) payload.hoverFieldId = pos.hoverFieldId;
       }
       return payload;
     };
@@ -128,6 +147,10 @@ export function usePresence(
           nodeId?: string;
           cellId?: string;
           feature?: string;
+          hoverCellId?: string;
+          hoverCardId?: string;
+          hoverItemId?: string;
+          hoverFieldId?: string;
         }>
       >;
       // Stale-State-Filter: Auf Staging feuert der Realtime-Server
@@ -153,6 +176,10 @@ export function usePresence(
         if (typeof meta.nodeId === 'string') entry.nodeId = meta.nodeId;
         if (typeof meta.cellId === 'string') entry.cellId = meta.cellId;
         if (isFeature(meta.feature)) entry.feature = meta.feature;
+        if (typeof meta.hoverCellId === 'string') entry.hoverCellId = meta.hoverCellId;
+        if (typeof meta.hoverCardId === 'string') entry.hoverCardId = meta.hoverCardId;
+        if (typeof meta.hoverItemId === 'string') entry.hoverItemId = meta.hoverItemId;
+        if (typeof meta.hoverFieldId === 'string') entry.hoverFieldId = meta.hoverFieldId;
         list.push(entry);
       }
       list.sort((a, b) => {
@@ -177,7 +204,11 @@ export function usePresence(
             a.email !== b.email ||
             a.nodeId !== b.nodeId ||
             a.cellId !== b.cellId ||
-            a.feature !== b.feature
+            a.feature !== b.feature ||
+            a.hoverCellId !== b.hoverCellId ||
+            a.hoverCardId !== b.hoverCardId ||
+            a.hoverItemId !== b.hoverItemId ||
+            a.hoverFieldId !== b.hoverFieldId
           ) {
             same = false;
             break;

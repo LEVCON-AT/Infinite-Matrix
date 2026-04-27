@@ -102,6 +102,30 @@ Merksatz: *Jede strukturelle Änderung braucht den Vier-Artefakte-Durchlauf — 
 - [ ] **In Text-Input geschützt?** → Guard `!event.target.matches('input,textarea,[contenteditable]')` bei Alphazeichen-Shortcuts (wie Shift+R).
 - [ ] **Overlay mit ESC**: `document.addEventListener('keydown', h, true)` (Capture) + `ev.stopImmediatePropagation()` im Handler, sonst schluckt globaler Back-Handler das Event.
 
+## Trigger: Multi-User-Awareness erweitern (Presence / Live-Cursor)
+
+Wenn ein neues Hover-Ziel sichtbar werden soll (z.B. Doc-Link, Aggregat-Spalte, …) oder ein neuer statischer Member-Indikator angezeigt wird, läuft die Änderung durch **fünf Stellen**. Eine zu vergessen heißt: stale Cursor bei anderen Usern oder „Avatar-Geist" auf der letzten Position.
+
+- [ ] **Schema** in `packages/client-web/src/lib/presence.ts`:
+  - [ ] Neues Feld in `PresencePosition` UND `PresenceUser` (gleicher Name, gleicher Type).
+  - [ ] `buildPayload()` reicht das Feld in den Track-Payload.
+  - [ ] `rebuild()` liest es aus den `meta`-Objects (mit `typeof ... === 'string'`-Guard).
+  - [ ] Identitäts-Check in `setUsers`-Vergleich (sonst feuert das Signal nicht bei reinem Hover-Wechsel).
+- [ ] **Hoist-Punkt** in `packages/client-web/src/routes/Workspace.tsx`:
+  - [ ] `createSignal<string | undefined>(undefined)` für den Hover-State.
+  - [ ] In `presencePosition`-Memo aufnehmen.
+  - [ ] An die jeweilige Page/Component reichen + `selfUserId` + `presenceUsers`-Accessor.
+- [ ] **Component-Pfad**:
+  - [ ] `presenceByXxx`-`createMemo<Map<id, PresenceUser[]>>` baut einmal die Lookup-Map (nicht pro Item filtern — das skaliert mit O(items × users)).
+  - [ ] `onMouseEnter`/`onMouseLeave` auf dem DOM-Ziel feuern den Callback.
+  - [ ] `onCleanup(() => onXxxHover(undefined))` — sonst bleibt der Cursor bei anderen Usern auf der letzten Position stehen (Page-Wechsel, Modal-Close, etc.).
+  - [ ] `<PresenceMini users={presenceByXxx().get(id) ?? []} />` als absolute Overlay-Schicht.
+  - [ ] Container braucht `position: relative` + `pointer-events:none` auf `.presence-mini` damit der Click-Pfad nicht blockiert wird.
+- [ ] **Subscription bleibt zentral**: `usePresence` wird **nur einmal** in `Workspace.tsx` aufgerufen. Wenn eine neue Component Presence braucht, reichst du den Accessor durch — nicht erneut subscriben (Quota + Channel-Doppelung).
+- [ ] **Static Member-Avatar (NT-Pattern)**: wenn das Feld eine User-Referenz IST (created_by, last_modified_by, …) statt nur Hover-State, gilt zusätzlich der **Schema-Quad** (siehe oben „Strukturelle Änderung") — Tabelle + Mutations + MCP + Export/Import + Members-Lookup.
+
+Merksatz: *Hover-Felder leben in `PresencePosition` + `PresenceUser` + `buildPayload` + `rebuild` + `setUsers`-Diff. Fünf Stellen, sonst ist der Cursor kaputt.*
+
 ## Trigger: Vor dem Commit (jede Änderung, immer)
 
 - [ ] **Diff gelesen**: `git diff --cached` manuell durchgegangen — keine `console.log`, keine Dead-Code-Reste, keine TODOs ohne Ticket-Referenz, keine Secrets.

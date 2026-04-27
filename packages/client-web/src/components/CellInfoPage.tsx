@@ -14,7 +14,7 @@
 //   - "+ Feld": nur sichtbar im Edit-Mode
 
 import { useNavigate } from '@solidjs/router';
-import { type Component, For, Show, createSignal, onCleanup } from 'solid-js';
+import { type Component, For, Show, createMemo, createSignal, onCleanup } from 'solid-js';
 import { readCellLinksFromCell, readInfoFieldsFromCell } from '../lib/cell-data';
 import { showConfirm, showPrompt } from '../lib/dialog';
 import { openDocsPopup } from '../lib/docs-ui';
@@ -32,6 +32,7 @@ import {
   setCellLinkLabel,
   setCellLinkUrl,
 } from '../lib/mutations';
+import type { PresenceUser } from '../lib/presence';
 import { showToast } from '../lib/toasts';
 import type { CellRow, ColRow, InfoField, InfoLink, RowRow } from '../lib/types';
 import { sanitizeUrl } from '../lib/url';
@@ -39,6 +40,7 @@ import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 import { useViewerActive } from '../lib/workspace-role';
 import AliasText from './AliasText';
 import CellDocsSection from './CellDocsSection';
+import PresenceMini from './PresenceMini';
 
 type Props = {
   workspaceId: string;
@@ -47,6 +49,10 @@ type Props = {
   col: ColRow | undefined;
   realtimeDocsVersion: number;
   onChanged: () => void;
+  // P1.D Live-Cursor (Felder + Links).
+  presence?: () => PresenceUser[];
+  selfUserId?: string;
+  onFieldHover?: (fieldId: string | undefined) => void;
 };
 
 const CellInfoPage: Component<Props> = (p) => {
@@ -54,6 +60,27 @@ const CellInfoPage: Component<Props> = (p) => {
   const editMode = useEditMode();
   const viewerActive = useViewerActive();
   const [busy, setBusy] = createSignal(false);
+
+  // P1.D Live-Cursor — Felder UND Links teilen sich denselben hoverFieldId-
+  // Slot, weil beide Element-Typen unter "Info" laufen und die IDs
+  // disjunkt sind (UUIDs).
+  const presenceByField = createMemo<Map<string, PresenceUser[]>>(() => {
+    const map = new Map<string, PresenceUser[]>();
+    const all = p.presence?.() ?? [];
+    for (const u of all) {
+      if (u.userId === p.selfUserId) continue;
+      const fid = u.hoverFieldId;
+      if (!fid) continue;
+      const arr = map.get(fid);
+      if (arr) arr.push(u);
+      else map.set(fid, [u]);
+    }
+    return map;
+  });
+
+  onCleanup(() => {
+    p.onFieldHover?.(undefined);
+  });
 
   const fields = () => readInfoFieldsFromCell(p.cell);
   const links = () => readCellLinksFromCell(p.cell);
@@ -204,7 +231,13 @@ const CellInfoPage: Component<Props> = (p) => {
         <div class="info-list">
           <For each={fields()}>
             {(f) => (
-              <div class="info-field" attr:data-edit={editMode() ? 'true' : 'false'}>
+              <div
+                class="info-field"
+                attr:data-edit={editMode() ? 'true' : 'false'}
+                onMouseEnter={() => p.onFieldHover?.(f.id)}
+                onMouseLeave={() => p.onFieldHover?.(undefined)}
+              >
+                <PresenceMini users={presenceByField().get(f.id) ?? []} />
                 <div class="info-field-hd" classList={{ 'mx-editable': editMode() }}>
                   <div class="info-arrow-stack">
                     <button
@@ -315,7 +348,13 @@ const CellInfoPage: Component<Props> = (p) => {
           <ul class="info-link-list">
             <For each={links()}>
               {(l) => (
-                <li class="info-link" attr:data-edit={editMode() ? 'true' : 'false'}>
+                <li
+                  class="info-link"
+                  attr:data-edit={editMode() ? 'true' : 'false'}
+                  onMouseEnter={() => p.onFieldHover?.(l.id)}
+                  onMouseLeave={() => p.onFieldHover?.(undefined)}
+                >
+                  <PresenceMini users={presenceByField().get(l.id) ?? []} />
                   <div class="info-link-hd" classList={{ 'mx-editable': editMode() }}>
                     <div class="info-arrow-stack">
                       <button

@@ -9,6 +9,7 @@ import { openDocsPopup } from '../lib/docs-ui';
 import { useEditMode } from '../lib/edit-mode';
 import { translateDbError } from '../lib/errors';
 import { addCellChecklist } from '../lib/mutations';
+import type { PresenceUser } from '../lib/presence';
 import { fetchCellChecklists } from '../lib/queries';
 import { showToast } from '../lib/toasts';
 import type { CellRow, ColRow, RowRow } from '../lib/types';
@@ -27,6 +28,10 @@ type Props = {
   // nie gelesen.
   realtimeVersion: number;
   realtimeDocsVersion: number;
+  // P1.D Live-Cursor durchreichen.
+  presence?: () => PresenceUser[];
+  selfUserId?: string;
+  onItemHover?: (itemId: string | undefined) => void;
 };
 
 const CellChecklistsPage: Component<Props> = (p) => {
@@ -152,6 +157,9 @@ const CellChecklistsPage: Component<Props> = (p) => {
                     items={itemsFor()}
                     workspaceId={p.workspaceId}
                     onChanged={() => void refetch()}
+                    presence={p.presence}
+                    selfUserId={p.selfUserId}
+                    onItemHover={p.onItemHover}
                   />
                 );
               }}

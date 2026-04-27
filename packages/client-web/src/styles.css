@@ -920,6 +920,47 @@ button[type="submit"]:hover:not(:disabled) {
   letter-spacing: -0.5px;
 }
 
+/* P1.D: Live-Cursor-Indikator. Absolutes Overlay rechts oben auf dem
+   Hover-Ziel (Cell, Card, Checklist-Item, Info-Field/Link). Parent
+   muss position:relative haben — die jeweiligen Container-Klassen
+   bekommen das (siehe .mx-cell/.kb-card/.cl-it/.info-field/.info-link).
+   pointer-events:none, sonst blockt der Avatar Click/Drag im Hover-
+   Ziel; pure Anzeige-Schicht. */
+.presence-mini {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: inline-flex;
+  align-items: center;
+  z-index: 2;
+  pointer-events: none;
+}
+.presence-mini .presence-mini-avatar + .presence-mini-avatar {
+  margin-left: -3px;
+}
+.presence-mini-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--avatar-sm);
+  height: var(--avatar-sm);
+  border-radius: 50%;
+  background: var(--avatar-color, var(--blue));
+  color: #fff;
+  border: 1.5px solid var(--bg);
+  font-weight: 600;
+  font-size: 8px;
+  letter-spacing: -0.3px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.presence-mini-avatar-overflow {
+  background: var(--bg2);
+  color: var(--text2);
+  font-weight: 500;
+  font-size: 8px;
+}
+
 /* NT.3: Static Creator-Avatar pro node-Row. Klein (--avatar-sm),
    klickbar — navigiert zur Members-Page mit Anker auf den Member. */
 .tree-avatar-creator {
@@ -4150,6 +4191,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   padding-left: calc(13px + var(--space-md) * var(--cl-level, 0));
   border-bottom: 0.5px solid var(--border);
   transition: background var(--tr-std);
+  position: relative;
 }
 
 .cl-it:last-child {
@@ -4377,6 +4419,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   border-radius: var(--r);
   background: var(--bg);
   transition: border-color var(--tr-std), background var(--tr-std);
+  position: relative;
 }
 
 .info-field[data-edit="true"] {
@@ -4519,6 +4562,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   padding: var(--space-xs) var(--space-sm);
   border-radius: var(--rs);
   transition: background var(--tr-std);
+  position: relative;
 }
 
 .info-link[data-edit="true"] {
