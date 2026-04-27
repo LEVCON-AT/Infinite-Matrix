@@ -9,8 +9,9 @@
 
 import { supabase } from './supabase';
 
-// Action-Typen, die Migration 011 + 013 + 015 in workspace_audit_log.action ablegen.
+// Action-Typen, die Migration 011-015 + 020 in workspace_audit_log.action ablegen.
 export type AuditAction =
+  // Member-Lifecycle (011/013/014)
   | 'invite.created'
   | 'invite.accepted'
   | 'invite.revoked'
@@ -18,7 +19,22 @@ export type AuditAction =
   | 'member.removed'
   | 'member.deactivated'
   | 'member.reactivated'
-  | 'workspace.ownership_transferred';
+  // Workspace-Lifecycle (015)
+  | 'workspace.ownership_transferred'
+  | 'workspace.deleted'
+  // Inhalts-Struktur (020 Phase-2-Polish)
+  | 'node.created'
+  | 'node.deleted'
+  | 'node.renamed'
+  | 'node.alias_changed'
+  | 'card.created'
+  | 'card.deleted'
+  | 'card.moved'
+  | 'card.archived'
+  | 'doc.created'
+  | 'doc.deleted'
+  | 'doc.renamed'
+  | 'doc.alias_changed';
 
 export type AuditEntry = {
   id: string;
@@ -89,6 +105,32 @@ export function describeAuditAction(action: string): string {
       return 'Mitglied reaktiviert';
     case 'workspace.ownership_transferred':
       return 'Eigentum uebertragen';
+    case 'workspace.deleted':
+      return 'Workspace geloescht';
+    case 'node.created':
+      return 'Knoten erstellt';
+    case 'node.deleted':
+      return 'Knoten geloescht';
+    case 'node.renamed':
+      return 'Knoten umbenannt';
+    case 'node.alias_changed':
+      return 'Knoten-Alias geaendert';
+    case 'card.created':
+      return 'Karte erstellt';
+    case 'card.deleted':
+      return 'Karte geloescht';
+    case 'card.moved':
+      return 'Karte verschoben';
+    case 'card.archived':
+      return 'Karte archiviert';
+    case 'doc.created':
+      return 'Doku erstellt';
+    case 'doc.deleted':
+      return 'Doku geloescht';
+    case 'doc.renamed':
+      return 'Doku umbenannt';
+    case 'doc.alias_changed':
+      return 'Doku-Alias geaendert';
     default:
       return action;
   }

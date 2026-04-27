@@ -11,13 +11,30 @@ import { translateDbError } from '../../lib/errors';
 import { fetchMembers } from '../../lib/members';
 import { showToast } from '../../lib/toasts';
 
-type FilterPreset = 'all' | 'invites' | 'members' | 'workspace';
+type FilterPreset = 'all' | 'invites' | 'members' | 'workspace' | 'content';
 
 const FILTER_ACTIONS: Record<FilterPreset, ReadonlyArray<AuditAction>> = {
   all: [],
   invites: ['invite.created', 'invite.accepted', 'invite.revoked'],
   members: ['member.role_changed', 'member.removed', 'member.deactivated', 'member.reactivated'],
-  workspace: ['workspace.ownership_transferred'],
+  workspace: ['workspace.ownership_transferred', 'workspace.deleted'],
+  // Content-Struktur-Aenderungen ab Migration 020 (Phase-2-Polish).
+  // Cell-Inhalt + Card-Edits + Doc-Content sind bewusst NICHT geloggt
+  // (Volume-Risk) und tauchen daher nicht im Filter auf.
+  content: [
+    'node.created',
+    'node.deleted',
+    'node.renamed',
+    'node.alias_changed',
+    'card.created',
+    'card.deleted',
+    'card.moved',
+    'card.archived',
+    'doc.created',
+    'doc.deleted',
+    'doc.renamed',
+    'doc.alias_changed',
+  ],
 };
 
 const FILTER_LABELS: Record<FilterPreset, string> = {
@@ -25,6 +42,7 @@ const FILTER_LABELS: Record<FilterPreset, string> = {
   invites: 'Einladungen',
   members: 'Mitglieder',
   workspace: 'Workspace',
+  content: 'Inhalt',
 };
 
 const WorkspaceAuditLog: Component = () => {
