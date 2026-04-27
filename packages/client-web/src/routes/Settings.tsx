@@ -92,6 +92,12 @@ const Settings: ParentComponent = (props) => {
       icon: 'eye',
       hint: 'Bedienelemente ein/aus',
     },
+    {
+      to: `${wsBase()}/account/ai`,
+      label: 'AI-Anbindung',
+      icon: 'sparkles',
+      hint: 'API-Key fuer Onboarding & Hilfe',
+    },
   ];
 
   const workspaceItems = (): NavItem[] => [

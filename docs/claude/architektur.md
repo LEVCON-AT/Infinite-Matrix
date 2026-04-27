@@ -182,3 +182,45 @@ Die bestehende Sub-Sprint-Konvention (`Sprint X.Y: …` bzw. `Backlog N<letter>:
 ### Commit-Autorenschaft
 
 Lokaler Committer ist die User-Identität (Git-Config). Inhaltliche Mitarbeit durch den AI-Assistenten wird per `Co-Authored-By`-Trailer anerkannt. Nie `--no-verify`, nie Signaturen manipulieren, nie Force-Push auf `main`.
+
+## AI-Provider-Master-Key (Phase 2 Welle A.0)
+
+Migration `018_user_ai_providers.sql` legt eine Tabelle `user_ai_providers` an, in der jeder User eigene API-Keys (Anthropic/OpenAI/Gemini) ablegt. Die Keys werden at-rest verschluesselt mit `pgp_sym_encrypt` (pgcrypto). Der Master-Key dafuer kommt **nicht** aus einer Migration und **nicht** aus einer Datei im Repo, sondern aus einer Postgres-GUC:
+
+```sql
+ALTER DATABASE postgres SET app.ai_master_key = '<base64-32-byte-secret>';
+```
+
+### Setup-Schritte pro Environment
+
+1. **Master-Key generieren** (32 Byte zufaellig, Base64-encoded):
+   ```bash
+   openssl rand -base64 32
+   ```
+2. **Env-Variable** in deinem Deploy-Stack definieren — z.B. `.env` neben `infra/supabase/`:
+   ```
+   AI_KEY_ENCRYPTION_KEY=<output-aus-Schritt-1>
+   ```
+3. **Auf der DB anwenden** (einmalig pro Environment):
+   ```sql
+   -- als Superuser (postgres-Role) ausfuehren:
+   ALTER DATABASE postgres SET app.ai_master_key = '<value>';
+   ```
+   Reconnect anschliessend, damit die Session die GUC sieht (bei laufenden Connections nimmt PostgreSQL den neuen Wert erst beim naechsten Reset wahr).
+4. **Verifizieren**:
+   ```sql
+   SELECT current_setting('app.ai_master_key', true) IS NOT NULL AND length(current_setting('app.ai_master_key', true)) >= 16;
+   -- erwartet: t
+   ```
+
+### Was passiert wenn der Key fehlt
+
+Die Helper-Funktion `public._ai_master_key()` raised `ai_master_key_missing` mit Hint, wenn die GUC nicht gesetzt oder zu kurz ist. Daraus wird im Frontend ein Toast — der User sieht "Provider konnte nicht gespeichert werden", die App-Logs zeigen die echte Ursache.
+
+### Was bei Key-Rotation passiert (out-of-scope V1)
+
+Wenn der Master-Key rotiert wird, sind alle bestehenden `api_key_encrypted`-Werte unbrauchbar (kein Decrypt mehr moeglich). Phase-3-Item: Rotation-Tool als pg_cron-Helper, das mit beiden Keys decryptet+re-encryptet. Bis dahin: Master-Key behandeln wie ein Schluessel zum Tresor — nie verlieren, nie rotieren.
+
+### Backups
+
+Postgres-Dumps enthalten die `bytea`-Spalte mit verschluesselten Bytes — nutzlos ohne Master-Key. **Master-Key NIE in Backups oder Git mit-bundlen.** Im Worst-Case (Backup leakt, aber Master-Key ist sicher) bleiben die User-API-Keys geschuetzt.

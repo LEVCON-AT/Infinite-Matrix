@@ -19,6 +19,7 @@ export type SearchTab =
   | 'account/profile'
   | 'account/security'
   | 'account/visibility'
+  | 'account/ai'
   | 'workspace/general'
   | 'workspace/members'
   | 'workspace/audit';
@@ -73,6 +74,12 @@ export const SETTINGS_SEARCH_INDEX: ReadonlyArray<SearchEntry> = [
     label: 'Wartung',
     hint: 'Reset Cache leeren IndexedDB Offline-Cache Zuruecksetzen',
     anchorId: 'maintenance-head',
+  },
+  {
+    tab: 'account/ai',
+    label: 'AI-Anbindung',
+    hint: 'API-Key Anthropic Claude OpenAI GPT Gemini Provider KI Onboarding Hilfe Wizard',
+    anchorId: null,
   },
 
   // ── Workspace ────────────────────────────────────────────────
@@ -137,6 +144,7 @@ const TAB_LABELS: Record<SearchTab, string> = {
   'account/profile': 'Konto · Profil',
   'account/security': 'Konto · Sicherheit',
   'account/visibility': 'Konto · Sichtbarkeit',
+  'account/ai': 'Konto · AI-Anbindung',
   'workspace/general': 'Workspace · Allgemein',
   'workspace/members': 'Workspace · Mitglieder',
   'workspace/audit': 'Workspace · Audit-Log',
@@ -154,6 +162,7 @@ const TAB_ICONS: Record<SearchTab, IconName> = {
   'account/profile': 'user',
   'account/security': 'lock-closed',
   'account/visibility': 'eye',
+  'account/ai': 'sparkles',
   'workspace/general': 'cog',
   'workspace/members': 'users',
   'workspace/audit': 'list-bullet',

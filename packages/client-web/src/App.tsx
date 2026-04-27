@@ -1,5 +1,6 @@
 import { useLocation, useNavigate } from '@solidjs/router';
 import { type JSX, type ParentComponent, Show, createEffect } from 'solid-js';
+import AiProviderHint from './components/AiProviderHint';
 import DialogHost from './components/DialogHost';
 import ProgressOverlay from './components/ProgressOverlay';
 import Toasts from './components/Toasts';
@@ -80,6 +81,7 @@ const App: ParentComponent = (props): JSX.Element => {
       <Show when={ready()} fallback={<p class="boot">Lade…</p>}>
         {props.children}
       </Show>
+      <AiProviderHint />
       <Toasts />
       <DialogHost />
       <ProgressOverlay />

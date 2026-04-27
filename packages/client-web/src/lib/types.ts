@@ -340,3 +340,29 @@ export type DocRow = {
   created_at: string;
   updated_at: string;
 };
+
+// ─── AI-Provider (Phase 2 Welle A.0) ───────────────────────────
+// Pro User mehrere Provider, einer is_default. Der API-Key liegt at-
+// rest verschluesselt in user_ai_providers.api_key_encrypted und ist
+// fuer das Frontend NIE sichtbar — es liest die _safe-View, die die
+// Spalte ausblendet. Mutations gehen ueber RPC, nicht direkt.
+export type AiProviderKind = 'anthropic' | 'openai' | 'gemini';
+
+export type AiProvider = {
+  id: string;
+  kind: AiProviderKind;
+  label: string;
+  model_name: string | null;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AiProviderInput = {
+  id?: string; // undefined → INSERT, gesetzt → UPDATE
+  kind: AiProviderKind;
+  label: string;
+  apiKey?: string; // undefined bei UPDATE ohne Key-Wechsel
+  modelName?: string;
+  setDefault?: boolean;
+};

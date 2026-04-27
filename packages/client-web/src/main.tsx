@@ -5,6 +5,7 @@ import Invite from './routes/Invite';
 import Login from './routes/Login';
 import Settings from './routes/Settings';
 import Workspace from './routes/Workspace';
+import AccountAi from './routes/settings/AccountAi';
 import AccountProfile from './routes/settings/AccountProfile';
 import AccountSecurity from './routes/settings/AccountSecurity';
 import AccountVisibility from './routes/settings/AccountVisibility';
@@ -49,6 +50,7 @@ render(
         <Route path="/account/profile" component={AccountProfile} />
         <Route path="/account/security" component={AccountSecurity} />
         <Route path="/account/visibility" component={AccountVisibility} />
+        <Route path="/account/ai" component={AccountAi} />
         <Route path="/workspace/general" component={WorkspaceGeneral} />
         <Route path="/workspace/members" component={WorkspaceMembers} />
         <Route path="/workspace/audit" component={WorkspaceAuditLog} />
