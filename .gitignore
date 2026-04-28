@@ -63,6 +63,13 @@ infra/supabase/volumes/functions/
 Secrets_aus_claude_chat.txt
 .playwright-mcp/
 
+# --- Lokale One-Off Diagnose-/Migrations-Scripts ---
+# Repo-root scripts/ enthaelt Ad-hoc .sh-Helper + commit-msg-*.txt
+# Artefakte (apply-mig-*, check-pgpw-*, diagnose-*, ...) — nicht
+# versionierter Werkzeugkasten. Falls ein Script langfristig gehoert,
+# bewusst in infra/ oder packages/<x>/scripts/ verschieben.
+/scripts/
+
 # --- Debug-Screenshots (Root-only) ---
 # Agent-Artefakte (hyperui-*.png, tree-*.png, card-overlay-*.png, etc.).
 # /*.png matcht nur das Repo-Root — Asset-PNGs in packages/ bleiben tracked.
