@@ -34,6 +34,7 @@ import {
   setKbColPosition,
   toggleCardDone,
 } from '../lib/mutations';
+import { ensureObjectForKbCol } from '../lib/objects';
 import type { PresenceUser } from '../lib/presence';
 import { isCardDone, isRecurCard, todayIso, toggleOccurrence } from '../lib/recur';
 import { useVis } from '../lib/settings';
@@ -468,6 +469,13 @@ const BoardView: Component<Props> = (p) => {
   async function onRenameCol(col: KbColRow, newLabel: string) {
     if (newLabel === col.label) return;
     await wrap(() => renameKbCol(col.id, newLabel));
+    // Phase 3 O.2a: bei erstmaligem Label-Set Auto-Object on-the-fly.
+    void ensureObjectForKbCol({
+      id: col.id,
+      workspace_id: col.workspace_id,
+      label: newLabel,
+      object_id: col.object_id ?? null,
+    });
   }
 
   async function onColorCol(col: KbColRow, color: string | null) {

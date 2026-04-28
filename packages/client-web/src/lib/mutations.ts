@@ -121,6 +121,10 @@ export async function addRow(args: {
   workspaceId: string;
   matrixId: string;
   label?: string;
+  // Phase 3 O.2a: optional Object-Ref. Wenn gesetzt, wird die Zeile
+  // direkt mit einem existing Object verknuepft — fuer Auto-Object-
+  // Pfad via addRowWithObject (siehe lib/objects.ts).
+  objectId?: string | null;
 }): Promise<RowRow> {
   return runOptimisticInsert<RowRow>({
     table: 'rows',
@@ -135,6 +139,7 @@ export async function addRow(args: {
           matrix_id: args.matrixId,
           label: args.label ?? '',
           position: pos,
+          object_id: args.objectId ?? null,
         })
         .select()
         .single();
@@ -153,6 +158,7 @@ export async function addRow(args: {
         matrix_id: args.matrixId,
         label: args.label ?? '',
         position: pos,
+        object_id: args.objectId ?? null,
       } as unknown as RowRow;
     },
   });
@@ -205,6 +211,7 @@ export async function addCol(args: {
   workspaceId: string;
   matrixId: string;
   label?: string;
+  objectId?: string | null;
 }): Promise<ColRow> {
   return runOptimisticInsert<ColRow>({
     table: 'cols',
@@ -219,6 +226,7 @@ export async function addCol(args: {
           matrix_id: args.matrixId,
           label: args.label ?? '',
           position: pos,
+          object_id: args.objectId ?? null,
         })
         .select()
         .single();
@@ -237,6 +245,7 @@ export async function addCol(args: {
         matrix_id: args.matrixId,
         label: args.label ?? '',
         position: pos,
+        object_id: args.objectId ?? null,
       } as unknown as ColRow;
     },
   });
@@ -545,6 +554,7 @@ export async function addKbCol(args: {
   boardId: string;
   label?: string;
   color?: string | null;
+  objectId?: string | null;
 }): Promise<KbColRow> {
   return runOptimisticInsert<KbColRow>({
     table: 'kb_cols',
@@ -560,6 +570,7 @@ export async function addKbCol(args: {
           label: args.label ?? '',
           position: pos,
           color: args.color ?? null,
+          object_id: args.objectId ?? null,
         })
         .select()
         .single();
@@ -579,6 +590,7 @@ export async function addKbCol(args: {
         label: args.label ?? '',
         position: pos,
         color: args.color ?? null,
+        object_id: args.objectId ?? null,
       } as unknown as KbColRow;
     },
   });

@@ -27,6 +27,7 @@ import {
   setRowPosition,
 } from '../lib/mutations';
 import { rememberFocus, useLastFocus } from '../lib/navigation-focus';
+import { ensureObjectForCol, ensureObjectForRow } from '../lib/objects';
 import type { PresenceUser } from '../lib/presence';
 import { useVis } from '../lib/settings';
 import { showToast, showUndoToast } from '../lib/toasts';
@@ -218,11 +219,26 @@ const MatrixView: Component<Props> = (p) => {
   async function onRenameRow(row: RowRow, newLabel: string) {
     if (newLabel === row.label) return;
     await wrap(() => renameRow(row.id, newLabel));
+    // Phase 3 O.2a: bei erstmaligem Label-Set Auto-Object on-the-fly
+    // anlegen + linken. Idempotent (ensureObjectForRow checkt selbst).
+    // void: Auto-Object ist Hintergrund-Mechanik, kein Wait-noetig.
+    void ensureObjectForRow({
+      id: row.id,
+      workspace_id: row.workspace_id,
+      label: newLabel,
+      object_id: row.object_id ?? null,
+    });
   }
 
   async function onRenameCol(col: ColRow, newLabel: string) {
     if (newLabel === col.label) return;
     await wrap(() => renameCol(col.id, newLabel));
+    void ensureObjectForCol({
+      id: col.id,
+      workspace_id: col.workspace_id,
+      label: newLabel,
+      object_id: col.object_id ?? null,
+    });
   }
 
   async function onDelRow(row: RowRow) {
