@@ -95,6 +95,49 @@ Merksatz: *Jede strukturelle Änderung braucht den Vier-Artefakte-Durchlauf — 
 - [ ] **Ref-Resolver**: neue Ref-Form? Muster `^`-Prefix strippen + Alias-Index zuerst + Raw-ID-Fallback + Typ-Check, analog zu `_resolveNodeRef`/`_resolveBoardRef`/`_resolveCardRef`.
 - [ ] **URL-Input**: landet ein URL-String im State? → `sanitizeUrl()` davor. **Alias**: `validateAlias(val, oldAlias)` mit canonical `v.alias` speichern.
 
+## Trigger: AI-Pipe / MCP-RPC (Cloud) / Wizard ändern
+
+Berührt `lib/ai-assist/*`, `lib/wizard-*`, `components/wizard/*`,
+`components/AiHelpDrawer*`, `infra/supabase/migrations/02x_*.sql`
+mit `mcp_*`-RPCs oder den `WIZARD_PROPOSE_TOOL`? Die Cloud-AI-Pipe
+hat **drei Schichten** (System-Prompt / Tool-Allowlist / dispatchTool)
+plus **zwei UI-Konsumenten** (Drawer A.3 + Wizard A.4). Jede Schicht
+muss zur nächsten passen — ohne diesen Sweep zerreißt die
+Mitigation-Stack-Logik leise.
+
+Pattern-Files:
+- Tool-Registry: `packages/client-web/src/lib/ai-assist/tools.ts`
+  (`TOOL_REGISTRY`, `WIZARD_PROPOSE_TOOL`, `TOOL_REGISTRY_FULL`,
+  `allowedToolsForMode`)
+- Dispatcher: `packages/client-web/src/lib/ai-assist/index.ts`
+  (`dispatchTool`, `ITER_CAP`, special-case-Bypass für
+  `WIZARD_PROPOSE_TOOL_NAME`)
+- System-Prompt: `packages/client-web/src/lib/ai-assist/system-prompt.ts`
+  (`WIZARD_BLOCK` / `HELP_BLOCK` / `CELL_SUGGEST_BLOCK`)
+- MCP-RPCs: `infra/supabase/migrations/021_mcp_tools.sql` (Pattern
+  für SECURITY DEFINER + `_mcp_validate_*`), `022_log_ai_call.sql`,
+  `023_create_workspace_rpc.sql`
+- Wizard-Apply: `lib/wizard-apply.ts`, Wizard-State:
+  `lib/wizard-state.ts`, Wizard-Steps: `components/wizard/Step*.tsx`
+
+Checks:
+
+- [ ] **Tool-Allowlist (Mitigation B)**: pro neuem `ToolDef` die Felder `riskLevel` (`safe`/`destructive`) + `allowedInModes` (Subset von `wizard`/`help`/`cell-suggest`). Forbidden-Tools (account, workspace-lifecycle, webhooks, bulk) tauchen NICHT als `ToolDef` auf — der LLM darf nicht mal wissen dass es sie gibt. `TOOL_MAP` und `allowedToolsForMode` bauen automatisch aus `TOOL_REGISTRY_FULL`.
+- [ ] **MCP-RPC anlegen** (neue Migration `02x_*.sql`): `SECURITY DEFINER` + `SET search_path = public, extensions` + `auth.uid()`-NULL-Check + `public._mcp_assert_writer(workspace_id)` + Args-Validation via `_mcp_validate_label`/`_mcp_validate_alias` (Migration 021). `GRANT EXECUTE ... TO authenticated`. Frontend-Tool-`p_*`-Args matchen die SQL-Args 1:1; auch Defaults vermeiden — required-Schema im Tool zwingt den LLM zu vollen Args.
+- [ ] **Wizard-only Tools (Mitigation H)**: kein RPC, sondern Args-Passthrough. Pattern: separater `ToolDef`-Slot (siehe `WIZARD_PROPOSE_TOOL`), `dispatchTool` faengt `tu.name === WIZARD_*_TOOL_NAME` ab und reicht `tu.args` als `data` zurueck. NICHT in `TOOL_REGISTRY` aufnehmen — Anhang via `TOOL_REGISTRY_FULL`.
+- [ ] **System-Prompt-Sync** (`system-prompt.ts`): WIZARD/HELP/CELL_SUGGEST_BLOCK referenzieren die im Mode erlaubten Tools implizit ueber die Tool-Liste am Ende. Bei Tool-Add: prüfen ob System-Prompt-Anweisung den Tool-Use begründet ODER explizit verbietet ("ruf KEIN anderes Tool"). Bei Mode-Add: neuen Block + `buildSystemPrompt`-Switch.
+- [ ] **Iter-Cap (Mitigation D)** in `ITER_CAP`-Record: bei neuem Mode Eintrag ergänzen. Wizard hat 5 (single-tool-Pfad), Help/Cell-Suggest 10. Kein Mode > 50 ohne klaren Grund.
+- [ ] **Confirm-Modal (Mitigation C)**: destructive-Tool? → `confirmDestructive`-Callback im Caller (Drawer/Wizard) hinterlegen. `dispatchTool` lehnt ohne Callback hart ab — never silent-execute.
+- [ ] **Read-Only-Modus (Mitigation G)**: neuer Caller setzt `readOnly` explizit. Wizard `false` (eigener Workspace), Drawer `true` bei Multi-Member-Foreign-Cell. Kein implizites Default.
+- [ ] **Audit-Log (Mitigation I)**: `log_ai_call`-RPC (Migration 022) wird von `runAssist` automatisch gerufen. Neue Provider-Kind oder neue Felder? → Migration ergänzen, Frontend-Helper `lib/ai-assist/audit.ts` mit-erweitern.
+- [ ] **Args-Validation server-side (Mitigation J)**: kein Trust auf Frontend-`maxLength`. Pro Args-Feld in der RPC ein `_mcp_validate_*` aufrufen oder neuen Helper anlegen. Errors strukturiert (`USING ERRCODE = 'check_violation'`); Frontend reicht `error.message` an LLM zurueck als `tool_result`-Error.
+- [ ] **Wizard-Apply-Sync**: wenn `WIZARD_PROPOSE_TOOL.inputSchema` erweitert wird (neue Children-Typen, neue Sub-Strukturen), MUSS `lib/wizard-apply.ts` mit-erweitert werden — sonst zeigt die Preview Vision, die nicht angelegt wird (Erwartungs-Diskrepanz). Trios: `parseProposal` in `StepProposing.tsx` (neue Felder + `selected:true`-Default) + `lib/wizard-state.ts` (`Proposal*`-Types) + `applyBoardChildren`/`applyMatrixChildren` in `wizard-apply.ts` (neue Apply-Logik) + `components/wizard/StepPreview.tsx` (Render + Checkbox-Selection). Failures werden in `failedItems` (scope/label/error) gesammelt — kein silent-`console.warn`.
+- [ ] **Provider-Cache** (`lib/ai-providers.ts`): jede Mutation (`setAiProvider`/`setAiProviderDefault`/`deleteAiProvider`) ruft `invalidateProviderCaches()` (= `clearProviderCredentialCache()` aus `lib/ai-assist/credential` + `cachedAccessor=null`). Sonst nutzt der naechste `runAssist` den alten Default-Key.
+- [ ] **Provider-Adapter erweitern**: V1 nur Anthropic. OpenAI/Gemini-Adapter in `lib/ai-assist/providers/<kind>.ts` mit `streamCompletion`-Equivalent. Tool-Schema-Konvertierung aus Anthropic-Format zu Provider-Format. `runAssist` switch erweitern. Tools-Allowlist + System-Prompt bleiben provider-agnostisch.
+- [ ] **Live-Test-Plan**: F12-Network-Inspect des `POST /v1/messages`-Body — `tools[]` enthält nur Mode-allowed Tools, `system` enthält Mode-Block + Tool-Liste, `messages` enthält `contextSnapshot` als user-Role-Message (nicht im system-prompt). Console-Errors in `runAssist (<mode>):`-Prefix sichtbar.
+
+Merksatz: *Tool-Allowlist + System-Prompt + dispatchTool + Wizard-Apply müssen synchron sein. Eine Schicht alleine ändern brennt leise.*
+
 ## Trigger: Neue Tastatur-Shortcut / Keyboard-Interaktion
 
 - [ ] **Konfigurierbar?** → Eintrag in `DEFAULT_KEYBINDINGS` + `KB_ACTIONS`, Check via `matchShortcut(e, 'actionName')`.
