@@ -27,6 +27,7 @@ import NodeDescription from '../components/NodeDescription';
 import NodeTree from '../components/NodeTree';
 import ObjectSuggestion from '../components/ObjectSuggestion';
 import PresenceStack from '../components/PresenceStack';
+import WorkspaceEmptyState from '../components/WorkspaceEmptyState';
 import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
 import { useAggregateView } from '../lib/aggregate-view';
 import { aliasChipMenuState, closeAliasChipMenu } from '../lib/alias-chip-menu';
@@ -1128,7 +1129,13 @@ const Workspace: Component = () => {
 
           <Show
             when={currentCell() || currentNode()}
-            fallback={<p class="hint">Waehle links eine Matrix oder ein Board.</p>}
+            fallback={
+              <WorkspaceEmptyState
+                workspaceId={params.workspaceId ?? ''}
+                canCreate={canWrite(myRole())}
+                onCreated={(nodeId) => navigate(`/w/${params.workspaceId}/n/${nodeId}`)}
+              />
+            }
           >
             <Show when={currentCell()}>
               {(cell) => (

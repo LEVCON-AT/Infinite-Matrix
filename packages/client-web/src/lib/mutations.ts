@@ -457,6 +457,51 @@ export async function createChildMatrix(args: {
   });
 }
 
+// Top-Level-Knoten anlegen (parent_cell_id = null). Heute nur durch
+// Wizard / Import erzeugt — der Empty-State im Workspace-Content ruft
+// das jetzt ueber + Matrix / + Board-CTA.
+export async function createRootNode(args: {
+  workspaceId: string;
+  type: 'matrix' | 'board';
+  label?: string;
+}): Promise<NodeRow> {
+  const label = args.label ?? (args.type === 'matrix' ? 'Neue Matrix' : 'Neues Board');
+  return runOptimisticInsert<NodeRow>({
+    table: 'nodes',
+    workspaceId: args.workspaceId,
+    label: args.type === 'matrix' ? 'Matrix anlegen' : 'Board anlegen',
+    run: async () => {
+      const { data, error } = await supabase
+        .from('nodes')
+        .insert({
+          workspace_id: args.workspaceId,
+          type: args.type,
+          label,
+          parent_cell_id: null,
+          data: {},
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as NodeRow;
+    },
+    buildOffline: (id) => {
+      const now = new Date().toISOString();
+      return {
+        id,
+        workspace_id: args.workspaceId,
+        type: args.type,
+        label,
+        alias: null,
+        parent_cell_id: null,
+        data: {},
+        created_at: now,
+        updated_at: now,
+      } as unknown as NodeRow;
+    },
+  });
+}
+
 export async function createChildBoard(args: {
   workspaceId: string;
   parentCellId: string;
@@ -468,6 +513,58 @@ export async function createChildBoard(args: {
     type: 'board',
     label: args.label ?? 'Neues Board',
   });
+}
+
+// "Warm-Start" fuer eine neue Top-Level-Matrix:
+//   - Node anlegen
+//   - 2 leere Zeilen (default labels)
+//   - 2 leere Spalten (default labels)
+// Cells werden NICHT vorab angelegt — sie entstehen lazy on-demand
+// beim ersten Cell-Klick (existing matrix-cell-Pattern). User landet
+// auf einer 2x2-Struktur, kann sofort tippen.
+export async function createRootMatrixWithDefaults(args: {
+  workspaceId: string;
+  label?: string;
+}): Promise<NodeRow> {
+  const node = await createRootNode({
+    workspaceId: args.workspaceId,
+    type: 'matrix',
+    label: args.label,
+  });
+  // 2 rows + 2 cols sequenziell — RLS + FKs moegen Reihenfolge.
+  // Best-effort: Fehler werden geloggt damit zumindest die Matrix
+  // entsteht. User kann manuell + Zeile / + Spalte nachlegen.
+  try {
+    await addRow({ workspaceId: args.workspaceId, matrixId: node.id });
+    await addRow({ workspaceId: args.workspaceId, matrixId: node.id });
+    await addCol({ workspaceId: args.workspaceId, matrixId: node.id });
+    await addCol({ workspaceId: args.workspaceId, matrixId: node.id });
+  } catch (err) {
+    console.warn('createRootMatrixWithDefaults seeds failed:', err);
+  }
+  return node;
+}
+
+// "Warm-Start" fuer ein neues Top-Level-Board:
+//   - Node anlegen
+//   - 3 default kb_cols ("ToDo" / "In Arbeit" / "Erledigt")
+export async function createRootBoardWithDefaults(args: {
+  workspaceId: string;
+  label?: string;
+}): Promise<NodeRow> {
+  const node = await createRootNode({
+    workspaceId: args.workspaceId,
+    type: 'board',
+    label: args.label,
+  });
+  try {
+    await addKbCol({ workspaceId: args.workspaceId, boardId: node.id, label: 'ToDo' });
+    await addKbCol({ workspaceId: args.workspaceId, boardId: node.id, label: 'In Arbeit' });
+    await addKbCol({ workspaceId: args.workspaceId, boardId: node.id, label: 'Erledigt' });
+  } catch (err) {
+    console.warn('createRootBoardWithDefaults seeds failed:', err);
+  }
+  return node;
 }
 
 // Cascade via FK ON DELETE CASCADE: alle Kinder (rows/cols/cells/...) gehen mit.

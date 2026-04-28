@@ -9207,6 +9207,124 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   flex: 0 0 auto;
 }
 
+/* ─── Workspace-Empty-State ──────────────────────────────────── */
+.ws-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  margin: var(--space-lg) auto;
+  max-width: 640px;
+  border: 1px solid var(--border);
+  border-radius: var(--rl);
+  background: var(--surface);
+  animation: modalIn var(--tr-enter);
+}
+
+.ws-empty-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--amberbg, var(--bg2));
+  color: var(--amber, var(--text2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ws-empty-title {
+  margin: 0;
+  font-size: var(--fs-title);
+  color: var(--text);
+}
+
+.ws-empty-hint {
+  margin: 0;
+  color: var(--text2);
+  line-height: 1.55;
+  max-width: 480px;
+}
+
+.ws-empty-readonly {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px dashed var(--border);
+  border-radius: var(--rs);
+  color: var(--text2);
+  font-size: 13px;
+}
+
+.ws-empty-actions {
+  display: flex;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: var(--space-sm);
+}
+
+.ws-empty-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 220px;
+  padding: var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: transform var(--tr-std), border-color var(--tr-std), background var(--tr-std);
+}
+
+.ws-empty-cta:hover:not(:disabled) {
+  border-color: var(--text2);
+  background: var(--bg2);
+  transform: translateY(-1px);
+}
+
+.ws-empty-cta:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ws-empty-cta > svg {
+  margin-bottom: 4px;
+  color: var(--text2);
+}
+
+.ws-empty-cta-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.ws-empty-cta-sub {
+  font-size: 12px;
+  color: var(--text3);
+}
+
+.ws-empty-cta-matrix:hover:not(:disabled) > svg {
+  color: var(--blue, var(--text));
+}
+
+.ws-empty-cta-board:hover:not(:disabled) > svg {
+  color: var(--teal, var(--text));
+}
+
+@media (max-width: 600px) {
+  .ws-empty-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  .ws-empty-cta {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
 .wizard-applying-body {
   min-height: 140px;
 }
