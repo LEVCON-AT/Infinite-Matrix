@@ -167,10 +167,7 @@ async function dispatchTool(
   tu: AssistToolUse,
   onEvent: (e: AssistEvent) => void,
   opts: {
-    confirmDestructive?: (
-      toolName: string,
-      args: Record<string, unknown>,
-    ) => Promise<boolean>;
+    confirmDestructive?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>;
     readOnly: boolean;
   },
 ): Promise<{ ok: true; data: unknown } | { ok: false; error: string }> {
