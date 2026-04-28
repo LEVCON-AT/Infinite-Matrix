@@ -3,6 +3,7 @@ import { render } from 'solid-js/web';
 import App from './App';
 import Invite from './routes/Invite';
 import Login from './routes/Login';
+import ObjectDetail from './routes/ObjectDetail';
 import Onboarding from './routes/Onboarding';
 import Settings from './routes/Settings';
 import Workspace from './routes/Workspace';
@@ -47,6 +48,7 @@ render(
       <Route path="/w/:workspaceId/c/:cellId/checklists" component={Workspace} />
       <Route path="/w/:workspaceId/c/:cellId/info" component={Workspace} />
       <Route path="/w/:workspaceId/c/:cellId/docs" component={Workspace} />
+      <Route path="/w/:workspaceId/o/:objectId" component={ObjectDetail} />
       <Route path="/w/:workspaceId/settings" component={Settings}>
         <Route path="/" component={AccountProfile} />
         <Route path="/account/profile" component={AccountProfile} />

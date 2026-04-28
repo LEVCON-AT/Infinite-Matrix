@@ -82,6 +82,81 @@ export async function fetchObjects(workspaceId: string): Promise<ObjectRow[]> {
   return (data ?? []) as ObjectRow[];
 }
 
+// ─── Read: fetchObject (single) ──────────────────────────────
+export async function fetchObject(objectId: string): Promise<ObjectRow | null> {
+  if (!objectId) return null;
+  const { data, error } = await supabase
+    .from('objects')
+    .select('*')
+    .eq('id', objectId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data ?? null) as ObjectRow | null;
+}
+
+// ─── Read: fetchObjectChildren (parent_id-Tree) ─────────────
+export async function fetchObjectChildren(
+  workspaceId: string,
+  parentId: string,
+): Promise<ObjectRow[]> {
+  if (!workspaceId || !parentId) return [];
+  const { data, error } = await supabase
+    .from('objects')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .eq('parent_id', parentId)
+    .order('label', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as ObjectRow[];
+}
+
+// ─── Read: object_backlinks_v ───────────────────────────────
+// Liefert die Vorkommen-Liste fuer ein Object. Pfad-Anzeige + Click-
+// Through ueber kind/ref_id/node_id.
+export type ObjectBacklink = {
+  workspace_id: string;
+  object_id: string;
+  kind: 'row' | 'col' | 'kb_col' | 'node';
+  ref_id: string;
+  ref_label: string;
+  node_id: string;
+  node_label: string;
+  node_type: 'matrix' | 'board' | null;
+};
+
+export async function fetchObjectBacklinks(
+  workspaceId: string,
+  objectId: string,
+): Promise<ObjectBacklink[]> {
+  if (!workspaceId || !objectId) return [];
+  const { data, error } = await supabase
+    .from('object_backlinks_v')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .eq('object_id', objectId);
+  if (error) throw error;
+  return (data ?? []) as ObjectBacklink[];
+}
+
+// ─── Read: fetchObjectGroups (welche Groups enthalten dieses Object?) ──
+export async function fetchObjectGroups(
+  workspaceId: string,
+  objectId: string,
+): Promise<GroupRow[]> {
+  if (!workspaceId || !objectId) return [];
+  const { data, error } = await supabase
+    .from('group_members')
+    .select(
+      'group_id, groups!inner(id, workspace_id, name, description, created_at, created_by, updated_at)',
+    )
+    .eq('workspace_id', workspaceId)
+    .eq('object_id', objectId);
+  if (error) throw error;
+  // Inner-Join liefert nested groups. Wir extrahieren auf flach.
+  const rows = (data ?? []) as Array<{ groups: GroupRow | GroupRow[] }>;
+  return rows.flatMap((r) => (Array.isArray(r.groups) ? r.groups : [r.groups]));
+}
+
 // ─── Mutation: createObject ──────────────────────────────────
 // RPC: mcp_create_object. Gibt {object_id, workspace_id, label, alias}
 // als jsonb zurueck. Wir holen die volle ObjectRow danach mit einem
@@ -365,13 +440,21 @@ export async function fetchSoftGroupMembers(
   return (data ?? []) as SoftGroupMemberRow[];
 }
 
-// Tag-M:N kommt mit O.4 (Object-Detail-Page). Stub bleibt damit
-// andere Module schon importieren koennen ohne Type-Errors.
+// Phase 3 O.4: M:N Object-Tags. Liefert die "tag_object"-Refs des
+// gegebenen Objects. Caller resolved tag-Object-Labels via separatem
+// fetchObject-Call oder bereits-vorhandenem ObjectMap.
 export async function fetchObjectTags(
-  _workspaceId: string,
-  _objectId: string,
+  workspaceId: string,
+  objectId: string,
 ): Promise<ObjectTagRow[]> {
-  return [];
+  if (!workspaceId || !objectId) return [];
+  const { data, error } = await supabase
+    .from('object_tags')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .eq('object_id', objectId);
+  if (error) throw error;
+  return (data ?? []) as ObjectTagRow[];
 }
 
 // ─── Mutations: Groups / Soft-Groups ─────────────────────────
@@ -484,4 +567,55 @@ export async function promoteSoftGroup(args: {
   const r = data as { group_id?: string; already_promoted?: boolean } | null;
   if (!r?.group_id) throw new Error('mcp_promote_soft_group: keine group_id zurueck');
   return { groupId: r.group_id, alreadyPromoted: r.already_promoted === true };
+}
+
+// ─── Mutations: Object-Detail (Phase 3 O.4) ──────────────────
+// Edit-Pfad fuer label/alias/type/attrs + Hierarchie + Tags + Delete.
+// Sync-online ohne safe-mutation-Wrapper — Object-Detail-Page hat
+// eigene Toast/Loading-Pflege, kein Bulk-Optimistic.
+
+export async function updateObject(args: {
+  objectId: string;
+  label?: string;
+  alias?: string | null; // '' oder null = clear
+  typeLabel?: string | null; // '' oder null = clear
+  attrs?: Record<string, unknown>;
+}): Promise<void> {
+  const { error } = await supabase.rpc('mcp_update_object', {
+    p_object_id: args.objectId,
+    p_label: args.label ?? null,
+    p_alias: args.alias ?? null,
+    p_type_label: args.typeLabel ?? null,
+    p_attrs: args.attrs ?? null,
+  });
+  if (error) throw error;
+}
+
+export async function setObjectParent(objectId: string, parentId: string | null): Promise<void> {
+  const { error } = await supabase.rpc('mcp_set_object_parent', {
+    p_object_id: objectId,
+    p_parent_id: parentId,
+  });
+  if (error) throw error;
+}
+
+export async function addObjectTag(objectId: string, tagObjectId: string): Promise<void> {
+  const { error } = await supabase.rpc('mcp_add_object_tag', {
+    p_object_id: objectId,
+    p_tag_object_id: tagObjectId,
+  });
+  if (error) throw error;
+}
+
+export async function removeObjectTag(objectId: string, tagObjectId: string): Promise<void> {
+  const { error } = await supabase.rpc('mcp_remove_object_tag', {
+    p_object_id: objectId,
+    p_tag_object_id: tagObjectId,
+  });
+  if (error) throw error;
+}
+
+export async function deleteObject(objectId: string): Promise<void> {
+  const { error } = await supabase.rpc('mcp_delete_object', { p_object_id: objectId });
+  if (error) throw error;
 }
