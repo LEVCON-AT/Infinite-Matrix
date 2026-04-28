@@ -55,6 +55,7 @@ import {
   fetchWorkspaceAttachedDocs,
   fetchWorkspaceLinks,
 } from '../lib/queries';
+import { resolveNodeLabel } from '../lib/label-template';
 import { fetchObjects } from '../lib/objects';
 import { subscribeWorkspace } from '../lib/realtime';
 import { useSettingsBodyClassSync } from '../lib/settings';
@@ -283,14 +284,21 @@ const Workspace: Component = () => {
   // Phase 3 O.8: Objects workspace-weit fuer Live-Resolver der
   // Name-Templates (`{row.object}` / `{column.object}`). Object-Rename
   // schlaegt via Realtime-Bump (objects-Tabelle) durch und triggert
-  // den hier verkabelten Refetch. Konsument kommt mit O.8.C — der
-  // Resolver-Verbrauch in NodeTree/MatrixView/BoardView. Bis dahin
-  // bleibt die Resource „warm", aber ungelesen — daher der `_`-
-  // Prefix. Die Reaktivitaet baut den Cache trotzdem auf.
-  const [_objects, { refetch: refetchObjects }] = createResource(
+  // den hier verkabelten Refetch.
+  const [objects, { refetch: refetchObjects }] = createResource(
     () => params.workspaceId,
     async (wid) => (wid ? fetchObjects(wid) : []),
   );
+
+  // Maps fuer Resolver. Reaktiv ueber alle Resource-Accessoren —
+  // recomputed bei jedem nodes/cells/rows/cols/objects-Bump.
+  // Konsumiert in NodeTree (labelOf), MatrixView (Header), Breadcrumb.
+  const resolverMaps = createMemo(() => ({
+    cellsById: new Map((cells() ?? []).map((c) => [c.id, c])),
+    rowsById: new Map((rows() ?? []).map((r) => [r.id, r])),
+    colsById: new Map((colsData() ?? []).map((c) => [c.id, c])),
+    objectsById: new Map((objects() ?? []).map((o) => [o.id, o])),
+  }));
 
   // Set der cells, an denen Dokus haengen — fuer die derived Doku-
   // Pill in der Matrix-Ansicht. Reagiert auf rtDocs-Bumps ueber den
@@ -433,7 +441,7 @@ const Workspace: Component = () => {
     const rowsList = rows() ?? [];
     const colsList = colsData() ?? [];
     const node = u.nodeId ? nodesList.find((n) => n.id === u.nodeId) : undefined;
-    if (node) parts.push(node.label);
+    if (node) parts.push(resolveNodeLabel(node, resolverMaps()));
     if (u.cellId) {
       const cell = cellsList.find((c) => c.id === u.cellId);
       if (cell) {
@@ -527,11 +535,13 @@ const Workspace: Component = () => {
       const chain: Array<{ id: string; label: string; type: 'matrix' | 'board' }> = [];
       let cursor = byNodeId.get(startNodeId);
       const seen = new Set<string>();
+      const maps = resolverMaps();
       while (cursor && !seen.has(cursor.id)) {
         seen.add(cursor.id);
         chain.unshift({
           id: cursor.id,
-          label: cursor.label || '(ohne Label)',
+          // Phase 3 O.8: Template-Resolver fuer Breadcrumb-Labels.
+          label: resolveNodeLabel(cursor, maps) || '(ohne Label)',
           type: cursor.type,
         });
         if (!cursor.parent_cell_id) break;
@@ -871,6 +881,7 @@ const Workspace: Component = () => {
             presence={presenceUsers}
             selfUserId={user()?.id}
             members={() => workspaceMembers() ?? []}
+            resolverMaps={resolverMaps}
             onChanged={() => {
               void refetchCells();
               void refetchCellsWithDocs();
@@ -1217,7 +1228,7 @@ const Workspace: Component = () => {
               {(node) => (
                 <section class="node-view">
                   <div class="node-view-head">
-                    <h2>{node().label || '(ohne Label)'}</h2>
+                    <h2>{resolveNodeLabel(node(), resolverMaps()) || '(ohne Label)'}</h2>
                     <Show when={node().alias}>
                       {(alias) => <span class="node-alias">^{alias()}</span>}
                     </Show>

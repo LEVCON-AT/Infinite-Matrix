@@ -8,6 +8,7 @@ import { showChoice, showPrompt } from '../lib/dialog';
 import { openDocsPopup } from '../lib/docs-ui';
 import { useEditMode } from '../lib/edit-mode';
 import { translateDbError } from '../lib/errors';
+import { type ContextMaps, resolveNodeLabel } from '../lib/label-template';
 import {
   type WorkspaceExport,
   downloadSubtreeExport,
@@ -110,6 +111,10 @@ type Props = {
   // NT.3: Workspace-Members fuer den Creator-Avatar (Lookup von
   // node.created_by-uuid -> Member-Record).
   members?: () => WorkspaceMember[];
+  // Phase 3 O.8: Resolver-Maps fuer Name-Templates. Wenn gesetzt,
+  // rendert labelOf() Templates (`{row.object}` / `{column.object}`)
+  // live aus parent_cell-Kette. Default-Fallback: legacy node.label.
+  resolverMaps?: () => ContextMaps;
 };
 
 // Icon-Lookup nach Entry-Kind / Node-Type. Feature-Rows gibt es nur
@@ -169,8 +174,14 @@ const FEATURE_LABEL: Record<'info' | 'checklists', string> = {
   checklists: 'Checklisten',
 };
 
-function labelOf(entry: TreeEntry): string {
-  if (entry.kind === 'node') return entry.node.label || '(ohne Label)';
+function labelOf(entry: TreeEntry, maps: ContextMaps | null): string {
+  if (entry.kind === 'node') {
+    // Phase 3 O.8: Template-Resolver wenn Maps verfuegbar; Fallback
+    // legacy `node.label` falls Resolver-Maps nicht verkabelt sind
+    // (z.B. Component-Verwendung ohne resolverMaps-Prop).
+    if (maps) return resolveNodeLabel(entry.node, maps) || '(ohne Label)';
+    return entry.node.label || '(ohne Label)';
+  }
   if (entry.kind === 'feature') return FEATURE_LABEL[entry.feature];
   if (entry.kind === 'link') return entry.label;
   if (entry.kind === 'doc') return entry.title;
@@ -222,7 +233,12 @@ type FilterChip = 'matrix' | 'board' | 'cell';
 // qualifiziert, wenn BEIDES zutrifft (Text matcht UND Entry-Kind ist
 // im aktiven Set). Ancestors bleiben sichtbar, damit der Pfad sichtbar
 // ist; bei einem Self-Match zeigen wir den ganzen Subtree mit.
-function filterTree(tree: TreeEntry[], q: string, chips: Set<FilterChip>): TreeEntry[] {
+function filterTree(
+  tree: TreeEntry[],
+  q: string,
+  chips: Set<FilterChip>,
+  maps: ContextMaps | null,
+): TreeEntry[] {
   if (!q && chips.size === 0) return tree;
   const query = q.toLowerCase();
 
@@ -241,7 +257,7 @@ function filterTree(tree: TreeEntry[], q: string, chips: Set<FilterChip>): TreeE
   const walk = (items: TreeEntry[]): TreeEntry[] => {
     const out: TreeEntry[] = [];
     for (const it of items) {
-      const label = labelOf(it).toLowerCase();
+      const label = labelOf(it, maps).toLowerCase();
       const alias = (aliasOf(it) || '').toLowerCase();
       const textMatch = !query || label.includes(query) || alias.includes(query);
       const kindMatch = chips.size === 0 || chips.has(entryKindKey(it));
@@ -294,6 +310,9 @@ const TreeItem: Component<{
   presence?: () => PresenceUser[];
   selfUserId?: string;
   members?: () => WorkspaceMember[];
+  // Phase 3 O.8: Resolver-Maps (s. Component-Props oben). Wird durch
+  // den Tree gereicht damit jede TreeItem Templates aufloesen kann.
+  resolverMaps?: () => ContextMaps;
 }> = (p) => {
   // Presence-User die gerade in genau dieser Row sind. Selbst raus —
   // den eigenen Avatar im Tree zu sehen waere visueller Lärm, der
@@ -462,7 +481,7 @@ const TreeItem: Component<{
             <Icon name={iconNameFor(p.entry)} size={14} />
           </span>
           <span class="tree-label">
-            <For each={highlightLabel(labelOf(p.entry), p.query)}>
+            <For each={highlightLabel(labelOf(p.entry, p.resolverMaps?.() ?? null), p.query)}>
               {(part) =>
                 typeof part === 'string' ? <>{part}</> : <mark class="tree-match">{part.m}</mark>
               }
@@ -500,6 +519,7 @@ const TreeItem: Component<{
                 presence={p.presence}
                 selfUserId={p.selfUserId}
                 members={p.members}
+                resolverMaps={p.resolverMaps}
               />
             )}
           </For>
@@ -1031,7 +1051,9 @@ const NodeTree: Component<Props> = (props) => {
     expand.seedIfFresh(roots.map((r) => r.id));
   });
 
-  const filtered = createMemo(() => filterTree(props.tree, query().trim(), chips()));
+  const filtered = createMemo(() =>
+    filterTree(props.tree, query().trim(), chips(), props.resolverMaps?.() ?? null),
+  );
 
   // Active-Path: Set aller Ancestor-IDs, die zur currentNodeId fuehren.
   // Wird im TreeItem benutzt, um Pfad zur aktiven Node automatisch
@@ -1535,7 +1557,7 @@ const NodeTree: Component<Props> = (props) => {
       y,
       sourceEl: rowEl,
       headerBadge: badge,
-      headerLabel: labelOf(entry),
+      headerLabel: labelOf(entry, props.resolverMaps?.() ?? null),
       items,
     });
   }
@@ -1749,6 +1771,7 @@ const NodeTree: Component<Props> = (props) => {
                   presence={props.presence}
                   selfUserId={props.selfUserId}
                   members={props.members}
+                  resolverMaps={props.resolverMaps}
                 />
               )}
             </For>
