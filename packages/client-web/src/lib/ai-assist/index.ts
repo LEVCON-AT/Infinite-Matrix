@@ -28,7 +28,7 @@ import { logAiCall } from './audit';
 import { type ProviderCredential, getProviderCredential } from './credential';
 import { callAnthropicStream } from './providers/anthropic';
 import { buildSystemPrompt } from './system-prompt';
-import { TOOL_MAP, allowedToolsForMode } from './tools';
+import { TOOL_MAP, WIZARD_PROPOSE_TOOL_NAME, allowedToolsForMode } from './tools';
 import type { AssistEvent, AssistMessage, AssistToolUse, RunAssistOptions } from './types';
 
 // Mitigation D: Iter-Cap pro Mode.
@@ -183,6 +183,23 @@ async function dispatchTool(
     const error = `Tool-Calls sind im Read-Only-Modus deaktiviert. Der User muss erst "Action-Mode aktivieren" druecken.`;
     onEvent({ type: 'tool_result', tool: tu.name, toolUseId: tu.toolUseId, ok: false, error });
     return { ok: false, error };
+  }
+
+  // Mitigation H (Wizard-Preview-Pattern): wizard_propose_structure
+  // ist KEIN echtes RPC. Der LLM benutzt es um seinen Vorschlag
+  // strukturiert zurueckzugeben — die Args SIND der Vorschlag. Wir
+  // reichen sie als data zurueck. Apply geschieht erst nach User-
+  // Confirm in Step 4 (lib/wizard-apply.ts), via direkter mcp_create_*
+  // -RPC-Calls auf dem Apply-Pfad, nicht durch den LLM.
+  if (tu.name === WIZARD_PROPOSE_TOOL_NAME) {
+    onEvent({
+      type: 'tool_result',
+      tool: tu.name,
+      toolUseId: tu.toolUseId,
+      ok: true,
+      result: tu.args,
+    });
+    return { ok: true, data: tu.args };
   }
 
   // Mitigation C: destructive-Tools brauchen Confirm-Modal.

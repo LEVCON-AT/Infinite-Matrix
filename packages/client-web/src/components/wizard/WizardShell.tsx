@@ -28,6 +28,8 @@ import {
   visibleStepIndex,
 } from '../../lib/wizard-state';
 import Icon from '../Icon';
+import StepPreview from './StepPreview';
+import StepProposing from './StepProposing';
 import StepProvider from './StepProvider';
 import StepQuestions from './StepQuestions';
 import StepWelcome from './StepWelcome';
@@ -168,25 +170,11 @@ const WizardShell: Component<Props> = (p) => {
               <Match when={state.phase() === 'questions'}>
                 <StepQuestions />
               </Match>
-              <Match when={state.phase() === 'proposing' || state.phase() === 'preview'}>
-                <div class="wizard-placeholder">
-                  <p class="hint">
-                    Step 3 (KI-Vorschlag) ist noch nicht angeschlossen — Sub-Sprint A.4c kommt
-                    naechsten.
-                  </p>
-                  <div class="wizard-footer">
-                    <button
-                      type="button"
-                      class="btn-secondary"
-                      onClick={() => state.setPhase('questions')}
-                    >
-                      Zurueck
-                    </button>
-                    <button type="button" onClick={() => void finalizeDone()}>
-                      Wizard beenden
-                    </button>
-                  </div>
-                </div>
+              <Match when={state.phase() === 'proposing'}>
+                <StepProposing />
+              </Match>
+              <Match when={state.phase() === 'preview'}>
+                <StepPreview />
               </Match>
               <Match when={state.phase() === 'applying' || state.phase() === 'done'}>
                 <div class="wizard-placeholder">

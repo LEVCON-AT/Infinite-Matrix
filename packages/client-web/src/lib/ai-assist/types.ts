@@ -37,9 +37,16 @@ export type ToolDef = {
   // Anthropic-/OpenAI-/Gemini-kompatibles JSON-Schema fuer Tool-Args.
   // input_schema in Anthropic-Sprech, parameters in OpenAI/Gemini —
   // wir nutzen Anthropic-Naming, Adapter konvertieren bei Bedarf.
+  //
+  // properties bewusst auf `Record<string, unknown>` geweitet (statt
+  // strenger JsonSchemaProperty-Map) — fuer wizard_propose_structure
+  // brauchen wir nested objects/arrays, die das schmale flat-property-
+  // Schema nicht ausdruecken kann. Anthropic akzeptiert beliebiges
+  // JSON-Schema im input_schema-Feld; Type-Pruefung der Args passiert
+  // server-side in den RPCs (Mitigation J).
   inputSchema: {
     type: 'object';
-    properties: Record<string, JsonSchemaProperty>;
+    properties: Record<string, unknown>;
     required?: string[];
   };
   riskLevel: ToolRiskLevel;

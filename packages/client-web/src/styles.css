@@ -8838,6 +8838,154 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   color: var(--text2);
 }
 
+.wizard-proposing-body {
+  min-height: 160px;
+}
+
+.wizard-streaming {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--bg2);
+  border-radius: var(--rs);
+  border: 1px solid var(--border);
+}
+
+.wizard-streaming-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text2);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.wizard-streaming-text {
+  white-space: pre-wrap;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.wizard-error {
+  padding: var(--space-md);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+}
+
+.wizard-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.wizard-preview-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wizard-preview-ws-label {
+  margin: 0;
+  font-size: var(--fs-subtitle, 16px);
+}
+
+.wizard-tree-preview {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  padding: var(--space-md);
+  background: var(--surface);
+}
+
+.wizard-tree-node {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wizard-tree-node-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.wizard-tree-node-kind {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text3);
+  margin-left: 4px;
+}
+
+.wizard-tree-children {
+  list-style: none;
+  margin: 0 0 0 18px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border-left: 1px dashed var(--border);
+  padding-left: 12px;
+}
+
+.wizard-tree-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wizard-tree-child-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.wizard-tree-child-note {
+  color: var(--text3);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.wizard-tree-checklists {
+  list-style: none;
+  margin: 4px 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wizard-tree-checklist-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text2);
+  font-weight: 500;
+}
+
+.wizard-tree-checklist-items {
+  list-style: disc;
+  margin: 2px 0 4px 22px;
+  padding: 0;
+  font-size: 11px;
+  color: var(--text2);
+}
+
+.wizard-tree-checklist-items > li {
+  line-height: 1.4;
+}
+
 @media (max-width: 600px) {
   .wizard-card {
     max-height: 96vh;
