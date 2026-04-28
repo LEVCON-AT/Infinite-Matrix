@@ -1107,6 +1107,19 @@ const Workspace: Component = () => {
             <button
               type="button"
               class="theme-toggle-btn"
+              onClick={() => {
+                const wsId = params.workspaceId;
+                if (wsId) navigate(`/w/${wsId}/objects`);
+              }}
+              title="Objekte (Phase 3)"
+              aria-label="Objekte"
+              disabled={!params.workspaceId}
+            >
+              <Icon name="tag" size={18} />
+            </button>
+            <button
+              type="button"
+              class="theme-toggle-btn"
               onClick={() => toggleTheme()}
               title={theme() === 'dark' ? 'Light-Mode' : 'Dark-Mode'}
               aria-label={theme() === 'dark' ? 'Light-Mode' : 'Dark-Mode'}

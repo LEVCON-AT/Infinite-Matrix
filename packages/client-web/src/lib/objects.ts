@@ -138,6 +138,20 @@ export async function fetchObjectBacklinks(
   return (data ?? []) as ObjectBacklink[];
 }
 
+// Workspace-weite Backlink-Liste — fuer ObjectsList-Page (O.4.D) um
+// Backlinks-Counts pro Object clientseitig zu gruppieren ohne N+1.
+// Bei sehr grossen Workspaces (> 10k Backlinks) macht das das Frontend
+// langsam — dann Paginierung oder Materialized-View in O.5.
+export async function fetchAllBacklinks(workspaceId: string): Promise<ObjectBacklink[]> {
+  if (!workspaceId) return [];
+  const { data, error } = await supabase
+    .from('object_backlinks_v')
+    .select('*')
+    .eq('workspace_id', workspaceId);
+  if (error) throw error;
+  return (data ?? []) as ObjectBacklink[];
+}
+
 // ─── Read: fetchObjectGroups (welche Groups enthalten dieses Object?) ──
 export async function fetchObjectGroups(
   workspaceId: string,
