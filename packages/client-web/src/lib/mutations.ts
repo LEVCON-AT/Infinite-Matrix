@@ -567,6 +567,51 @@ export async function createRootBoardWithDefaults(args: {
   return node;
 }
 
+// Phase 3 O.6 — Group→Matrix-Generator. Aus zwei Objekt-Listen (typisch
+// Group-Members, kann auch Tag-/Parent-Filter-Resultat sein) eine neue
+// Matrix mit den Objects als Achsen erzeugen.
+//
+// Wichtig: rows/cols werden mit object_id-FK angelegt — die Achsen sind
+// also First-Class-Identitaeten, nicht losgeloeste Strings. Cells werden
+// NICHT automatisch befuellt (Pfad-Enden bleiben object-frei, User-Regel).
+//
+// Seeds best-effort: bei Fehler bleibt zumindest der Matrix-Knoten,
+// User kann manuell ergaenzen. Reihenfolge sequenziell wegen
+// Position-Race im addRow/addCol-Helper.
+export async function createMatrixFromGroups(args: {
+  workspaceId: string;
+  label: string;
+  rowObjects: Array<{ id: string; label: string }>;
+  colObjects: Array<{ id: string; label: string }>;
+}): Promise<NodeRow> {
+  const node = await createRootNode({
+    workspaceId: args.workspaceId,
+    type: 'matrix',
+    label: args.label,
+  });
+  try {
+    for (const r of args.rowObjects) {
+      await addRow({
+        workspaceId: args.workspaceId,
+        matrixId: node.id,
+        label: r.label,
+        objectId: r.id,
+      });
+    }
+    for (const c of args.colObjects) {
+      await addCol({
+        workspaceId: args.workspaceId,
+        matrixId: node.id,
+        label: c.label,
+        objectId: c.id,
+      });
+    }
+  } catch (err) {
+    console.warn('createMatrixFromGroups seeds failed:', err);
+  }
+  return node;
+}
+
 // Cascade via FK ON DELETE CASCADE: alle Kinder (rows/cols/cells/...) gehen mit.
 // Read-modify-write auf nodes.data, parallel zu mutateCellData.
 // Gleiche Semantik: paralleler Writer mit anderen Keys in node.data

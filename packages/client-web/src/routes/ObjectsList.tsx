@@ -12,6 +12,7 @@
 
 import { useNavigate, useParams } from '@solidjs/router';
 import { type Component, For, Show, createMemo, createResource, createSignal } from 'solid-js';
+import GroupMatrixGenerator from '../components/GroupMatrixGenerator';
 import Icon from '../components/Icon';
 import { translateDbError } from '../lib/errors';
 import {
@@ -32,6 +33,7 @@ const ObjectsList: Component = () => {
 
   const [search, setSearch] = createSignal('');
   const [typeFilter, setTypeFilter] = createSignal<string>('');
+  const [generatorOpen, setGeneratorOpen] = createSignal(false);
   // O.5: Tag-Multi-Select als Set fuer toggle-Pattern. AND-Match.
   const [tagFilter, setTagFilter] = createSignal<Set<string>>(new Set());
   const [groupFilter, setGroupFilter] = createSignal<string>('');
@@ -265,6 +267,18 @@ const ObjectsList: Component = () => {
         <Show when={objects.loading}>
           <span class="hint">Lade…</span>
         </Show>
+        <span class="objects-list-head-spacer" />
+        <Show when={(groups() ?? []).length > 0}>
+          <button
+            type="button"
+            class="objects-list-generator-btn"
+            onClick={() => setGeneratorOpen(true)}
+            title="Aus zwei Gruppen eine neue Matrix bauen"
+          >
+            <Icon name="squares-2x2" size={14} />
+            <span>Matrix aus Gruppen</span>
+          </button>
+        </Show>
       </header>
 
       <div class="objects-list-filters">
@@ -398,6 +412,10 @@ const ObjectsList: Component = () => {
             }}
           </For>
         </ul>
+      </Show>
+
+      <Show when={generatorOpen()}>
+        <GroupMatrixGenerator workspaceId={wsId()} onClose={() => setGeneratorOpen(false)} />
       </Show>
     </div>
   );

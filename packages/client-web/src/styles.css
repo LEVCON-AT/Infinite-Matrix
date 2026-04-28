@@ -8646,6 +8646,220 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   background: var(--bg);
 }
 
+.objects-list-head-spacer {
+  flex: 1 1 auto;
+}
+
+.objects-list-generator-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--amberbg, var(--rl));
+  border: 1px solid var(--amber, var(--rl));
+  border-radius: var(--radius-sm, 6px);
+  color: var(--text);
+  font-size: var(--fs-small);
+  cursor: pointer;
+  font-weight: 500;
+  transition: transform var(--tr-std), box-shadow var(--tr-std);
+}
+
+.objects-list-generator-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm, 0 2px 6px rgba(0, 0, 0, 0.1));
+}
+
+/* ── GroupMatrixGenerator-Modal (Phase 3 O.6) ───────────────── */
+
+.group-matrix-card {
+  max-width: 720px;
+  width: 94vw;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+}
+
+.group-matrix-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.group-matrix-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text3);
+  line-height: 1.4;
+}
+
+.group-matrix-empty {
+  padding: var(--space-md);
+  background: var(--rl);
+  border-radius: var(--radius-sm, 6px);
+  text-align: center;
+}
+
+.group-matrix-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+
+.group-matrix-source {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-sm);
+  background: var(--bg-subtle, transparent);
+  border: 1px solid var(--rl);
+  border-radius: var(--radius-sm, 6px);
+}
+
+.group-matrix-source-label {
+  font-size: 12px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+.group-matrix-select {
+  padding: 6px 10px;
+  border: 1px solid var(--rl);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg);
+  color: var(--text);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+.group-matrix-select:focus {
+  outline: none;
+  border-color: var(--p);
+}
+
+.group-matrix-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text3);
+}
+
+.group-matrix-actions .link-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--p);
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+.group-matrix-actions .link-btn:hover {
+  text-decoration-style: solid;
+}
+
+.group-matrix-actions-count {
+  margin-left: auto;
+  color: var(--text3);
+  font-size: 11px;
+}
+
+.group-matrix-member-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.group-matrix-member-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm, 6px);
+  transition: background var(--tr-std);
+}
+
+.group-matrix-member-row:hover {
+  background: var(--rl);
+}
+
+.group-matrix-checkbox {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--p);
+  cursor: pointer;
+}
+
+.group-matrix-member-label {
+  flex: 1 1 auto;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.group-matrix-name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--rl);
+}
+
+.group-matrix-name-label {
+  font-size: 12px;
+  color: var(--text3);
+  font-weight: 500;
+  flex: 0 0 auto;
+}
+
+.group-matrix-name-input {
+  flex: 1 1 auto;
+  padding: 6px 10px;
+  border: 1px solid var(--rl);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg);
+  color: var(--text);
+  font-size: var(--fs-small);
+}
+
+.group-matrix-name-input:focus {
+  outline: none;
+  border-color: var(--p);
+}
+
+.group-matrix-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+@media (max-width: 600px) {
+  .group-matrix-card {
+    width: 96vw;
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .group-matrix-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .group-matrix-name-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 .objects-list {
   list-style: none;
   margin: 0;
