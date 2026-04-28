@@ -8889,6 +8889,86 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   color: var(--text);
 }
 
+.group-matrix-member-row.is-manual .group-matrix-member-label::before {
+  content: '+ ';
+  color: var(--text3);
+  font-weight: 600;
+}
+
+.group-matrix-member-remove {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text3);
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--tr-std), background var(--tr-std), color var(--tr-std);
+}
+
+.group-matrix-member-row:hover .group-matrix-member-remove,
+.group-matrix-member-remove:focus-visible {
+  opacity: 1;
+}
+
+.group-matrix-member-remove:hover {
+  background: var(--rl);
+  color: var(--danger, #c53030);
+}
+
+.group-matrix-member-remove:disabled {
+  opacity: 0;
+  cursor: default;
+}
+
+.group-matrix-add-row {
+  margin-top: 6px;
+  display: flex;
+}
+
+.group-matrix-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px dashed var(--rl);
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--text3);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color var(--tr-std), color var(--tr-std), background var(--tr-std);
+}
+
+.group-matrix-add-btn:hover:not(:disabled),
+.group-matrix-add-btn:focus-visible {
+  border-color: var(--p);
+  color: var(--text);
+  background: var(--rl);
+}
+
+.group-matrix-add-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.group-matrix-add-input {
+  flex: 1 1 auto;
+  padding: 5px 8px;
+  border: 1px solid var(--p);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+  outline: none;
+}
+
 .group-matrix-name-row {
   display: flex;
   align-items: center;

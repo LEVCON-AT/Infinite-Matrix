@@ -11,9 +11,19 @@
 // bis ~5000 Objects / ~50k Mappings; daruber Server-side-Filter (O.10).
 
 import { useNavigate, useParams } from '@solidjs/router';
-import { type Component, For, Show, createMemo, createResource, createSignal } from 'solid-js';
+import {
+  type Component,
+  For,
+  Show,
+  createMemo,
+  createResource,
+  createSignal,
+  onCleanup,
+  onMount,
+} from 'solid-js';
 import GroupMatrixGenerator from '../components/GroupMatrixGenerator';
 import Icon from '../components/Icon';
+import { dialogQueue } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
 import {
   fetchAllBacklinks,
@@ -331,6 +341,40 @@ const ObjectsList: Component = () => {
   function navToObject(id: string) {
     navigate(`/w/${wsId()}/o/${id}`);
   }
+
+  // ESC: Generator-Modal > aktiver Filter > Workspace. Generator-Modal
+  // hat einen eigenen Capture-Handler (siehe GroupMatrixGenerator), der
+  // greift zuerst — wir sehen den Event hier nicht. Wenn ein Filter
+  // gesetzt ist, leeren statt navigieren — sonst Workspace.
+  onMount(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (dialogQueue().length > 0) return;
+      if (generatorOpen()) return;
+      const t = e.target as HTMLElement | null;
+      // Search-Input: ESC leert nur die Suche, navigiert nicht.
+      if (t instanceof HTMLInputElement && t.classList.contains('objects-list-search-input')) {
+        if (search()) {
+          e.preventDefault();
+          setSearch('');
+          return;
+        }
+      }
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
+        return;
+      }
+      if (hasActiveFilters()) {
+        e.preventDefault();
+        resetFilters();
+        return;
+      }
+      e.preventDefault();
+      const ws = wsId();
+      if (ws) navigate(`/w/${ws}`);
+    };
+    document.addEventListener('keydown', onKey);
+    onCleanup(() => document.removeEventListener('keydown', onKey));
+  });
 
   return (
     <div class="objects-list-page">

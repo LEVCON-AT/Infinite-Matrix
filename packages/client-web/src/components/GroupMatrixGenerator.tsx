@@ -36,7 +36,15 @@ import { createMatrixFromGroups } from '../lib/mutations';
 import { fetchAllGroupMembers, fetchGroups, fetchObjects } from '../lib/objects';
 import { showToast } from '../lib/toasts';
 import type { ObjectRow } from '../lib/types';
+import {
+  closeObjectSuggest,
+  commitObjectSuggest,
+  navigateObjectSuggest,
+  objectSuggestState,
+  openObjectSuggest,
+} from '../lib/use-object-suggest';
 import Icon from './Icon';
+import ObjectSuggestion from './ObjectSuggestion';
 
 type Props = {
   workspaceId: string;
@@ -53,7 +61,15 @@ const GroupMatrixGenerator: Component<Props> = (p) => {
   const [colSelection, setColSelection] = createSignal<Set<string>>(new Set());
   const [matrixName, setMatrixName] = createSignal('');
   const [busy, setBusy] = createSignal(false);
+  // Manuelle (nicht-Group) Entries pro Achse — vom User per "+ manuell"
+  // Object-Picker hinzugefuegt. Werden in *Members gemerged + de-duped.
+  const [manualRows, setManualRows] = createSignal<Array<{ id: string; label: string }>>([]);
+  const [manualCols, setManualCols] = createSignal<Array<{ id: string; label: string }>>([]);
+  // Picker-State (Singleton ObjectSuggest) — welche Achse picked gerade?
+  const [pickerKind, setPickerKind] = createSignal<'row' | 'col' | null>(null);
   let cardRef: HTMLDivElement | undefined;
+  let rowAddInputRef: HTMLInputElement | undefined;
+  let colAddInputRef: HTMLInputElement | undefined;
 
   const [groups] = createResource(
     () => p.workspaceId,
@@ -121,29 +137,55 @@ const GroupMatrixGenerator: Component<Props> = (p) => {
     return map;
   });
 
-  const rowMembers = createMemo(() => {
+  type MemberRow = { id: string; label: string; manual: boolean };
+
+  function mergeMembers(
+    groupList: Array<{ id: string; label: string }>,
+    manual: Array<{ id: string; label: string }>,
+  ): MemberRow[] {
+    const seen = new Set<string>();
+    const out: MemberRow[] = [];
+    for (const m of groupList) {
+      if (seen.has(m.id)) continue;
+      seen.add(m.id);
+      out.push({ id: m.id, label: m.label, manual: false });
+    }
+    for (const m of manual) {
+      if (seen.has(m.id)) continue;
+      seen.add(m.id);
+      out.push({ id: m.id, label: m.label, manual: true });
+    }
+    return out;
+  }
+
+  const rowMembers = createMemo<MemberRow[]>(() => {
     const id = rowGroupId();
-    if (!id) return [];
-    return membersByGroup().get(id) ?? [];
+    const groupList = id ? (membersByGroup().get(id) ?? []) : [];
+    return mergeMembers(groupList, manualRows());
   });
 
-  const colMembers = createMemo(() => {
+  const colMembers = createMemo<MemberRow[]>(() => {
     const id = colGroupId();
-    if (!id) return [];
-    return membersByGroup().get(id) ?? [];
+    const groupList = id ? (membersByGroup().get(id) ?? []) : [];
+    return mergeMembers(groupList, manualCols());
   });
 
-  // Beim Group-Wechsel: alle Members default angehakt.
+  // Beim Group-Wechsel: alle Members default angehakt + manuelle Eintraege
+  // bleiben ausgewaehlt (sie wurden vom User explizit ergaenzt).
   function pickRowGroup(id: string) {
     setRowGroupId(id);
     const members = membersByGroup().get(id) ?? [];
-    setRowSelection(new Set(members.map((m) => m.id)));
+    const sel = new Set(members.map((m) => m.id));
+    for (const m of manualRows()) sel.add(m.id);
+    setRowSelection(sel);
   }
 
   function pickColGroup(id: string) {
     setColGroupId(id);
     const members = membersByGroup().get(id) ?? [];
-    setColSelection(new Set(members.map((m) => m.id)));
+    const sel = new Set(members.map((m) => m.id));
+    for (const m of manualCols()) sel.add(m.id);
+    setColSelection(sel);
   }
 
   function toggleRow(id: string) {
@@ -180,6 +222,116 @@ const GroupMatrixGenerator: Component<Props> = (p) => {
     setColSelection(new Set<string>());
   }
 
+  // ─── Manual-Entry-Picker ────────────────────────────────────
+  function addManualEntry(axis: 'row' | 'col', id: string, label: string) {
+    const setter = axis === 'row' ? setManualRows : setManualCols;
+    const selSetter = axis === 'row' ? setRowSelection : setColSelection;
+    setter((arr) => (arr.some((m) => m.id === id) ? arr : [...arr, { id, label }]));
+    // Neu hinzugefuegte Entries automatisch anhaken — match the "default
+    // alle ausgewaehlt"-Semantik der Group-Picks.
+    selSetter((s) => {
+      if (s.has(id)) return s;
+      const next = new Set(s);
+      next.add(id);
+      return next;
+    });
+  }
+
+  function removeManualEntry(axis: 'row' | 'col', id: string) {
+    const setter = axis === 'row' ? setManualRows : setManualCols;
+    const selSetter = axis === 'row' ? setRowSelection : setColSelection;
+    setter((arr) => arr.filter((m) => m.id !== id));
+    selSetter((s) => {
+      if (!s.has(id)) return s;
+      const next = new Set(s);
+      next.delete(id);
+      return next;
+    });
+  }
+
+  function openManualPicker(axis: 'row' | 'col') {
+    const anchor = axis === 'row' ? rowAddInputRef : colAddInputRef;
+    if (!anchor) return;
+    setPickerKind(axis);
+    anchor.value = '';
+    anchor.focus();
+    openObjectSuggest({
+      anchor,
+      workspaceId: p.workspaceId,
+      query: '',
+      currentObjectId: null,
+      onPick: (hit) => {
+        if (!hit) return;
+        addManualEntry(axis, hit.id, hit.label);
+        setPickerKind(null);
+        if (anchor) anchor.value = '';
+        closeObjectSuggest();
+      },
+    });
+  }
+
+  function onPickerInput(axis: 'row' | 'col', e: InputEvent & { currentTarget: HTMLInputElement }) {
+    const value = e.currentTarget.value;
+    const anchor = axis === 'row' ? rowAddInputRef : colAddInputRef;
+    if (!anchor) return;
+    openObjectSuggest({
+      anchor,
+      workspaceId: p.workspaceId,
+      query: value,
+      currentObjectId: null,
+      onPick: (hit) => {
+        if (!hit) return;
+        addManualEntry(axis, hit.id, hit.label);
+        setPickerKind(null);
+        anchor.value = '';
+        closeObjectSuggest();
+      },
+    });
+  }
+
+  function onPickerKey(
+    _axis: 'row' | 'col',
+    e: KeyboardEvent & { currentTarget: HTMLInputElement },
+  ) {
+    if (e.key === 'ArrowDown' && objectSuggestState().open) {
+      e.preventDefault();
+      navigateObjectSuggest('down');
+      return;
+    }
+    if (e.key === 'ArrowUp' && objectSuggestState().open) {
+      e.preventDefault();
+      navigateObjectSuggest('up');
+      return;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      setPickerKind(null);
+      e.currentTarget.value = '';
+      closeObjectSuggest();
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const hit = commitObjectSuggest();
+      if (!hit) {
+        // Nichts highlighted — Picker schliessen, kein Pick.
+        setPickerKind(null);
+        e.currentTarget.value = '';
+        closeObjectSuggest();
+      }
+      // Bei hit: onPick uebernimmt das Aufraeumen.
+    }
+  }
+
+  function onPickerBlur(_axis: 'row' | 'col') {
+    // Verzoegert schliessen — Click auf Dropdown-Item soll noch durchgehen.
+    setTimeout(() => {
+      if (objectSuggestState().open) return; // Dropdown selber kuemmert sich
+      setPickerKind(null);
+    }, 150);
+  }
+
   // Default Matrix-Name vom Group-Pick: "Group-A × Group-B".
   const defaultName = createMemo(() => {
     const gMap = new Map((groups() ?? []).map((g) => [g.id, g.name]));
@@ -198,6 +350,9 @@ const GroupMatrixGenerator: Component<Props> = (p) => {
     if (cardRef) onCleanup(installFocusTrap(cardRef));
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || busy()) return;
+      // Wenn der Object-Picker offen ist, schluckt der Input-Handler ESC
+      // (siehe onPickerKey). Modal NICHT zumachen.
+      if (objectSuggestState().open || pickerKind() !== null) return;
       e.stopImmediatePropagation();
       p.onClose();
     };
@@ -282,12 +437,14 @@ const GroupMatrixGenerator: Component<Props> = (p) => {
         <div class="group-matrix-body">
           <p class="group-matrix-hint">
             Waehle eine Gruppe fuer Zeilen und Spalten. Aus den Mitgliedern wird eine Matrix — jede
-            Achse ist ein First-Class-Object, nicht nur ein String.
+            Achse ist ein First-Class-Object, nicht nur ein String. Fehlt etwas? Per „+ Manuelle
+            Zeile/Spalte" einzelne Objekte ergaenzen.
           </p>
           <Show when={(groups() ?? []).length === 0 && !groups.loading}>
             <p class="hint group-matrix-empty">
-              Noch keine Gruppen im Workspace. Nutze „Bulk-Anlage" mit Shift+Klick auf „+ Zeile" und
-              tippe „Als Gruppe speichern" — dann gibt's hier was zur Auswahl.
+              Noch keine Gruppen im Workspace. Du kannst trotzdem mit „+ Manuelle Zeile/Spalte"
+              einzelne Objekte zusammenstellen — oder per „Bulk-Anlage" (Shift+Klick auf „+ Zeile")
+              eine Gruppe erzeugen.
             </p>
           </Show>
           <div class="group-matrix-grid">
@@ -321,7 +478,7 @@ const GroupMatrixGenerator: Component<Props> = (p) => {
                 <ul class="group-matrix-member-list">
                   <For each={rowMembers()}>
                     {(m) => (
-                      <li class="group-matrix-member-row">
+                      <li class="group-matrix-member-row" classList={{ 'is-manual': m.manual }}>
                         <input
                           type="checkbox"
                           class="group-matrix-checkbox"
@@ -331,11 +488,53 @@ const GroupMatrixGenerator: Component<Props> = (p) => {
                           aria-label={m.label}
                         />
                         <span class="group-matrix-member-label">{m.label}</span>
+                        <Show when={m.manual}>
+                          <button
+                            type="button"
+                            class="group-matrix-member-remove"
+                            onClick={() => removeManualEntry('row', m.id)}
+                            disabled={busy()}
+                            aria-label={`${m.label} entfernen`}
+                            title="Manuelle Zeile entfernen"
+                          >
+                            <Icon name="x" size={11} />
+                          </button>
+                        </Show>
                       </li>
                     )}
                   </For>
                 </ul>
               </Show>
+              <div class="group-matrix-add-row">
+                <Show
+                  when={pickerKind() === 'row'}
+                  fallback={
+                    <button
+                      type="button"
+                      class="group-matrix-add-btn"
+                      onClick={() => openManualPicker('row')}
+                      disabled={busy()}
+                      title="Einzelnes Objekt als Zeile ergaenzen"
+                    >
+                      <Icon name="plus" size={12} />
+                      <span>Manuelle Zeile</span>
+                    </button>
+                  }
+                >
+                  <input
+                    ref={rowAddInputRef}
+                    type="text"
+                    class="group-matrix-add-input"
+                    placeholder="Objekt suchen…"
+                    onInput={(e) => onPickerInput('row', e)}
+                    onKeyDown={(e) => onPickerKey('row', e)}
+                    onBlur={() => onPickerBlur('row')}
+                    disabled={busy()}
+                    aria-label="Objekt fuer manuelle Zeile suchen"
+                    autocomplete="off"
+                  />
+                </Show>
+              </div>
             </section>
             <section class="group-matrix-source">
               <label class="group-matrix-source-label" for="gmg-col-select">
@@ -367,7 +566,7 @@ const GroupMatrixGenerator: Component<Props> = (p) => {
                 <ul class="group-matrix-member-list">
                   <For each={colMembers()}>
                     {(m) => (
-                      <li class="group-matrix-member-row">
+                      <li class="group-matrix-member-row" classList={{ 'is-manual': m.manual }}>
                         <input
                           type="checkbox"
                           class="group-matrix-checkbox"
@@ -377,11 +576,53 @@ const GroupMatrixGenerator: Component<Props> = (p) => {
                           aria-label={m.label}
                         />
                         <span class="group-matrix-member-label">{m.label}</span>
+                        <Show when={m.manual}>
+                          <button
+                            type="button"
+                            class="group-matrix-member-remove"
+                            onClick={() => removeManualEntry('col', m.id)}
+                            disabled={busy()}
+                            aria-label={`${m.label} entfernen`}
+                            title="Manuelle Spalte entfernen"
+                          >
+                            <Icon name="x" size={11} />
+                          </button>
+                        </Show>
                       </li>
                     )}
                   </For>
                 </ul>
               </Show>
+              <div class="group-matrix-add-row">
+                <Show
+                  when={pickerKind() === 'col'}
+                  fallback={
+                    <button
+                      type="button"
+                      class="group-matrix-add-btn"
+                      onClick={() => openManualPicker('col')}
+                      disabled={busy()}
+                      title="Einzelnes Objekt als Spalte ergaenzen"
+                    >
+                      <Icon name="plus" size={12} />
+                      <span>Manuelle Spalte</span>
+                    </button>
+                  }
+                >
+                  <input
+                    ref={colAddInputRef}
+                    type="text"
+                    class="group-matrix-add-input"
+                    placeholder="Objekt suchen…"
+                    onInput={(e) => onPickerInput('col', e)}
+                    onKeyDown={(e) => onPickerKey('col', e)}
+                    onBlur={() => onPickerBlur('col')}
+                    disabled={busy()}
+                    aria-label="Objekt fuer manuelle Spalte suchen"
+                    autocomplete="off"
+                  />
+                </Show>
+              </div>
             </section>
           </div>
           <label class="group-matrix-name-row">
@@ -410,6 +651,7 @@ const GroupMatrixGenerator: Component<Props> = (p) => {
           </button>
         </footer>
       </div>
+      <ObjectSuggestion />
     </div>
   );
 };

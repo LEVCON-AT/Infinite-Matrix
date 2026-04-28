@@ -10,11 +10,11 @@
 // Dashboard (O.5).
 
 import { useNavigate, useParams } from '@solidjs/router';
-import { type Component, For, Show, createMemo, createSignal } from 'solid-js';
+import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
 import { createResource } from 'solid-js';
 import Icon from '../components/Icon';
 import ObjectSuggestion from '../components/ObjectSuggestion';
-import { showConfirm } from '../lib/dialog';
+import { dialogQueue, showConfirm } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
 import {
   type ObjectBacklink,
@@ -183,6 +183,36 @@ const ObjectDetail: Component = () => {
     }
     navigate(`/w/${wsId()}`);
   }
+
+  // ESC: Picker > Edit-Mode > Page-Back. Modals/Confirms haben eigene
+  // Capture-Phase-Handler (stopImmediatePropagation), die feuern zuerst.
+  onMount(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (dialogQueue().length > 0) return;
+      if (objectSuggestState().open || pickerKind() !== null) {
+        e.preventDefault();
+        setPickerKind(null);
+        setPickerInput('');
+        closeObjectSuggest();
+        return;
+      }
+      if (editMode()) {
+        e.preventDefault();
+        cancelEdit();
+        return;
+      }
+      // Tipp-Schutz: ESC im Input/Textarea soll kein Page-Back ausloesen.
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
+        return;
+      }
+      e.preventDefault();
+      navBack();
+    };
+    document.addEventListener('keydown', onKey);
+    onCleanup(() => document.removeEventListener('keydown', onKey));
+  });
 
   function enterEdit() {
     const o = obj();

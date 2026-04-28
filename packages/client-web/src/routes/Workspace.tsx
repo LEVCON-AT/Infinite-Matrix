@@ -1111,7 +1111,7 @@ const Workspace: Component = () => {
                 const wsId = params.workspaceId;
                 if (wsId) navigate(`/w/${wsId}/objects`);
               }}
-              title="Objekte (Phase 3)"
+              title="Objekte"
               aria-label="Objekte"
               disabled={!params.workspaceId}
             >
