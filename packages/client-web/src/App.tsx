@@ -1,9 +1,11 @@
 import { useLocation, useNavigate } from '@solidjs/router';
 import { type JSX, type ParentComponent, Show, createEffect } from 'solid-js';
+import AiHelpDrawer, { AiHelpDrawerToggle } from './components/AiHelpDrawer';
 import AiProviderHint from './components/AiProviderHint';
 import DialogHost from './components/DialogHost';
 import ProgressOverlay from './components/ProgressOverlay';
 import Toasts from './components/Toasts';
+import { useDrawerHotkey } from './lib/ai-help-state';
 import { bootstrapAuth, useAccountInvalid, useAuthReady, useSession } from './lib/auth';
 import { useEditModeHotkey } from './lib/edit-mode';
 import { useUserPrefsSync } from './lib/settings';
@@ -30,6 +32,7 @@ const App: ParentComponent = (props): JSX.Element => {
   useEditModeHotkey();
   useThemeBootstrap();
   useUserPrefsSync();
+  useDrawerHotkey();
 
   // Account-Health-Toast: wenn die JWT-Session lokal noch existiert, der
   // serverseitige User aber weg ist (geloeschter Account), hat lib/auth
@@ -82,6 +85,10 @@ const App: ParentComponent = (props): JSX.Element => {
         {props.children}
       </Show>
       <AiProviderHint />
+      <Show when={session()}>
+        <AiHelpDrawerToggle />
+        <AiHelpDrawer />
+      </Show>
       <Toasts />
       <DialogHost />
       <ProgressOverlay />

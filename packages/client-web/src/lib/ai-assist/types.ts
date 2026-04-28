@@ -128,4 +128,14 @@ export type RunAssistOptions = {
   onEvent: (e: AssistEvent) => void;
   // AbortController.signal um vom UI aus abzubrechen.
   signal?: AbortSignal;
+  // Promptinj-Mitigation C: vor jedem destructive-Tool-Aufruf wird
+  // dieser Callback gerufen. Returnt true → ausfuehren, false →
+  // ablehnen mit Error an LLM. UI-Layer rendert ein Confirm-Modal.
+  // Wenn nicht gesetzt: destructive Tools werden hart abgelehnt.
+  confirmDestructive?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>;
+  // Promptinj-Mitigation G: Read-Only-Modus. Wenn true werden ALLE
+  // Tool-Calls abgelehnt — der LLM darf nur antworten, nichts tun.
+  // Drawer-UI setzt das wenn die aktuelle Cell von einem anderen
+  // User in einem Multi-Member-Workspace stammt.
+  readOnly?: boolean;
 };

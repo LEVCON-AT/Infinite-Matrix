@@ -117,7 +117,10 @@ export async function runAssist(opts: RunAssistOptions): Promise<void> {
       // Tool-Calls dispatchen.
       for (const tu of result.toolUses) {
         totalToolCalls += 1;
-        const toolResult = await dispatchTool(tu, opts.onEvent);
+        const toolResult = await dispatchTool(tu, opts.onEvent, {
+          confirmDestructive: opts.confirmDestructive,
+          readOnly: opts.readOnly === true,
+        });
         messages.push({
           role: 'tool_result',
           toolUseId: tu.toolUseId,
@@ -163,6 +166,13 @@ export async function runAssist(opts: RunAssistOptions): Promise<void> {
 async function dispatchTool(
   tu: AssistToolUse,
   onEvent: (e: AssistEvent) => void,
+  opts: {
+    confirmDestructive?: (
+      toolName: string,
+      args: Record<string, unknown>,
+    ) => Promise<boolean>;
+    readOnly: boolean;
+  },
 ): Promise<{ ok: true; data: unknown } | { ok: false; error: string }> {
   const def = TOOL_MAP.get(tu.name);
   if (!def) {
@@ -171,16 +181,35 @@ async function dispatchTool(
     return { ok: false, error };
   }
 
-  // Mitigation C: destructive-Tools brauchen Confirm-Modal. Das wird
-  // mit A.3 (Inline-Help-Drawer) eingebaut. Bis dahin: destructive
-  // Tools werden NICHT dispatched, sondern als Error zurueckgegeben.
-  // Da die Tool-Allowlist (Mitigation B) destructive heute nicht mal
-  // zulaesst (alle aktuellen Tools sind 'safe'), greift das nicht —
-  // aber der Pfad bleibt fuer A.3 ready.
-  if (def.riskLevel === 'destructive') {
-    const error = `Destructive-Tool "${tu.name}" verlangt User-Bestaetigung — kommt mit A.3 Inline-Help-Drawer.`;
+  // Mitigation G: Read-Only-Mode lehnt ALLE Tool-Calls ab.
+  if (opts.readOnly) {
+    const error = `Tool-Calls sind im Read-Only-Modus deaktiviert. Der User muss erst "Action-Mode aktivieren" druecken.`;
     onEvent({ type: 'tool_result', tool: tu.name, toolUseId: tu.toolUseId, ok: false, error });
     return { ok: false, error };
+  }
+
+  // Mitigation C: destructive-Tools brauchen Confirm-Modal.
+  // Wenn confirmDestructive gesetzt ist (UI-Layer): User-Klick
+  // entscheidet. Sonst: hart ablehnen.
+  if (def.riskLevel === 'destructive') {
+    if (!opts.confirmDestructive) {
+      const error = `Destructive-Tool "${tu.name}" braucht User-Bestaetigung, aber kein confirm-Callback gesetzt.`;
+      onEvent({ type: 'tool_result', tool: tu.name, toolUseId: tu.toolUseId, ok: false, error });
+      return { ok: false, error };
+    }
+    let confirmed: boolean;
+    try {
+      confirmed = await opts.confirmDestructive(tu.name, tu.args);
+    } catch (e) {
+      const error = `Confirm-Modal-Fehler: ${(e as Error).message ?? String(e)}`;
+      onEvent({ type: 'tool_result', tool: tu.name, toolUseId: tu.toolUseId, ok: false, error });
+      return { ok: false, error };
+    }
+    if (!confirmed) {
+      const error = `User hat ${tu.name} abgelehnt.`;
+      onEvent({ type: 'tool_result', tool: tu.name, toolUseId: tu.toolUseId, ok: false, error });
+      return { ok: false, error };
+    }
   }
 
   try {
