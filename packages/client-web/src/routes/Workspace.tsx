@@ -55,6 +55,7 @@ import {
   fetchWorkspaceAttachedDocs,
   fetchWorkspaceLinks,
 } from '../lib/queries';
+import { fetchObjects } from '../lib/objects';
 import { subscribeWorkspace } from '../lib/realtime';
 import { useSettingsBodyClassSync } from '../lib/settings';
 import { useSidebarChips } from '../lib/sidebar-chips';
@@ -277,6 +278,18 @@ const Workspace: Component = () => {
   const [colsData, { refetch: refetchCols }] = createResource(
     () => params.workspaceId,
     async (wid) => (wid ? fetchColsForWorkspace(wid) : []),
+  );
+
+  // Phase 3 O.8: Objects workspace-weit fuer Live-Resolver der
+  // Name-Templates (`{row.object}` / `{column.object}`). Object-Rename
+  // schlaegt via Realtime-Bump (objects-Tabelle) durch und triggert
+  // den hier verkabelten Refetch. Konsument kommt mit O.8.C — der
+  // Resolver-Verbrauch in NodeTree/MatrixView/BoardView. Bis dahin
+  // bleibt die Resource „warm", aber ungelesen — daher der `_`-
+  // Prefix. Die Reaktivitaet baut den Cache trotzdem auf.
+  const [_objects, { refetch: refetchObjects }] = createResource(
+    () => params.workspaceId,
+    async (wid) => (wid ? fetchObjects(wid) : []),
   );
 
   // Set der cells, an denen Dokus haengen — fuer die derived Doku-
@@ -802,6 +815,12 @@ const Workspace: Component = () => {
         setRtDocs((v) => v + 1);
         void refetchCellsWithDocs();
         scheduleAliasRefresh(wid);
+      },
+      // Phase 3 O.8: Object-Rename → Templates re-resolven. Refetch
+      // triggert die Solid-Resource, deren Memo-Konsumenten in
+      // NodeTree/MatrixView/BoardView automatisch neu rendern.
+      objects: () => {
+        void refetchObjects();
       },
     });
   });

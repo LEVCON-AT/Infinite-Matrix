@@ -28,7 +28,11 @@ export type RealtimeTable =
   | 'checklists'
   | 'checklist_items'
   | 'links'
-  | 'docs';
+  | 'docs'
+  // Phase 3 O.8: Object-Updates muessen Live-Resolver der Templates
+  // bumpen — sonst zeigt eine Sub-Matrix mit `{row.object}`-Template
+  // veraltete Labels, bis User die Page neu laedt.
+  | 'objects';
 
 export type RealtimeBumps = Partial<Record<RealtimeTable, () => void>>;
 
@@ -43,6 +47,7 @@ const TABLES: RealtimeTable[] = [
   'checklist_items',
   'links',
   'docs',
+  'objects',
 ];
 
 // Subscribe in einem reaktiven Scope (onMount / createEffect). Der
