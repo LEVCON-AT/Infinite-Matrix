@@ -8670,6 +8670,88 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   box-shadow: var(--shadow-sm, 0 2px 6px rgba(0, 0, 0, 0.1));
 }
 
+/* List/Tree-View-Toggle (O.7) */
+.objects-list-view-toggle {
+  display: inline-flex;
+  border: 1px solid var(--rl);
+  border-radius: var(--radius-sm, 6px);
+  overflow: hidden;
+}
+
+.objects-list-view-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  transition: background var(--tr-std), color var(--tr-std);
+}
+
+.objects-list-view-btn:hover {
+  background: var(--rl);
+  color: var(--text);
+}
+
+.objects-list-view-btn.active {
+  background: var(--p);
+  color: var(--bg);
+}
+
+.objects-list-view-btn + .objects-list-view-btn {
+  border-left: 1px solid var(--rl);
+}
+
+/* Tree-Render */
+.objects-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.objects-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: calc(var(--depth, 0) * 18px);
+}
+
+.objects-tree-spacer {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+}
+
+.objects-tree-toggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: transparent;
+  border: none;
+  color: var(--text3);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background var(--tr-std), color var(--tr-std);
+}
+
+.objects-tree-toggle:hover {
+  background: var(--rl);
+  color: var(--text);
+}
+
+.objects-tree-item {
+  flex: 1 1 auto;
+}
+
 /* ── GroupMatrixGenerator-Modal (Phase 3 O.6) ───────────────── */
 
 .group-matrix-card {

@@ -23,6 +23,9 @@ import {
   fetchObjects,
 } from '../lib/objects';
 import { showToast } from '../lib/toasts';
+import type { ObjectRow } from '../lib/types';
+
+type ObjectsListItem = ObjectRow;
 
 type RouteParams = { workspaceId: string };
 
@@ -34,6 +37,11 @@ const ObjectsList: Component = () => {
   const [search, setSearch] = createSignal('');
   const [typeFilter, setTypeFilter] = createSignal<string>('');
   const [generatorOpen, setGeneratorOpen] = createSignal(false);
+  // O.7: List vs Tree-View. Tree zeigt parent_id-Forest mit Indentation.
+  const [viewMode, setViewMode] = createSignal<'list' | 'tree'>('list');
+  // Expanded-Parents im Tree-View. Default: alles expandiert.
+  const [expandedSet, setExpandedSet] = createSignal<Set<string>>(new Set());
+  let expandInitialized = false;
   // O.5: Tag-Multi-Select als Set fuer toggle-Pattern. AND-Match.
   const [tagFilter, setTagFilter] = createSignal<Set<string>>(new Set());
   const [groupFilter, setGroupFilter] = createSignal<string>('');
@@ -244,6 +252,74 @@ const ObjectsList: Component = () => {
     });
   }
 
+  // ─── Tree-View Memos (O.7) ─────────────────────────────────
+  // childrenInFiltered: pro parent_id im gefilterten Set die Children.
+  const childrenInFiltered = createMemo(() => {
+    const map = new Map<string, ObjectsListItem[]>();
+    const ids = new Set(filtered().map((o) => o.id));
+    for (const o of filtered()) {
+      if (!o.parent_id) continue;
+      if (!ids.has(o.parent_id)) continue;
+      let arr = map.get(o.parent_id);
+      if (!arr) {
+        arr = [];
+        map.set(o.parent_id, arr);
+      }
+      arr.push(o);
+    }
+    for (const arr of map.values()) {
+      arr.sort((a, b) => (a.label ?? '').localeCompare(b.label ?? ''));
+    }
+    return map;
+  });
+
+  // topLevelInFiltered: Objects ohne parent_id ODER deren parent nicht
+  // im gefilterten Set ist (z.B. wenn Filter den Parent ausgeschlossen hat).
+  const topLevelInFiltered = createMemo(() => {
+    const ids = new Set(filtered().map((o) => o.id));
+    return filtered()
+      .filter((o) => !o.parent_id || !ids.has(o.parent_id))
+      .sort((a, b) => (a.label ?? '').localeCompare(b.label ?? ''));
+  });
+
+  // Beim ersten Tree-View-Aufruf: alle Eltern expandieren damit der
+  // User direkt alles sieht. Spaeter merken wir den Toggle-State.
+  function ensureExpandInit() {
+    if (expandInitialized) return;
+    expandInitialized = true;
+    const all = new Set<string>();
+    for (const id of childrenInFiltered().keys()) all.add(id);
+    setExpandedSet(all);
+  }
+
+  // Flatten DFS — fuer den For-Loop ohne rekursive Component (Solid-JS-
+  // Reactivity ist mit flachem Array stabiler).
+  type TreeRow = { obj: ObjectsListItem; depth: number; hasChildren: boolean };
+  const treeRows = createMemo<TreeRow[]>(() => {
+    if (viewMode() !== 'tree') return [];
+    ensureExpandInit();
+    const out: TreeRow[] = [];
+    const expanded = expandedSet();
+    const childIdx = childrenInFiltered();
+    const visit = (o: ObjectsListItem, depth: number) => {
+      const kids = childIdx.get(o.id) ?? [];
+      out.push({ obj: o, depth, hasChildren: kids.length > 0 });
+      if (!expanded.has(o.id)) return;
+      for (const k of kids) visit(k, depth + 1);
+    };
+    for (const t of topLevelInFiltered()) visit(t, 0);
+    return out;
+  });
+
+  function toggleExpand(id: string) {
+    setExpandedSet((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   function navBack() {
     if (window.history.length > 1) {
       window.history.back();
@@ -268,6 +344,28 @@ const ObjectsList: Component = () => {
           <span class="hint">Lade…</span>
         </Show>
         <span class="objects-list-head-spacer" />
+        <div class="objects-list-view-toggle" aria-label="Ansicht">
+          <button
+            type="button"
+            class="objects-list-view-btn"
+            classList={{ active: viewMode() === 'list' }}
+            onClick={() => setViewMode('list')}
+            title="Liste"
+            aria-pressed={viewMode() === 'list'}
+          >
+            <Icon name="list-bullet" size={14} />
+          </button>
+          <button
+            type="button"
+            class="objects-list-view-btn"
+            classList={{ active: viewMode() === 'tree' }}
+            onClick={() => setViewMode('tree')}
+            title="Tree (Hierarchie)"
+            aria-pressed={viewMode() === 'tree'}
+          >
+            <Icon name="bars-3" size={14} />
+          </button>
+        </div>
         <Show when={(groups() ?? []).length > 0}>
           <button
             type="button"
@@ -385,33 +483,89 @@ const ObjectsList: Component = () => {
           </p>
         }
       >
-        <ul class="objects-list">
-          <For each={filtered()}>
-            {(o) => {
-              const cnt = () => backlinkCount().get(o.id) ?? 0;
-              return (
-                <li>
-                  <button type="button" class="objects-list-item" onClick={() => navToObject(o.id)}>
-                    <span class="objects-list-item-label">{o.label || '(ohne Label)'}</span>
-                    <Show when={o.type_label}>
-                      {(t) => <span class="obj-type-chip obj-type-chip-sm">{t()}</span>}
+        <Show
+          when={viewMode() === 'tree'}
+          fallback={
+            <ul class="objects-list">
+              <For each={filtered()}>
+                {(o) => {
+                  const cnt = () => backlinkCount().get(o.id) ?? 0;
+                  return (
+                    <li>
+                      <button
+                        type="button"
+                        class="objects-list-item"
+                        onClick={() => navToObject(o.id)}
+                      >
+                        <span class="objects-list-item-label">{o.label || '(ohne Label)'}</span>
+                        <Show when={o.type_label}>
+                          {(t) => <span class="obj-type-chip obj-type-chip-sm">{t()}</span>}
+                        </Show>
+                        <Show when={o.alias}>
+                          {(a) => <span class="objects-list-item-alias">^o.{a()}</span>}
+                        </Show>
+                        <span class="objects-list-item-spacer" />
+                        <Show when={cnt() > 0}>
+                          <span class="objects-list-item-count" title="Backlinks">
+                            {cnt()}× verlinkt
+                          </span>
+                        </Show>
+                        <Icon name="chevron-right" size={14} />
+                      </button>
+                    </li>
+                  );
+                }}
+              </For>
+            </ul>
+          }
+        >
+          <ul class="objects-tree">
+            <For each={treeRows()}>
+              {(row) => {
+                const cnt = () => backlinkCount().get(row.obj.id) ?? 0;
+                const isExpanded = () => expandedSet().has(row.obj.id);
+                return (
+                  <li class="objects-tree-row" style={{ '--depth': String(row.depth) }}>
+                    <Show
+                      when={row.hasChildren}
+                      fallback={<span class="objects-tree-spacer" aria-hidden="true" />}
+                    >
+                      <button
+                        type="button"
+                        class="objects-tree-toggle"
+                        onClick={() => toggleExpand(row.obj.id)}
+                        aria-label={isExpanded() ? 'Einklappen' : 'Ausklappen'}
+                        aria-expanded={isExpanded()}
+                      >
+                        <Icon name={isExpanded() ? 'chevron-down' : 'chevron-right'} size={14} />
+                      </button>
                     </Show>
-                    <Show when={o.alias}>
-                      {(a) => <span class="objects-list-item-alias">^o.{a()}</span>}
-                    </Show>
-                    <span class="objects-list-item-spacer" />
-                    <Show when={cnt() > 0}>
-                      <span class="objects-list-item-count" title="Backlinks">
-                        {cnt()}× verlinkt
-                      </span>
-                    </Show>
-                    <Icon name="chevron-right" size={14} />
-                  </button>
-                </li>
-              );
-            }}
-          </For>
-        </ul>
+                    <button
+                      type="button"
+                      class="objects-list-item objects-tree-item"
+                      onClick={() => navToObject(row.obj.id)}
+                    >
+                      <span class="objects-list-item-label">{row.obj.label || '(ohne Label)'}</span>
+                      <Show when={row.obj.type_label}>
+                        {(t) => <span class="obj-type-chip obj-type-chip-sm">{t()}</span>}
+                      </Show>
+                      <Show when={row.obj.alias}>
+                        {(a) => <span class="objects-list-item-alias">^o.{a()}</span>}
+                      </Show>
+                      <span class="objects-list-item-spacer" />
+                      <Show when={cnt() > 0}>
+                        <span class="objects-list-item-count" title="Backlinks">
+                          {cnt()}× verlinkt
+                        </span>
+                      </Show>
+                      <Icon name="chevron-right" size={14} />
+                    </button>
+                  </li>
+                );
+              }}
+            </For>
+          </ul>
+        </Show>
       </Show>
 
       <Show when={generatorOpen()}>
