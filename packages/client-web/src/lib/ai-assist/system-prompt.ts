@@ -49,14 +49,19 @@ WICHTIG — Mitigation H (Preview-Pattern):
   Du baust deinen Vorschlag NUR aus den User-Antworten.
 - Nach dem einen Tool-Call beendest Du den Turn. Eine kurze Text-
   Zusammenfassung VOR dem Tool-Call ist OK (1-2 Saetze).
-- Der User entscheidet dann manuell ueber "Anlegen" oder "Verwerfen".
-  NICHTS wird automatisch erstellt.
+- Der User entscheidet manuell ueber "Anlegen", kann zudem in der
+  Vorschau einzelne Eintraege per Checkbox abwaehlen — liefere
+  ruhig ein paar mehr Vorschlaege, der User filtert selbst.
 
-Plan-Limits (Tool-Schema erzwingt das, halte Dich aber bewusst
-darunter):
-- 1-3 Top-Level-Knoten (matrix oder board)
-- pro Knoten 2-6 Children (Cells bei matrix, Karten bei board)
-- pro Cell optional 1-2 Checklisten mit je 3-6 Items
+Was im Plan landet:
+- 1-3 Top-Level-Knoten (matrix oder board) mit aussagekraeftigen
+  Labels.
+- Pro Knoten 2-6 children:
+  - Bei type='matrix': child mit cell_label (kurzer Item-Name) +
+    optional 1-2 checklists die wirklich relevant sind.
+  - Bei type='board': child mit card_name (kurzer Karten-Titel) +
+    optional eine card_note (1-2 Saetze).
+- Pro checklist 3-6 items, kein Filler.
 
 Sei konkret: keine Platzhalter wie "Projekt 1 / Projekt 2", sondern
 nimm die echten Themen aus den User-Antworten. Wenn die Antworten

@@ -216,17 +216,20 @@ export const TOOL_REGISTRY: ReadonlyArray<ToolDef> = [
 // index.ts faengt es ab und reicht die args als data zurueck. Der
 // LLM gibt seinen Vorschlag als Tool-Use-Args (strukturiert),
 // statt JSON in Text zu bauen. Apply-Schleife in lib/wizard-apply.ts
-// (A.4d) iteriert die args und ruft die echten mcp_create_*-RPCs.
+// iteriert die args und ruft die echten mcp_create_*-RPCs.
 //
-// Tiefen-Limit absichtlich: max 3 nodes, max 6 children pro Node,
-// keine tieferen Verschachtelungen. Begrenzt LLM-Token-Burn und
-// Apply-Loop-Laufzeit (Mitigation D).
+// Tiefen-Limit: 1-3 Top-Level-Knoten, max 6 children pro Node, je
+// Cell max 2 Checklisten mit max 6 Items. Begrenzt LLM-Token-Burn
+// und Apply-Loop-Laufzeit (Mitigation D).
+//
+// Children koennen vom User in der Preview per Checkbox einzeln
+// (de-)aktiviert werden — Apply nimmt nur die selektierten.
 export const WIZARD_PROPOSE_TOOL_NAME = 'wizard_propose_structure';
 
 const WIZARD_PROPOSE_TOOL: ToolDef = {
   name: WIZARD_PROPOSE_TOOL_NAME,
   description:
-    'Liefert einen STRUKTURIERTEN Workspace-Vorschlag fuer den Onboarding-Wizard. Wird NICHT direkt ausgefuehrt — der User sieht eine Vorschau und entscheidet manuell. Rufe dieses Tool GENAU EINMAL und beende dann den Turn ohne weiteren Tool-Call.',
+    'Liefert einen STRUKTURIERTEN Workspace-Vorschlag fuer den Onboarding-Wizard. Wird NICHT direkt ausgefuehrt — der User sieht eine Vorschau, kann einzelne Eintraege an-/abwaehlen und entscheidet manuell. Rufe dieses Tool GENAU EINMAL und beende dann den Turn ohne weiteren Tool-Call.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -243,7 +246,8 @@ const WIZARD_PROPOSE_TOOL: ToolDef = {
       nodes: {
         type: 'array',
         description:
-          'Top-Level-Knoten des Workspaces. Max 3 Eintraege — kein Spam, lieber wenige starke Vorschlaege.',
+          'Top-Level-Knoten des Workspaces. 1-3 Eintraege — kein Spam, lieber wenige starke Vorschlaege.',
+        minItems: 1,
         maxItems: 3,
         items: {
           type: 'object',
@@ -263,7 +267,7 @@ const WIZARD_PROPOSE_TOOL: ToolDef = {
             children: {
               type: 'array',
               description:
-                'Eintraege INNERHALB des Knotens. Bei type=matrix: Zellen mit optional checklists/sub_node. Bei type=board: Karten mit name/note. Max 6 Eintraege pro Knoten.',
+                'Eintraege INNERHALB des Knotens. Bei type=matrix: Zellen (cell_label) mit optional checklists. Bei type=board: Karten (card_name) mit optional note. Max 6 Eintraege pro Knoten.',
               maxItems: 6,
               items: {
                 type: 'object',
@@ -271,12 +275,12 @@ const WIZARD_PROPOSE_TOOL: ToolDef = {
                   cell_label: {
                     type: ['string', 'null'],
                     description:
-                      'Bei matrix-Parent: Label fuer eine Cell. Bei board-Parent: nicht setzen.',
+                      'Bei matrix-Parent: Label fuer eine Cell. Bei board-Parent: nicht setzen (null).',
                   },
                   card_name: {
                     type: ['string', 'null'],
                     description:
-                      'Bei board-Parent: Name fuer eine Karte. Bei matrix-Parent: nicht setzen.',
+                      'Bei board-Parent: Name fuer eine Karte. Bei matrix-Parent: nicht setzen (null).',
                   },
                   card_note: {
                     type: ['string', 'null'],

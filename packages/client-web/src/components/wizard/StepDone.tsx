@@ -1,6 +1,9 @@
 // Step 5 — Done. Erfolgsmeldung + Button zum Workspace.
+//
+// Bei partial-success (failedItems.length > 0): dezentes Warning-Banner
+// mit Liste, damit der User weiss dass nicht alles geklappt hat.
 
-import type { Component } from 'solid-js';
+import { type Component, For, Show } from 'solid-js';
 import { useWizard } from '../../lib/wizard-state';
 import Icon from '../Icon';
 
@@ -11,6 +14,7 @@ type Props = {
 const StepDone: Component<Props> = (p) => {
   const w = useWizard();
   const proposal = () => w.proposal();
+  const failures = () => w.applyFailures();
   return (
     <>
       <header class="wizard-step-head">
@@ -24,12 +28,34 @@ const StepDone: Component<Props> = (p) => {
               <strong>Dein Workspace ist startklar.</strong>
             </p>
             <p class="hint">
-              Die KI hat dir Top-Level-Knoten angelegt. Cells, Karten und Checklisten kannst du
-              jederzeit selbst hinzufuegen — oder ueber den Hilfe-Drawer rechts oben (Funkelchen-
-              Icon oder <kbd>Ctrl</kbd>+<kbd>K</kbd>) per Chat-Anfrage.
+              Was nicht abgehakt war oder hier nicht ausgefuehrt wurde, kannst du jederzeit
+              hinzufuegen — ueber den Hilfe-Drawer rechts oben (Funkelchen-Icon oder <kbd>Ctrl</kbd>
+              +<kbd>K</kbd>) per Chat-Anfrage.
             </p>
           </div>
         </div>
+
+        <Show when={failures().length > 0}>
+          <div class="wizard-warning-banner">
+            <p>
+              <strong>Hinweis:</strong> {failures().length}{' '}
+              {failures().length === 1 ? 'Eintrag konnte' : 'Eintraege konnten'} nicht angelegt
+              werden:
+            </p>
+            <ul class="wizard-failure-list">
+              <For each={failures()}>
+                {(f) => (
+                  <li>
+                    <span class="wizard-failure-scope">{f.scope}</span>
+                    <span class="wizard-failure-label">{f.label}</span>
+                    <span class="wizard-failure-error">{f.error}</span>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </div>
+        </Show>
+
         <p class="hint">
           Wenn dir die Struktur spaeter doch nicht passt: du kannst jederzeit unter dem
           Workspace-Switcher links oben "+ Neuer Workspace mit Wizard" auswaehlen, einen weiteren

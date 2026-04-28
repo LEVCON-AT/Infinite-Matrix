@@ -1,16 +1,25 @@
-// Step 3b — Preview. Read-only Tree-Render des Vorschlags (A.4c).
+// Step 3b — Preview. Tree-Render des Vorschlags mit Checkbox-Selection.
 //
-// Custom-Renderer (NodeTree.tsx ist zu RW-pfaden-bound). Zeigt
-// Workspace-Label + summary + flachen Tree der nodes. Bei matrix-
-// Parent: Cells als Sub-Items, Checklists indented. Bei board-
-// Parent: Karten als Sub-Items.
+// Pro Knoten / Child / Checkliste eine Checkbox. Default: alles
+// abgehakt. User kann gezielt deselektieren — Apply nimmt nur
+// abgehakte Items.
 //
-// Buttons: "Anlegen" → phase='applying' (kommt mit A.4d).
+// Disabled-State: wenn der Parent (Node oder Child) deselektiert ist,
+// werden seine sub-Checkboxen optisch ausgegraut UND ihre Checkbox-
+// State bleibt zwar erhalten, ist aber im Apply-Loop irrelevant
+// (Parent nicht selected → kein Sub-Apply).
+//
+// Buttons: "Anlegen" → phase='applying'.
 //          "Andere Variante" → phase='proposing' (re-roll).
 //          "Verwerfen" → phase='questions' (zurueck zu Antworten).
 
 import { type Component, For, Show } from 'solid-js';
-import { useWizard } from '../../lib/wizard-state';
+import {
+  type ProposalChecklist,
+  type ProposalChild,
+  type ProposalNode,
+  useWizard,
+} from '../../lib/wizard-state';
 import Icon from '../Icon';
 
 const StepPreview: Component = () => {
@@ -36,7 +45,8 @@ const StepPreview: Component = () => {
       <header class="wizard-step-head">
         <h2>Vorschau</h2>
         <p class="hint">
-          Hier ist der KI-Vorschlag. Anlegen, Variante neu erzeugen oder zu den Antworten zurueck.
+          Hier ist der KI-Vorschlag. Hak ab, was angelegt werden soll. Standard: alles aktiviert —
+          deselektierte Eintraege werden uebersprungen.
         </p>
       </header>
 
@@ -52,7 +62,7 @@ const StepPreview: Component = () => {
                 <p class="hint">{p().summary}</p>
               </section>
               <ul class="wizard-tree-preview">
-                <For each={p().nodes}>{(node) => <NodeRow node={node} />}</For>
+                <For each={p().nodes}>{(node, i) => <NodeRow node={node} nodeIdx={i()} />}</For>
               </ul>
             </div>
           )}
@@ -74,75 +84,121 @@ const StepPreview: Component = () => {
   );
 };
 
-const NodeRow: Component<{
-  node: { label: string; type: 'matrix' | 'board'; children?: unknown[] };
-}> = (p) => (
-  <li class="wizard-tree-node">
-    <div class="wizard-tree-node-head">
-      <Icon name={p.node.type === 'matrix' ? 'squares-2x2' : 'view-columns'} size={14} />
-      <span class="wizard-tree-node-label">{p.node.label}</span>
-      <span class="wizard-tree-node-kind">{p.node.type === 'matrix' ? 'Matrix' : 'Board'}</span>
-    </div>
-    <Show when={p.node.children && p.node.children.length > 0}>
-      <ul class="wizard-tree-children">
-        <For each={p.node.children}>{(child) => <ChildRow child={child} />}</For>
-      </ul>
-    </Show>
-  </li>
-);
+const NodeRow: Component<{ node: ProposalNode; nodeIdx: number }> = (p) => {
+  const w = useWizard();
+  return (
+    <li class="wizard-tree-node" classList={{ 'wizard-tree-deselected': !p.node.selected }}>
+      <label class="wizard-tree-node-head wizard-tree-row">
+        <input
+          type="checkbox"
+          class="wizard-checkbox"
+          checked={p.node.selected}
+          onChange={() => w.toggleNode(p.nodeIdx)}
+          aria-label={`${p.node.label} anlegen`}
+        />
+        <Icon name={p.node.type === 'matrix' ? 'squares-2x2' : 'view-columns'} size={14} />
+        <span class="wizard-tree-node-label">{p.node.label}</span>
+        <span class="wizard-tree-node-kind">{p.node.type === 'matrix' ? 'Matrix' : 'Board'}</span>
+        <Show when={p.node.alias}>
+          {(alias) => <span class="wizard-tree-alias">^{alias()}</span>}
+        </Show>
+      </label>
+      <Show when={p.node.children.length > 0}>
+        <ul class="wizard-tree-children">
+          <For each={p.node.children}>
+            {(child, j) => (
+              <ChildRow
+                child={child}
+                childIdx={j()}
+                nodeIdx={p.nodeIdx}
+                parentSelected={p.node.selected}
+                parentType={p.node.type}
+              />
+            )}
+          </For>
+        </ul>
+      </Show>
+    </li>
+  );
+};
 
-const ChildRow: Component<{ child: unknown }> = (p) => {
-  const c = (p.child ?? {}) as Record<string, unknown>;
-  const cellLabel = typeof c.cell_label === 'string' ? c.cell_label : null;
-  const cardName = typeof c.card_name === 'string' ? c.card_name : null;
-  const cardNote = typeof c.card_note === 'string' ? c.card_note : null;
-  const checklists = Array.isArray(c.checklists) ? (c.checklists as unknown[]) : [];
+const ChildRow: Component<{
+  child: ProposalChild;
+  childIdx: number;
+  nodeIdx: number;
+  parentSelected: boolean;
+  parentType: 'matrix' | 'board';
+}> = (p) => {
+  const w = useWizard();
+  const effectivelySelected = () => p.parentSelected && p.child.selected;
+  const label = () => p.child.cell_label ?? p.child.card_name ?? '(Eintrag)';
+  const icon = () => (p.parentType === 'matrix' ? 'information-circle' : 'document-text');
 
   return (
-    <li class="wizard-tree-child">
-      <Show when={cellLabel}>
-        {(label) => (
-          <div class="wizard-tree-child-head">
-            <Icon name="information-circle" size={12} />
-            <span>{label()}</span>
-          </div>
-        )}
-      </Show>
-      <Show when={cardName}>
-        {(name) => (
-          <div class="wizard-tree-child-head">
-            <Icon name="document-text" size={12} />
-            <span>{name()}</span>
-            <Show when={cardNote}>
-              {(note) => <span class="wizard-tree-child-note">— {note()}</span>}
-            </Show>
-          </div>
-        )}
-      </Show>
-      <Show when={checklists.length > 0}>
+    <li class="wizard-tree-child" classList={{ 'wizard-tree-deselected': !effectivelySelected() }}>
+      <label class="wizard-tree-row">
+        <input
+          type="checkbox"
+          class="wizard-checkbox"
+          checked={p.child.selected}
+          disabled={!p.parentSelected}
+          onChange={() => w.toggleChild(p.nodeIdx, p.childIdx)}
+          aria-label={`${label()} anlegen`}
+        />
+        <Icon name={icon()} size={12} />
+        <span class="wizard-tree-child-label">{label()}</span>
+        <Show when={p.child.card_note}>
+          {(note) => <span class="wizard-tree-child-note">— {note()}</span>}
+        </Show>
+      </label>
+      <Show when={p.child.checklists.length > 0}>
         <ul class="wizard-tree-checklists">
-          <For each={checklists}>
-            {(cl) => {
-              const obj = (cl ?? {}) as Record<string, unknown>;
-              const label = typeof obj.label === 'string' ? obj.label : '(Liste)';
-              const items = Array.isArray(obj.items) ? (obj.items as unknown[]) : [];
-              return (
-                <li>
-                  <div class="wizard-tree-checklist-label">
-                    <Icon name="check-circle" size={11} />
-                    <span>{label}</span>
-                  </div>
-                  <Show when={items.length > 0}>
-                    <ul class="wizard-tree-checklist-items">
-                      <For each={items}>
-                        {(it) => <li>{typeof it === 'string' ? it : '(Item)'}</li>}
-                      </For>
-                    </ul>
-                  </Show>
-                </li>
-              );
-            }}
+          <For each={p.child.checklists}>
+            {(cl, k) => (
+              <ChecklistRow
+                checklist={cl}
+                clIdx={k()}
+                childIdx={p.childIdx}
+                nodeIdx={p.nodeIdx}
+                parentSelected={effectivelySelected()}
+              />
+            )}
           </For>
+        </ul>
+      </Show>
+    </li>
+  );
+};
+
+const ChecklistRow: Component<{
+  checklist: ProposalChecklist;
+  clIdx: number;
+  childIdx: number;
+  nodeIdx: number;
+  parentSelected: boolean;
+}> = (p) => {
+  const w = useWizard();
+  const effectivelySelected = () => p.parentSelected && p.checklist.selected;
+  return (
+    <li
+      class="wizard-tree-checklist"
+      classList={{ 'wizard-tree-deselected': !effectivelySelected() }}
+    >
+      <label class="wizard-tree-row">
+        <input
+          type="checkbox"
+          class="wizard-checkbox"
+          checked={p.checklist.selected}
+          disabled={!p.parentSelected}
+          onChange={() => w.toggleChecklist(p.nodeIdx, p.childIdx, p.clIdx)}
+          aria-label={`Checkliste ${p.checklist.label} anlegen`}
+        />
+        <Icon name="check-circle" size={11} />
+        <span class="wizard-tree-checklist-label">{p.checklist.label}</span>
+      </label>
+      <Show when={p.checklist.items.length > 0}>
+        <ul class="wizard-tree-checklist-items">
+          <For each={p.checklist.items}>{(it) => <li>{it}</li>}</For>
         </ul>
       </Show>
     </li>

@@ -1,14 +1,27 @@
-// Apply-Pfad fuer den Onboarding-Wizard (A.4d).
+// Apply-Pfad fuer den Onboarding-Wizard (A.4d + Polish-Welle).
 //
-// Spielt den vom LLM in Step 3 generierten Vorschlag als reale RPC-
-// Calls ab. Sequentiell — RLS + FKs moegen Reihenfolge, parallel-
-// Inserts riskieren Position-Kollisionen.
+// Spielt den vom LLM in Step 3 generierten Vorschlag als reale RPC-/
+// Insert-Calls ab. Sequentiell — RLS + FKs moegen Reihenfolge,
+// parallel-Inserts riskieren Position-Kollisionen.
 //
-// V1 (A.4d): nur Top-Level-Nodes werden angelegt. children (cell_label/
-// card_name/checklists) sind im Proposal als Vision sichtbar, aber
-// werden in V1 nicht ausgefuehrt — der User baut sie nach Wunsch mit
-// dem Inline-Help-Drawer (A.3) aus. Naechste Welle (A.4e oder A.5)
-// kann das vertiefen.
+// User-Selection: pro Item (Node, Child, Checkliste) ein
+// `selected: boolean`. Apply iteriert nur ueber `selected===true`.
+// Children innerhalb eines deselektierten Nodes werden geskippt.
+//
+// Was angelegt wird:
+//   - Top-Level: mcp_create_node pro selektiertem Node
+//   - Boards: 1 default kb_col "Inbox" + mcp_create_card pro
+//             selektierte child.card_name + board-level Checklisten
+//             via mcp_create_checklist(board_id) + mcp_add_checklist_item
+//   - Matrices: 1 default col "Themen" + 1 row pro selektierter
+//             child.cell_label + cell an (row, col) mit features=
+//             ['checklists'] wenn Checklisten dran haengen
+//             + Cell-Checklisten via mcp_create_checklist(cell_id)
+//
+// Direct-Inserts in cols/rows/cells/kb_cols laufen ueber RLS-Policies
+// der jeweiligen Tabellen (Owner darf schreiben). RPCs werden nur
+// dort genutzt wo sie schon existieren (mcp_create_node/card/checklist/
+// add_checklist_item).
 //
 // Source-Pfade:
 //   - kind: 'initial' → workspace existiert (handle_new_user trigger),
@@ -17,12 +30,25 @@
 //     werden, dann fuellen.
 
 import { supabase } from './supabase';
-import type { ApplyProgress, WizardProposal, WizardSource } from './wizard-state';
+import type {
+  ApplyFailure,
+  ApplyProgress,
+  ProposalChild,
+  ProposalNode,
+  WizardProposal,
+  WizardSource,
+} from './wizard-state';
 import { createWorkspace } from './workspace-create';
 
-export type ApplyResult =
-  | { ok: true; workspaceId: string; createdNodes: number }
-  | { ok: false; error: string; partialWorkspaceId?: string; createdSoFar: number };
+export type ApplyResult = {
+  ok: boolean;
+  workspaceId: string | null;
+  createdNodes: number;
+  failedItems: ApplyFailure[];
+  // Wenn fresh-Mode + alle-fail: Workspace-Cleanup ist noetig (User-
+  // sichtbarer Hinweis in StepApplying).
+  workspaceCreatedButEmpty: boolean;
+};
 
 export type ApplyOptions = {
   proposal: WizardProposal;
@@ -33,83 +59,402 @@ export type ApplyOptions = {
 
 export async function applyWizardProposal(opts: ApplyOptions): Promise<ApplyResult> {
   const { proposal, source, onProgress, signal } = opts;
-  const totalSteps = (source.kind === 'new' ? 1 : 0) + proposal.nodes.length;
-  let step = 0;
-  let workspaceId: string;
-  let created = 0;
 
-  // Step 0: Workspace anlegen wenn neu.
-  if (source.kind === 'new') {
+  const failures: ApplyFailure[] = [];
+  const selectedNodes = proposal.nodes.filter((n) => n.selected);
+
+  // Total-Step-Schaetzung: 1 (workspace) + 1 (per Node) + variable
+  // pro Child/Checkliste. Wir rechnen die obere Grenze um den Progress-
+  // Balken sinnvoll zu fuellen.
+  const totalSteps =
+    (source.kind === 'new' ? 1 : 0) +
+    selectedNodes.reduce((sum, n) => sum + 1 + childWorkSteps(n), 0);
+  let step = 0;
+  const tick = (label: string): void => {
     step += 1;
-    onProgress?.({ current: step, total: totalSteps, step: 'Workspace anlegen…' });
+    onProgress?.({ current: step, total: totalSteps, step: label });
+  };
+
+  let workspaceId: string | null = null;
+  let workspaceFreshlyCreated = false;
+
+  // ─── Step 0: Workspace anlegen wenn fresh ─────────────────────
+  if (source.kind === 'new') {
+    tick('Workspace anlegen…');
     if (signal?.aborted) {
-      return { ok: false, error: 'abgebrochen', createdSoFar: 0 };
+      return abortedResult(workspaceId, failures, 0, false);
     }
     try {
       workspaceId = await createWorkspace(proposal.workspace_label || 'Neuer Workspace');
+      workspaceFreshlyCreated = true;
     } catch (err) {
+      failures.push({
+        scope: 'workspace',
+        label: proposal.workspace_label || 'Neuer Workspace',
+        error: errMsg(err),
+      });
       return {
         ok: false,
-        error: err instanceof Error ? err.message : String(err),
-        createdSoFar: 0,
+        workspaceId: null,
+        createdNodes: 0,
+        failedItems: failures,
+        workspaceCreatedButEmpty: false,
       };
     }
   } else {
     workspaceId = source.workspaceId;
   }
 
-  // Step 1..N: pro Top-Level-Node ein mcp_create_node.
-  for (const node of proposal.nodes) {
+  // ─── Step 1..N: pro Node ──────────────────────────────────────
+  let createdNodes = 0;
+  for (const node of selectedNodes) {
     if (signal?.aborted) {
-      return {
-        ok: false,
-        error: 'abgebrochen',
-        partialWorkspaceId: workspaceId,
-        createdSoFar: created,
-      };
+      return abortedResult(workspaceId, failures, createdNodes, workspaceFreshlyCreated);
     }
-    step += 1;
-    onProgress?.({
-      current: step,
-      total: totalSteps,
-      step: `Knoten "${node.label}" anlegen…`,
-    });
+    tick(`Knoten "${node.label}" anlegen…`);
+    const nodeId = await createNode(workspaceId, node, failures);
+    if (!nodeId) continue;
+    createdNodes += 1;
 
+    const selectedChildren = node.children.filter((c) => c.selected);
+    if (selectedChildren.length === 0) {
+      // Skip die child-Steps fuer Progress-Korrektheit. Wir haben
+      // sie in childWorkSteps eingerechnet — naechster Tick startet
+      // also evtl. mit "Sprung". Akzeptabel, der User merkt das nicht.
+      continue;
+    }
+
+    if (node.type === 'board') {
+      await applyBoardChildren(workspaceId, nodeId, selectedChildren, failures, tick, signal);
+    } else {
+      await applyMatrixChildren(workspaceId, nodeId, selectedChildren, failures, tick, signal);
+    }
+  }
+
+  const okOverall = createdNodes > 0;
+  const workspaceCreatedButEmpty = workspaceFreshlyCreated && createdNodes === 0;
+
+  return {
+    ok: okOverall,
+    workspaceId,
+    createdNodes,
+    failedItems: failures,
+    workspaceCreatedButEmpty,
+  };
+}
+
+// ─── Helper: Worksteps pro Node fuer Progress-Schaetzung ─────
+function childWorkSteps(node: ProposalNode): number {
+  const sel = node.children.filter((c) => c.selected);
+  if (sel.length === 0) return 0;
+  // 1 fuer default-col/kb_col + 1 pro selected child + 1 pro selected
+  // checklist (items werden gesammelt mit der checklist).
+  let n = 1;
+  for (const c of sel) {
+    n += 1;
+    n += c.checklists.filter((cl) => cl.selected).length;
+  }
+  return n;
+}
+
+// ─── Node-Create ──────────────────────────────────────────────
+async function createNode(
+  workspaceId: string,
+  node: ProposalNode,
+  failures: ApplyFailure[],
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.rpc('mcp_create_node', {
+      p_workspace_id: workspaceId,
+      p_parent_cell_id: null,
+      p_type: node.type,
+      p_label: node.label,
+      p_alias: node.alias,
+    });
+    if (error) {
+      failures.push({ scope: 'node', label: node.label, error: error.message });
+      return null;
+    }
+    const obj = data as { node_id?: string } | null;
+    return obj?.node_id ?? null;
+  } catch (err) {
+    failures.push({ scope: 'node', label: node.label, error: errMsg(err) });
+    return null;
+  }
+}
+
+// ─── Board-Children: kb_col + Cards + board-Checklisten ──────
+async function applyBoardChildren(
+  workspaceId: string,
+  boardId: string,
+  selectedChildren: ProposalChild[],
+  failures: ApplyFailure[],
+  tick: (s: string) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (signal?.aborted) return;
+  tick('Default-Spalte "Inbox" anlegen…');
+
+  const { data: colRows, error: colErr } = await supabase
+    .from('kb_cols')
+    .insert({
+      workspace_id: workspaceId,
+      board_id: boardId,
+      label: 'Inbox',
+      position: 0,
+    })
+    .select('id')
+    .single();
+
+  if (colErr || !colRows) {
+    failures.push({
+      scope: 'col',
+      label: 'Inbox',
+      error: colErr?.message ?? 'kb_col-Insert fehlgeschlagen',
+    });
+    // Ohne kb_col koennen wir keine Karten anlegen. Skip board-children.
+    return;
+  }
+
+  const colId = (colRows as { id: string }).id;
+
+  // Cards
+  for (const child of selectedChildren) {
+    if (signal?.aborted) return;
+    if (!child.card_name) continue;
+    tick(`Karte "${child.card_name}" anlegen…`);
     try {
-      const { error } = await supabase.rpc('mcp_create_node', {
-        p_workspace_id: workspaceId,
-        p_parent_cell_id: null,
-        p_type: node.type,
-        p_label: node.label,
-        p_alias: node.alias ?? null,
+      const { error } = await supabase.rpc('mcp_create_card', {
+        p_col_id: colId,
+        p_name: child.card_name,
+        p_note: child.card_note,
+        p_alias: null,
       });
       if (error) {
-        // Ein-Knoten-Fehler ist kein Apply-Abbruch — wir wollen
-        // sehen wie viele durchgehen. Aber wir geben den Fehler als
-        // Result raus + onProgress mit step-Info, damit das UI weiss
-        // wo's haengt.
-        console.warn(`mcp_create_node fuer "${node.label}":`, error.message);
-        // weiter machen, naechster Node
-      } else {
-        created += 1;
+        failures.push({ scope: 'card', label: child.card_name, error: error.message });
       }
     } catch (err) {
-      console.warn(`mcp_create_node throw fuer "${node.label}":`, err);
-      // weiter machen
+      failures.push({ scope: 'card', label: child.card_name, error: errMsg(err) });
+    }
+
+    // Board-Checklisten kommen NICHT auf Cell-Ebene (Boards haben keine
+    // Cells). Wir haengen sie pro Child mit board_id direkt ans Board.
+    for (const cl of child.checklists) {
+      if (!cl.selected || signal?.aborted) continue;
+      tick(`Checkliste "${cl.label}" anlegen…`);
+      await createChecklistAtBoard(boardId, cl.label, cl.items, failures, signal);
     }
   }
+}
 
-  if (created === 0) {
-    return {
-      ok: false,
-      error:
-        proposal.nodes.length === 0
-          ? 'Kein Knoten im Vorschlag'
-          : 'Keiner der Knoten konnte angelegt werden — bitte spaeter erneut versuchen.',
-      partialWorkspaceId: workspaceId,
-      createdSoFar: 0,
-    };
+// ─── Matrix-Children: 1 col + N rows + N cells + Checklisten ─
+async function applyMatrixChildren(
+  workspaceId: string,
+  matrixId: string,
+  selectedChildren: ProposalChild[],
+  failures: ApplyFailure[],
+  tick: (s: string) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (signal?.aborted) return;
+  tick('Default-Spalte "Themen" anlegen…');
+
+  const { data: colRows, error: colErr } = await supabase
+    .from('cols')
+    .insert({
+      workspace_id: workspaceId,
+      matrix_id: matrixId,
+      label: 'Themen',
+      position: 0,
+    })
+    .select('id')
+    .single();
+
+  if (colErr || !colRows) {
+    failures.push({
+      scope: 'col',
+      label: 'Themen',
+      error: colErr?.message ?? 'cols-Insert fehlgeschlagen',
+    });
+    return;
   }
+  const colId = (colRows as { id: string }).id;
 
-  return { ok: true, workspaceId, createdNodes: created };
+  let rowPos = 0;
+  for (const child of selectedChildren) {
+    if (signal?.aborted) return;
+    if (!child.cell_label) continue;
+    tick(`Zeile "${child.cell_label}" anlegen…`);
+
+    // Row anlegen
+    const { data: rowRow, error: rowErr } = await supabase
+      .from('rows')
+      .insert({
+        workspace_id: workspaceId,
+        matrix_id: matrixId,
+        label: child.cell_label,
+        position: rowPos,
+      })
+      .select('id')
+      .single();
+    rowPos += 1;
+
+    if (rowErr || !rowRow) {
+      failures.push({
+        scope: 'row',
+        label: child.cell_label,
+        error: rowErr?.message ?? 'rows-Insert fehlgeschlagen',
+      });
+      continue;
+    }
+    const rowId = (rowRow as { id: string }).id;
+
+    // Cell an (row, col) mit features
+    const selectedChecklists = child.checklists.filter((cl) => cl.selected);
+    const features = selectedChecklists.length > 0 ? ['checklists'] : [];
+
+    const { data: cellRow, error: cellErr } = await supabase
+      .from('cells')
+      .insert({
+        workspace_id: workspaceId,
+        matrix_id: matrixId,
+        row_id: rowId,
+        col_id: colId,
+        features,
+      })
+      .select('id')
+      .single();
+
+    if (cellErr || !cellRow) {
+      failures.push({
+        scope: 'cell',
+        label: child.cell_label,
+        error: cellErr?.message ?? 'cells-Insert fehlgeschlagen',
+      });
+      continue;
+    }
+    const cellId = (cellRow as { id: string }).id;
+
+    for (const cl of selectedChecklists) {
+      if (signal?.aborted) return;
+      tick(`Checkliste "${cl.label}" anlegen…`);
+      await createChecklistAtCell(cellId, cl.label, cl.items, failures, signal);
+    }
+  }
+}
+
+// ─── Checklist-Helper (cell-scoped) ───────────────────────────
+async function createChecklistAtCell(
+  cellId: string,
+  label: string,
+  items: string[],
+  failures: ApplyFailure[],
+  signal?: AbortSignal,
+): Promise<void> {
+  try {
+    const { data, error } = await supabase.rpc('mcp_create_checklist', {
+      p_cell_id: cellId,
+      p_board_id: null,
+      p_label: label,
+      p_alias: null,
+    });
+    if (error || !data) {
+      failures.push({
+        scope: 'checklist',
+        label,
+        error: error?.message ?? 'checklist-Insert fehlgeschlagen',
+      });
+      return;
+    }
+    const checklistId = (data as { checklist_id?: string }).checklist_id;
+    if (!checklistId) return;
+    await addChecklistItems(checklistId, items, label, failures, signal);
+  } catch (err) {
+    failures.push({ scope: 'checklist', label, error: errMsg(err) });
+  }
+}
+
+// ─── Checklist-Helper (board-scoped) ──────────────────────────
+async function createChecklistAtBoard(
+  boardId: string,
+  label: string,
+  items: string[],
+  failures: ApplyFailure[],
+  signal?: AbortSignal,
+): Promise<void> {
+  try {
+    const { data, error } = await supabase.rpc('mcp_create_checklist', {
+      p_cell_id: null,
+      p_board_id: boardId,
+      p_label: label,
+      p_alias: null,
+    });
+    if (error || !data) {
+      failures.push({
+        scope: 'checklist',
+        label,
+        error: error?.message ?? 'checklist-Insert fehlgeschlagen',
+      });
+      return;
+    }
+    const checklistId = (data as { checklist_id?: string }).checklist_id;
+    if (!checklistId) return;
+    await addChecklistItems(checklistId, items, label, failures, signal);
+  } catch (err) {
+    failures.push({ scope: 'checklist', label, error: errMsg(err) });
+  }
+}
+
+// ─── Checklist-Items ──────────────────────────────────────────
+async function addChecklistItems(
+  checklistId: string,
+  items: string[],
+  parentLabel: string,
+  failures: ApplyFailure[],
+  signal?: AbortSignal,
+): Promise<void> {
+  for (const text of items) {
+    if (signal?.aborted) return;
+    if (!text.trim()) continue;
+    try {
+      const { error } = await supabase.rpc('mcp_add_checklist_item', {
+        p_checklist_id: checklistId,
+        p_text: text,
+        p_level: 0,
+      });
+      if (error) {
+        failures.push({
+          scope: 'item',
+          label: `${parentLabel}: ${text.slice(0, 40)}`,
+          error: error.message,
+        });
+      }
+    } catch (err) {
+      failures.push({
+        scope: 'item',
+        label: `${parentLabel}: ${text.slice(0, 40)}`,
+        error: errMsg(err),
+      });
+    }
+  }
+}
+
+// ─── Utilities ────────────────────────────────────────────────
+function errMsg(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function abortedResult(
+  workspaceId: string | null,
+  failures: ApplyFailure[],
+  createdNodes: number,
+  workspaceFreshlyCreated: boolean,
+): ApplyResult {
+  return {
+    ok: createdNodes > 0,
+    workspaceId,
+    createdNodes,
+    failedItems: failures,
+    workspaceCreatedButEmpty: workspaceFreshlyCreated && createdNodes === 0,
+  };
 }

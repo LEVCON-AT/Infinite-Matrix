@@ -32,8 +32,14 @@ import { TOOL_MAP, WIZARD_PROPOSE_TOOL_NAME, allowedToolsForMode } from './tools
 import type { AssistEvent, AssistMessage, AssistToolUse, RunAssistOptions } from './types';
 
 // Mitigation D: Iter-Cap pro Mode.
+//
+// Wizard hat dank Mitigation H (single-tool wizard_propose_structure)
+// einen klaren Happy-Path: 1 Iter genuegt. Wenn der LLM nach 5
+// Versuchen kein Tool-Call abgesetzt hat, ist das ein System-Prompt-
+// Problem, kein Cap-Problem — kein Sinn weiter zu loopen + Tokens
+// zu verbrennen.
 const ITER_CAP: Record<RunAssistOptions['mode'], number> = {
-  wizard: 50,
+  wizard: 5,
   help: 10,
   'cell-suggest': 10,
 };

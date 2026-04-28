@@ -14,6 +14,7 @@
 // synchron-online ohne safe-mutation-Wrapper. Kein Offline-Replay.
 
 import { type Accessor, createMemo, createResource } from 'solid-js';
+import { clearProviderCredentialCache } from './ai-assist/credential';
 import { useUser } from './auth';
 import { isNetworkError } from './mutation-queue';
 import { markCacheFallback } from './offline-state';
@@ -72,6 +73,16 @@ export async function fetchAiProviders(userId: string): Promise<AiProvider[]> {
   }
 }
 
+// Cache-Invalidate-Helper: nach jeder Mutation den decrypted-Key-Cache
+// in lib/ai-assist/credential leeren. Sonst nutzt der naechste runAssist
+// den alten Default-Provider, obwohl der User in Settings gewechselt hat.
+// Plus: cachedAccessor von useHasDefaultProvider zuruecksetzen, damit der
+// AiProviderHint (Banner) sofort verschwindet/erscheint.
+function invalidateProviderCaches(): void {
+  clearProviderCredentialCache();
+  cachedAccessor = null;
+}
+
 export async function setAiProvider(input: AiProviderInput): Promise<AiProvider> {
   const { data, error } = await supabase.rpc('set_ai_provider', {
     p_id: input.id ?? null,
@@ -82,17 +93,20 @@ export async function setAiProvider(input: AiProviderInput): Promise<AiProvider>
     p_set_default: input.setDefault ?? false,
   });
   if (error) throw error;
+  invalidateProviderCaches();
   return data as AiProvider;
 }
 
 export async function deleteAiProvider(id: string): Promise<void> {
   const { error } = await supabase.rpc('delete_ai_provider', { p_id: id });
   if (error) throw error;
+  invalidateProviderCaches();
 }
 
 export async function setAiProviderDefault(id: string): Promise<void> {
   const { error } = await supabase.rpc('set_ai_provider_default', { p_id: id });
   if (error) throw error;
+  invalidateProviderCaches();
 }
 
 // ─── Provider-Console-Direct-Links ──────────────────────────────

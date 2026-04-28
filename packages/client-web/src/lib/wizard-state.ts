@@ -1,5 +1,5 @@
-// Wizard-State-Container (A.4b) — Solid-Context fuer den Onboarding-
-// Wizard. Lokal pro WizardShell-Mount, Refresh = Reset.
+// Wizard-State-Container — Solid-Context fuer den Onboarding-Wizard.
+// Lokal pro WizardShell-Mount, Refresh = Reset.
 //
 // Phasen orientieren sich an ImportDialog.tsx — `phase`-Signal +
 // <Show when=phase()===...> in der Shell.
@@ -10,15 +10,16 @@
 //     beginnen (Step 0). Ein global persistiertes State waere hier
 //     nur Verwirrung.
 //
-// Type-Diskussion:
+// Type-Modell:
 //   - WizardSource trennt zwei Lifecycle-Pfade. Initial: bestehender
 //     default-Workspace, der wird gefuellt. New: noch kein Workspace,
 //     wird in Step 4 angelegt mit createWorkspace(proposal.label).
 //   - WizardAnswers sind die 5 Fragen aus Step 2. Bewusst alle Strings
 //     (statt Enum) — der LLM soll mit Freitext umgehen koennen, fest
 //     verdrahtete Optionen sind hier zu rigide.
-//   - WizardProposal kommt vom wizard_propose_structure-Tool (kommt
-//     mit A.4c). Hier nur als optional<unknown>-Slot.
+//   - WizardProposal ist die Args von wizard_propose_structure +
+//     pro Item ein `selected: boolean` (User-Steuerung in Preview).
+//     Apply uebernimmt nur abgehakte Items.
 
 import { type Setter, createContext, createSignal, useContext } from 'solid-js';
 
@@ -37,26 +38,49 @@ export type WizardSource =
   | { kind: 'new'; pendingName: string };
 
 export type WizardAnswers = {
-  goal: string; // Hauptziel
-  topics: string; // Themen
-  workStyle: string; // Arbeitsweise (Solo / Team / verteilt)
-  hurdles: string; // Huerden mit aktuellen Tools
-  role: string; // Rolle (Manager / Entwickler / …)
+  goal: string;
+  topics: string;
+  workStyle: string;
+  hurdles: string;
+  role: string;
 };
 
-// Type des Vorschlags vom wizard_propose_structure-Tool. Bewusst
-// loose getypt fuer A.4b — die Struktur kommt mit A.4c, hier nur
-// als Daten-Slot.
+// ─── Proposal-Typen ──────────────────────────────────────────
+// Alle Items haben `selected: boolean` — User toggelt in Preview,
+// Apply nimmt nur selektierte.
+
+export type ProposalChecklist = {
+  label: string;
+  items: string[];
+  selected: boolean;
+};
+
+export type ProposalChild = {
+  // Genau eines von cell_label oder card_name ist gesetzt — abhaengig
+  // vom parent-Node-Type. In der Praxis vom LLM nicht immer sauber
+  // gehalten, parseProposal normalisiert.
+  cell_label: string | null;
+  card_name: string | null;
+  card_note: string | null;
+  checklists: ProposalChecklist[];
+  selected: boolean;
+};
+
+export type ProposalNode = {
+  label: string;
+  type: 'matrix' | 'board';
+  alias: string | null;
+  children: ProposalChild[];
+  selected: boolean;
+};
+
 export type WizardProposal = {
   workspace_label: string;
   summary: string;
-  nodes: Array<{
-    label: string;
-    type: 'matrix' | 'board';
-    alias?: string | null;
-    children?: Array<unknown>;
-  }>;
+  nodes: ProposalNode[];
 };
+
+// ─── Apply-Progress + Failures ────────────────────────────────
 
 export type ApplyProgress = {
   current: number;
@@ -64,31 +88,52 @@ export type ApplyProgress = {
   step: string;
 };
 
+export type ApplyFailureScope =
+  | 'workspace'
+  | 'node'
+  | 'col'
+  | 'row'
+  | 'cell'
+  | 'card'
+  | 'checklist'
+  | 'item';
+
+export type ApplyFailure = {
+  scope: ApplyFailureScope;
+  label: string;
+  error: string;
+};
+
+// ─── State-Container ──────────────────────────────────────────
+
 export type WizardState = {
-  // Phase
   phase: () => WizardPhase;
   setPhase: Setter<WizardPhase>;
 
-  // Source (initial vs new)
   source: () => WizardSource;
 
-  // Step 2 — Antworten
   answers: () => WizardAnswers;
   setAnswers: Setter<WizardAnswers>;
 
-  // Step 3 — Vorschlag
   proposal: () => WizardProposal | null;
   setProposal: Setter<WizardProposal | null>;
 
-  // Step 4 — Apply-Progress
   applyProgress: () => ApplyProgress | null;
   setApplyProgress: Setter<ApplyProgress | null>;
 
-  // Resultate / Fehler
+  applyFailures: () => ApplyFailure[];
+  setApplyFailures: Setter<ApplyFailure[]>;
+
   resultWorkspaceId: () => string | null;
   setResultWorkspaceId: Setter<string | null>;
   errorMsg: () => string;
   setErrorMsg: Setter<string>;
+
+  // Selection-Toggle-Helfer fuer Preview. Operieren auf der proposal-
+  // Signal-Mutation.
+  toggleNode: (nodeIdx: number) => void;
+  toggleChild: (nodeIdx: number, childIdx: number) => void;
+  toggleChecklist: (nodeIdx: number, childIdx: number, clIdx: number) => void;
 };
 
 const EMPTY_ANSWERS: WizardAnswers = {
@@ -104,8 +149,70 @@ export function createWizardState(source: WizardSource): WizardState {
   const [answers, setAnswers] = createSignal<WizardAnswers>(EMPTY_ANSWERS);
   const [proposal, setProposal] = createSignal<WizardProposal | null>(null);
   const [applyProgress, setApplyProgress] = createSignal<ApplyProgress | null>(null);
+  const [applyFailures, setApplyFailures] = createSignal<ApplyFailure[]>([]);
   const [resultWorkspaceId, setResultWorkspaceId] = createSignal<string | null>(null);
   const [errorMsg, setErrorMsg] = createSignal<string>('');
+
+  // Toggle-Helfer: deep-clone den proposal-State bevor wir ihn mutieren,
+  // damit Solid die Aenderung bemerkt. Seitwaerts-Effekte greifen sonst
+  // nicht, weil createSignal Identitaets-Vergleich nutzt.
+  const toggleNode = (nodeIdx: number): void => {
+    const cur = proposal();
+    if (!cur || nodeIdx < 0 || nodeIdx >= cur.nodes.length) return;
+    const next: WizardProposal = {
+      ...cur,
+      nodes: cur.nodes.map((n, i) => (i === nodeIdx ? { ...n, selected: !n.selected } : n)),
+    };
+    setProposal(next);
+  };
+
+  const toggleChild = (nodeIdx: number, childIdx: number): void => {
+    const cur = proposal();
+    if (!cur || nodeIdx < 0 || nodeIdx >= cur.nodes.length) return;
+    const node = cur.nodes[nodeIdx];
+    if (!node || childIdx < 0 || childIdx >= node.children.length) return;
+    const next: WizardProposal = {
+      ...cur,
+      nodes: cur.nodes.map((n, i) => {
+        if (i !== nodeIdx) return n;
+        return {
+          ...n,
+          children: n.children.map((c, j) =>
+            j === childIdx ? { ...c, selected: !c.selected } : c,
+          ),
+        };
+      }),
+    };
+    setProposal(next);
+  };
+
+  const toggleChecklist = (nodeIdx: number, childIdx: number, clIdx: number): void => {
+    const cur = proposal();
+    if (!cur || nodeIdx < 0 || nodeIdx >= cur.nodes.length) return;
+    const node = cur.nodes[nodeIdx];
+    if (!node || childIdx < 0 || childIdx >= node.children.length) return;
+    const child = node.children[childIdx];
+    if (!child || clIdx < 0 || clIdx >= child.checklists.length) return;
+    const next: WizardProposal = {
+      ...cur,
+      nodes: cur.nodes.map((n, i) => {
+        if (i !== nodeIdx) return n;
+        return {
+          ...n,
+          children: n.children.map((c, j) => {
+            if (j !== childIdx) return c;
+            return {
+              ...c,
+              checklists: c.checklists.map((cl, k) =>
+                k === clIdx ? { ...cl, selected: !cl.selected } : cl,
+              ),
+            };
+          }),
+        };
+      }),
+    };
+    setProposal(next);
+  };
 
   return {
     phase,
@@ -117,10 +224,15 @@ export function createWizardState(source: WizardSource): WizardState {
     setProposal,
     applyProgress,
     setApplyProgress,
+    applyFailures,
+    setApplyFailures,
     resultWorkspaceId,
     setResultWorkspaceId,
     errorMsg,
     setErrorMsg,
+    toggleNode,
+    toggleChild,
+    toggleChecklist,
   };
 }
 
