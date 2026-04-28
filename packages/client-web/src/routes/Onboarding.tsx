@@ -9,31 +9,38 @@
 // (kommt mit A.4d).
 
 import { useNavigate, useSearchParams } from '@solidjs/router';
-import { type Component, Show, createResource } from 'solid-js';
+import { type Component, Show, createMemo, createResource } from 'solid-js';
 import WizardShell from '../components/wizard/WizardShell';
 import { useUser } from '../lib/auth';
 import { fetchMyWorkspaces } from '../lib/queries';
+import type { WizardSource } from '../lib/wizard-state';
 
 const Onboarding: Component = () => {
   const user = useUser();
   const [search] = useSearchParams();
   const navigate = useNavigate();
 
-  const [resolved] = createResource<string | null, string | null>(
-    () => user()?.id ?? null,
-    async (uid) => {
+  // ?fresh=1 → Re-Run-Pfad: createWorkspace im Apply-Step (kind:'new').
+  // Sonst: Initial-Pfad mit existing default-workspace.
+  const isFresh = createMemo(() => search.fresh === '1');
+
+  const [resolved] = createResource<WizardSource | null, { uid: string | null; fresh: boolean }>(
+    () => ({ uid: user()?.id ?? null, fresh: isFresh() }),
+    async ({ uid, fresh }) => {
       if (!uid) return null;
-      const fromQuery = typeof search.ws === 'string' ? search.ws : null;
-      if (fromQuery) return fromQuery;
+      if (fresh) {
+        return { kind: 'new', pendingName: 'Neuer Workspace' };
+      }
+      const fromQuery = typeof search.ws === 'string' && search.ws ? search.ws : null;
+      if (fromQuery) return { kind: 'initial', workspaceId: fromQuery };
       try {
         const list = await fetchMyWorkspaces();
         if (list.length === 0) {
-          // Kein Workspace + Onboarding aufgerufen → Redirect home,
-          // App.tsx-Gate handhabt den Rest.
           navigate('/', { replace: true });
           return null;
         }
-        return list[0]?.id ?? null;
+        const wsId = list[0]?.id;
+        return wsId ? { kind: 'initial', workspaceId: wsId } : null;
       } catch (err) {
         console.error('Onboarding fetchMyWorkspaces:', err);
         navigate('/', { replace: true });
@@ -44,7 +51,7 @@ const Onboarding: Component = () => {
 
   return (
     <Show when={resolved()} fallback={<p class="boot">Lade Onboarding…</p>}>
-      {(wsId) => <WizardShell source={{ kind: 'initial', workspaceId: wsId() }} />}
+      {(src) => <WizardShell source={src()} />}
     </Show>
   );
 };

@@ -28,6 +28,8 @@ import {
   visibleStepIndex,
 } from '../../lib/wizard-state';
 import Icon from '../Icon';
+import StepApplying from './StepApplying';
+import StepDone from './StepDone';
 import StepPreview from './StepPreview';
 import StepProposing from './StepProposing';
 import StepProvider from './StepProvider';
@@ -176,18 +178,11 @@ const WizardShell: Component<Props> = (p) => {
               <Match when={state.phase() === 'preview'}>
                 <StepPreview />
               </Match>
-              <Match when={state.phase() === 'applying' || state.phase() === 'done'}>
-                <div class="wizard-placeholder">
-                  <p class="hint">
-                    Step 4 (Apply-Loop) ist noch nicht angeschlossen — Sub-Sprint A.4d kommt zum
-                    Abschluss.
-                  </p>
-                  <div class="wizard-footer">
-                    <button type="button" onClick={() => void finalizeDone()}>
-                      Wizard beenden
-                    </button>
-                  </div>
-                </div>
+              <Match when={state.phase() === 'applying'}>
+                <StepApplying />
+              </Match>
+              <Match when={state.phase() === 'done'}>
+                <StepDone onFinish={() => void finalizeDone()} />
               </Match>
               <Match when={state.phase() === 'error'}>
                 <div class="wizard-placeholder">

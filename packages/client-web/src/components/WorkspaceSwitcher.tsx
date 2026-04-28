@@ -68,6 +68,13 @@ const WorkspaceSwitcher: Component<Props> = (props) => {
     if (id !== props.currentWorkspaceId) navigate(`/w/${id}`);
   }
 
+  function pickNewWorkspace(): void {
+    close();
+    // Re-Run-Pfad: Onboarding-Wizard mit kind='new' — createWorkspace
+    // laeuft im Apply-Step. Siehe routes/Onboarding.tsx.
+    navigate('/onboarding?fresh=1');
+  }
+
   onMount(() => {
     const onDocClick = (e: MouseEvent) => {
       if (!open()) return;
@@ -155,6 +162,17 @@ const WorkspaceSwitcher: Component<Props> = (props) => {
                     </li>
                   )}
                 </For>
+                <li class="ws-switcher-action-row">
+                  <button
+                    type="button"
+                    class="ws-switcher-action"
+                    onClick={pickNewWorkspace}
+                    title="Mit dem KI-Wizard einen neuen Workspace bauen"
+                  >
+                    <Icon name="plus" size={12} />
+                    <span>Neuer Workspace mit Wizard</span>
+                  </button>
+                </li>
               </ul>
             </Portal>
           )}
