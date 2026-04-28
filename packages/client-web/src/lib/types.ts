@@ -34,6 +34,10 @@ export type NodeRow = {
   workspace_id: string;
   type: NodeType;
   label: string;
+  // Phase 3 O.8: Source-of-Truth fuer Display-Name. Plain rendert wie
+  // label; mit {row.object}/{column.object} resolved der Client live.
+  // label bleibt als Plain-Snapshot/Fallback erhalten.
+  label_template: string;
   alias: string | null;
   parent_cell_id: string | null;
   data: Record<string, unknown>;
@@ -219,6 +223,9 @@ export type ChecklistRow = {
   board_id: string | null;
   cell_id: string | null;
   label: string;
+  // Phase 3 O.8: Source-of-Truth fuer Display-Label. Plain rendert wie
+  // label; mit {row.object}/{column.object} resolved der Client live.
+  label_template: string;
   position: number;
   recur: Record<string, unknown> | null;
   close_mode: ChecklistCloseMode;
@@ -344,6 +351,9 @@ export type DocRow = {
   workspace_id: string;
   alias: string | null;
   title: string;
+  // Phase 3 O.8: Source-of-Truth fuer Display-Title. Plain rendert wie
+  // title; mit {row.object}/{column.object} resolved der Client live.
+  title_template: string;
   content: string;
   source_alias: string | null;
   attached_cell_id: string | null;

@@ -419,6 +419,9 @@ async function createChildNode(args: {
           workspace_id: args.workspaceId,
           type: args.type,
           label: args.label,
+          // Phase 3 O.8: Template-Spalte mit-anlegen (Snapshot = label).
+          // Volle Template-API kommt mit dem Wizard in O.8.E/F.
+          label_template: args.label,
           parent_cell_id: args.parentCellId,
           data: {},
         })
@@ -434,6 +437,7 @@ async function createChildNode(args: {
         workspace_id: args.workspaceId,
         type: args.type,
         label: args.label,
+        label_template: args.label,
         alias: null,
         parent_cell_id: args.parentCellId,
         data: {},
@@ -477,6 +481,7 @@ export async function createRootNode(args: {
           workspace_id: args.workspaceId,
           type: args.type,
           label,
+          label_template: label,
           parent_cell_id: null,
           data: {},
         })
@@ -492,6 +497,7 @@ export async function createRootNode(args: {
         workspace_id: args.workspaceId,
         type: args.type,
         label,
+        label_template: label,
         alias: null,
         parent_cell_id: null,
         data: {},
@@ -1187,6 +1193,8 @@ export async function addChecklist(args: {
           workspace_id: args.workspaceId,
           board_id: args.boardId,
           label: args.label ?? '',
+          // Phase 3 O.8: Template-Spalte (Snapshot = label).
+          label_template: args.label ?? '',
           position: pos,
         })
         .select()
@@ -1207,6 +1215,7 @@ export async function addChecklist(args: {
         board_id: args.boardId,
         cell_id: null,
         label: args.label ?? '',
+        label_template: args.label ?? '',
         position: pos,
         recur: null,
         close_mode: null,
@@ -1252,6 +1261,8 @@ export async function addCellChecklist(args: {
           workspace_id: args.workspaceId,
           cell_id: args.cellId,
           label: args.label ?? '',
+          // Phase 3 O.8: Template-Spalte (Snapshot = label).
+          label_template: args.label ?? '',
           position: pos,
         })
         .select()
@@ -1272,6 +1283,7 @@ export async function addCellChecklist(args: {
         board_id: null,
         cell_id: args.cellId,
         label: args.label ?? '',
+        label_template: args.label ?? '',
         position: pos,
         recur: null,
         close_mode: null,
@@ -2164,6 +2176,8 @@ export async function createDoc(args: {
         .insert({
           workspace_id: args.workspaceId,
           title: args.title ?? '',
+          // Phase 3 O.8: Template-Spalte (Snapshot = title).
+          title_template: args.title ?? '',
           content: args.content ?? '',
           alias: args.alias ?? null,
           source_alias: args.source_alias ?? null,
@@ -2181,6 +2195,7 @@ export async function createDoc(args: {
         workspace_id: args.workspaceId,
         alias: args.alias ?? null,
         title: args.title ?? '',
+        title_template: args.title ?? '',
         content: args.content ?? '',
         source_alias: args.source_alias ?? null,
         attached_cell_id: args.attached_cell_id ?? null,

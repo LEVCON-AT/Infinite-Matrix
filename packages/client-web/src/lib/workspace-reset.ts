@@ -107,6 +107,8 @@ export async function resetAllWorkspace(workspaceId: string): Promise<{ rootMatr
       workspace_id: workspaceId,
       type: 'matrix',
       label: 'Neue Matrix',
+      // Phase 3 O.8: Template-Spalte (Snapshot = label).
+      label_template: 'Neue Matrix',
       parent_cell_id: null,
       data: {},
     })

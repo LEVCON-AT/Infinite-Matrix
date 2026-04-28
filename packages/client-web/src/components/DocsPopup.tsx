@@ -614,6 +614,8 @@ const DocsPopup: Component<Props> = (p) => {
       workspace_id: p.workspaceId,
       alias: t.alias || null,
       title: t.title,
+      // Phase 3 O.8: Snapshot fuer Restore — Template = Title als Fallback.
+      title_template: t.title,
       content: t.content,
       source_alias: t.sourceAlias,
       attached_cell_id: t.attachedCellId,
