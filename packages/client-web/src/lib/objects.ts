@@ -152,6 +152,31 @@ export async function fetchAllBacklinks(workspaceId: string): Promise<ObjectBack
   return (data ?? []) as ObjectBacklink[];
 }
 
+// Phase 3 O.5: workspace-weite Tag-/Group-Mappings fuer ObjectsList-
+// Filter ohne N+1. fetchAllObjectTags liefert alle (object_id, tag_object_id)
+// Paare; fetchAllGroupMembers liefert alle (group_id, object_id)-Paare.
+// Skaliert bis ~50k Tags/Members; daruber Server-side-Filter via RPC.
+
+export async function fetchAllObjectTags(workspaceId: string): Promise<ObjectTagRow[]> {
+  if (!workspaceId) return [];
+  const { data, error } = await supabase
+    .from('object_tags')
+    .select('*')
+    .eq('workspace_id', workspaceId);
+  if (error) throw error;
+  return (data ?? []) as ObjectTagRow[];
+}
+
+export async function fetchAllGroupMembers(workspaceId: string): Promise<GroupMemberRow[]> {
+  if (!workspaceId) return [];
+  const { data, error } = await supabase
+    .from('group_members')
+    .select('*')
+    .eq('workspace_id', workspaceId);
+  if (error) throw error;
+  return (data ?? []) as GroupMemberRow[];
+}
+
 // ─── Read: fetchObjectGroups (welche Groups enthalten dieses Object?) ──
 export async function fetchObjectGroups(
   workspaceId: string,

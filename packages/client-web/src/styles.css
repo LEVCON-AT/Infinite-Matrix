@@ -8570,6 +8570,82 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   padding: var(--space-lg) 0;
 }
 
+.objects-list-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--rl);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--text2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--tr-std), border-color var(--tr-std), color var(--tr-std);
+}
+
+.objects-list-reset-btn:hover {
+  background: var(--bg-hover, var(--rl));
+  border-color: var(--danger, #c44);
+  color: var(--danger, #c44);
+}
+
+.objects-list-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--rl);
+}
+
+.objects-list-tags-label {
+  font-size: 12px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+  margin-right: 4px;
+}
+
+.objects-list-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: transparent;
+  border: 1px solid var(--rl);
+  border-radius: 12px;
+  color: var(--text2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--tr-std), border-color var(--tr-std), color var(--tr-std);
+}
+
+.objects-list-tag-chip:hover {
+  border-color: var(--p);
+  color: var(--text);
+}
+
+.objects-list-tag-chip.active {
+  background: var(--amberbg, var(--rl));
+  border-color: var(--amber, var(--p));
+  color: var(--text);
+  font-weight: 500;
+}
+
+.objects-list-tag-count {
+  padding: 0 5px;
+  background: var(--rl);
+  border-radius: 8px;
+  font-size: 10px;
+  color: var(--text3);
+}
+
+.objects-list-tag-chip.active .objects-list-tag-count {
+  background: var(--bg);
+}
+
 .objects-list {
   list-style: none;
   margin: 0;
