@@ -8,6 +8,7 @@ import Toasts from './components/Toasts';
 import { useDrawerHotkey } from './lib/ai-help-state';
 import { bootstrapAuth, useAccountInvalid, useAuthReady, useSession } from './lib/auth';
 import { useEditModeHotkey } from './lib/edit-mode';
+import { checkAndMaybeRedirectToOnboarding, resetOnboardingGate } from './lib/onboarding-gate';
 import { useUserPrefsSync } from './lib/settings';
 import { useThemeBootstrap } from './lib/theme';
 import { showToast } from './lib/toasts';
@@ -58,6 +59,7 @@ const App: ParentComponent = (props): JSX.Element => {
     const path = location.pathname;
     const onLogin = path === '/login';
     if (!session() && !isPublicRoute(path)) {
+      resetOnboardingGate();
       navigate('/login', { replace: true });
       return;
     }
@@ -75,6 +77,24 @@ const App: ParentComponent = (props): JSX.Element => {
         navigate(`/invite/${encodeURIComponent(pending)}`, { replace: true });
       } else {
         navigate('/', { replace: true });
+      }
+      return;
+    }
+
+    // Onboarding-Gate (A.4b): brand-neue User mit leerem Default-
+    // Workspace landen auf /onboarding. Existing User mit Inhalt
+    // werden nur gebackfilled (onboarding_done=true gesetzt). Pruefung
+    // laeuft einmal pro Session via Modul-lokal-Cache in
+    // onboarding-gate.ts.
+    if (
+      session() &&
+      !path.startsWith('/onboarding') &&
+      !isPublicRoute(path) &&
+      !path.startsWith('/invite/')
+    ) {
+      const userId = session()?.user.id;
+      if (userId) {
+        void checkAndMaybeRedirectToOnboarding(userId, navigate);
       }
     }
   });
