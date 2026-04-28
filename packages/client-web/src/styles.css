@@ -8388,6 +8388,86 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   border-top: 1px solid var(--rl);
 }
 
+/* Attribute-Edit-Liste (O.4.E) */
+.obj-attrs-edit-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.obj-attrs-edit-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.4fr) 1fr 24px;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.obj-attr-key-input,
+.obj-attr-val-input {
+  padding: 6px 10px;
+  font-size: var(--fs-small);
+}
+
+.obj-attr-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  color: var(--text3);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background var(--tr-std), color var(--tr-std);
+}
+
+.obj-attr-remove-btn:hover {
+  background: var(--rl);
+  color: var(--danger, #c44);
+}
+
+.obj-attr-add-btn {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px dashed var(--rl);
+  color: var(--text2);
+  padding: 4px 12px;
+  border-radius: var(--radius-sm, 6px);
+  font-size: 12px;
+  cursor: pointer;
+  margin-top: 6px;
+  transition: border-color var(--tr-std), color var(--tr-std);
+}
+
+.obj-attr-add-btn:hover {
+  border-color: var(--p);
+  color: var(--p);
+}
+
+@media (max-width: 600px) {
+  .obj-attrs-edit-row {
+    grid-template-columns: 1fr 24px;
+    grid-template-rows: auto auto;
+  }
+
+  .obj-attr-key-input {
+    grid-column: 1 / 3;
+  }
+
+  .obj-attr-val-input {
+    grid-column: 1 / 2;
+  }
+
+  .obj-attr-remove-btn {
+    grid-column: 2 / 3;
+    grid-row: 2 / 3;
+  }
+}
+
 /* ── Objects-List-Page (Phase 3 O.4.D) ──────────────────────── */
 
 .objects-list-page {

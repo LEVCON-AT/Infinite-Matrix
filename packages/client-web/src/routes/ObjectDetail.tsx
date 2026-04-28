@@ -74,6 +74,9 @@ const ObjectDetail: Component = () => {
   // Inline-Picker fuer Parent + Tag-Add.
   const [pickerKind, setPickerKind] = createSignal<'parent' | 'tag' | null>(null);
   const [pickerInput, setPickerInput] = createSignal('');
+  // Attribute als Array<[key, valueStr]> waehrend Edit — Order stable +
+  // Duplicate-Keys-Check moeglich. Beim Save: zurueck in Record.
+  const [draftAttrs, setDraftAttrs] = createSignal<Array<{ k: string; v: string }>>([]);
 
   // Single-Object holen.
   const [obj, { refetch: refetchObj }] = createResource(objId, async (id) => {
@@ -187,7 +190,62 @@ const ObjectDetail: Component = () => {
     setDraftLabel(o.label ?? '');
     setDraftAlias(o.alias ?? '');
     setDraftType(o.type_label ?? '');
+    const attrs = o.attrs ?? {};
+    setDraftAttrs(
+      Object.entries(attrs).map(([k, v]) => ({
+        k,
+        v: typeof v === 'string' ? v : JSON.stringify(v),
+      })),
+    );
     setEditMode(true);
+  }
+
+  function addDraftAttr() {
+    setDraftAttrs((arr) => [...arr, { k: '', v: '' }]);
+  }
+
+  function setDraftAttr(idx: number, patch: Partial<{ k: string; v: string }>) {
+    setDraftAttrs((arr) => arr.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+  }
+
+  function removeDraftAttr(idx: number) {
+    setDraftAttrs((arr) => arr.filter((_, i) => i !== idx));
+  }
+
+  function buildAttrsObject(): Record<string, unknown> | null {
+    const list = draftAttrs();
+    const seenKeys = new Set<string>();
+    const out: Record<string, unknown> = {};
+    for (const { k, v } of list) {
+      const key = k.trim();
+      if (!key) continue; // leere Keys: silent skip
+      if (seenKeys.has(key)) {
+        showToast(`Doppelter Attribut-Key "${key}".`, 'error');
+        return null;
+      }
+      seenKeys.add(key);
+      // Versuche JSON-Parse; klappt nur wenn der Wert ein gueltiges
+      // JSON-Literal ist (z.B. {"a":1} oder [1,2]). Sonst Plain-String.
+      const trimmed = v.trim();
+      if (
+        trimmed.length > 0 &&
+        (trimmed.startsWith('{') ||
+          trimmed.startsWith('[') ||
+          trimmed === 'true' ||
+          trimmed === 'false' ||
+          trimmed === 'null' ||
+          /^-?\d+(\.\d+)?$/.test(trimmed))
+      ) {
+        try {
+          out[key] = JSON.parse(trimmed);
+          continue;
+        } catch {
+          // Fallthrough zu Plain-String.
+        }
+      }
+      out[key] = v;
+    }
+    return out;
   }
 
   function cancelEdit() {
@@ -206,6 +264,8 @@ const ObjectDetail: Component = () => {
       showToast('Label darf nicht leer sein.', 'error');
       return;
     }
+    const attrs = buildAttrsObject();
+    if (attrs === null) return; // Toast schon gezeigt
     setBusy(true);
     try {
       await updateObject({
@@ -214,6 +274,7 @@ const ObjectDetail: Component = () => {
         // '' = clear server-side, undefined = nicht aendern.
         alias: draftAlias().trim(),
         typeLabel: draftType().trim(),
+        attrs,
       });
       showToast('Object gespeichert.', 'success');
       setEditMode(false);
@@ -726,21 +787,61 @@ const ObjectDetail: Component = () => {
                 <span>Attribute</span>
               </h2>
               <Show
-                when={Object.keys(o().attrs ?? {}).length > 0}
-                fallback={<p class="hint">Keine Attribute gepflegt.</p>}
+                when={editMode()}
+                fallback={
+                  <Show
+                    when={Object.keys(o().attrs ?? {}).length > 0}
+                    fallback={<p class="hint">Keine Attribute gepflegt.</p>}
+                  >
+                    <dl class="obj-attrs-list">
+                      <For each={Object.entries(o().attrs ?? {})}>
+                        {([k, v]) => (
+                          <>
+                            <dt class="obj-attr-key">{k}</dt>
+                            <dd class="obj-attr-val">
+                              {typeof v === 'string' ? v : JSON.stringify(v)}
+                            </dd>
+                          </>
+                        )}
+                      </For>
+                    </dl>
+                  </Show>
+                }
               >
-                <dl class="obj-attrs-list">
-                  <For each={Object.entries(o().attrs ?? {})}>
-                    {([k, v]) => (
-                      <>
-                        <dt class="obj-attr-key">{k}</dt>
-                        <dd class="obj-attr-val">
-                          {typeof v === 'string' ? v : JSON.stringify(v)}
-                        </dd>
-                      </>
+                <ul class="obj-attrs-edit-list">
+                  <For each={draftAttrs()}>
+                    {(item, idx) => (
+                      <li class="obj-attrs-edit-row">
+                        <input
+                          type="text"
+                          class="obj-detail-input obj-attr-key-input"
+                          value={item.k}
+                          placeholder="Key (z.B. email)"
+                          onInput={(e) => setDraftAttr(idx(), { k: e.currentTarget.value })}
+                        />
+                        <input
+                          type="text"
+                          class="obj-detail-input obj-attr-val-input"
+                          value={item.v}
+                          placeholder="Wert (Text oder JSON)"
+                          onInput={(e) => setDraftAttr(idx(), { v: e.currentTarget.value })}
+                        />
+                        <button
+                          type="button"
+                          class="obj-attr-remove-btn"
+                          onClick={() => removeDraftAttr(idx())}
+                          aria-label="Attribut entfernen"
+                          title="Attribut entfernen"
+                        >
+                          <Icon name="x" size={14} />
+                        </button>
+                      </li>
                     )}
                   </For>
-                </dl>
+                </ul>
+                <button type="button" class="obj-attr-add-btn" onClick={addDraftAttr}>
+                  + Attribut
+                </button>
               </Show>
             </section>
 
