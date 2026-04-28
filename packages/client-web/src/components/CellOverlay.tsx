@@ -166,6 +166,15 @@ const CellOverlay: Component<Props> = (p) => {
 
   async function onToggle(def: FeatureDef) {
     if (busy()) return;
+    // Phase 3 O.8: Doku ist ein neues Feature mit eigener Anlage-/
+    // Loesch-Logik (createDoc/deleteDoc). Bis der Wizard (O.8.E/F)
+    // CellOverlay komplett ersetzt, blocken wir Doku-Toggle hier —
+    // Doku-Anlage laeuft uebergangsweise weiter ueber den existing
+    // Workspace-Pfad (D-Hotkey im MatrixView).
+    if (def.kind === 'doc') {
+      showToast('Doku-Anlage erfolgt im neuen Wizard (kommt mit O.8.E/F).', 'info');
+      return;
+    }
     await wrap(def.key, async () => {
       if (def.kind === 'flag') await toggleFlag(def);
       else await toggleStructural(def);
@@ -396,7 +405,7 @@ const CellOverlay: Component<Props> = (p) => {
             role="group"
             aria-label="Zellen-Features"
           >
-            <For each={CELL_FEATURES}>
+            <For each={CELL_FEATURES.filter((f) => f.kind !== 'doc')}>
               {(def) => (
                 <button
                   type="button"

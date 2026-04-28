@@ -6,14 +6,22 @@
 //                  Cascade via FK).
 //   'flag'       = reiner Anzeige-Flag im cells.features-Array. Toggle
 //                  haengt nur am Array, kein Node-Write.
+//   'doc'        = Doku haengt ueber docs.attached_cell_id; kein cell.features-
+//                  Eintrag. Anlage = createDoc(...attached_cell_id), Loeschen
+//                  = doc loeschen. Doku ist `nameable: true` (eigener Title).
+//
+// nameable: Phase 3 O.8 — true wenn der Wizard fuer dieses Feature einen
+//           Cycle-Template-Schritt anbieten soll (Matrix, Board, Doku,
+//           Checkliste). Info ist ein reiner Flag ohne Namen, daher false.
 //
 // requires: optional. Feature-Hotkey ist disabled wenn Voraussetzung fehlt,
 //           und der Toggle-Handler kaskadiert beim Ausschalten der Basis.
 //
-// Neues Feature hinzufuegen = ein Listen-Eintrag. Hotkey '1'..'9' frei waehlen.
-// Der Button-Handler ist dispatch-based (kind -> Strategie), skaliert linear.
+// Neues Feature hinzufuegen = ein Listen-Eintrag. Hotkey '1'..'9' oder
+// einzelne Buchstaben (Phase 3 O.8: 'd' fuer Doku, 'n' als Platzhalter
+// fuer zukuenftige Features). Der Button-Handler ist dispatch-based.
 
-export type FeatureKind = 'structural' | 'flag';
+export type FeatureKind = 'structural' | 'flag' | 'doc';
 
 import type { IconName } from '../components/Icon';
 
@@ -24,6 +32,8 @@ export type FeatureDef = {
   icon: string; // Legacy Unicode-Fallback (Filter-Toolbar, Kompakt-Stellen)
   iconName: IconName; // Heroicons-SVG-Icon fuer alle Render-Pfade
   kind: FeatureKind;
+  // Phase 3 O.8: Wizard zeigt fuer nameable Features den Cycle-Step.
+  nameable: boolean;
   requires?: string;
 };
 
@@ -35,6 +45,7 @@ export const CELL_FEATURES: FeatureDef[] = [
     icon: '▦',
     iconName: 'squares-2x2',
     kind: 'structural',
+    nameable: true,
   },
   {
     key: 'board',
@@ -43,6 +54,7 @@ export const CELL_FEATURES: FeatureDef[] = [
     icon: '▤',
     iconName: 'view-columns',
     kind: 'structural',
+    nameable: true,
   },
   {
     key: 'info',
@@ -51,17 +63,27 @@ export const CELL_FEATURES: FeatureDef[] = [
     icon: 'i',
     iconName: 'information-circle',
     kind: 'flag',
+    nameable: false,
   },
   {
     key: 'checklists',
     hotkey: '4',
-    label: 'Checklisten',
+    label: 'Checkliste',
     icon: '✓',
     iconName: 'check-circle',
     kind: 'flag',
+    nameable: true,
   },
-  // { key: 'links', hotkey: '5', label: 'Links', icon: '→', iconName: 'link', kind: 'flag' },
-  // Platz fuer weitere Features (Hotkeys 5-9 frei).
+  {
+    key: 'doc',
+    hotkey: 'd',
+    label: 'Doku',
+    icon: '¶',
+    iconName: 'document-text',
+    kind: 'doc',
+    nameable: true,
+  },
+  // Hotkeys 5-9 + 'n' frei fuer zukuenftige Features.
 ];
 
 export function findFeatureByHotkey(hotkey: string): FeatureDef | undefined {
