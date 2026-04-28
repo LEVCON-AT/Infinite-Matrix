@@ -1,37 +1,45 @@
-// Object-Detail-Page (Phase 3 Welle O.4) — Read-only erste Version.
+// Object-Detail-Page (Phase 3 Welle O.4) — Read + Edit.
 //
-// Zeigt fuer ein Object:
-//   - Identity-Header: label, type-chip, ^o.alias-chip
-//   - Strukturpfad: home_ref → node-Pfad (Workspace > Node > Row/Col)
-//   - Backlinks-Sektion: alle Vorkommen ueber rows/cols/kb_cols/nodes
-//     mit Click-Through zur jeweiligen Node-Seite
-//   - Kinder-Sektion: parent_id-Children (mit Click-Through zum jeweiligen
-//     Object-Detail)
-//   - Gruppen-Sektion: groups die das Object enthalten
-//   - Tags-Sektion: object_tags-Liste (resolved zu Tag-Object-Labels)
-//   - Attribute-Sektion: attrs-jsonb als Key/Value-Liste
+// Zeigt fuer ein Object: Identity (label/alias/type/parent), Backlinks,
+// Kinder, Gruppen, Tags, Attribute. Edit-Toggle (Pencil-Button) macht
+// Identity-Felder editierbar; Tag-Add/-Remove und Parent-Pick laufen
+// ueber das ObjectSuggest-Singleton (Pattern aus MatrixView/BoardView).
 //
-// Edit-Modus + Delete kommen mit O.4.C als Folge-Sprint.
-//
-// Routen-Pattern: Standalone, keine Workspace-Sidebar — der User
-// navigiert hierhin gezielt aus einem Backlink, NodeTree-Object-Tab
-// (O.7) oder Filter-Dashboard (O.5).
+// Routen-Pattern: Standalone, keine Workspace-Sidebar — User navigiert
+// hierhin gezielt aus Backlink, NodeTree-Object-Tab (O.7) oder Filter-
+// Dashboard (O.5).
 
 import { useNavigate, useParams } from '@solidjs/router';
-import { type Component, For, Show, createMemo, createResource } from 'solid-js';
+import { type Component, For, Show, createMemo, createSignal } from 'solid-js';
+import { createResource } from 'solid-js';
 import Icon from '../components/Icon';
+import ObjectSuggestion from '../components/ObjectSuggestion';
+import { showConfirm } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
 import {
   type ObjectBacklink,
+  addObjectTag,
+  deleteObject,
   fetchObject,
   fetchObjectBacklinks,
   fetchObjectChildren,
   fetchObjectGroups,
   fetchObjectTags,
   fetchObjects,
+  removeObjectTag,
+  setObjectParent,
+  updateObject,
 } from '../lib/objects';
 import { showToast } from '../lib/toasts';
 import type { ObjectRow } from '../lib/types';
+import {
+  closeObjectSuggest,
+  commitObjectSuggest,
+  navigateObjectSuggest,
+  objectSuggestState,
+  openObjectSuggest,
+} from '../lib/use-object-suggest';
+import { useViewerActive } from '../lib/workspace-role';
 
 type RouteParams = { workspaceId: string; objectId: string };
 
@@ -52,12 +60,23 @@ const KIND_ICON: Record<ObjectBacklink['kind'], 'list-bullet' | 'view-columns' |
 const ObjectDetail: Component = () => {
   const params = useParams<RouteParams>();
   const navigate = useNavigate();
+  const viewerActive = useViewerActive();
 
   const wsId = () => params.workspaceId;
   const objId = () => params.objectId;
 
+  const [editMode, setEditMode] = createSignal(false);
+  const [busy, setBusy] = createSignal(false);
+  // Pro Identity-Feld eigener Draft-State, Reset beim Toggle off.
+  const [draftLabel, setDraftLabel] = createSignal('');
+  const [draftAlias, setDraftAlias] = createSignal('');
+  const [draftType, setDraftType] = createSignal('');
+  // Inline-Picker fuer Parent + Tag-Add.
+  const [pickerKind, setPickerKind] = createSignal<'parent' | 'tag' | null>(null);
+  const [pickerInput, setPickerInput] = createSignal('');
+
   // Single-Object holen.
-  const [obj, { mutate: _mutObj }] = createResource(objId, async (id) => {
+  const [obj, { refetch: refetchObj }] = createResource(objId, async (id) => {
     if (!id) return null;
     try {
       return await fetchObject(id);
@@ -69,9 +88,9 @@ const ObjectDetail: Component = () => {
   });
 
   // Workspace-Object-Index fuer Tag-Resolution (Tag IST ein Object).
-  // Wir lesen alle Workspace-Objects einmal — nicht ueberragend skaliert,
-  // aber bei < 5000 Objects akzeptabel. O.5 baut Index-Optimierungen.
-  const [allObjects] = createResource(wsId, async (ws) => {
+  // Wir lesen alle Workspace-Objects einmal — bei < 5000 Objects
+  // akzeptabel. O.5 baut Index-Optimierungen.
+  const [allObjects, { refetch: refetchAllObjects }] = createResource(wsId, async (ws) => {
     if (!ws) return [];
     try {
       return await fetchObjects(ws);
@@ -99,7 +118,7 @@ const ObjectDetail: Component = () => {
     },
   );
 
-  const [children] = createResource(
+  const [children, { refetch: refetchChildren }] = createResource(
     () => ({ ws: wsId(), id: objId() }),
     async (k) => {
       if (!k.ws || !k.id) return [];
@@ -125,7 +144,7 @@ const ObjectDetail: Component = () => {
     },
   );
 
-  const [tags] = createResource(
+  const [tags, { refetch: refetchTags }] = createResource(
     () => ({ ws: wsId(), id: objId() }),
     async (k) => {
       if (!k.ws || !k.id) return [];
@@ -138,17 +157,15 @@ const ObjectDetail: Component = () => {
     },
   );
 
-  // Parent-Object aufloesen (fuer Strukturpfad-Hint).
   const parentObject = createMemo<ObjectRow | null>(() => {
     const o = obj();
     if (!o?.parent_id) return null;
     return objectMap().get(o.parent_id) ?? null;
   });
 
+  const canEdit = () => !viewerActive();
+
   function navToBacklink(b: ObjectBacklink) {
-    // Zur Node-Seite — Row/Col/Kb_col scrollen wir nicht heran (das
-    // braeuchte Hash-Scroll-Pattern wie in NodeTree). Erste Version
-    // bringt User auf die Matrix/Board, die das Vorkommen enthaelt.
     navigate(`/w/${wsId()}/n/${b.node_id}`);
   }
 
@@ -157,12 +174,216 @@ const ObjectDetail: Component = () => {
   }
 
   function navBack() {
-    // Versuche aus dem Browser-Verlauf zurueck — sonst Workspace-Root.
     if (window.history.length > 1) {
       window.history.back();
       return;
     }
     navigate(`/w/${wsId()}`);
+  }
+
+  function enterEdit() {
+    const o = obj();
+    if (!o) return;
+    setDraftLabel(o.label ?? '');
+    setDraftAlias(o.alias ?? '');
+    setDraftType(o.type_label ?? '');
+    setEditMode(true);
+  }
+
+  function cancelEdit() {
+    setEditMode(false);
+    setPickerKind(null);
+    setPickerInput('');
+    closeObjectSuggest();
+  }
+
+  async function saveIdentity() {
+    if (busy()) return;
+    const o = obj();
+    if (!o) return;
+    const newLabel = draftLabel().trim();
+    if (!newLabel) {
+      showToast('Label darf nicht leer sein.', 'error');
+      return;
+    }
+    setBusy(true);
+    try {
+      await updateObject({
+        objectId: o.id,
+        label: newLabel,
+        // '' = clear server-side, undefined = nicht aendern.
+        alias: draftAlias().trim(),
+        typeLabel: draftType().trim(),
+      });
+      showToast('Object gespeichert.', 'success');
+      setEditMode(false);
+      void refetchObj();
+      void refetchAllObjects();
+    } catch (err) {
+      console.error('updateObject:', err);
+      showToast(translateDbError(err), 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // ─── Tag-Add via Inline-Picker ──────────────────────────────
+  function openTagPicker(anchor: HTMLInputElement) {
+    setPickerKind('tag');
+    openObjectSuggest({
+      anchor,
+      workspaceId: wsId(),
+      query: pickerInput(),
+      currentObjectId: objId(),
+      onPick: (hit) => {
+        if (!hit) return;
+        void doAddTag(hit.id);
+      },
+    });
+  }
+
+  async function doAddTag(tagId: string) {
+    const o = obj();
+    if (!o || tagId === o.id) return;
+    if ((tags() ?? []).some((t) => t.tag_object_id === tagId)) {
+      showToast('Tag bereits vergeben.', 'info');
+      setPickerKind(null);
+      setPickerInput('');
+      closeObjectSuggest();
+      return;
+    }
+    try {
+      await addObjectTag(o.id, tagId);
+      showToast('Tag hinzugefuegt.', 'success');
+      void refetchTags();
+    } catch (err) {
+      console.error('addObjectTag:', err);
+      showToast(translateDbError(err), 'error');
+    } finally {
+      setPickerKind(null);
+      setPickerInput('');
+      closeObjectSuggest();
+    }
+  }
+
+  async function removeTag(tagObjectId: string) {
+    const o = obj();
+    if (!o) return;
+    try {
+      await removeObjectTag(o.id, tagObjectId);
+      showToast('Tag entfernt.', 'success');
+      void refetchTags();
+    } catch (err) {
+      console.error('removeObjectTag:', err);
+      showToast(translateDbError(err), 'error');
+    }
+  }
+
+  // ─── Parent-Pick via Inline-Picker ──────────────────────────
+  function openParentPicker(anchor: HTMLInputElement) {
+    setPickerKind('parent');
+    openObjectSuggest({
+      anchor,
+      workspaceId: wsId(),
+      query: pickerInput(),
+      currentObjectId: objId(),
+      onPick: (hit) => {
+        if (!hit) return;
+        void doSetParent(hit.id);
+      },
+    });
+  }
+
+  async function doSetParent(parentId: string | null) {
+    const o = obj();
+    if (!o || parentId === o.id) return;
+    try {
+      await setObjectParent(o.id, parentId);
+      showToast(parentId ? 'Eltern-Object gesetzt.' : 'Eltern-Object entfernt.', 'success');
+      void refetchObj();
+      void refetchChildren();
+    } catch (err) {
+      console.error('setObjectParent:', err);
+      showToast(translateDbError(err), 'error');
+    } finally {
+      setPickerKind(null);
+      setPickerInput('');
+      closeObjectSuggest();
+    }
+  }
+
+  // ─── Picker-Input-Keyboard ──────────────────────────────────
+  function onPickerKey(e: KeyboardEvent & { currentTarget: HTMLInputElement }) {
+    if (e.key === 'ArrowDown' && objectSuggestState().open) {
+      e.preventDefault();
+      navigateObjectSuggest('down');
+      return;
+    }
+    if (e.key === 'ArrowUp' && objectSuggestState().open) {
+      e.preventDefault();
+      navigateObjectSuggest('up');
+      return;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setPickerKind(null);
+      setPickerInput('');
+      closeObjectSuggest();
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const hit = commitObjectSuggest();
+      // Wenn nichts highlighted, schliesse Picker still.
+      if (!hit) {
+        setPickerKind(null);
+        setPickerInput('');
+        closeObjectSuggest();
+      }
+      // Bei hit: onPick wurde durch commitObjectSuggest aufgerufen,
+      // doAddTag/doSetParent erledigt das Aufraeumen.
+    }
+  }
+
+  function onPickerInput(e: InputEvent & { currentTarget: HTMLInputElement }) {
+    const v = e.currentTarget.value;
+    setPickerInput(v);
+    if (v.trim().length >= 1) {
+      const kind = pickerKind();
+      if (kind === 'tag') openTagPicker(e.currentTarget);
+      else if (kind === 'parent') openParentPicker(e.currentTarget);
+    } else {
+      closeObjectSuggest();
+    }
+  }
+
+  // ─── Delete-Pfad ────────────────────────────────────────────
+  async function onDelete() {
+    if (busy()) return;
+    const o = obj();
+    if (!o) return;
+    const refsCount = (backlinks() ?? []).length;
+    const message =
+      refsCount > 0
+        ? `"${o.label}" loeschen? Wird aus ${refsCount} Vorkommen entfernt — Zeilen/Spalten bleiben, verlieren nur die Object-Verknuepfung.`
+        : `"${o.label}" loeschen?`;
+    const ok = await showConfirm({
+      title: 'Object loeschen?',
+      message,
+      variant: 'danger',
+      confirmLabel: 'Loeschen',
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await deleteObject(o.id);
+      showToast('Object geloescht.', 'success');
+      navBack();
+    } catch (err) {
+      console.error('deleteObject:', err);
+      showToast(translateDbError(err), 'error');
+      setBusy(false);
+    }
   }
 
   return (
@@ -172,11 +393,35 @@ const ObjectDetail: Component = () => {
           <Icon name="arrow-left" size={18} />
           <span>Zurueck</span>
         </button>
+        <div class="obj-detail-head-spacer" />
         <Show when={obj.loading}>
           <p class="hint">Lade Object…</p>
         </Show>
         <Show when={!obj.loading && !obj()}>
           <p class="hint">Object nicht gefunden.</p>
+        </Show>
+        <Show when={obj() && canEdit()}>
+          <Show
+            when={editMode()}
+            fallback={
+              <button
+                type="button"
+                class="obj-detail-edit-btn"
+                onClick={enterEdit}
+                title="Object bearbeiten"
+              >
+                <Icon name="pencil" size={16} />
+                <span>Bearbeiten</span>
+              </button>
+            }
+          >
+            <button type="button" class="btn-subtle" onClick={cancelEdit} disabled={busy()}>
+              Abbrechen
+            </button>
+            <button type="button" class="btn btn-p" onClick={saveIdentity} disabled={busy()}>
+              Speichern
+            </button>
+          </Show>
         </Show>
       </header>
 
@@ -184,14 +429,72 @@ const ObjectDetail: Component = () => {
         {(o) => (
           <div class="obj-detail-body">
             <section class="obj-detail-identity">
-              <div class="obj-detail-identity-row">
-                <h1 class="obj-detail-label">{o().label || '(ohne Label)'}</h1>
-                <Show when={o().type_label}>
-                  {(typeLabel) => <span class="obj-type-chip">{typeLabel()}</span>}
-                </Show>
-              </div>
-              <Show when={o().alias}>{(alias) => <p class="obj-alias-chip">^o.{alias()}</p>}</Show>
-              <Show when={parentObject()}>
+              <Show
+                when={editMode()}
+                fallback={
+                  <>
+                    <div class="obj-detail-identity-row">
+                      <h1 class="obj-detail-label">{o().label || '(ohne Label)'}</h1>
+                      <Show when={o().type_label}>
+                        {(typeLabel) => <span class="obj-type-chip">{typeLabel()}</span>}
+                      </Show>
+                    </div>
+                    <Show when={o().alias}>
+                      {(alias) => <p class="obj-alias-chip">^o.{alias()}</p>}
+                    </Show>
+                  </>
+                }
+              >
+                <div class="obj-detail-edit-form">
+                  <label class="obj-detail-field">
+                    <span class="obj-detail-field-label">Label</span>
+                    <input
+                      type="text"
+                      class="obj-detail-input"
+                      value={draftLabel()}
+                      onInput={(e) => setDraftLabel(e.currentTarget.value)}
+                      placeholder="Label"
+                    />
+                  </label>
+                  <label class="obj-detail-field">
+                    <span class="obj-detail-field-label">Alias (^o.&lt;slug&gt;, optional)</span>
+                    <input
+                      type="text"
+                      class="obj-detail-input"
+                      value={draftAlias()}
+                      onInput={(e) => setDraftAlias(e.currentTarget.value)}
+                      placeholder="kunde-mueller"
+                    />
+                  </label>
+                  <label class="obj-detail-field">
+                    <span class="obj-detail-field-label">Type (frei, optional)</span>
+                    <input
+                      type="text"
+                      class="obj-detail-input"
+                      value={draftType()}
+                      onInput={(e) => setDraftType(e.currentTarget.value)}
+                      placeholder="z.B. Kunde, Hunderasse"
+                    />
+                  </label>
+                </div>
+              </Show>
+
+              <Show
+                when={parentObject()}
+                fallback={
+                  <Show when={editMode() && pickerKind() !== 'parent'}>
+                    <p class="obj-parent-line">
+                      <button
+                        type="button"
+                        class="obj-parent-pick-btn"
+                        onClick={() => setPickerKind('parent')}
+                      >
+                        + Eltern-Object setzen
+                      </button>
+                    </p>
+                  </Show>
+                }
+              >
                 {(parent) => (
                   <p class="obj-parent-line">
                     <span class="obj-parent-label">Eltern-Object:</span>{' '}
@@ -202,8 +505,50 @@ const ObjectDetail: Component = () => {
                     >
                       {parent().label || '(ohne Label)'}
                     </button>
+                    <Show when={editMode()}>
+                      <button
+                        type="button"
+                        class="obj-parent-clear-btn"
+                        onClick={() => void doSetParent(null)}
+                        title="Eltern-Object entfernen"
+                        aria-label="Eltern-Object entfernen"
+                      >
+                        <Icon name="x" size={12} />
+                      </button>
+                      <button
+                        type="button"
+                        class="obj-parent-pick-btn"
+                        onClick={() => setPickerKind('parent')}
+                      >
+                        ändern
+                      </button>
+                    </Show>
                   </p>
                 )}
+              </Show>
+              <Show when={editMode() && pickerKind() === 'parent'}>
+                <div class="obj-picker-row">
+                  <input
+                    type="text"
+                    class="obj-detail-input obj-picker-input"
+                    value={pickerInput()}
+                    placeholder="Object suchen…"
+                    onInput={onPickerInput}
+                    onKeyDown={onPickerKey}
+                    ref={(el) => queueMicrotask(() => el.focus())}
+                  />
+                  <button
+                    type="button"
+                    class="btn-subtle"
+                    onClick={() => {
+                      setPickerKind(null);
+                      setPickerInput('');
+                      closeObjectSuggest();
+                    }}
+                  >
+                    Abbrechen
+                  </button>
+                </div>
               </Show>
             </section>
 
@@ -299,11 +644,25 @@ const ObjectDetail: Component = () => {
             </section>
 
             <section class="obj-detail-section">
-              <h2 class="obj-detail-section-title">
-                <Icon name="tag" size={16} />
-                <span>Tags ({tags()?.length ?? 0})</span>
-              </h2>
-              <Show when={(tags() ?? []).length > 0} fallback={<p class="hint">Keine Tags.</p>}>
+              <div class="obj-detail-section-title-row">
+                <h2 class="obj-detail-section-title">
+                  <Icon name="tag" size={16} />
+                  <span>Tags ({tags()?.length ?? 0})</span>
+                </h2>
+                <Show when={editMode() && pickerKind() !== 'tag'}>
+                  <button
+                    type="button"
+                    class="obj-tag-add-btn"
+                    onClick={() => setPickerKind('tag')}
+                  >
+                    + Tag
+                  </button>
+                </Show>
+              </div>
+              <Show
+                when={(tags() ?? []).length > 0 || editMode()}
+                fallback={<p class="hint">Keine Tags.</p>}
+              >
                 <ul class="obj-tag-list">
                   <For each={tags() ?? []}>
                     {(t) => {
@@ -318,11 +677,46 @@ const ObjectDetail: Component = () => {
                           >
                             {tagObj()?.label ?? '(unbekannt)'}
                           </button>
+                          <Show when={editMode()}>
+                            <button
+                              type="button"
+                              class="obj-tag-remove-btn"
+                              onClick={() => void removeTag(t.tag_object_id)}
+                              aria-label="Tag entfernen"
+                              title="Tag entfernen"
+                            >
+                              <Icon name="x" size={10} />
+                            </button>
+                          </Show>
                         </li>
                       );
                     }}
                   </For>
                 </ul>
+              </Show>
+              <Show when={editMode() && pickerKind() === 'tag'}>
+                <div class="obj-picker-row">
+                  <input
+                    type="text"
+                    class="obj-detail-input obj-picker-input"
+                    value={pickerInput()}
+                    placeholder="Tag-Object suchen…"
+                    onInput={onPickerInput}
+                    onKeyDown={onPickerKey}
+                    ref={(el) => queueMicrotask(() => el.focus())}
+                  />
+                  <button
+                    type="button"
+                    class="btn-subtle"
+                    onClick={() => {
+                      setPickerKind(null);
+                      setPickerInput('');
+                      closeObjectSuggest();
+                    }}
+                  >
+                    Abbrechen
+                  </button>
+                </div>
               </Show>
             </section>
 
@@ -349,9 +743,26 @@ const ObjectDetail: Component = () => {
                 </dl>
               </Show>
             </section>
+
+            <Show when={editMode()}>
+              <footer class="obj-detail-foot">
+                <button
+                  type="button"
+                  class="btn-danger"
+                  onClick={() => void onDelete()}
+                  disabled={busy()}
+                  title="Object loeschen"
+                >
+                  <Icon name="trash" size={14} />
+                  <span>Object loeschen</span>
+                </button>
+              </footer>
+            </Show>
           </div>
         )}
       </Show>
+
+      <ObjectSuggestion />
     </div>
   );
 };

@@ -8226,6 +8226,168 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   border-bottom: 1px solid var(--rl);
 }
 
+.obj-detail-head-spacer {
+  flex: 1 1 auto;
+}
+
+.obj-detail-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--rl);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--text2);
+  font-size: var(--fs-small);
+  cursor: pointer;
+  transition: background var(--tr-std), border-color var(--tr-std), color var(--tr-std);
+}
+
+.obj-detail-edit-btn:hover {
+  background: var(--bg-hover, var(--rl));
+  color: var(--text);
+  border-color: var(--p);
+}
+
+.obj-detail-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.obj-detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.obj-detail-field-label {
+  font-size: 12px;
+  color: var(--text3);
+  font-weight: 500;
+}
+
+.obj-detail-input {
+  padding: 8px 12px;
+  border: 1px solid var(--rl);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg);
+  color: var(--text);
+  font-size: var(--fs-base, 14px);
+  transition: border-color var(--tr-std);
+}
+
+.obj-detail-input:focus {
+  outline: none;
+  border-color: var(--p);
+}
+
+.obj-detail-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.obj-parent-pick-btn {
+  background: transparent;
+  border: 1px dashed var(--rl);
+  color: var(--text2);
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-left: 6px;
+  transition: border-color var(--tr-std), color var(--tr-std);
+}
+
+.obj-parent-pick-btn:hover {
+  border-color: var(--p);
+  color: var(--p);
+}
+
+.obj-parent-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: transparent;
+  border: none;
+  color: var(--text3);
+  border-radius: 50%;
+  cursor: pointer;
+  margin-left: 4px;
+  transition: background var(--tr-std), color var(--tr-std);
+}
+
+.obj-parent-clear-btn:hover {
+  background: var(--rl);
+  color: var(--danger, #c44);
+}
+
+.obj-picker-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: 4px;
+}
+
+.obj-picker-input {
+  flex: 1 1 auto;
+}
+
+.obj-detail-section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.obj-tag-add-btn {
+  background: transparent;
+  border: 1px dashed var(--rl);
+  color: var(--text2);
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color var(--tr-std), color var(--tr-std);
+}
+
+.obj-tag-add-btn:hover {
+  border-color: var(--p);
+  color: var(--p);
+}
+
+.obj-tag-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: transparent;
+  border: none;
+  color: var(--text3);
+  border-radius: 50%;
+  cursor: pointer;
+  margin-left: 4px;
+  transition: background var(--tr-std), color var(--tr-std);
+}
+
+.obj-tag-remove-btn:hover {
+  background: var(--rl);
+  color: var(--danger, #c44);
+}
+
+.obj-detail-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  padding-top: var(--space-md);
+  margin-top: var(--space-md);
+  border-top: 1px solid var(--rl);
+}
+
 .obj-detail-back {
   display: inline-flex;
   align-items: center;
