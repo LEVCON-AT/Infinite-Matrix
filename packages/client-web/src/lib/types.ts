@@ -43,6 +43,10 @@ export type NodeRow = {
   // automatisch gesetzt; NULL nach User-Delete (ON DELETE SET NULL)
   // oder bei Service-Role-Inserts ohne explicit-Param (Bridge).
   created_by: string | null;
+  // Phase 3 O.1: optional Object-Ref. Wenn gesetzt, ist der Knoten
+  // selbst eine wiederverwendbare Identitaet (Power-User-Toggle).
+  // Default null — Knoten ist nur Container.
+  object_id?: string | null;
 };
 
 export type CellRow = {
@@ -64,6 +68,8 @@ export type RowRow = {
   workspace_id: string;
   label: string;
   position: number;
+  // Phase 3 O.1: optional Object-Ref. Auto-Object kommt mit O.2.
+  object_id?: string | null;
 };
 
 export type ColRow = {
@@ -72,6 +78,7 @@ export type ColRow = {
   workspace_id: string;
   label: string;
   position: number;
+  object_id?: string | null;
 };
 
 export type MatrixContent = {
@@ -111,6 +118,9 @@ export type KbColRow = {
   label: string;
   position: number;
   color: string | null;
+  // Phase 3 O.1: optional Object-Ref. kb_cards (Karten) bekommen
+  // KEIN object_id — User-Architektur-Regel: Karten sind Pfad-Enden.
+  object_id?: string | null;
 };
 
 // Inline-Checkliste auf einer Karte (kb_cards.checklist jsonb).
@@ -365,4 +375,82 @@ export type AiProviderInput = {
   apiKey?: string; // undefined bei UPDATE ohne Key-Wechsel
   modelName?: string;
   setDefault?: boolean;
+};
+
+// ─── Object-Layer (Phase 3 Welle O.1) ─────────────────────────
+// Globale Identities pro Workspace. Zeilen / Spalten / kb_cols /
+// (optional) nodes referenzieren ueber object_id auf einen
+// ObjectRow-Eintrag. Cells und kb_cards bleiben Pfad-Enden ohne
+// object_id (User-Architektur-Regel 2026-04-29).
+//
+// Auto-Anlage + Suggestion-UI kommt mit O.2. O.1 ist nur Schema +
+// leere Helper. Die Typen sind hier vorbereitet damit nachfolgende
+// Wellen ohne Type-Refactor weiterbauen koennen.
+
+export type ObjectHomeRefKind = 'row' | 'col' | 'kb_col' | 'node' | 'standalone';
+
+export type ObjectRow = {
+  id: string;
+  workspace_id: string;
+  label: string;
+  alias: string | null; // ohne ^o.-Prefix gespeichert; UI rendert mit Prefix
+  type_label: string | null; // frei, optional
+  parent_id: string | null; // Self-FK fuer Hierarchie
+  attrs: Record<string, unknown>;
+  home_ref_kind: ObjectHomeRefKind | null;
+  home_ref_id: string | null;
+  created_at: string;
+  created_by: string | null;
+  updated_at: string;
+};
+
+export type ObjectInput = {
+  label: string;
+  alias?: string | null;
+  type_label?: string | null;
+  parent_id?: string | null;
+  attrs?: Record<string, unknown>;
+  home_ref_kind?: ObjectHomeRefKind;
+  home_ref_id?: string;
+};
+
+export type ObjectTagRow = {
+  object_id: string;
+  tag_object_id: string;
+  workspace_id: string;
+  created_at: string;
+};
+
+export type GroupRow = {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+  created_by: string | null;
+  updated_at: string;
+};
+
+export type GroupMemberRow = {
+  group_id: string;
+  object_id: string;
+  workspace_id: string;
+  created_at: string;
+};
+
+export type SoftGroupRow = {
+  id: string;
+  workspace_id: string;
+  name: string;
+  source_node_id: string | null;
+  promoted_to: string | null; // groups.id wenn promoted
+  created_at: string;
+  last_used_at: string;
+  created_by: string | null;
+};
+
+export type SoftGroupMemberRow = {
+  soft_group_id: string;
+  object_id: string;
+  workspace_id: string;
 };
