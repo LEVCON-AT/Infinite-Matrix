@@ -311,15 +311,62 @@ export async function searchObjects(
   return (data ?? []) as ObjectSearchHit[];
 }
 
-// ─── Stubs fuer Tags / Groups / Soft-Groups ──────────────────
-// Werden in O.4 (Hierarchie + Tags) und O.3 (Bulk-Modal + Soft-
-// Groups) implementiert. Hier nur Signaturen damit andere Module
-// schon importieren koennen ohne Type-Errors.
+// ─── Reads: Groups / Soft-Groups ─────────────────────────────
+// Online-only wie fetchObjects — IDB-Cache-Fallback folgt mit O.4
+// wenn offline-cache.ts-TABLES-Liste erweitert wird (DB_VERSION-Bump).
 
-export async function fetchGroups(_workspaceId: string): Promise<GroupRow[]> {
-  return [];
+export async function fetchGroups(workspaceId: string): Promise<GroupRow[]> {
+  if (!workspaceId) return [];
+  const { data, error } = await supabase
+    .from('groups')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as GroupRow[];
 }
 
+export async function fetchGroupMembers(
+  workspaceId: string,
+  groupId: string,
+): Promise<GroupMemberRow[]> {
+  if (!workspaceId || !groupId) return [];
+  const { data, error } = await supabase
+    .from('group_members')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .eq('group_id', groupId);
+  if (error) throw error;
+  return (data ?? []) as GroupMemberRow[];
+}
+
+export async function fetchSoftGroups(workspaceId: string): Promise<SoftGroupRow[]> {
+  if (!workspaceId) return [];
+  const { data, error } = await supabase
+    .from('soft_groups')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .order('last_used_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as SoftGroupRow[];
+}
+
+export async function fetchSoftGroupMembers(
+  workspaceId: string,
+  softGroupId: string,
+): Promise<SoftGroupMemberRow[]> {
+  if (!workspaceId || !softGroupId) return [];
+  const { data, error } = await supabase
+    .from('soft_group_members')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .eq('soft_group_id', softGroupId);
+  if (error) throw error;
+  return (data ?? []) as SoftGroupMemberRow[];
+}
+
+// Tag-M:N kommt mit O.4 (Object-Detail-Page). Stub bleibt damit
+// andere Module schon importieren koennen ohne Type-Errors.
 export async function fetchObjectTags(
   _workspaceId: string,
   _objectId: string,
@@ -327,20 +374,114 @@ export async function fetchObjectTags(
   return [];
 }
 
-export async function fetchGroupMembers(
-  _workspaceId: string,
-  _groupId: string,
-): Promise<GroupMemberRow[]> {
-  return [];
+// ─── Mutations: Groups / Soft-Groups ─────────────────────────
+// Sync-online ohne safe-mutation-Wrapper — Group-Anlage ist eine
+// User-getriggerte Single-Action im Bulk-Modal mit eigener Toast-
+// Pflege. Pattern wie createObject.
+
+export async function createGroup(args: {
+  workspaceId: string;
+  name: string;
+  description?: string | null;
+}): Promise<GroupRow> {
+  const { data: rpcData, error: rpcErr } = await supabase.rpc('mcp_create_group', {
+    p_workspace_id: args.workspaceId,
+    p_name: args.name,
+    p_description: args.description ?? null,
+  });
+  if (rpcErr) throw rpcErr;
+  const groupId = (rpcData as { group_id?: string } | null)?.group_id;
+  if (!groupId) throw new Error('mcp_create_group: keine group_id zurueck');
+
+  const { data: rowData, error: rowErr } = await supabase
+    .from('groups')
+    .select('*')
+    .eq('id', groupId)
+    .single();
+  if (rowErr) throw rowErr;
+  return rowData as GroupRow;
 }
 
-export async function fetchSoftGroups(_workspaceId: string): Promise<SoftGroupRow[]> {
-  return [];
+export async function addGroupMembers(
+  groupId: string,
+  objectIds: string[],
+): Promise<{ added: number; total: number }> {
+  if (objectIds.length === 0) return { added: 0, total: 0 };
+  const { data, error } = await supabase.rpc('mcp_add_group_members', {
+    p_group_id: groupId,
+    p_object_ids: objectIds,
+  });
+  if (error) throw error;
+  const r = data as { added?: number; total?: number } | null;
+  return { added: r?.added ?? 0, total: r?.total ?? objectIds.length };
 }
 
-export async function fetchSoftGroupMembers(
-  _workspaceId: string,
-  _softGroupId: string,
-): Promise<SoftGroupMemberRow[]> {
-  return [];
+export async function removeGroupMembers(
+  groupId: string,
+  objectIds: string[],
+): Promise<{ removed: number }> {
+  if (objectIds.length === 0) return { removed: 0 };
+  const { data, error } = await supabase.rpc('mcp_remove_group_members', {
+    p_group_id: groupId,
+    p_object_ids: objectIds,
+  });
+  if (error) throw error;
+  return { removed: (data as { removed?: number } | null)?.removed ?? 0 };
+}
+
+export async function renameGroup(groupId: string, newName: string): Promise<void> {
+  const { error } = await supabase.rpc('mcp_rename_group', {
+    p_group_id: groupId,
+    p_new_name: newName,
+  });
+  if (error) throw error;
+}
+
+export async function deleteGroup(groupId: string): Promise<void> {
+  const { error } = await supabase.rpc('mcp_delete_group', { p_group_id: groupId });
+  if (error) throw error;
+}
+
+// Soft-Gruppe: ephemere Multi-Select-Auswahl. Wird vom BulkAddModal
+// im Hintergrund gespeichert wenn der User KEIN "Als Gruppe speichern"
+// aktiviert hat — Quick-Vorschlag fuer naechste aehnliche Aktion.
+export async function createSoftGroup(args: {
+  workspaceId: string;
+  name: string;
+  sourceNodeId?: string | null;
+  objectIds: string[];
+}): Promise<SoftGroupRow> {
+  const { data: rpcData, error: rpcErr } = await supabase.rpc('mcp_create_soft_group', {
+    p_workspace_id: args.workspaceId,
+    p_name: args.name,
+    p_source_node_id: args.sourceNodeId ?? null,
+    p_object_ids: args.objectIds,
+  });
+  if (rpcErr) throw rpcErr;
+  const sgId = (rpcData as { soft_group_id?: string } | null)?.soft_group_id;
+  if (!sgId) throw new Error('mcp_create_soft_group: keine soft_group_id zurueck');
+
+  const { data: rowData, error: rowErr } = await supabase
+    .from('soft_groups')
+    .select('*')
+    .eq('id', sgId)
+    .single();
+  if (rowErr) throw rowErr;
+  return rowData as SoftGroupRow;
+}
+
+export async function promoteSoftGroup(args: {
+  softGroupId: string;
+  groupName: string;
+  description?: string | null;
+}): Promise<{ groupId: string; alreadyPromoted: boolean }> {
+  const { data, error } = await supabase.rpc('mcp_promote_soft_group', {
+    p_soft_group_id: args.softGroupId,
+    p_group_name: args.groupName,
+    p_description: args.description ?? null,
+  });
+  if (error) throw error;
+  const r = data as { group_id?: string; already_promoted?: boolean } | null;
+  if (!r?.group_id) throw new Error('mcp_promote_soft_group: keine group_id zurueck');
+  return { groupId: r.group_id, alreadyPromoted: r.already_promoted === true };
 }

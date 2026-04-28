@@ -50,6 +50,7 @@ import {
   openObjectSuggest,
 } from '../lib/use-object-suggest';
 import { useViewerActive } from '../lib/workspace-role';
+import BulkAddModal from './BulkAddModal';
 import CardOverlay from './CardOverlay';
 import ChecklistPanel from './ChecklistPanel';
 import Icon from './Icon';
@@ -374,6 +375,8 @@ const BoardView: Component<Props> = (p) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedCardId, setSelectedCardId] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
+  // Phase 3 O.3: Bulk-Add fuer Kb-Spalten (Shift+Klick auf "+ Spalte").
+  const [bulkAddOpen, setBulkAddOpen] = createSignal(false);
 
   // Deep-Link ?card=<id> → CardOverlay direkt oeffnen (Quicknav).
   // Erst wenn content vorhanden ist und die Karte wirklich existiert.
@@ -470,7 +473,11 @@ const BoardView: Component<Props> = (p) => {
     }
   }
 
-  async function onAddCol() {
+  async function onAddCol(e?: MouseEvent | KeyboardEvent) {
+    if (e?.shiftKey) {
+      setBulkAddOpen(true);
+      return;
+    }
     await wrap(() => addKbCol({ workspaceId: p.workspaceId, boardId: p.boardId }));
   }
 
@@ -945,7 +952,13 @@ const BoardView: Component<Props> = (p) => {
                   <Show when={canAddKbCol()}> + Spalte, um zu starten.</Show>
                 </p>
                 <Show when={canAddKbCol()}>
-                  <button type="button" class="btn-subtle" onClick={onAddCol} disabled={busy()}>
+                  <button
+                    type="button"
+                    class="btn-subtle"
+                    onClick={(e) => onAddCol(e)}
+                    disabled={busy()}
+                    title="Spalte hinzufuegen (Shift+Klick: mehrere)"
+                  >
                     <Icon name="plus" size={14} />
                     <span>Spalte</span>
                   </button>
@@ -1279,15 +1292,15 @@ const BoardView: Component<Props> = (p) => {
                 }}
               </For>
 
-              {/* Letzte Spalte im Edit-Mode: "+ Spalte" */}
+              {/* Letzte Spalte im Edit-Mode: "+ Spalte" (Shift+Klick = Bulk) */}
               <Show when={canAddKbCol()}>
                 <div class="kb-col kb-col-add">
                   <button
                     type="button"
                     class="kb-col-add-btn"
-                    onClick={onAddCol}
+                    onClick={(e) => onAddCol(e)}
                     disabled={busy()}
-                    title="Spalte hinzufuegen"
+                    title="Spalte hinzufuegen (Shift+Klick: mehrere)"
                   >
                     <Icon name="plus" size={14} />
                     <span>Spalte</span>
@@ -1346,6 +1359,17 @@ const BoardView: Component<Props> = (p) => {
                 onChanged={() => p.onChanged?.()}
               />
             )}
+          </Show>
+
+          <Show when={bulkAddOpen()}>
+            <BulkAddModal
+              workspaceId={p.workspaceId}
+              mode="board-cols"
+              parentId={p.boardId}
+              sourceNodeId={p.boardId}
+              onClose={() => setBulkAddOpen(false)}
+              onCreated={() => p.onChanged?.()}
+            />
           </Show>
         </div>
       )}

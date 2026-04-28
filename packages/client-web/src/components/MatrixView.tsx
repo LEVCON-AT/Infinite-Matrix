@@ -41,6 +41,7 @@ import {
   objectSuggestState,
   openObjectSuggest,
 } from '../lib/use-object-suggest';
+import BulkAddModal, { type BulkAddMode } from './BulkAddModal';
 import CellOverlay from './CellOverlay';
 import Icon, { type IconName } from './Icon';
 import MatrixAggregateSection from './MatrixAggregateSection';
@@ -133,6 +134,9 @@ const MatrixView: Component<Props> = (p) => {
 
   const [busy, setBusy] = createSignal(false);
   const [overlayTarget, setOverlayTarget] = createSignal<OverlayTarget | null>(null);
+  // Phase 3 O.3: Bulk-Add-Modal-State. Shift+Klick auf "+ Zeile" bzw.
+  // "+ Spalte" oeffnet listenweise Anlage, optional Gruppen-Speicher.
+  const [bulkAddMode, setBulkAddMode] = createSignal<BulkAddMode | null>(null);
   // Guard: Initial-Focus (0,0) nur einmal pro Matrix-Besuch. Verhindert,
   // dass jede Content-Mutation den Fokus auf (0,0) zurueckreisst.
   const [initialFocusedFor, setInitialFocusedFor] = createSignal<string | null>(null);
@@ -217,11 +221,19 @@ const MatrixView: Component<Props> = (p) => {
     }
   }
 
-  async function onAddRow() {
+  async function onAddRow(e?: MouseEvent | KeyboardEvent) {
+    if (e?.shiftKey) {
+      setBulkAddMode('matrix-rows');
+      return;
+    }
     await wrap(() => addRow({ workspaceId: p.workspaceId, matrixId: p.matrixId }));
   }
 
-  async function onAddCol() {
+  async function onAddCol(e?: MouseEvent | KeyboardEvent) {
+    if (e?.shiftKey) {
+      setBulkAddMode('matrix-cols');
+      return;
+    }
     await wrap(() => addCol({ workspaceId: p.workspaceId, matrixId: p.matrixId }));
   }
 
@@ -616,10 +628,20 @@ const MatrixView: Component<Props> = (p) => {
               </p>
               <Show when={canAddRowCol()}>
                 <div class="mx-toolbar">
-                  <button type="button" onClick={onAddRow} disabled={busy()}>
+                  <button
+                    type="button"
+                    onClick={(e) => onAddRow(e)}
+                    disabled={busy()}
+                    title="Klick: 1 Zeile · Shift+Klick: mehrere"
+                  >
                     + Zeile
                   </button>
-                  <button type="button" onClick={onAddCol} disabled={busy()}>
+                  <button
+                    type="button"
+                    onClick={(e) => onAddCol(e)}
+                    disabled={busy()}
+                    title="Klick: 1 Spalte · Shift+Klick: mehrere"
+                  >
                     + Spalte
                   </button>
                 </div>
@@ -705,15 +727,15 @@ const MatrixView: Component<Props> = (p) => {
                 }}
               </For>
 
-              {/* Ecke rechts oben: "+ Spalte" */}
+              {/* Ecke rechts oben: "+ Spalte" (Shift+Klick = Bulk-Modal) */}
               <Show when={canAddRowCol()}>
                 <div class="mx-add-col-cell">
                   <button
                     type="button"
                     class="mx-add-btn"
-                    onClick={onAddCol}
+                    onClick={(e) => onAddCol(e)}
                     disabled={busy()}
-                    title="Spalte hinzufuegen"
+                    title="Spalte hinzufuegen (Shift+Klick: mehrere)"
                   >
                     +
                   </button>
@@ -911,15 +933,15 @@ const MatrixView: Component<Props> = (p) => {
                 }}
               </For>
 
-              {/* Ecke unten links: "+ Zeile" */}
+              {/* Ecke unten links: "+ Zeile" (Shift+Klick = Bulk-Modal) */}
               <Show when={canAddRowCol()}>
                 <div class="mx-add-row-cell">
                   <button
                     type="button"
                     class="mx-add-btn"
-                    onClick={onAddRow}
+                    onClick={(e) => onAddRow(e)}
                     disabled={busy()}
-                    title="Zeile hinzufuegen"
+                    title="Zeile hinzufuegen (Shift+Klick: mehrere)"
                   >
                     +
                   </button>
@@ -944,6 +966,19 @@ const MatrixView: Component<Props> = (p) => {
         cols={p.wsCols}
         realtimeVersion={p.cardsRealtimeVersion}
       />
+
+      <Show when={bulkAddMode()}>
+        {(mode) => (
+          <BulkAddModal
+            workspaceId={p.workspaceId}
+            mode={mode()}
+            parentId={p.matrixId}
+            sourceNodeId={p.matrixId}
+            onClose={() => setBulkAddMode(null)}
+            onCreated={() => p.onChanged?.()}
+          />
+        )}
+      </Show>
     </div>
   );
 };

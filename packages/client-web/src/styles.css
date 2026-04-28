@@ -8036,6 +8036,177 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   line-height: 1.4;
 }
 
+/* ── Bulk-Add-Modal (Phase 3 O.3) ───────────────────────────── */
+
+.bulk-add-card {
+  max-width: 560px;
+  width: 92vw;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+}
+
+.bulk-add-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.bulk-add-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text3);
+  line-height: 1.4;
+}
+
+.bulk-item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bulk-item-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.bulk-item-checkbox {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--p);
+}
+
+.bulk-item-input {
+  flex: 1 1 auto;
+  padding: 6px 10px;
+  border: 1px solid var(--rl);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg);
+  color: var(--text);
+  font-size: var(--fs-small);
+  transition: border-color var(--tr-std);
+}
+
+.bulk-item-input:focus {
+  outline: none;
+  border-color: var(--p);
+}
+
+.bulk-item-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.bulk-item-remove {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text3);
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  transition: background var(--tr-std), color var(--tr-std);
+}
+
+.bulk-item-remove:hover:not(:disabled) {
+  background: var(--rl);
+  color: var(--text);
+}
+
+.bulk-item-remove:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.bulk-add-row-btn {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px dashed var(--rl);
+  color: var(--text2);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm, 6px);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color var(--tr-std), color var(--tr-std);
+}
+
+.bulk-add-row-btn:hover:not(:disabled) {
+  border-color: var(--p);
+  color: var(--p);
+}
+
+.bulk-add-row-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bulk-group-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--rl);
+  flex-wrap: wrap;
+}
+
+.bulk-group-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-small);
+  color: var(--text2);
+  cursor: pointer;
+}
+
+.bulk-group-toggle input[type="checkbox"] {
+  accent-color: var(--p);
+  cursor: pointer;
+}
+
+.bulk-group-name {
+  flex: 1 1 200px;
+  padding: 6px 10px;
+  border: 1px solid var(--rl);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg);
+  color: var(--text);
+  font-size: var(--fs-small);
+}
+
+.bulk-group-name:focus {
+  outline: none;
+  border-color: var(--p);
+}
+
+.bulk-add-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+@media (max-width: 600px) {
+  .bulk-add-card {
+    width: 96vw;
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .bulk-group-foot {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 /* ── Info-Feld-Value View-Mode (Chips statt read-only textarea) ── */
 .info-val-view {
   padding: var(--space-xs) var(--space-sm);
