@@ -21,6 +21,7 @@ import {
   delCard,
   delKbCol,
   moveCard,
+  renameAndLinkKbCol,
   renameKbCol,
   restoreBoardLink,
   restoreCard,
@@ -41,6 +42,13 @@ import { useVis } from '../lib/settings';
 import { showToast, showUndoToast } from '../lib/toasts';
 import type { BoardContent, KbCardRow, KbColRow, LinkRow, LinkType } from '../lib/types';
 import { sanitizeUrl } from '../lib/url';
+import {
+  closeObjectSuggest,
+  commitObjectSuggest,
+  navigateObjectSuggest,
+  objectSuggestState,
+  openObjectSuggest,
+} from '../lib/use-object-suggest';
 import { useViewerActive } from '../lib/workspace-role';
 import CardOverlay from './CardOverlay';
 import ChecklistPanel from './ChecklistPanel';
@@ -466,16 +474,85 @@ const BoardView: Component<Props> = (p) => {
     await wrap(() => addKbCol({ workspaceId: p.workspaceId, boardId: p.boardId }));
   }
 
-  async function onRenameCol(col: KbColRow, newLabel: string) {
-    if (newLabel === col.label) return;
-    await wrap(() => renameKbCol(col.id, newLabel));
-    // Phase 3 O.2a: bei erstmaligem Label-Set Auto-Object on-the-fly.
-    void ensureObjectForKbCol({
-      id: col.id,
-      workspace_id: col.workspace_id,
-      label: newLabel,
-      object_id: col.object_id ?? null,
-    });
+  async function onRenameCol(col: KbColRow, newLabel: string, pickedObjectId: string | null) {
+    if (newLabel === col.label && !pickedObjectId) return;
+    if (pickedObjectId && pickedObjectId !== col.object_id) {
+      // Cross-Cut-Pick: KbCol mit existing Object verlinken
+      await wrap(() => renameAndLinkKbCol(col.id, newLabel, pickedObjectId));
+    } else {
+      await wrap(() => renameKbCol(col.id, newLabel));
+      void ensureObjectForKbCol({
+        id: col.id,
+        workspace_id: col.workspace_id,
+        label: newLabel,
+        object_id: col.object_id ?? null,
+      });
+    }
+  }
+
+  // Helper: gemeinsames Set-Up fuer KbCol-Header-Input (analog
+  // MatrixView.makeHeaderHandlers). Liefert onInput/onKeyDown/onBlur.
+  function makeKbColHeaderHandlers(args: {
+    getLabel: () => string;
+    getObjectId: () => string | null;
+    commit: (label: string, pickedObjectId: string | null) => void | Promise<void>;
+  }) {
+    const onPick = (hit: { id: string; label: string } | null) => {
+      if (hit) void args.commit(hit.label, hit.id);
+    };
+
+    return {
+      onInput: (e: InputEvent & { currentTarget: HTMLInputElement }) => {
+        if (!canRenameHeaders()) return;
+        const v = e.currentTarget.value;
+        if (v.trim().length >= 2) {
+          openObjectSuggest({
+            anchor: e.currentTarget,
+            workspaceId: p.workspaceId,
+            query: v,
+            currentObjectId: args.getObjectId(),
+            onPick,
+          });
+        } else {
+          closeObjectSuggest();
+        }
+      },
+      onKeyDown: (e: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
+        if (!canRenameHeaders()) return;
+        if (e.key === 'ArrowDown' && objectSuggestState().open) {
+          e.preventDefault();
+          navigateObjectSuggest('down');
+          return;
+        }
+        if (e.key === 'ArrowUp' && objectSuggestState().open) {
+          e.preventDefault();
+          navigateObjectSuggest('up');
+          return;
+        }
+        if (e.key === 'Escape' && objectSuggestState().open) {
+          e.preventDefault();
+          closeObjectSuggest();
+          return;
+        }
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const picked = commitObjectSuggest();
+          const finalLabel = picked ? picked.label : e.currentTarget.value.trim();
+          e.currentTarget.blur();
+          if (!picked) {
+            void args.commit(finalLabel, null);
+          }
+        }
+      },
+      onBlur: (e: FocusEvent & { currentTarget: HTMLInputElement }) => {
+        if (!canRenameHeaders()) return;
+        setTimeout(() => closeObjectSuggest(), 100);
+        const finalLabel = e.currentTarget.value.trim();
+        if (finalLabel !== args.getLabel()) {
+          void args.commit(finalLabel, null);
+        }
+      },
+    };
   }
 
   async function onColorCol(col: KbColRow, color: string | null) {
@@ -881,6 +958,11 @@ const BoardView: Component<Props> = (p) => {
                 {(col, colIdx) => {
                   const list = () => cardsByCol().get(col.id) ?? [];
                   const collapsed = () => boardUi.isCollapsed(col.id);
+                  const headerHandlers = makeKbColHeaderHandlers({
+                    getLabel: () => col.label,
+                    getObjectId: () => col.object_id ?? null,
+                    commit: (label, pickedId) => onRenameCol(col, label, pickedId),
+                  });
                   return (
                     <div
                       class="kb-col"
@@ -912,17 +994,9 @@ const BoardView: Component<Props> = (p) => {
                           placeholder="(Spalte)"
                           readOnly={!canRenameHeaders()}
                           tabIndex={canRenameHeaders() ? 0 : -1}
-                          onBlur={(e) => {
-                            if (!canRenameHeaders()) return;
-                            onRenameCol(col, e.currentTarget.value.trim());
-                          }}
-                          onKeyDown={(e) => {
-                            if (!canRenameHeaders()) return;
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              (e.currentTarget as HTMLInputElement).blur();
-                            }
-                          }}
+                          onInput={headerHandlers.onInput}
+                          onKeyDown={headerHandlers.onKeyDown}
+                          onBlur={headerHandlers.onBlur}
                         />
                         <input
                           type="color"

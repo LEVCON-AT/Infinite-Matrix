@@ -25,6 +25,7 @@ import KeyboardHelp from '../components/KeyboardHelp';
 import MatrixView from '../components/MatrixView';
 import NodeDescription from '../components/NodeDescription';
 import NodeTree from '../components/NodeTree';
+import ObjectSuggestion from '../components/ObjectSuggestion';
 import PresenceStack from '../components/PresenceStack';
 import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
 import { useAggregateView } from '../lib/aggregate-view';
@@ -884,6 +885,12 @@ const Workspace: Component = () => {
       {/* Singleton-Dropdown fuer Alias-Autocomplete. Sichtbarkeit steuert
           lib/use-alias-autocomplete; Inputs binden sich per ref an den Hook. */}
       <AliasAutocomplete />
+
+      {/* Singleton-Dropdown fuer Object-Suggestion (Phase 3 O.2b).
+          Wird beim Tippen einer Row/Col/KbCol-Header-Input geoeffnet —
+          bietet existing Objects als Cross-Cut-Pick. Sichtbarkeit steuert
+          lib/use-object-suggest. */}
+      <ObjectSuggestion />
 
       {/* Singleton-Context-Menu fuer Alias-Chips (Click/+/Rechtsklick).
           Jeder AliasChip triggert openAliasChipMenu — nur eine Instanz

@@ -166,7 +166,7 @@ export async function addRow(args: {
 
 async function updateRow(
   rowId: string,
-  patch: Partial<Pick<RowRow, 'label' | 'position'>>,
+  patch: Partial<Pick<RowRow, 'label' | 'position' | 'object_id'>>,
 ): Promise<RowRow> {
   return runOptimisticUpdate<RowRow>({
     table: 'rows',
@@ -188,6 +188,13 @@ async function updateRow(
 
 export function renameRow(rowId: string, label: string): Promise<RowRow> {
   return updateRow(rowId, { label });
+}
+
+// Phase 3 O.2b: Cross-Cut-Pick — Row mit existing Object verlinken
+// (statt Auto-Anlage via ensureObjectForRow). Setzt label + object_id
+// in einem Update-Pass.
+export function renameAndLinkRow(rowId: string, label: string, objectId: string): Promise<RowRow> {
+  return updateRow(rowId, { label, object_id: objectId });
 }
 
 export async function setRowPosition(rowId: string, position: number): Promise<void> {
@@ -253,7 +260,7 @@ export async function addCol(args: {
 
 async function updateCol(
   colId: string,
-  patch: Partial<Pick<ColRow, 'label' | 'position'>>,
+  patch: Partial<Pick<ColRow, 'label' | 'position' | 'object_id'>>,
 ): Promise<ColRow> {
   return runOptimisticUpdate<ColRow>({
     table: 'cols',
@@ -275,6 +282,10 @@ async function updateCol(
 
 export function renameCol(colId: string, label: string): Promise<ColRow> {
   return updateCol(colId, { label });
+}
+
+export function renameAndLinkCol(colId: string, label: string, objectId: string): Promise<ColRow> {
+  return updateCol(colId, { label, object_id: objectId });
 }
 
 export async function setColPosition(colId: string, position: number): Promise<void> {
@@ -598,7 +609,7 @@ export async function addKbCol(args: {
 
 async function updateKbCol(
   colId: string,
-  patch: Partial<Pick<KbColRow, 'label' | 'color' | 'position'>>,
+  patch: Partial<Pick<KbColRow, 'label' | 'color' | 'position' | 'object_id'>>,
 ): Promise<KbColRow> {
   return runOptimisticUpdate<KbColRow>({
     table: 'kb_cols',
@@ -625,6 +636,14 @@ async function updateKbCol(
 
 export function renameKbCol(colId: string, label: string): Promise<KbColRow> {
   return updateKbCol(colId, { label });
+}
+
+export function renameAndLinkKbCol(
+  colId: string,
+  label: string,
+  objectId: string,
+): Promise<KbColRow> {
+  return updateKbCol(colId, { label, object_id: objectId });
 }
 
 export function setKbColColor(colId: string, color: string | null): Promise<KbColRow> {

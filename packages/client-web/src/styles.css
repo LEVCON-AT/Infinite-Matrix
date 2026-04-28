@@ -9126,6 +9126,87 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   word-break: break-word;
 }
 
+/* ─── Object-Suggestion-Dropdown (Phase 3 O.2b) ─────────────── */
+.object-suggest-popup {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  box-shadow: var(--shadow-lg);
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 0;
+  animation: overlayIn var(--tr-enter);
+}
+
+.object-suggest-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: 4px 10px 6px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text3);
+  border-bottom: 0.5px solid var(--border);
+  margin-bottom: 2px;
+}
+
+.object-suggest-hint {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.object-suggest-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+  transition: background var(--tr-std);
+}
+
+.object-suggest-item:hover,
+.object-suggest-active {
+  background: var(--bg2);
+}
+
+.object-suggest-active {
+  background: var(--bluebg, var(--bg2));
+  color: var(--bluetxt, var(--text));
+}
+
+.object-suggest-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.object-suggest-type {
+  font-size: 11px;
+  color: var(--text3);
+  background: var(--bg2);
+  padding: 1px 6px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.object-suggest-alias {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--text3);
+  flex: 0 0 auto;
+}
+
 .wizard-applying-body {
   min-height: 140px;
 }
