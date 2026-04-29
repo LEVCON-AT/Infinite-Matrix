@@ -432,6 +432,118 @@ export async function fetchCellChecklists(
   }
 }
 
+// ─── Phase 3 O.8.N.1: existing Templates pro Cell laden ──────────
+// Liefert pro nameable Feature der Cell den aktuellen Template +
+// Ziel-Row-ID, damit der NewCellWizard im Edit-Modus den Cycle auf
+// die vorhandene Position vorbelegen und ein Rename atomar
+// schreiben kann (label_template + label).
+//
+// Nameable-Feature-Map:
+//  - 'matrix' → nodes(child_matrix_id).label_template
+//  - 'board'  → nodes(board_id).label_template
+//  - 'checklists' → checklists(cell_id).label_template (sortiert nach
+//                   position; erste/aktive)
+//  - 'doc'    → docs(attached_cell_id).title_template (sortiert nach
+//                   updated_at DESC; juengstes Doku)
+//
+// Online-only (fetch-on-open). Bei Network-Error liefert die Map
+// leer — der Wizard faellt dann auf Pos 1 / Plain-Default zurueck.
+export type ExistingNameableTarget =
+  | { kind: 'node'; id: string }
+  | { kind: 'checklist'; id: string }
+  | { kind: 'doc'; id: string };
+
+export type ExistingNameableInfo = {
+  template: string;
+  target: ExistingNameableTarget;
+};
+
+export async function fetchCellExistingTemplates(
+  cell: CellRow,
+  workspaceId: string,
+): Promise<Map<string, ExistingNameableInfo>> {
+  const out = new Map<string, ExistingNameableInfo>();
+  const tasks: Promise<void>[] = [];
+
+  if (cell.child_matrix_id) {
+    const id = cell.child_matrix_id;
+    tasks.push(
+      (async () => {
+        const { data } = await supabase
+          .from('nodes')
+          .select('label_template')
+          .eq('id', id)
+          .single();
+        const tpl = (data as { label_template?: string } | null)?.label_template ?? '';
+        out.set('matrix', { template: tpl, target: { kind: 'node', id } });
+      })(),
+    );
+  }
+  if (cell.board_id) {
+    const id = cell.board_id;
+    tasks.push(
+      (async () => {
+        const { data } = await supabase
+          .from('nodes')
+          .select('label_template')
+          .eq('id', id)
+          .single();
+        const tpl = (data as { label_template?: string } | null)?.label_template ?? '';
+        out.set('board', { template: tpl, target: { kind: 'node', id } });
+      })(),
+    );
+  }
+  if ((cell.features ?? []).includes('checklists')) {
+    tasks.push(
+      (async () => {
+        const { data } = await supabase
+          .from('checklists')
+          .select('id,label_template')
+          .eq('workspace_id', workspaceId)
+          .eq('cell_id', cell.id)
+          .order('position', { ascending: true })
+          .limit(1);
+        const row = (data ?? [])[0] as { id: string; label_template?: string } | undefined;
+        if (row) {
+          out.set('checklists', {
+            template: row.label_template ?? '',
+            target: { kind: 'checklist', id: row.id },
+          });
+        }
+      })(),
+    );
+  }
+  // Doku: prueft NICHT cell.features (Doku haengt ueber attached_cell_id,
+  // kein Feature-Flag in cells.features). Wir laden alle Docs der Cell
+  // und nehmen das juengste — falls keine, bleibt 'doc' aus der Map.
+  tasks.push(
+    (async () => {
+      const { data } = await supabase
+        .from('docs')
+        .select('id,title_template')
+        .eq('workspace_id', workspaceId)
+        .eq('attached_cell_id', cell.id)
+        .order('updated_at', { ascending: false })
+        .limit(1);
+      const row = (data ?? [])[0] as { id: string; title_template?: string } | undefined;
+      if (row) {
+        out.set('doc', {
+          template: row.title_template ?? '',
+          target: { kind: 'doc', id: row.id },
+        });
+      }
+    })(),
+  );
+
+  try {
+    await Promise.all(tasks);
+  } catch {
+    // Network/RLS-Error: Map bleibt teil-/leer. Wizard faellt dann
+    // auf Pos-1-Default zurueck — keine Regression gegen O.8.M.
+  }
+  return out;
+}
+
 // ─── Node-Leer-Probe (fuer Confirm-vor-Delete) ────────────────────
 // Gibt true zurueck, wenn der Node weder strukturelle Kinder (rows/cols
 // bzw. kb_cols/kb_cards/checklists/links) hat. Ein leerer Sub-Node

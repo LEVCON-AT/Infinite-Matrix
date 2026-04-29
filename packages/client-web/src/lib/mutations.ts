@@ -695,21 +695,30 @@ export async function deleteNode(nodeId: string): Promise<void> {
   });
 }
 
-export async function renameNode(nodeId: string, label: string): Promise<NodeRow> {
+export async function renameNode(
+  nodeId: string,
+  label: string,
+  template?: string,
+): Promise<NodeRow> {
   // Phase 3 O.8.L: User-Rename via Plain-Input (Sidebar/NodeTree) ist
   // explicit Template-Override. Wir schreiben label UND label_template
   // mit dem getippten String — sonst rendert der Resolver weiterhin
   // den dynamischen Template (z.B. {row.object}/{column.object}) und
   // ueberschreibt das, was der User gerade eingegeben hat.
+  //
+  // Phase 3 O.8.N.1: Optional `template` kann einen *anderen* Template
+  // setzen (z.B. dynamisch '{row.object}'); `label` ist dann der
+  // resolved Snapshot. Genutzt vom NewCellWizard im Edit-Modus.
+  const tpl = template ?? label;
   return runOptimisticUpdate<NodeRow>({
     table: 'nodes',
     id: nodeId,
-    patch: { label, label_template: label },
+    patch: { label, label_template: tpl },
     label: 'Element umbenennen',
     run: async () => {
       const { data, error } = await supabase
         .from('nodes')
-        .update({ label, label_template: label })
+        .update({ label, label_template: tpl })
         .eq('id', nodeId)
         .select()
         .single();
@@ -1338,10 +1347,16 @@ async function updateChecklist(clId: string, patch: ChecklistPatch): Promise<Che
   });
 }
 
-export function renameChecklist(clId: string, label: string): Promise<ChecklistRow> {
+export function renameChecklist(
+  clId: string,
+  label: string,
+  template?: string,
+): Promise<ChecklistRow> {
   // Phase 3 O.8.L: User-Rename schreibt label + label_template
   // (Plain-Override, siehe renameNode-Begruendung).
-  return updateChecklist(clId, { label, label_template: label });
+  // Phase 3 O.8.N.1: Optional `template` separat (Wizard-Edit setzt
+  // dynamische Templates mit Snapshot-label).
+  return updateChecklist(clId, { label, label_template: template ?? label });
 }
 
 export function setChecklistAlias(clId: string, alias: string | null): Promise<ChecklistRow> {
@@ -2261,9 +2276,10 @@ async function updateDoc(
   });
 }
 
-export function setDocTitle(docId: string, title: string): Promise<DocRow> {
+export function setDocTitle(docId: string, title: string, template?: string): Promise<DocRow> {
   // Phase 3 O.8.L: User-Edit ueberschreibt Template + Snapshot.
-  return updateDoc(docId, { title, title_template: title });
+  // Phase 3 O.8.N.1: Optional `template` separat (Wizard-Edit).
+  return updateDoc(docId, { title, title_template: template ?? title });
 }
 
 export function setDocContent(docId: string, content: string): Promise<DocRow> {

@@ -44,7 +44,12 @@ import { validateAlias } from '../lib/alias';
 import { installFocusRestore, installFocusTrap, showConfirm } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
 import { CELL_FEATURES, type FeatureDef, findFeatureByHotkey } from '../lib/features';
-import { type ContextMaps, buildContext, resolveLabel } from '../lib/label-template';
+import {
+  type ContextMaps,
+  buildContext,
+  isDynamicTemplate,
+  resolveLabel,
+} from '../lib/label-template';
 import {
   addCellChecklist,
   createChildBoard,
@@ -53,9 +58,12 @@ import {
   delCellRow,
   deleteNode,
   insertCell,
+  renameChecklist,
+  renameNode,
+  setDocTitle,
   updateCell,
 } from '../lib/mutations';
-import { isNodeEmpty } from '../lib/queries';
+import { type ExistingNameableInfo, fetchCellExistingTemplates, isNodeEmpty } from '../lib/queries';
 import { showToast } from '../lib/toasts';
 import type { CellRow, ColRow, RowRow } from '../lib/types';
 import Icon from './Icon';
@@ -114,6 +122,13 @@ const NewCellWizard: Component<Props> = (p) => {
   // Pro nameable Feature: Cycle-Position + aktueller Label-Draft.
   const [cyclePos, setCyclePos] = createSignal<Map<string, CyclePosition>>(new Map());
   const [labelDraft, setLabelDraft] = createSignal<Map<string, string>>(new Map());
+  // Phase 3 O.8.N.1: pro existing nameable Feature der aktuellen Cell
+  // — Template + Ziel-ID. Wird in startNameSteps() einmalig nachgeladen
+  // (online-only). Genutzt fuer (a) Cycle-Pos-Vorbelegung in Step 2,
+  // (b) Rename-Mutation im Commit (statt re-create).
+  const [existingTemplates, setExistingTemplates] = createSignal<Map<string, ExistingNameableInfo>>(
+    new Map(),
+  );
   // Bloop-Indikator fuer den Caller (welche Features sollen einbloopen).
   let cardRef: HTMLDivElement | undefined;
   let aliasInputRef: HTMLInputElement | undefined;
@@ -181,33 +196,74 @@ const NewCellWizard: Component<Props> = (p) => {
   }
 
   // Liste der nameable selected (Reihenfolge wie selectedKeys).
-  // Im Edit-Mode: nur NEU hinzugefuegte Features bekommen einen Cycle-
-  // Step (existing Features behalten ihren Namen — User aendert sie
-  // via Sidebar-Rename mit explicit Plain-Override-Semantik).
-  const nameableSelected = createMemo(() => {
-    const original = new Set(originalKeys);
-    return selectedKeys()
-      .filter((k) => !original.has(k))
+  // Phase 3 O.8.N.1: Im Edit-Mode bekommen ALLE nameable Features einen
+  // Cycle-Step — auch existing. Pre-Belegung des Cycle-Pos passiert in
+  // startNameSteps() basierend auf dem aktuellen Template-Wert
+  // (isDynamicTemplate → Pos 2/3, sonst Pos 1).
+  const nameableSelected = createMemo(() =>
+    selectedKeys()
       .map((k) => CELL_FEATURES.find((f) => f.key === k))
-      .filter((d): d is FeatureDef => !!d && d.nameable);
-  });
+      .filter((d): d is FeatureDef => !!d && d.nameable),
+  );
+
+  // Phase 3 O.8.N.1: Cycle-Pos aus existing Template ableiten.
+  //  - exact-match auf Pos-2/3-Template-Strings → Pos 2 / Pos 3
+  //  - sonst dynamisch → Pos 2 (Default-Dynamisch)
+  //  - Plain (kein '{') → Pos 1 (User-Eingabe). Pos 4/5 sind statische
+  //    Snapshots ohne Original-Ctx unentscheidbar.
+  function detectInitialPos(template: string): CyclePosition {
+    if (!template) return 1;
+    if (template === '{row.object} / {column.object}') return 2;
+    if (template === '{column.object} / {row.object}') return 3;
+    if (isDynamicTemplate(template)) return 2;
+    return 1;
+  }
 
   // ─── Step-Übergänge ─────────────────────────────────────────
-  function startNameSteps() {
+  async function startNameSteps() {
     const list = nameableSelected();
     if (list.length === 0) {
       void doCommit();
       return;
     }
-    // Default-Position 1, Default-Label = Type-Name (Pos 1 Template).
+    // Phase 3 O.8.N.1: Im Edit-Mode existing Templates nachladen — eine
+    // Round-Trip-Anfrage parallel pro nameable Feature der Cell. Bei
+    // Network-Error liefert die Helper eine leere Map; faellt auf
+    // Pos-1-Default zurueck (kein Block).
+    let existing: Map<string, ExistingNameableInfo> = new Map();
+    if (isEditMode && p.cell) {
+      setBusy(true);
+      try {
+        existing = await fetchCellExistingTemplates(p.cell, p.workspaceId);
+      } catch (err) {
+        console.warn('NewCellWizard.startNameSteps: existing fetch failed', err);
+      } finally {
+        setBusy(false);
+      }
+    }
+    setExistingTemplates(existing);
+
+    // Default-Position 1 (Type-Name), Existing-Features mit
+    // detectedPos + Existing-Template-Draft.
     const cycles = new Map<string, CyclePosition>();
     const drafts = new Map<string, string>();
+    const original = new Set(originalKeys);
     for (const def of list) {
-      cycles.set(def.key, 1);
-      drafts.set(def.key, def.label);
+      const ex = existing.get(def.key);
+      if (original.has(def.key) && ex) {
+        const pos = detectInitialPos(ex.template);
+        cycles.set(def.key, pos);
+        drafts.set(def.key, ex.template || def.label);
+      } else {
+        cycles.set(def.key, 1);
+        drafts.set(def.key, def.label);
+      }
     }
     setCyclePos(cycles);
     setLabelDraft(drafts);
+    // Step 2 mount nach Daten-Load — sonst flackert die UI mit Pos 1
+    // bevor die Existing-Defaults da sind.
+    nameInputInitialized.clear();
     setStep({ kind: 'name', idx: 0 });
   }
 
@@ -414,6 +470,29 @@ const NewCellWizard: Component<Props> = (p) => {
       }
       void checklistFlagAdded; // marker fuer biome — lokal genutzt indirekt
 
+      // 5b. Phase 3 O.8.N.1: Existing nameable Features umbenennen wenn
+      //     der User im Step-2-Cycle einen anderen Template gewaehlt hat.
+      //     Geht ueber renameNode/renameChecklist/setDocTitle mit dem
+      //     optionalen `template`-Argument (label = resolved Snapshot).
+      const ex = existingTemplates();
+      for (const key of sel) {
+        if (!original.has(key)) continue; // Add-Path schon oben behandelt.
+        const def = CELL_FEATURES.find((f) => f.key === key);
+        if (!def?.nameable) continue;
+        const info = ex.get(key);
+        if (!info) continue;
+        const nextTpl = drafts.get(key) ?? def.label;
+        if (nextTpl === info.template) continue; // No-Op.
+        const nextSnap = previewLabel(nextTpl) || def.label;
+        if (info.target.kind === 'node') {
+          await renameNode(info.target.id, nextSnap, nextTpl);
+        } else if (info.target.kind === 'checklist') {
+          await renameChecklist(info.target.id, nextSnap, nextTpl);
+        } else if (info.target.kind === 'doc') {
+          await setDocTitle(info.target.id, nextSnap, nextTpl);
+        }
+      }
+
       // 6. Cell-Update wenn sich was geaendert hat.
       const finalFeatures = Array.from(new Set(workingFeatures));
       const cellChanged =
@@ -504,12 +583,12 @@ const NewCellWizard: Component<Props> = (p) => {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
         e.preventDefault();
         e.stopImmediatePropagation();
-        startNameSteps();
+        void startNameSteps();
         return;
       }
       e.preventDefault();
       e.stopImmediatePropagation();
-      startNameSteps();
+      void startNameSteps();
       return;
     }
     // Hotkeys: 1/2/3/4/d. Greifen NICHT wenn:
@@ -631,7 +710,13 @@ const NewCellWizard: Component<Props> = (p) => {
           <h3 id="new-cell-wizard-title">
             <Show
               when={step().kind === 'pick'}
-              fallback={isEditMode ? 'Neues Feature benennen' : 'Feature benennen'}
+              fallback={
+                // Phase 3 O.8.N.1: existing Feature → "umbenennen",
+                // sonst "benennen".
+                originalKeys.includes(currentNameDef()?.key ?? '')
+                  ? 'Feature umbenennen'
+                  : 'Feature benennen'
+              }
             >
               {isEditMode ? 'Zelle bearbeiten' : 'Zelle konfigurieren'}
             </Show>
@@ -672,9 +757,8 @@ const NewCellWizard: Component<Props> = (p) => {
                   </>
                 }
               >
-                Aktive Features sind angekreuzt. Toggle entfernt oder ergaenzt — neue Features
-                bekommen im naechsten Schritt einen Namen, existierende behalten ihren (Rename via
-                Sidebar).
+                Aktive Features sind angekreuzt. Toggle entfernt oder ergaenzt — im naechsten
+                Schritt kannst du jedes nameable Feature umbenennen (auch bestehende).
               </Show>
             </p>
             <div class="new-cell-wizard-features" aria-label="Zellen-Features">
@@ -728,7 +812,7 @@ const NewCellWizard: Component<Props> = (p) => {
             <button
               type="button"
               class="btn btn-p"
-              onClick={() => startNameSteps()}
+              onClick={() => void startNameSteps()}
               disabled={busy()}
             >
               {isEditMode ? 'Anwenden' : 'Weiter'}
@@ -750,7 +834,8 @@ const NewCellWizard: Component<Props> = (p) => {
               <div class="new-cell-wizard-body new-cell-wizard-name-body">
                 <p class="new-cell-wizard-step-counter">
                   Schritt {(step() as { kind: 'name'; idx: number }).idx + 1}/
-                  {nameableSelected().length}: {currentNameDef()?.label ?? def.label} benennen
+                  {nameableSelected().length}: {currentNameDef()?.label ?? def.label}{' '}
+                  {originalKeys.includes(currentNameDef()?.key ?? '') ? 'umbenennen' : 'benennen'}
                 </p>
                 <input
                   // ref + queueMicrotask: Pos 1 voll-markieren beim Mount
