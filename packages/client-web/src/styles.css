@@ -10737,3 +10737,315 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
     flex: 1 1 auto;
   }
 }
+
+/* ── NewCellWizard (Phase 3 O.8.E/F) ─────────────────────────
+   Cell-Anlage-Wizard, ersetzt CellOverlay an Anlage-Zeit. Stepper-
+   Modal mit Step 1 (alias + features) + Step 2..N (Cycle-Naming) +
+   Final-Bloop-Animation. Animationen ueber `--tr-enter` / `--tr-std`. */
+
+.new-cell-wizard {
+  width: 540px;
+  max-width: 96vw;
+}
+
+.new-cell-wizard-head {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  position: relative;
+}
+
+.new-cell-wizard-crumb {
+  font-size: var(--fs-small);
+  color: var(--text3);
+  font-weight: 500;
+}
+
+.new-cell-wizard-head h3 {
+  margin: 0;
+  font-size: var(--fs-subtitle);
+}
+
+.new-cell-wizard-head .overlay-close {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+}
+
+.new-cell-wizard-body {
+  padding: var(--space-md) var(--space-md) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  animation: subStepIn var(--tr-enter);
+}
+
+@keyframes subStepIn {
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.new-cell-wizard-alias-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.new-cell-wizard-alias-label {
+  flex: 0 0 auto;
+  font-size: var(--fs-small);
+  color: var(--text3);
+  font-weight: 500;
+  min-width: 60px;
+}
+
+.new-cell-wizard-alias-input {
+  flex: 1 1 auto;
+  padding: 6px 10px;
+  border: 1px solid var(--rl);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg);
+  color: var(--text);
+  font-size: var(--fs-small);
+}
+
+.new-cell-wizard-alias-input:focus {
+  outline: none;
+  border-color: var(--p);
+}
+
+.new-cell-wizard-hint {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--text3);
+}
+
+.new-cell-wizard-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-xs, 6px);
+}
+
+.new-cell-wizard-feat {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--rl);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg);
+  color: var(--text);
+  font-size: var(--fs-small);
+  cursor: pointer;
+  transition: border-color var(--tr-std), background var(--tr-std), color var(--tr-std);
+}
+
+.new-cell-wizard-feat:hover:not(:disabled),
+.new-cell-wizard-feat:focus-visible {
+  border-color: var(--p);
+  background: var(--rl);
+}
+
+.new-cell-wizard-feat.active {
+  border-color: var(--p);
+  background: color-mix(in srgb, var(--p) 12%, var(--bg));
+  color: var(--text);
+}
+
+.new-cell-wizard-feat:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.new-cell-wizard-feat-hotkey {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: var(--rl);
+  color: var(--text3);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.new-cell-wizard-feat.active .new-cell-wizard-feat-hotkey {
+  background: var(--p);
+  color: #fff;
+}
+
+.new-cell-wizard-feat-ico {
+  flex: 0 0 auto;
+  color: var(--text3);
+}
+
+.new-cell-wizard-feat-label {
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+.new-cell-wizard-feat-check {
+  flex: 0 0 auto;
+  color: var(--p);
+}
+
+.new-cell-wizard-foot {
+  padding: var(--space-sm) var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+  border-top: 1px solid var(--rl);
+  margin-top: var(--space-sm);
+}
+
+.new-cell-wizard-tip {
+  flex: 1 1 auto;
+  font-size: 11px;
+  color: var(--text3);
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.new-cell-wizard-tip kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid var(--rl);
+  border-radius: 3px;
+  background: var(--bg);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+}
+
+.new-cell-wizard-name-body {
+  gap: 10px;
+}
+
+.new-cell-wizard-step-counter {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--text3);
+}
+
+.new-cell-wizard-name-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--p);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg);
+  color: var(--text);
+  font-size: var(--fs-body, 14px);
+  font-family: var(--font-mono, monospace);
+}
+
+.new-cell-wizard-name-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--p) 24%, transparent);
+}
+
+.new-cell-wizard-cycle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text3);
+}
+
+.new-cell-wizard-cycle-label {
+  flex: 0 0 auto;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+.new-cell-wizard-cycle-dot {
+  flex: 0 0 auto;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--rl);
+  transition: background var(--tr-std), transform var(--tr-std);
+}
+
+.new-cell-wizard-cycle-dot.active {
+  background: var(--p);
+  transform: scale(1.4);
+}
+
+.new-cell-wizard-cycle-modus {
+  margin-left: auto;
+  font-style: italic;
+}
+
+.new-cell-wizard-preview {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--text3);
+}
+
+.new-cell-wizard-preview strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.new-cell-wizard-commit-body {
+  align-items: center;
+  padding: var(--space-lg, 24px) var(--space-md);
+}
+
+.new-cell-wizard-spinner {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--rl);
+  border-top-color: var(--p);
+  border-radius: 50%;
+  animation: wizardSpin 0.7s linear infinite;
+}
+
+@keyframes wizardSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Cell-Feature-Bloop (Phase 3 O.8.F) ─────────────────────
+   Wenn der Wizard schliesst, wird auf den frisch angelegten Feature-
+   Chips kurzzeitig data-just-added="yes" gesetzt — die Animation
+   spielt einmalig und das Attribut wird per JS-cleanup nach 240ms
+   wieder entfernt. prefers-reduced-motion: keine Animation. */
+
+@keyframes featureBloop {
+  0%   { opacity: 0; transform: scale(0.6); }
+  60%  { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.mx-cell [data-just-added="yes"],
+[data-just-added="yes"] {
+  animation: featureBloop 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mx-cell [data-just-added="yes"],
+  [data-just-added="yes"] {
+    animation: none;
+  }
+  .new-cell-wizard-body {
+    animation: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .new-cell-wizard {
+    width: 96vw;
+  }
+  .new-cell-wizard-features {
+    grid-template-columns: 1fr;
+  }
+}

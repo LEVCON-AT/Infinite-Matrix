@@ -1265,6 +1265,7 @@ const Workspace: Component = () => {
                       presence={presenceUsers}
                       selfUserId={user()?.id}
                       onCellHover={setHoverCellId}
+                      resolverMaps={resolverMaps}
                       onChanged={() => {
                         // Nach strukturellen Aenderungen koennen neue/entfernte Sub-Nodes
                         // im Tree sichtbar werden, und cells.child_matrix_id/board_id
