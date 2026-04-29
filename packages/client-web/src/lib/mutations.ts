@@ -696,15 +696,20 @@ export async function deleteNode(nodeId: string): Promise<void> {
 }
 
 export async function renameNode(nodeId: string, label: string): Promise<NodeRow> {
+  // Phase 3 O.8.L: User-Rename via Plain-Input (Sidebar/NodeTree) ist
+  // explicit Template-Override. Wir schreiben label UND label_template
+  // mit dem getippten String — sonst rendert der Resolver weiterhin
+  // den dynamischen Template (z.B. {row.object}/{column.object}) und
+  // ueberschreibt das, was der User gerade eingegeben hat.
   return runOptimisticUpdate<NodeRow>({
     table: 'nodes',
     id: nodeId,
-    patch: { label },
+    patch: { label, label_template: label },
     label: 'Element umbenennen',
     run: async () => {
       const { data, error } = await supabase
         .from('nodes')
-        .update({ label })
+        .update({ label, label_template: label })
         .eq('id', nodeId)
         .select()
         .single();
@@ -1308,7 +1313,10 @@ export async function addCellChecklist(args: {
 }
 
 type ChecklistPatch = Partial<
-  Pick<ChecklistRow, 'label' | 'alias' | 'close_mode' | 'recur' | 'action' | 'history'>
+  Pick<
+    ChecklistRow,
+    'label' | 'label_template' | 'alias' | 'close_mode' | 'recur' | 'action' | 'history'
+  >
 >;
 
 async function updateChecklist(clId: string, patch: ChecklistPatch): Promise<ChecklistRow> {
@@ -1331,7 +1339,9 @@ async function updateChecklist(clId: string, patch: ChecklistPatch): Promise<Che
 }
 
 export function renameChecklist(clId: string, label: string): Promise<ChecklistRow> {
-  return updateChecklist(clId, { label });
+  // Phase 3 O.8.L: User-Rename schreibt label + label_template
+  // (Plain-Override, siehe renameNode-Begruendung).
+  return updateChecklist(clId, { label, label_template: label });
 }
 
 export function setChecklistAlias(clId: string, alias: string | null): Promise<ChecklistRow> {
@@ -2221,7 +2231,12 @@ export async function createDoc(args: {
 
 async function updateDoc(
   docId: string,
-  patch: Partial<Pick<DocRow, 'title' | 'content' | 'alias' | 'source_alias' | 'attached_cell_id'>>,
+  patch: Partial<
+    Pick<
+      DocRow,
+      'title' | 'title_template' | 'content' | 'alias' | 'source_alias' | 'attached_cell_id'
+    >
+  >,
 ): Promise<DocRow> {
   return runOptimisticUpdate<DocRow>({
     table: 'docs',
@@ -2247,7 +2262,8 @@ async function updateDoc(
 }
 
 export function setDocTitle(docId: string, title: string): Promise<DocRow> {
-  return updateDoc(docId, { title });
+  // Phase 3 O.8.L: User-Edit ueberschreibt Template + Snapshot.
+  return updateDoc(docId, { title, title_template: title });
 }
 
 export function setDocContent(docId: string, content: string): Promise<DocRow> {
