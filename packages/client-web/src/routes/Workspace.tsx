@@ -1273,9 +1273,15 @@ const Workspace: Component = () => {
                         // Nach strukturellen Aenderungen koennen neue/entfernte Sub-Nodes
                         // im Tree sichtbar werden, und cells.child_matrix_id/board_id
                         // aendern sich. Daher: nodes+cells auch refetchen.
+                        // Phase 3 O.8.M.7: rows + cols auch — bei Row-/Col-Header-
+                        // Rename via MatrixView wuerden sonst Sidebar-Tree und
+                        // workspace-globale Listen veraltete Labels zeigen, bis
+                        // der Realtime-Bump (asynchron) ankommt.
                         void refetchMatrix();
                         void refetchNodes();
                         void refetchCells();
+                        void refetchRows();
+                        void refetchCols();
                       }}
                     />
                   </Show>
