@@ -42,7 +42,6 @@ import {
   openObjectSuggest,
 } from '../lib/use-object-suggest';
 import BulkAddModal, { type BulkAddMode } from './BulkAddModal';
-import CellOverlay from './CellOverlay';
 import Icon, { type IconName } from './Icon';
 import MatrixAggregateSection from './MatrixAggregateSection';
 import NewCellWizard from './NewCellWizard';
@@ -680,43 +679,21 @@ const MatrixView: Component<Props> = (p) => {
     <div class="matrix-wrap">
       <Show when={overlayTarget()}>
         {(target) => {
-          // Phase 3 O.8: Leere Zellen (kein Feature, kein FK, kein Alias)
-          // bekommen den neuen Anlage-Wizard. Cells mit existing Features
-          // gehen weiter ueber CellOverlay (Edit-Toggle-Pfad) — der wird
-          // erst in O.8.I komplett ersetzt.
+          // Phase 3 O.8.M.2: NewCellWizard handelt sowohl Anlage als
+          // auch Edit-Modus — fuer leere und befuellte Zellen identisch.
+          // CellOverlay wird in O.8.M.4 geloescht.
           const t = target();
-          const isEmpty =
-            !t.cell ||
-            ((t.cell.features ?? []).length === 0 &&
-              !t.cell.child_matrix_id &&
-              !t.cell.board_id &&
-              !t.cell.alias);
           return (
-            <Show
-              when={isEmpty}
-              fallback={
-                <CellOverlay
-                  workspaceId={p.workspaceId}
-                  matrixId={p.matrixId}
-                  row={t.row}
-                  col={t.col}
-                  cell={t.cell}
-                  onClose={() => setOverlayTarget(null)}
-                  onChanged={() => p.onChanged?.()}
-                />
-              }
-            >
-              <NewCellWizard
-                workspaceId={p.workspaceId}
-                matrixId={p.matrixId}
-                row={t.row}
-                col={t.col}
-                cell={t.cell}
-                resolverMaps={p.resolverMaps}
-                onClose={() => setOverlayTarget(null)}
-                onCreated={() => p.onChanged?.()}
-              />
-            </Show>
+            <NewCellWizard
+              workspaceId={p.workspaceId}
+              matrixId={p.matrixId}
+              row={t.row}
+              col={t.col}
+              cell={t.cell}
+              resolverMaps={p.resolverMaps}
+              onClose={() => setOverlayTarget(null)}
+              onCreated={() => p.onChanged?.()}
+            />
           );
         }}
       </Show>

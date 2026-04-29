@@ -28,7 +28,7 @@
 
 import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
 import { validateAlias } from '../lib/alias';
-import { installFocusRestore, installFocusTrap } from '../lib/dialog';
+import { installFocusRestore, installFocusTrap, showConfirm } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
 import { CELL_FEATURES, type FeatureDef, findFeatureByHotkey } from '../lib/features';
 import { type ContextMaps, buildContext, resolveLabel } from '../lib/label-template';
@@ -37,12 +37,31 @@ import {
   createChildBoard,
   createChildMatrix,
   createDoc,
+  deleteNode,
   insertCell,
   updateCell,
 } from '../lib/mutations';
+import { isNodeEmpty } from '../lib/queries';
 import { showToast } from '../lib/toasts';
 import type { CellRow, ColRow, RowRow } from '../lib/types';
 import Icon from './Icon';
+
+// Phase 3 O.8.M.2: Initial-State eines Edit-Wizards aus existing
+// Cell ableiten — welche Features sind aktuell „aktiv"?
+function deriveInitialSelected(cell: CellRow | undefined): string[] {
+  if (!cell) return [];
+  const out: string[] = [];
+  if (cell.child_matrix_id) out.push('matrix');
+  if (cell.board_id) out.push('board');
+  for (const f of cell.features ?? []) {
+    // Wir mappen nur 1:1 cells.features-Werte in unsere Feature-Keys.
+    // 'doc' ist hier nicht enthalten — Doku haengt ueber
+    // docs.attached_cell_id, kein cells.features-Eintrag (V1 keine
+    // Doku-Toggle-Off via Wizard, Docs leben weiter via Suche).
+    if (f === 'info' || f === 'checklists') out.push(f);
+  }
+  return out;
+}
 
 type Props = {
   workspaceId: string;
@@ -67,11 +86,17 @@ function pickableFeatures(): FeatureDef[] {
 }
 
 const NewCellWizard: Component<Props> = (p) => {
+  // Phase 3 O.8.M.2: Initial-State aus existing Cell. originalKeys
+  // bleibt als Snapshot fuer Delta-Berechnung beim Commit.
+  const originalKeys = deriveInitialSelected(p.cell);
+  const isEditMode = originalKeys.length > 0;
+
   const [step, setStep] = createSignal<Step>({ kind: 'pick' });
   const [aliasDraft, setAliasDraft] = createSignal(p.cell?.alias ?? '');
   const [busy, setBusy] = createSignal(false);
   // Reihenfolge stable — Sub-Steps laufen in Auswahl-Reihenfolge.
-  const [selectedKeys, setSelectedKeys] = createSignal<string[]>([]);
+  // Im Edit-Mode mit existing Features als pre-checked starten.
+  const [selectedKeys, setSelectedKeys] = createSignal<string[]>([...originalKeys]);
   // Pro nameable Feature: Cycle-Position + aktueller Label-Draft.
   const [cyclePos, setCyclePos] = createSignal<Map<string, CyclePosition>>(new Map());
   const [labelDraft, setLabelDraft] = createSignal<Map<string, string>>(new Map());
@@ -138,11 +163,16 @@ const NewCellWizard: Component<Props> = (p) => {
   }
 
   // Liste der nameable selected (Reihenfolge wie selectedKeys).
-  const nameableSelected = createMemo(() =>
-    selectedKeys()
+  // Im Edit-Mode: nur NEU hinzugefuegte Features bekommen einen Cycle-
+  // Step (existing Features behalten ihren Namen — User aendert sie
+  // via Sidebar-Rename mit explicit Plain-Override-Semantik).
+  const nameableSelected = createMemo(() => {
+    const original = new Set(originalKeys);
+    return selectedKeys()
+      .filter((k) => !original.has(k))
       .map((k) => CELL_FEATURES.find((f) => f.key === k))
-      .filter((d): d is FeatureDef => !!d && d.nameable),
-  );
+      .filter((d): d is FeatureDef => !!d && d.nameable);
+  });
 
   // ─── Step-Übergänge ─────────────────────────────────────────
   function startNameSteps() {
@@ -214,6 +244,13 @@ const NewCellWizard: Component<Props> = (p) => {
   }
 
   // ─── Commit ─────────────────────────────────────────────────
+  // Commit fuer leere Cells UND existing Cells:
+  //  - removed = originalKeys \ selectedKeys → delete-confirm bei
+  //    structural mit Inhalten, dann deleteNode + null-FK.
+  //  - added   = selectedKeys \ originalKeys → createChildMatrix/Board/
+  //    addCellChecklist/createDoc mit Cycle-Template; Info als Flag.
+  //  - Alias: wenn geaendert → validate + setzen.
+  //  - No-Op: keine Aenderungen → einfach close, kein DB-Write.
   async function doCommit() {
     if (busy()) return;
     setBusy(true);
@@ -221,9 +258,15 @@ const NewCellWizard: Component<Props> = (p) => {
     try {
       const aliasNext = aliasDraft().trim();
       const sel = selectedKeys();
-      // 1. Alias validieren wenn gesetzt.
-      let canonicalAlias: string | null = null;
-      if (aliasNext) {
+      const original = new Set(originalKeys);
+      const newSet = new Set(sel);
+      const removed = originalKeys.filter((k) => !newSet.has(k));
+      const added = sel.filter((k) => !original.has(k));
+      const aliasChanged = aliasNext !== (p.cell?.alias ?? '');
+
+      // 1. Alias validieren wenn neu/geaendert.
+      let canonicalAlias: string | null = p.cell?.alias ?? null;
+      if (aliasChanged && aliasNext) {
         const res = await validateAlias(aliasNext, p.workspaceId, {
           type: 'cell',
           id: p.cell?.id ?? '__new__',
@@ -235,27 +278,40 @@ const NewCellWizard: Component<Props> = (p) => {
           return;
         }
         canonicalAlias = res.canonical;
+      } else if (aliasChanged && !aliasNext) {
+        canonicalAlias = null;
       }
 
-      // 2. Cell sicherstellen. Fluechtige Features (Info-Flag) wandern in
-      //    cell.features. Structural FKs (Matrix/Board) setzen wir nach
-      //    der Node-Anlage in Schritt 3.
-      const flagFeatures: string[] = [];
-      for (const k of sel) {
-        const def = CELL_FEATURES.find((f) => f.key === k);
+      // 2. Removals confirmieren (structural mit Inhalt → showConfirm).
+      //    Bei Cancel: ganzen Commit abbrechen. Sonst alle in einem Rutsch.
+      for (const key of removed) {
+        const def = CELL_FEATURES.find((f) => f.key === key);
         if (!def) continue;
-        if (def.kind === 'flag' && def.key === 'info') flagFeatures.push('info');
+        if (def.kind === 'structural') {
+          const nodeId = key === 'matrix' ? p.cell?.child_matrix_id : p.cell?.board_id;
+          if (!nodeId) continue;
+          const empty = await isNodeEmpty(nodeId, def.key as 'matrix' | 'board');
+          if (!empty) {
+            const ok = await showConfirm({
+              title: `Sub-${def.label} loeschen?`,
+              message: `Sub-${def.label} und alle Inhalte loeschen? Das kann nicht rueckgaengig gemacht werden.`,
+              variant: 'danger',
+              confirmLabel: 'Loeschen',
+            });
+            if (!ok) {
+              setBusy(false);
+              setStep({ kind: 'pick' });
+              return;
+            }
+          }
+        }
       }
 
+      // 3. Cell sicherstellen — bei neuer Cell INSERT mit minimalen Feldern,
+      //    bei existing nur fuer FK-/Feature-Updates am Ende.
       let cellRow: CellRow;
       if (p.cell) {
-        const merged = Array.from(new Set([...(p.cell.features ?? []), ...flagFeatures]));
-        cellRow = await updateCell(p.cell.id, {
-          alias: canonicalAlias,
-          features: merged,
-          child_matrix_id: p.cell.child_matrix_id,
-          board_id: p.cell.board_id,
-        });
+        cellRow = p.cell;
       } else {
         cellRow = await insertCell({
           workspaceId: p.workspaceId,
@@ -264,27 +320,41 @@ const NewCellWizard: Component<Props> = (p) => {
           colId: p.col.id,
           patch: {
             alias: canonicalAlias,
-            features: flagFeatures,
+            features: [],
             child_matrix_id: null,
             board_id: null,
           },
         });
       }
 
-      // 3. Pro nameable Feature anlegen.
-      const drafts = labelDraft();
+      // 4. Removals durchfuehren (Sub-Nodes loeschen, FKs nullen).
       let childMatrixId: string | null = cellRow.child_matrix_id;
       let boardId: string | null = cellRow.board_id;
-      const checklistFlag = sel.includes('checklists');
-
-      for (const k of sel) {
-        const def = CELL_FEATURES.find((f) => f.key === k);
+      let workingFeatures: string[] = [...(cellRow.features ?? [])];
+      for (const key of removed) {
+        const def = CELL_FEATURES.find((f) => f.key === key);
         if (!def) continue;
-        const labelTemplate = drafts.get(k) ?? def.label;
-        // Snapshot = template resolved zum Anlage-Zeitpunkt. Liegt in der
-        // *.label/*.title-Spalte als Fallback fuer Resolver/Audit-Log.
-        // Pos 1, 4, 5 enthalten kein '{}' → Snapshot == Template.
-        // Pos 2, 3 enthalten '{}' → Snapshot ist resolved aus Cell-Kontext.
+        if (def.kind === 'structural') {
+          const nodeId = key === 'matrix' ? childMatrixId : boardId;
+          if (nodeId) {
+            await deleteNode(nodeId);
+          }
+          if (key === 'matrix') childMatrixId = null;
+          if (key === 'board') boardId = null;
+          workingFeatures = workingFeatures.filter((f) => f !== key);
+        } else if (def.kind === 'flag') {
+          workingFeatures = workingFeatures.filter((f) => f !== key);
+        }
+        // 'doc': V1 entfernt nichts — Docs leben weiter ueber attached_cell_id.
+      }
+
+      // 5. Additions durchfuehren (createChildMatrix/Board/Checklist/Doc).
+      const drafts = labelDraft();
+      const checklistFlagAdded = added.includes('checklists');
+      for (const key of added) {
+        const def = CELL_FEATURES.find((f) => f.key === key);
+        if (!def) continue;
+        const labelTemplate = drafts.get(key) ?? def.label;
         const snapshot = previewLabel(labelTemplate) || def.label;
 
         if (def.kind === 'structural' && def.key === 'matrix') {
@@ -295,6 +365,7 @@ const NewCellWizard: Component<Props> = (p) => {
             labelTemplate,
           });
           childMatrixId = node.id;
+          if (!workingFeatures.includes('matrix')) workingFeatures.push('matrix');
         } else if (def.kind === 'structural' && def.key === 'board') {
           const node = await createChildBoard({
             workspaceId: p.workspaceId,
@@ -303,6 +374,9 @@ const NewCellWizard: Component<Props> = (p) => {
             labelTemplate,
           });
           boardId = node.id;
+          if (!workingFeatures.includes('board')) workingFeatures.push('board');
+        } else if (def.key === 'info') {
+          if (!workingFeatures.includes('info')) workingFeatures.push('info');
         } else if (def.key === 'checklists') {
           await addCellChecklist({
             workspaceId: p.workspaceId,
@@ -310,6 +384,7 @@ const NewCellWizard: Component<Props> = (p) => {
             label: snapshot,
             labelTemplate,
           });
+          if (!workingFeatures.includes('checklists')) workingFeatures.push('checklists');
         } else if (def.kind === 'doc') {
           await createDoc({
             workspaceId: p.workspaceId,
@@ -318,25 +393,20 @@ const NewCellWizard: Component<Props> = (p) => {
             titleTemplate: labelTemplate,
           });
         }
-        // Info ist schon in flagFeatures behandelt.
       }
+      void checklistFlagAdded; // marker fuer biome — lokal genutzt indirekt
 
-      // 4. Cell-Update mit FKs + checklist-Flag.
-      const finalFeatures = Array.from(
-        new Set([
-          ...flagFeatures,
-          ...(childMatrixId ? ['matrix'] : []),
-          ...(boardId ? ['board'] : []),
-          ...(checklistFlag ? ['checklists'] : []),
-        ]),
-      );
-      if (
+      // 6. Cell-Update wenn sich was geaendert hat.
+      const finalFeatures = Array.from(new Set(workingFeatures));
+      const cellChanged =
         finalFeatures.length !== (cellRow.features ?? []).length ||
+        finalFeatures.some((f) => !(cellRow.features ?? []).includes(f)) ||
         childMatrixId !== cellRow.child_matrix_id ||
-        boardId !== cellRow.board_id
-      ) {
+        boardId !== cellRow.board_id ||
+        canonicalAlias !== cellRow.alias;
+      if (cellChanged) {
         await updateCell(cellRow.id, {
-          alias: cellRow.alias,
+          alias: canonicalAlias,
           features: finalFeatures,
           child_matrix_id: childMatrixId,
           board_id: boardId,
@@ -502,8 +572,11 @@ const NewCellWizard: Component<Props> = (p) => {
             {p.row.label || '(Zeile)'} × {p.col.label || '(Spalte)'}
           </span>
           <h3 id="new-cell-wizard-title">
-            <Show when={step().kind === 'pick'} fallback="Feature benennen">
-              Zelle konfigurieren
+            <Show
+              when={step().kind === 'pick'}
+              fallback={isEditMode ? 'Neues Feature benennen' : 'Feature benennen'}
+            >
+              {isEditMode ? 'Zelle bearbeiten' : 'Zelle konfigurieren'}
             </Show>
           </h3>
           <button
@@ -533,8 +606,19 @@ const NewCellWizard: Component<Props> = (p) => {
               />
             </label>
             <p class="new-cell-wizard-hint">
-              Features auswaehlen — Hotkey oder Klick. Mehrfach-Auswahl moeglich. Namen folgen im
-              naechsten Schritt — fuer jedes Feature einzeln.
+              <Show
+                when={isEditMode}
+                fallback={
+                  <>
+                    Features auswaehlen — Hotkey oder Klick. Mehrfach-Auswahl moeglich. Namen folgen
+                    im naechsten Schritt — fuer jedes Feature einzeln.
+                  </>
+                }
+              >
+                Aktive Features sind angekreuzt. Toggle entfernt oder ergaenzt — neue Features
+                bekommen im naechsten Schritt einen Namen, existierende behalten ihren (Rename via
+                Sidebar).
+              </Show>
             </p>
             <div class="new-cell-wizard-features" aria-label="Zellen-Features">
               <For each={pickableFeatures()}>
