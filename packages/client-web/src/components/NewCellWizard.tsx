@@ -385,9 +385,15 @@ const NewCellWizard: Component<Props> = (p) => {
       startNameSteps();
       return;
     }
-    // Hotkeys: 1/2/3/4/d. Greifen NICHT wenn Modifier gedrueckt sind
-    // (Ctrl+1 etc. soll vom Browser/anderen Handlern verarbeitet werden).
+    // Hotkeys: 1/2/3/4/d. Greifen NICHT wenn:
+    //  - Modifier gedrueckt sind (Ctrl+1 etc. → Browser/andere Handler)
+    //  - Fokus im Alias-Input liegt (User tippt einen Alias mit `d` oder
+    //    Ziffern → das wuerde sonst die Feature-Toggle ausloesen statt
+    //    den Buchstaben einzutragen — Bug-Report 2026-04-29).
     if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = e.target as HTMLElement | null;
+    const inAlias = !!t && t === aliasInputRef;
+    if (inAlias) return;
     const def = findFeatureByHotkey(e.key);
     if (def) {
       e.preventDefault();
@@ -527,7 +533,8 @@ const NewCellWizard: Component<Props> = (p) => {
               />
             </label>
             <p class="new-cell-wizard-hint">
-              Features auswaehlen — Hotkey oder Klick. Mehrfach-Auswahl moeglich.
+              Features auswaehlen — Hotkey oder Klick. Mehrfach-Auswahl moeglich. Namen folgen im
+              naechsten Schritt — fuer jedes Feature einzeln.
             </p>
             <div class="new-cell-wizard-features" aria-label="Zellen-Features">
               <For each={pickableFeatures()}>
