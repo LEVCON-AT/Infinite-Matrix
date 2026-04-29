@@ -407,7 +407,11 @@ async function createChildNode(args: {
   parentCellId: string;
   type: 'matrix' | 'board';
   label: string;
+  // Phase 3 O.8: optional separates Template (mit {row.object} etc.).
+  // Wenn nicht gesetzt, faellt label_template = label (1:1 Snapshot).
+  labelTemplate?: string;
 }): Promise<NodeRow> {
+  const templateValue = args.labelTemplate ?? args.label;
   return runOptimisticInsert<NodeRow>({
     table: 'nodes',
     workspaceId: args.workspaceId,
@@ -419,9 +423,7 @@ async function createChildNode(args: {
           workspace_id: args.workspaceId,
           type: args.type,
           label: args.label,
-          // Phase 3 O.8: Template-Spalte mit-anlegen (Snapshot = label).
-          // Volle Template-API kommt mit dem Wizard in O.8.E/F.
-          label_template: args.label,
+          label_template: templateValue,
           parent_cell_id: args.parentCellId,
           data: {},
         })
@@ -437,7 +439,7 @@ async function createChildNode(args: {
         workspace_id: args.workspaceId,
         type: args.type,
         label: args.label,
-        label_template: args.label,
+        label_template: templateValue,
         alias: null,
         parent_cell_id: args.parentCellId,
         data: {},
@@ -452,12 +454,15 @@ export async function createChildMatrix(args: {
   workspaceId: string;
   parentCellId: string;
   label?: string;
+  // Phase 3 O.8: optional Template (mit {row.object}/{column.object}).
+  labelTemplate?: string;
 }): Promise<NodeRow> {
   return createChildNode({
     workspaceId: args.workspaceId,
     parentCellId: args.parentCellId,
     type: 'matrix',
-    label: args.label ?? 'Neue Matrix',
+    label: args.label ?? 'Matrix',
+    labelTemplate: args.labelTemplate,
   });
 }
 
@@ -512,12 +517,14 @@ export async function createChildBoard(args: {
   workspaceId: string;
   parentCellId: string;
   label?: string;
+  labelTemplate?: string;
 }): Promise<NodeRow> {
   return createChildNode({
     workspaceId: args.workspaceId,
     parentCellId: args.parentCellId,
     type: 'board',
-    label: args.label ?? 'Neues Board',
+    label: args.label ?? 'Board',
+    labelTemplate: args.labelTemplate,
   });
 }
 
@@ -1248,7 +1255,11 @@ export async function addCellChecklist(args: {
   workspaceId: string;
   cellId: string;
   label?: string;
+  // Phase 3 O.8: optional Template (mit {row.object}/{column.object}).
+  labelTemplate?: string;
 }): Promise<ChecklistRow> {
+  const labelValue = args.label ?? '';
+  const templateValue = args.labelTemplate ?? labelValue;
   return runOptimisticInsert<ChecklistRow>({
     table: 'checklists',
     workspaceId: args.workspaceId,
@@ -1260,9 +1271,8 @@ export async function addCellChecklist(args: {
         .insert({
           workspace_id: args.workspaceId,
           cell_id: args.cellId,
-          label: args.label ?? '',
-          // Phase 3 O.8: Template-Spalte (Snapshot = label).
-          label_template: args.label ?? '',
+          label: labelValue,
+          label_template: templateValue,
           position: pos,
         })
         .select()
@@ -1282,8 +1292,8 @@ export async function addCellChecklist(args: {
         workspace_id: args.workspaceId,
         board_id: null,
         cell_id: args.cellId,
-        label: args.label ?? '',
-        label_template: args.label ?? '',
+        label: labelValue,
+        label_template: templateValue,
         position: pos,
         recur: null,
         close_mode: null,
@@ -2161,11 +2171,15 @@ export async function restoreChecklistItem(snap: ChecklistItemRow): Promise<void
 export async function createDoc(args: {
   workspaceId: string;
   title?: string;
+  // Phase 3 O.8: optional Template (mit {row.object}/{column.object}).
+  titleTemplate?: string;
   content?: string;
   alias?: string | null;
   source_alias?: string | null;
   attached_cell_id?: string | null;
 }): Promise<DocRow> {
+  const titleValue = args.title ?? '';
+  const templateValue = args.titleTemplate ?? titleValue;
   return runOptimisticInsert<DocRow>({
     table: 'docs',
     workspaceId: args.workspaceId,
@@ -2175,9 +2189,8 @@ export async function createDoc(args: {
         .from('docs')
         .insert({
           workspace_id: args.workspaceId,
-          title: args.title ?? '',
-          // Phase 3 O.8: Template-Spalte (Snapshot = title).
-          title_template: args.title ?? '',
+          title: titleValue,
+          title_template: templateValue,
           content: args.content ?? '',
           alias: args.alias ?? null,
           source_alias: args.source_alias ?? null,
@@ -2194,8 +2207,8 @@ export async function createDoc(args: {
         id,
         workspace_id: args.workspaceId,
         alias: args.alias ?? null,
-        title: args.title ?? '',
-        title_template: args.title ?? '',
+        title: titleValue,
+        title_template: templateValue,
         content: args.content ?? '',
         source_alias: args.source_alias ?? null,
         attached_cell_id: args.attached_cell_id ?? null,

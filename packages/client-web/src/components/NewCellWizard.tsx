@@ -289,33 +289,41 @@ const NewCellWizard: Component<Props> = (p) => {
         const def = CELL_FEATURES.find((f) => f.key === k);
         if (!def) continue;
         const labelTemplate = drafts.get(k) ?? def.label;
-        const snapshot = previewLabel(labelTemplate);
+        // Snapshot = template resolved zum Anlage-Zeitpunkt. Liegt in der
+        // *.label/*.title-Spalte als Fallback fuer Resolver/Audit-Log.
+        // Pos 1, 4, 5 enthalten kein '{}' → Snapshot == Template.
+        // Pos 2, 3 enthalten '{}' → Snapshot ist resolved aus Cell-Kontext.
+        const snapshot = previewLabel(labelTemplate) || def.label;
 
         if (def.kind === 'structural' && def.key === 'matrix') {
           const node = await createChildMatrix({
             workspaceId: p.workspaceId,
             parentCellId: cellRow.id,
-            label: snapshot || def.label,
+            label: snapshot,
+            labelTemplate,
           });
           childMatrixId = node.id;
         } else if (def.kind === 'structural' && def.key === 'board') {
           const node = await createChildBoard({
             workspaceId: p.workspaceId,
             parentCellId: cellRow.id,
-            label: snapshot || def.label,
+            label: snapshot,
+            labelTemplate,
           });
           boardId = node.id;
         } else if (def.key === 'checklists') {
           await addCellChecklist({
             workspaceId: p.workspaceId,
             cellId: cellRow.id,
-            label: snapshot || def.label,
+            label: snapshot,
+            labelTemplate,
           });
         } else if (def.kind === 'doc') {
           await createDoc({
             workspaceId: p.workspaceId,
             attached_cell_id: cellRow.id,
-            title: snapshot || def.label,
+            title: snapshot,
+            titleTemplate: labelTemplate,
           });
         }
         // Info ist schon in flagFeatures behandelt.
