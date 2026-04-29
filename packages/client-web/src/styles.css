@@ -10910,6 +10910,103 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   }
 }
 
+/* ── TopLevelWizard (Phase 3 O.8.N.2) ────────────────────────
+   Single-Step-Modal fuer Workspace-Root-Anlage. Eigene Klassen statt
+   Reuse von .new-cell-wizard-*: Container ist schmaler, kein Cycle-
+   Block, keine Multi-Feature-Grid — Reuse waere Lippenbekenntnis. */
+
+.top-level-wizard {
+  width: 420px;
+  max-width: 96vw;
+}
+
+.top-level-wizard-head {
+  position: relative;
+}
+
+.top-level-wizard-head h3 {
+  margin: 0;
+  font-size: var(--fs-subtitle);
+}
+
+.top-level-wizard-head .overlay-close {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+}
+
+.top-level-wizard-body {
+  padding: var(--space-md) var(--space-md) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  animation: subStepIn var(--tr-enter);
+}
+
+.top-level-wizard-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.top-level-wizard-label {
+  flex: 0 0 auto;
+  font-size: var(--fs-small);
+  color: var(--text3);
+  font-weight: 500;
+  min-width: 60px;
+}
+
+.top-level-wizard-input {
+  flex: 1 1 auto;
+  padding: 6px 10px;
+  border: 1px solid var(--rl);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg);
+  color: var(--text);
+  font-size: var(--fs-small);
+}
+
+.top-level-wizard-input:focus {
+  outline: none;
+  border-color: var(--p);
+}
+
+.top-level-wizard-hint {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--text3);
+}
+
+.top-level-wizard-foot {
+  padding: var(--space-sm) var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+  border-top: 1px solid var(--rl);
+  margin-top: var(--space-sm);
+}
+
+.top-level-wizard-tip {
+  flex: 1 1 auto;
+  font-size: 11px;
+  color: var(--text3);
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.top-level-wizard-tip kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid var(--rl);
+  border-radius: 3px;
+  background: var(--bg);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+}
+
 /* ── Cell-Feature-Bloop (Phase 3 O.8.F) ─────────────────────
    Wenn der Wizard schliesst, wird auf den frisch angelegten Feature-
    Chips kurzzeitig data-just-added="yes" gesetzt — die Animation

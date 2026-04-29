@@ -5,17 +5,13 @@
 // Sidebar leer ist. Jetzt: warmer Header + CTA-Buttons fuer den
 // schnellen "+ Matrix" / "+ Board"-Anlage-Pfad.
 //
-// Anlage-Helpers:
-//   - createRootMatrixWithDefaults: 2 Zeilen + 2 Spalten als Starter
-//   - createRootBoardWithDefaults: 3 kb_cols (ToDo/In Arbeit/Erledigt)
-// Beides best-effort — bei Seed-Fehler bleibt zumindest der Knoten,
-// User kann manuell ergaenzen.
+// Phase 3 O.8.N.2: CTAs oeffnen jetzt den TopLevelWizard (Alias +
+// Name-Input) statt direkt anzulegen — einheitlicher Wizard-Pfad
+// fuer ALLE Anlagen analog zum Cell-Wizard.
 
 import { type Component, Show, createSignal } from 'solid-js';
-import { translateDbError } from '../lib/errors';
-import { createRootBoardWithDefaults, createRootMatrixWithDefaults } from '../lib/mutations';
-import { showToast } from '../lib/toasts';
 import Icon from './Icon';
+import TopLevelWizard from './TopLevelWizard';
 
 type Props = {
   workspaceId: string;
@@ -24,37 +20,7 @@ type Props = {
 };
 
 const WorkspaceEmptyState: Component<Props> = (p) => {
-  const [busy, setBusy] = createSignal<'matrix' | 'board' | null>(null);
-
-  async function onCreateMatrix() {
-    if (busy() || !p.workspaceId) return;
-    setBusy('matrix');
-    try {
-      const node = await createRootMatrixWithDefaults({ workspaceId: p.workspaceId });
-      showToast('Matrix angelegt — du kannst direkt loslegen.', 'success');
-      p.onCreated(node.id);
-    } catch (err) {
-      console.error('createRootMatrixWithDefaults:', err);
-      showToast(translateDbError(err, 'Matrix konnte nicht angelegt werden.'), 'error');
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function onCreateBoard() {
-    if (busy() || !p.workspaceId) return;
-    setBusy('board');
-    try {
-      const node = await createRootBoardWithDefaults({ workspaceId: p.workspaceId });
-      showToast('Board angelegt — drei Spalten warten auf Karten.', 'success');
-      p.onCreated(node.id);
-    } catch (err) {
-      console.error('createRootBoardWithDefaults:', err);
-      showToast(translateDbError(err, 'Board konnte nicht angelegt werden.'), 'error');
-    } finally {
-      setBusy(null);
-    }
-  }
+  const [wizardType, setWizardType] = createSignal<'matrix' | 'board' | null>(null);
 
   return (
     <section class="ws-empty-state" aria-label="Workspace leer">
@@ -78,8 +44,8 @@ const WorkspaceEmptyState: Component<Props> = (p) => {
           <button
             type="button"
             class="ws-empty-cta ws-empty-cta-matrix"
-            onClick={onCreateMatrix}
-            disabled={busy() !== null}
+            onClick={() => setWizardType('matrix')}
+            disabled={wizardType() !== null}
           >
             <Icon name="squares-2x2" size={18} />
             <span class="ws-empty-cta-title">+ Matrix anlegen</span>
@@ -88,14 +54,24 @@ const WorkspaceEmptyState: Component<Props> = (p) => {
           <button
             type="button"
             class="ws-empty-cta ws-empty-cta-board"
-            onClick={onCreateBoard}
-            disabled={busy() !== null}
+            onClick={() => setWizardType('board')}
+            disabled={wizardType() !== null}
           >
             <Icon name="view-columns" size={18} />
             <span class="ws-empty-cta-title">+ Board anlegen</span>
             <span class="ws-empty-cta-sub">3 Spalten ToDo / In Arbeit / Erledigt</span>
           </button>
         </div>
+      </Show>
+      <Show when={wizardType()}>
+        {(type) => (
+          <TopLevelWizard
+            workspaceId={p.workspaceId}
+            type={type()}
+            onClose={() => setWizardType(null)}
+            onCreated={(nodeId) => p.onCreated(nodeId)}
+          />
+        )}
       </Show>
     </section>
   );

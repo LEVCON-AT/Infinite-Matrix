@@ -473,8 +473,18 @@ export async function createRootNode(args: {
   workspaceId: string;
   type: 'matrix' | 'board';
   label?: string;
+  // Phase 3 O.8.N.2: optional Template (Pos 1 statisch oder eigene
+  // User-Eingabe — Top-Level hat KEIN parent_cell, dynamische
+  // {row.object}-Templates ergeben hier semantisch nichts und werden
+  // vom TopLevelWizard auch nicht angeboten).
+  labelTemplate?: string;
+  // Phase 3 O.8.N.2: optional Alias (TopLevelWizard). Caller validiert
+  // vorab via validateAlias.
+  alias?: string | null;
 }): Promise<NodeRow> {
   const label = args.label ?? (args.type === 'matrix' ? 'Neue Matrix' : 'Neues Board');
+  const labelTemplate = args.labelTemplate ?? label;
+  const alias = args.alias ?? null;
   return runOptimisticInsert<NodeRow>({
     table: 'nodes',
     workspaceId: args.workspaceId,
@@ -486,7 +496,8 @@ export async function createRootNode(args: {
           workspace_id: args.workspaceId,
           type: args.type,
           label,
-          label_template: label,
+          label_template: labelTemplate,
+          alias,
           parent_cell_id: null,
           data: {},
         })
@@ -502,8 +513,8 @@ export async function createRootNode(args: {
         workspace_id: args.workspaceId,
         type: args.type,
         label,
-        label_template: label,
-        alias: null,
+        label_template: labelTemplate,
+        alias,
         parent_cell_id: null,
         data: {},
         created_at: now,
@@ -538,11 +549,16 @@ export async function createChildBoard(args: {
 export async function createRootMatrixWithDefaults(args: {
   workspaceId: string;
   label?: string;
+  // Phase 3 O.8.N.2: optional Template + Alias (TopLevelWizard).
+  labelTemplate?: string;
+  alias?: string | null;
 }): Promise<NodeRow> {
   const node = await createRootNode({
     workspaceId: args.workspaceId,
     type: 'matrix',
     label: args.label,
+    labelTemplate: args.labelTemplate,
+    alias: args.alias,
   });
   // 2 rows + 2 cols sequenziell — RLS + FKs moegen Reihenfolge.
   // Best-effort: Fehler werden geloggt damit zumindest die Matrix
@@ -564,11 +580,16 @@ export async function createRootMatrixWithDefaults(args: {
 export async function createRootBoardWithDefaults(args: {
   workspaceId: string;
   label?: string;
+  // Phase 3 O.8.N.2: optional Template + Alias (TopLevelWizard).
+  labelTemplate?: string;
+  alias?: string | null;
 }): Promise<NodeRow> {
   const node = await createRootNode({
     workspaceId: args.workspaceId,
     type: 'board',
     label: args.label,
+    labelTemplate: args.labelTemplate,
+    alias: args.alias,
   });
   try {
     await addKbCol({ workspaceId: args.workspaceId, boardId: node.id, label: 'ToDo' });
