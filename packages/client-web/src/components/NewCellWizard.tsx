@@ -741,13 +741,16 @@ const NewCellWizard: Component<Props> = (p) => {
           {(_) => {
             const def = currentNameDef();
             if (!def) return null;
-            const total = nameableSelected().length;
-            const stepIdx = (step() as { kind: 'name'; idx: number }).idx;
             const isTopLevel = !p.matrixId;
+            // Phase 3 O.8.M.6: stepIdx + total muessen reaktiv aus den
+            // Signalen gelesen werden — als const wuerden sie beim
+            // ersten Render eingefroren (Bug-Report 2026-04-29 „Schritt
+            // 1/3 bleibt statisch").
             return (
               <div class="new-cell-wizard-body new-cell-wizard-name-body">
                 <p class="new-cell-wizard-step-counter">
-                  Schritt {stepIdx + 1}/{total}: {def.label} benennen
+                  Schritt {(step() as { kind: 'name'; idx: number }).idx + 1}/
+                  {nameableSelected().length}: {currentNameDef()?.label ?? def.label} benennen
                 </p>
                 <input
                   // ref + queueMicrotask: Pos 1 voll-markieren beim Mount
