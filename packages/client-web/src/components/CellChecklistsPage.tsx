@@ -8,6 +8,7 @@ import { type Component, For, Show, createEffect, createResource, createSignal }
 import { openDocsPopup } from '../lib/docs-ui';
 import { useEditMode } from '../lib/edit-mode';
 import { translateDbError } from '../lib/errors';
+import type { ContextMaps } from '../lib/label-template';
 import { addCellChecklist } from '../lib/mutations';
 import type { PresenceUser } from '../lib/presence';
 import { fetchCellChecklists } from '../lib/queries';
@@ -32,6 +33,8 @@ type Props = {
   presence?: () => PresenceUser[];
   selfUserId?: string;
   onItemHover?: (itemId: string | undefined) => void;
+  // Phase 3 O.8.J: Resolver-Maps fuer Live-Aufloesung von doc.title_template.
+  resolverMaps?: () => ContextMaps;
 };
 
 const CellChecklistsPage: Component<Props> = (p) => {
@@ -183,6 +186,7 @@ const CellChecklistsPage: Component<Props> = (p) => {
         cell={p.cell}
         workspaceId={p.workspaceId}
         realtimeVersion={p.realtimeDocsVersion}
+        resolverMaps={p.resolverMaps}
       />
     </div>
   );

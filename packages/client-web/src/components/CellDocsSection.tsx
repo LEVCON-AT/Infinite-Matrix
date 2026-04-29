@@ -16,6 +16,7 @@
 import { type Component, For, Show, createEffect, createResource } from 'solid-js';
 import { openDocsPopup } from '../lib/docs-ui';
 import { useEditMode } from '../lib/edit-mode';
+import { type ContextMaps, resolveDocTitle } from '../lib/label-template';
 import { fetchDocsForCell } from '../lib/queries';
 import type { CellRow, DocRow } from '../lib/types';
 
@@ -26,6 +27,10 @@ type Props = {
   // Aenderungen der docs-Tabelle, damit der gerade im Popup angelegte
   // Doc hier sofort auftaucht.
   realtimeVersion: number;
+  // Phase 3 O.8.J: Resolver-Maps fuer Live-Aufloesung von
+  // doc.title_template. Wenn nicht gesetzt, fallback auf legacy
+  // doc.title.
+  resolverMaps?: () => ContextMaps;
 };
 
 function fmtDateShort(iso: string): string {
@@ -86,7 +91,13 @@ const CellDocsSection: Component<Props> = (p) => {
                 <li class="cell-docs-item-wrap">
                   <button type="button" class="cell-docs-item" onClick={() => onOpenDoc(d)}>
                     <span class="cell-docs-date hint">{fmtDateShort(d.updated_at)}</span>
-                    <span class="cell-docs-item-title">{d.title || '(ohne Titel)'}</span>
+                    <span class="cell-docs-item-title">
+                      {(() => {
+                        const maps = p.resolverMaps?.();
+                        const resolved = maps ? resolveDocTitle(d, maps) : d.title;
+                        return resolved || '(ohne Titel)';
+                      })()}
+                    </span>
                     <Show when={d.alias}>
                       <span class="cell-docs-alias">^{d.alias}</span>
                     </Show>

@@ -13,6 +13,7 @@
 import { useNavigate } from '@solidjs/router';
 import { type Component, Show } from 'solid-js';
 import { openDocsPopup } from '../lib/docs-ui';
+import type { ContextMaps } from '../lib/label-template';
 import type { CellRow, ColRow, RowRow } from '../lib/types';
 import CellDocsSection from './CellDocsSection';
 
@@ -22,6 +23,8 @@ type Props = {
   row: RowRow | undefined;
   col: ColRow | undefined;
   realtimeDocsVersion: number;
+  // Phase 3 O.8.J: Resolver-Maps fuer doc.title_template Live-Aufloesung.
+  resolverMaps?: () => ContextMaps;
 };
 
 const CellDocsPage: Component<Props> = (p) => {
@@ -72,6 +75,7 @@ const CellDocsPage: Component<Props> = (p) => {
         cell={p.cell}
         workspaceId={p.workspaceId}
         realtimeVersion={p.realtimeDocsVersion}
+        resolverMaps={p.resolverMaps}
       />
     </div>
   );

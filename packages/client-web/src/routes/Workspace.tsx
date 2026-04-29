@@ -1194,6 +1194,7 @@ const Workspace: Component = () => {
                       presence={presenceUsers}
                       selfUserId={user()?.id}
                       onItemHover={setHoverItemId}
+                      resolverMaps={resolverMaps}
                     />
                   </Show>
                   <Show when={cellSection() === 'info'}>
@@ -1206,6 +1207,7 @@ const Workspace: Component = () => {
                       presence={presenceUsers}
                       selfUserId={user()?.id}
                       onFieldHover={setHoverFieldId}
+                      resolverMaps={resolverMaps}
                       onChanged={() => {
                         void refetchCells();
                       }}
@@ -1218,6 +1220,7 @@ const Workspace: Component = () => {
                       row={cellRow()}
                       col={cellCol()}
                       realtimeDocsVersion={rtDocs()}
+                      resolverMaps={resolverMaps}
                     />
                   </Show>
                 </section>

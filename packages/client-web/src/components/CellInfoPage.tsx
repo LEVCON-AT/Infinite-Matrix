@@ -20,6 +20,7 @@ import { showConfirm, showPrompt } from '../lib/dialog';
 import { openDocsPopup } from '../lib/docs-ui';
 import { useEditMode } from '../lib/edit-mode';
 import { translateDbError } from '../lib/errors';
+import type { ContextMaps } from '../lib/label-template';
 import {
   addCellInfoField,
   addCellLink,
@@ -53,6 +54,8 @@ type Props = {
   presence?: () => PresenceUser[];
   selfUserId?: string;
   onFieldHover?: (fieldId: string | undefined) => void;
+  // Phase 3 O.8.J: Resolver-Maps fuer doc.title_template Live-Aufloesung.
+  resolverMaps?: () => ContextMaps;
 };
 
 const CellInfoPage: Component<Props> = (p) => {
@@ -457,6 +460,7 @@ const CellInfoPage: Component<Props> = (p) => {
         cell={p.cell}
         workspaceId={p.workspaceId}
         realtimeVersion={p.realtimeDocsVersion}
+        resolverMaps={p.resolverMaps}
       />
     </div>
   );
