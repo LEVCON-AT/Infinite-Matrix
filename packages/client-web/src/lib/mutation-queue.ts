@@ -163,6 +163,17 @@ export async function clearWorkspaceQueue(workspaceId: string): Promise<void> {
   await refreshPendingCount(workspaceId);
 }
 
+// AU-B1 K3 (B1-H-002): kompletter Queue-Wipe — fuer SIGNED_OUT-Pfad,
+// damit pending Mutations eines abgemeldeten Users nicht von einem
+// anderen User auf demselben Browser repliziert werden.
+export async function clearAllMutationQueues(): Promise<void> {
+  const inst = await db();
+  const tx = inst.transaction('mutation_queue', 'readwrite');
+  await tx.store.clear();
+  await tx.done;
+  setPendingCount(0);
+}
+
 export async function refreshCountForWorkspace(workspaceId: string): Promise<void> {
   await refreshPendingCount(workspaceId);
 }

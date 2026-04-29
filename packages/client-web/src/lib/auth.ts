@@ -1,5 +1,12 @@
 import type { Session, User } from '@supabase/supabase-js';
 import { createSignal, onCleanup } from 'solid-js';
+import { clearProviderCredentialCache } from './ai-assist/credential';
+import { resetAiProvidersCache } from './ai-providers';
+import { clearAllAliasIndex } from './alias-index';
+import { clearAllMutationQueues } from './mutation-queue';
+import { clearAll as clearAllOfflineCache } from './offline-cache';
+import { resetOfflineState } from './offline-state';
+import { resetOnboardingGate } from './onboarding-gate';
 import { supabase } from './supabase';
 
 // Magic-Link-Redirect-URI: aus VITE_SITE_URL (Build-time-Konstante).
@@ -50,6 +57,11 @@ export function bootstrapAuth(): void {
     setReady(true);
     if (event === 'SIGNED_OUT') {
       setAccountInvalid(false);
+      // AU-B1 K3 (B1-H-002 / B1-C-001): Local-User-Data komplett wipen.
+      // Ohne diesen Sweep koennte ein nachfolgender User auf demselben
+      // Browser den IDB-Cache + decrypted API-Key + Mutation-Queue +
+      // Alias-Index des vorherigen Users sehen.
+      void clearLocalUserData();
     } else if (
       s &&
       (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED')
@@ -61,6 +73,47 @@ export function bootstrapAuth(): void {
       void validateUserExists();
     }
   });
+}
+
+// AU-B1 K3 (B1-H-002 / B1-C-001): zentrale Cleanup-Funktion fuer
+// SIGNED_OUT. Best-effort — einzelne Failures werden geloggt aber
+// blockieren den Logout-Pfad nicht.
+async function clearLocalUserData(): Promise<void> {
+  // Sync-Cleanups zuerst (kein await noetig).
+  try {
+    clearProviderCredentialCache();
+  } catch (err) {
+    console.warn('clearLocalUserData: clearProviderCredentialCache failed:', err);
+  }
+  try {
+    resetAiProvidersCache();
+  } catch (err) {
+    console.warn('clearLocalUserData: resetAiProvidersCache failed:', err);
+  }
+  try {
+    clearAllAliasIndex();
+  } catch (err) {
+    console.warn('clearLocalUserData: clearAllAliasIndex failed:', err);
+  }
+  try {
+    resetOnboardingGate();
+  } catch (err) {
+    console.warn('clearLocalUserData: resetOnboardingGate failed:', err);
+  }
+  try {
+    resetOfflineState();
+  } catch (err) {
+    console.warn('clearLocalUserData: resetOfflineState failed:', err);
+  }
+  // Async-Cleanups: IDB-Stores parallel.
+  await Promise.allSettled([
+    clearAllOfflineCache().catch((err) => {
+      console.warn('clearLocalUserData: clearAllOfflineCache failed:', err);
+    }),
+    clearAllMutationQueues().catch((err) => {
+      console.warn('clearLocalUserData: clearAllMutationQueues failed:', err);
+    }),
+  ]);
 }
 
 // Pruefe, ob der User aus der aktuellen JWT-Session serverseitig noch

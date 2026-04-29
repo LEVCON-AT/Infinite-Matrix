@@ -290,6 +290,13 @@ export function clearAliasIndex(wsId: string): void {
   }
 }
 
+// AU-B1 K3 (B1-H-002): kompletter Alias-Index-Wipe — fuer SIGNED_OUT.
+export function clearAllAliasIndex(): void {
+  for (const t of debounceTimers.values()) clearTimeout(t);
+  debounceTimers.clear();
+  states.clear();
+}
+
 // Debouncer pro wsId, damit Bulk-Realtime-Events (z.B. Drag-Reorder
 // oder Bulk-Delete) nicht fuer jedes einzelne Event 6 parallele
 // Queries ausloesen. 250 ms Fensterbreite — schnell genug dass ein
