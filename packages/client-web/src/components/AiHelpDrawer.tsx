@@ -155,6 +155,19 @@ const AiHelpDrawer: Component = () => {
     }
 
     setError(null);
+    // AU-B1 K4 (B1-D-002 / B1-H-004): Conversation-Snapshot VOR dem
+    // setMessages bauen, sonst wird die neue User-Message doppelt
+    // angehaengt (einmal im setMessages, einmal in der for-Loop, weil
+    // messages() den aktualisierten Wert liefert). Konsequenz war:
+    // Anthropic-API bekam die letzte User-Message zweimal.
+    const prevMessages = messages();
+    const conversation: AssistMessage[] = [];
+    for (const m of prevMessages) {
+      if (m.kind === 'user') conversation.push({ role: 'user', content: m.text });
+      else if (m.kind === 'assistant') conversation.push({ role: 'assistant', content: m.text });
+    }
+    conversation.push({ role: 'user', content: text });
+
     setMessages((prev) => [...prev, { kind: 'user', text }]);
     setInput('');
     setStreamingText('');
@@ -173,17 +186,6 @@ const AiHelpDrawer: Component = () => {
     if (cellId) ctxParts.push(`Aktuelle Zelle: ${cellId}`);
     if (readOnly()) ctxParts.push('Hinweis: Read-Only-Modus aktiv — keine Tool-Calls erlaubt.');
     const contextSnapshot = ctxParts.join('\n');
-
-    // Conversation-History aufbauen (alle bisherigen messages als
-    // AssistMessage). System-prompts werden in lib/ai-assist gehaerted.
-    const conversation: AssistMessage[] = [];
-    for (const m of messages()) {
-      if (m.kind === 'user') conversation.push({ role: 'user', content: m.text });
-      else if (m.kind === 'assistant') conversation.push({ role: 'assistant', content: m.text });
-    }
-    // Letzte user-message ist die gerade gepushte — die ist schon drin.
-    // Wir muessen sicherstellen dass die Append-order stimmt: bei messages-
-    // Update via setMessages wurde sie ans Ende gepusht.
 
     // Confirm-Pattern fuer destructive Tools (Mitigation C).
     const confirmDestructive = async (toolName: string, args: Record<string, unknown>) => {
@@ -209,9 +211,15 @@ const AiHelpDrawer: Component = () => {
         onEvent: handleEvent,
       });
     } catch (e) {
-      // runAssist sollte intern handhaben, aber defensiv.
-      console.error('runAssist threw:', e);
-      setError((e as Error).message ?? String(e));
+      // AU-B1 K4 (B1-H-001): User-Cancel via abortCtrl.abort() wirft
+      // einen DOMException 'AbortError' — das ist eine bewusste User-
+      // Aktion, kein Systemfehler. Silent-stop statt Error-Toast.
+      if ((e as Error).name === 'AbortError') {
+        // nichts tun — finally-Block flush'ed Streaming-Text + Tools
+      } else {
+        console.error('runAssist threw:', e);
+        setError((e as Error).message ?? String(e));
+      }
     } finally {
       // Final-Flush: streaming-text + tool-calls in messages packen.
       const finalText = streamingText();

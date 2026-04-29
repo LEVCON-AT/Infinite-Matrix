@@ -85,6 +85,20 @@
   --r: 8px;
   --rl: 12px;
 
+  /* AU-B1 K4 (B1-E-003 / B1-E-004): Token-Aliase fuer Object-Layer-
+     Sections (Bulk-Add, Obj-Detail, Group-Matrix, NewCellWizard,
+     TopLevelWizard) die durchgaengig --p / --accent / --bg-hover /
+     --radius-sm / --focus-ring / --danger erwartet haben. Sie wurden
+     ohne Definition referenziert; ohne Aliase rendern alle Akzent-
+     Farben + Focus-Outlines unsichtbar. */
+  --p: var(--blue);
+  --accent: var(--blue);
+  --bg-hover: var(--surface-hover);
+  --radius-sm: var(--rs);
+  --focus-ring: var(--focus-width) solid var(--focus-color);
+  --danger: var(--red);
+  --dangerbg: var(--redbg);
+
   /* Font-Sizes */
   --fs-title: clamp(14px, 0.9vw + 10px, 17px);
   --fs-subtitle: clamp(13px, 0.6vw + 9px, 15px);
@@ -7965,7 +7979,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 .bulk-item-input {
   flex: 1 1 auto;
   padding: 6px 10px;
-  border: 1px solid var(--rl);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm, 6px);
   background: var(--bg);
   color: var(--text);
@@ -8011,7 +8025,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 .bulk-add-row-btn {
   align-self: flex-start;
   background: transparent;
-  border: 1px dashed var(--rl);
+  border: 1px dashed var(--border2);
   color: var(--text2);
   padding: 4px 10px;
   border-radius: var(--radius-sm, 6px);
@@ -8036,7 +8050,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   gap: var(--space-sm);
   margin-top: var(--space-sm);
   padding-top: var(--space-sm);
-  border-top: 1px solid var(--rl);
+  border-top: 1px solid var(--border);
   flex-wrap: wrap;
 }
 
@@ -8057,7 +8071,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 .bulk-group-name {
   flex: 1 1 200px;
   padding: 6px 10px;
-  border: 1px solid var(--rl);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm, 6px);
   background: var(--bg);
   color: var(--text);
@@ -8103,7 +8117,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   align-items: center;
   gap: var(--space-md);
   padding-bottom: var(--space-sm);
-  border-bottom: 1px solid var(--rl);
+  border-bottom: 1px solid var(--border);
 }
 
 .obj-detail-head-spacer {
@@ -8116,7 +8130,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   gap: 6px;
   padding: 6px 12px;
   background: transparent;
-  border: 1px solid var(--rl);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm, 6px);
   color: var(--text2);
   font-size: var(--fs-small);
@@ -8150,7 +8164,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 
 .obj-detail-input {
   padding: 8px 12px;
-  border: 1px solid var(--rl);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm, 6px);
   background: var(--bg);
   color: var(--text);
@@ -8170,7 +8184,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 
 .obj-parent-pick-btn {
   background: transparent;
-  border: 1px dashed var(--rl);
+  border: 1px dashed var(--border2);
   color: var(--text2);
   padding: 2px 10px;
   border-radius: 12px;
@@ -8225,7 +8239,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 
 .obj-tag-add-btn {
   background: transparent;
-  border: 1px dashed var(--rl);
+  border: 1px dashed var(--border2);
   color: var(--text2);
   padding: 2px 10px;
   border-radius: 12px;
@@ -8265,7 +8279,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   gap: var(--space-sm);
   padding-top: var(--space-md);
   margin-top: var(--space-md);
-  border-top: 1px solid var(--rl);
+  border-top: 1px solid var(--border);
 }
 
 /* Attribute-Edit-Liste (O.4.E) */
@@ -8313,7 +8327,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 .obj-attr-add-btn {
   align-self: flex-start;
   background: transparent;
-  border: 1px dashed var(--rl);
+  border: 1px dashed var(--border2);
   color: var(--text2);
   padding: 4px 12px;
   border-radius: var(--radius-sm, 6px);
@@ -8364,7 +8378,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   align-items: center;
   gap: var(--space-md);
   padding-bottom: var(--space-sm);
-  border-bottom: 1px solid var(--rl);
+  border-bottom: 1px solid var(--border);
 }
 
 .objects-list-title {
@@ -8386,7 +8400,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  border: 1px solid var(--rl);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm, 6px);
   background: var(--bg);
   flex: 1 1 220px;
@@ -8426,7 +8440,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 
 .objects-list-type-filter {
   padding: 6px 10px;
-  border: 1px solid var(--rl);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm, 6px);
   background: var(--bg);
   color: var(--text);
@@ -8456,7 +8470,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   gap: 4px;
   padding: 4px 10px;
   background: transparent;
-  border: 1px solid var(--rl);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm, 6px);
   color: var(--text2);
   font-size: 12px;
@@ -8476,7 +8490,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   flex-wrap: wrap;
   gap: 6px;
   padding: var(--space-sm) 0;
-  border-bottom: 1px solid var(--rl);
+  border-bottom: 1px solid var(--border);
 }
 
 .objects-list-tags-label {
@@ -8494,7 +8508,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   gap: 4px;
   padding: 3px 10px;
   background: transparent;
-  border: 1px solid var(--rl);
+  border: 1px solid var(--border);
   border-radius: 12px;
   color: var(--text2);
   font-size: 12px;
@@ -8535,8 +8549,8 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  background: var(--amberbg, var(--rl));
-  border: 1px solid var(--amber, var(--rl));
+  background: var(--amberbg, var(--surface-hover));
+  border: 1px solid var(--amber, var(--border));
   border-radius: var(--radius-sm, 6px);
   color: var(--text);
   font-size: var(--fs-small);
@@ -8553,7 +8567,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 /* List/Tree-View-Toggle (O.7) */
 .objects-list-view-toggle {
   display: inline-flex;
-  border: 1px solid var(--rl);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm, 6px);
   overflow: hidden;
 }
@@ -8582,7 +8596,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 }
 
 .objects-list-view-btn + .objects-list-view-btn {
-  border-left: 1px solid var(--rl);
+  border-left: 1px solid var(--border);
 }
 
 /* Tree-Render */
@@ -8675,7 +8689,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   gap: 6px;
   padding: var(--space-sm);
   background: var(--bg-subtle, transparent);
-  border: 1px solid var(--rl);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm, 6px);
 }
 
@@ -8689,7 +8703,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 
 .group-matrix-select {
   padding: 6px 10px;
-  border: 1px solid var(--rl);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm, 6px);
   background: var(--bg);
   color: var(--text);
@@ -8817,7 +8831,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
-  border: 1px dashed var(--rl);
+  border: 1px dashed var(--border2);
   border-radius: var(--radius-sm, 6px);
   background: transparent;
   color: var(--text3);
@@ -8855,7 +8869,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   gap: var(--space-sm);
   margin-top: var(--space-sm);
   padding-top: var(--space-sm);
-  border-top: 1px solid var(--rl);
+  border-top: 1px solid var(--border);
 }
 
 .group-matrix-name-label {
@@ -8868,7 +8882,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 .group-matrix-name-input {
   flex: 1 1 auto;
   padding: 6px 10px;
-  border: 1px solid var(--rl);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm, 6px);
   background: var(--bg);
   color: var(--text);
@@ -8918,7 +8932,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   width: 100%;
   padding: 10px 14px;
   background: transparent;
-  border: 1px solid var(--rl);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm, 6px);
   color: var(--text);
   font-size: var(--fs-small);
@@ -8978,7 +8992,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   gap: 6px;
   padding: 6px 12px;
   background: transparent;
-  border: 1px solid var(--rl);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm, 6px);
   color: var(--text2);
   font-size: var(--fs-small);
@@ -9118,7 +9132,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   width: 100%;
   padding: 6px 10px;
   background: transparent;
-  border: 1px solid var(--rl);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm, 6px);
   color: var(--text);
   font-size: var(--fs-small);
@@ -10688,7 +10702,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 .new-cell-wizard-alias-input {
   flex: 1 1 auto;
   padding: 6px 10px;
-  border: 1px solid var(--rl);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm, 6px);
   background: var(--bg);
   color: var(--text);
@@ -10718,7 +10732,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border: 1px solid var(--rl);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm, 6px);
   background: var(--bg);
   color: var(--text);
@@ -10785,7 +10799,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   align-items: center;
   gap: var(--space-sm);
   justify-content: flex-end;
-  border-top: 1px solid var(--rl);
+  border-top: 1px solid var(--border);
   margin-top: var(--space-sm);
 }
 
@@ -10810,7 +10824,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 .new-cell-wizard-tip kbd {
   display: inline-block;
   padding: 1px 5px;
-  border: 1px solid var(--rl);
+  border: 1px solid var(--border);
   border-radius: 3px;
   background: var(--bg);
   font-family: var(--font-mono, monospace);
@@ -10898,7 +10912,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   display: inline-block;
   width: 28px;
   height: 28px;
-  border: 2px solid var(--rl);
+  border: 2px solid var(--border);
   border-top-color: var(--p);
   border-radius: 50%;
   animation: wizardSpin 0.7s linear infinite;
@@ -10960,7 +10974,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 .top-level-wizard-input {
   flex: 1 1 auto;
   padding: 6px 10px;
-  border: 1px solid var(--rl);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm, 6px);
   background: var(--bg);
   color: var(--text);
@@ -10984,7 +10998,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   align-items: center;
   gap: var(--space-sm);
   justify-content: flex-end;
-  border-top: 1px solid var(--rl);
+  border-top: 1px solid var(--border);
   margin-top: var(--space-sm);
 }
 
@@ -11000,7 +11014,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 .top-level-wizard-tip kbd {
   display: inline-block;
   padding: 1px 5px;
-  border: 1px solid var(--rl);
+  border: 1px solid var(--border);
   border-radius: 3px;
   background: var(--bg);
   font-family: var(--font-mono, monospace);

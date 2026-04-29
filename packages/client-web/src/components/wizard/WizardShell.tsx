@@ -16,7 +16,7 @@
 
 import { useNavigate } from '@solidjs/router';
 import { type Component, For, Match, Show, Switch, onCleanup, onMount } from 'solid-js';
-import { installFocusRestore, showConfirm } from '../../lib/dialog';
+import { installFocusRestore, installFocusTrap, showConfirm } from '../../lib/dialog';
 import { markOnboardingDone, markOnboardingSkipped } from '../../lib/onboarding-gate';
 import { showToast } from '../../lib/toasts';
 import {
@@ -52,6 +52,10 @@ const WizardShell: Component<Props> = (p) => {
 
   onMount(() => {
     onCleanup(installFocusRestore());
+    // AU-B1 K4 (B1-E-002 / B1-D-009 / CC5): Focus-Trap haelt Tab-Order
+    // im 720px-Wizard-Modal — sonst sickert er in die Untergrund-UI
+    // (WCAG 2.1 SC 2.1.2 Verstoss).
+    if (cardRef) onCleanup(installFocusTrap(cardRef));
     // ESC wird absichtlich NICHT zum Schliessen verkabelt (s. oben).
     // Stattdessen: ESC oeffnet Skip-Bestaetigung — falls User irrt,
     // bleibt der State erhalten.

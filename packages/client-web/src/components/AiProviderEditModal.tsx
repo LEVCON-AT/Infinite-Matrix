@@ -21,7 +21,7 @@ import {
   PROVIDER_LABELS,
   setAiProvider,
 } from '../lib/ai-providers';
-import { installFocusRestore } from '../lib/dialog';
+import { installFocusRestore, installFocusTrap } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
 import { showToast } from '../lib/toasts';
 import type { AiProvider, AiProviderKind } from '../lib/types';
@@ -52,9 +52,13 @@ const AiProviderEditModal: Component<AiProviderEditModalProps> = (p) => {
   const [busy, setBusy] = createSignal(false);
 
   let labelInput: HTMLInputElement | undefined;
+  let cardRef: HTMLDivElement | undefined;
 
   onMount(() => {
     onCleanup(installFocusRestore());
+    // AU-B1 K4 (B1-D-003): Focus-Trap auf dem Modal-Card. API-Key-Form
+    // ist sensibel, Tab-Escape in den Hintergrund waere ein Risiko.
+    if (cardRef) onCleanup(installFocusTrap(cardRef));
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       e.stopImmediatePropagation();
@@ -121,6 +125,7 @@ const AiProviderEditModal: Component<AiProviderEditModalProps> = (p) => {
       }}
     >
       <div
+        ref={cardRef}
         class="overlay-card ai-provider-modal"
         // biome-ignore lint/a11y/useSemanticElements: role=dialog bewusst.
         role="dialog"

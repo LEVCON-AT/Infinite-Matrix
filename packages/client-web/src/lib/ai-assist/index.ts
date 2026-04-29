@@ -143,6 +143,12 @@ export async function runAssist(opts: RunAssistOptions): Promise<void> {
       opts.onEvent({ type: 'iter_cap', reached: iter, cap });
     }
   } catch (e) {
+    // AU-B1 K4 (B1-H-001): User-Cancel via opts.signal.abort() wirft
+    // AbortError — kein Systemfehler, sondern explizite User-Aktion.
+    // Re-throw, damit der Caller das Silent-Stop-Pfad wahrnimmt.
+    if ((e as Error).name === 'AbortError') {
+      throw e;
+    }
     finalStopReason = 'error';
     errorMsg = (e as Error).message ?? String(e);
   }
