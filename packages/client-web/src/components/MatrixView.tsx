@@ -9,7 +9,7 @@ import {
   onCleanup,
   onMount,
 } from 'solid-js';
-import { showConfirm } from '../lib/dialog';
+import { showChoice, showConfirm } from '../lib/dialog';
 import { openDocsPopup } from '../lib/docs-ui';
 import { useEditMode } from '../lib/edit-mode';
 import { translateDbError } from '../lib/errors';
@@ -446,6 +446,71 @@ const MatrixView: Component<Props> = (p) => {
     setOverlayTarget({ row, col, cell });
   }
 
+  // ─── Cell-Enter-Semantik (Phase 3 O.8.G) ─────────────────
+  // Edit-Mode: Enter -> Wizard/Overlay (onCellEdit).
+  // Non-Edit:  Matrix-Vorrang -> 1 navigierbar -> 2+ Picker -> 0 nichts.
+  type CellNavTarget = { key: string; label: string; href: string };
+
+  function collectNavTargets(cell: CellRow | undefined): CellNavTarget[] {
+    if (!cell) return [];
+    const out: CellNavTarget[] = [];
+    const features = cell.features ?? [];
+    if (cell.child_matrix_id) {
+      out.push({
+        key: 'matrix',
+        label: 'Matrix',
+        href: `/w/${p.workspaceId}/n/${cell.child_matrix_id}`,
+      });
+    }
+    if (cell.board_id) {
+      out.push({ key: 'board', label: 'Board', href: `/w/${p.workspaceId}/n/${cell.board_id}` });
+    }
+    if (features.includes('info')) {
+      out.push({ key: 'info', label: 'Info', href: `/w/${p.workspaceId}/c/${cell.id}/info` });
+    }
+    if (features.includes('checklists')) {
+      out.push({
+        key: 'checklists',
+        label: 'Checklisten',
+        href: `/w/${p.workspaceId}/c/${cell.id}/checklists`,
+      });
+    }
+    // Doku: navigiert zur Doku-Page wenn cell.id im cellsWithDocs liegt.
+    if (p.cellsWithDocs?.has(cell.id)) {
+      out.push({ key: 'doc', label: 'Doku', href: `/w/${p.workspaceId}/c/${cell.id}/docs` });
+    }
+    return out;
+  }
+
+  async function enterCellNonEdit(cell: CellRow | undefined) {
+    const targets = collectNavTargets(cell);
+    if (targets.length === 0) return;
+    // Matrix-Vorrang: wenn vorhanden, sofort rein.
+    const matrix = targets.find((t) => t.key === 'matrix');
+    if (matrix) {
+      navigate(matrix.href);
+      return;
+    }
+    if (targets.length === 1) {
+      navigate(targets[0].href);
+      return;
+    }
+    // Picker fuer 2+ — showChoice mit Buttons. Erstes Target ist Default
+    // (Focus-Trap setzt Fokus auf den ersten Button; Tab cyclt durch).
+    const choice = await showChoice({
+      title: 'Welches Feature?',
+      message: 'Mehrere Features in dieser Zelle. Wohin?',
+      choices: targets.map((t, i) => ({
+        id: t.key,
+        label: t.label,
+        variant: i === 0 ? 'primary' : 'default',
+      })),
+    });
+    if (!choice) return;
+    const tgt = targets.find((t) => t.key === choice);
+    if (tgt) navigate(tgt.href);
+  }
+
   // ─── Keyboard auf fokussierter Zelle ─────────────────────────
   // 1/2       : Sub-Matrix / Sub-Board oeffnen (structural Hotkey)
   // Arrows    : Focus auf Nachbar-Zelle verschieben (clamp am Rand)
@@ -507,18 +572,28 @@ const MatrixView: Component<Props> = (p) => {
         return;
       }
 
-      // 1/2 — Sub-Feature direkt oeffnen.
+      // 1/2/3/4 — Feature direkt oeffnen (Phase 3 O.8.G erweitert).
       const def = findFeatureByHotkey(e.key);
-      if (!def || def.kind !== 'structural') return;
+      if (!def) return;
 
       const cell = cellMap().get(`${rowId}::${colId}`);
       if (!cell) return;
-      const targetNode = def.key === 'matrix' ? cell.child_matrix_id : cell.board_id;
-      if (!targetNode) return;
+
+      let target: string | null = null;
+      if (def.key === 'matrix' && cell.child_matrix_id) {
+        target = `/w/${p.workspaceId}/n/${cell.child_matrix_id}`;
+      } else if (def.key === 'board' && cell.board_id) {
+        target = `/w/${p.workspaceId}/n/${cell.board_id}`;
+      } else if (def.key === 'info' && (cell.features ?? []).includes('info')) {
+        target = `/w/${p.workspaceId}/c/${cell.id}/info`;
+      } else if (def.key === 'checklists' && (cell.features ?? []).includes('checklists')) {
+        target = `/w/${p.workspaceId}/c/${cell.id}/checklists`;
+      }
+      if (!target) return;
 
       e.preventDefault();
       rememberCellFocus(rowId, colId);
-      navigate(`/w/${p.workspaceId}/n/${targetNode}`);
+      navigate(target);
     };
     document.addEventListener('keydown', onKey);
     onCleanup(() => document.removeEventListener('keydown', onKey));
@@ -884,10 +959,15 @@ const MatrixView: Component<Props> = (p) => {
                                 if (editMode()) onCellEdit(row, col, cell());
                               }}
                               onKeyDown={(e) => {
-                                if (!editMode()) return;
                                 if (e.key === 'Enter' || e.key === ' ') {
                                   e.preventDefault();
-                                  onCellEdit(row, col, cell());
+                                  if (editMode()) {
+                                    onCellEdit(row, col, cell());
+                                  } else {
+                                    // Phase 3 O.8.G: Non-Edit Enter mit
+                                    // Matrix-Vorrang / 1 nav / Picker.
+                                    void enterCellNonEdit(cell());
+                                  }
                                 }
                               }}
                             >
