@@ -163,6 +163,7 @@ const CellChecklistsPage: Component<Props> = (p) => {
                     presence={p.presence}
                     selfUserId={p.selfUserId}
                     onItemHover={p.onItemHover}
+                    resolverMaps={p.resolverMaps}
                   />
                 );
               }}

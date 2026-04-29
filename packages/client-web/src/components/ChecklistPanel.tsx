@@ -21,6 +21,7 @@ import { showConfirm } from '../lib/dialog';
 import { useEditMode } from '../lib/edit-mode';
 import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
+import { type ContextMaps, resolveChecklistLabel } from '../lib/label-template';
 import {
   addChecklistItem,
   applyChecklistClose,
@@ -63,11 +64,23 @@ type Props = {
   presence?: () => PresenceUser[];
   selfUserId?: string;
   onItemHover?: (itemId: string | undefined) => void;
+  // Phase 3 O.8.K: Resolver-Maps fuer Display-Pfade (Toasts, Confirms,
+  // History-Snapshot). Edit-Input bleibt auf legacy label.
+  resolverMaps?: () => ContextMaps;
 };
 
 const ChecklistPanel: Component<Props> = (p) => {
   const editMode = useEditMode();
   const [busy, setBusy] = createSignal(false);
+
+  // Phase 3 O.8.K: resolved Label fuer Display-Pfade (Toasts, Confirms,
+  // History-Snapshot, Child-Popup-Header). Faellt auf legacy label
+  // wenn keine Resolver-Maps verfuegbar sind.
+  const displayLabel = createMemo(() => {
+    const maps = p.resolverMaps?.();
+    if (!maps) return p.checklist.label;
+    return resolveChecklistLabel(p.checklist, maps);
+  });
 
   // P1.D Live-Cursor-Map. Pro Render des Panels einmal aufgebaut — nur
   // Items aus *dieser* Liste werden beruecksichtigt, andere Listen
@@ -155,7 +168,7 @@ const ChecklistPanel: Component<Props> = (p) => {
     if (count > 0) {
       const ok = await showConfirm({
         title: 'Checkliste loeschen?',
-        message: `Checkliste "${p.checklist.label || '(Liste)'}" loeschen? Enthaelt ${count} Punkt(e).`,
+        message: `Checkliste "${displayLabel() || '(Liste)'}" loeschen? Enthaelt ${count} Punkt(e).`,
         variant: 'danger',
         confirmLabel: 'Loeschen',
       });
@@ -163,8 +176,9 @@ const ChecklistPanel: Component<Props> = (p) => {
     }
     const clSnap = { ...p.checklist };
     const itemSnaps = p.items.map((i) => ({ ...i }));
+    const labelForToast = displayLabel() || clSnap.label;
     await wrap(() => delChecklist(p.checklist.id));
-    showUndoToast(`Checkliste "${clSnap.label || '(Liste)'}" geloescht.`, () => {
+    showUndoToast(`Checkliste "${labelForToast || '(Liste)'}" geloescht.`, () => {
       void (async () => {
         try {
           await restoreChecklistWithItems(clSnap, itemSnaps);
@@ -232,7 +246,7 @@ const ChecklistPanel: Component<Props> = (p) => {
     if (!recur && p.items.length > 0 && confirmIfDestructive) {
       const ok = await showConfirm({
         title: 'Checkliste abschliessen?',
-        message: `Checkliste "${p.checklist.label || '(Liste)'}" abschliessen? Alle ${p.items.length} Punkte werden entfernt — ein Snapshot bleibt in der Historie.`,
+        message: `Checkliste "${displayLabel() || '(Liste)'}" abschliessen? Alle ${p.items.length} Punkte werden entfernt — ein Snapshot bleibt in der Historie.`,
         variant: 'warning',
         confirmLabel: 'Abschliessen',
       });
@@ -262,7 +276,7 @@ const ChecklistPanel: Component<Props> = (p) => {
       // im executeChecklistAction via Toast gemeldet.
       void executeChecklistAction(parseChecklistAction(p.checklist.action), {
         workspaceId: p.workspaceId,
-        checklistLabel: p.checklist.label || '(Liste)',
+        checklistLabel: displayLabel() || '(Liste)',
         navigate,
       });
       return true;
@@ -349,7 +363,7 @@ const ChecklistPanel: Component<Props> = (p) => {
       } else if (mode === 'auto-prompt') {
         // Generischer Action-Toast mit passendem Button-Label
         // ("Abschliessen" statt generischem "Rueckgaengig").
-        showToast(`"${p.checklist.label || '(Liste)'}" ist vollstaendig.`, 'info', {
+        showToast(`"${displayLabel() || '(Liste)'}" ist vollstaendig.`, 'info', {
           ms: 10000,
           action: {
             label: 'Abschliessen',
@@ -671,7 +685,7 @@ const ChecklistPanel: Component<Props> = (p) => {
         <ChecklistToCardPopup
           workspaceId={p.workspaceId}
           checklistId={p.checklist.id}
-          checklistLabel={p.checklist.label}
+          checklistLabel={displayLabel()}
           onClose={() => setShowToCard(false)}
           onCreated={() => p.onChanged()}
         />
