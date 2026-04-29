@@ -1,11 +1,16 @@
-// Phase 3 O.8 — Cell-Anlage-Wizard.
+// Phase 3 O.8 — Cell-Anlage/Edit-Wizard.
 //
-// Ersetzt das CellOverlay-Modal an Anlage-Zeit (leere Zelle im Edit-
-// Mode). Zwei-Phasen-Stepper:
+// Einziger Pfad fuer Cell-Konfiguration. Ersetzt komplett das alte
+// CellOverlay (geloescht in O.8.M.4). Behandelt sowohl leere Cells
+// (Anlage) als auch befuellte Cells (Edit-Modus mit Add/Remove).
+// Zwei-Phasen-Stepper:
 //
 //   Step 1 (pick) : Alias-Input + Feature-Multi-Select (Hotkey 1/2/3/4/d).
-//   Step 2..N (name): pro nameable Feature ein animiertes Sub-Panel mit
-//                     Strg+Up/Down-Cycle durch 5 Template-Positionen.
+//                   Im Edit-Modus: existing Features pre-checked,
+//                   originalKeys-Snapshot bleibt fuer Delta-Berechnung.
+//   Step 2..N (name): pro NEU hinzugefuegtem nameable Feature ein
+//                     animiertes Sub-Panel mit Strg+Up/Down-Cycle
+//                     durch 5 Template-Positionen.
 //   Final : commit, Modal schliessen, Cell-Chips bloop-animieren ein.
 //
 // Top-Level (kein parent_cell): Cycle-Positionen 2-5 ausgeblendet —
@@ -25,6 +30,14 @@
 //   'flag' nameable (Checkliste): addCellChecklist
 //   'flag' non-nameable (Info)  : updateCell({features: [...,'info']})
 //   'doc'                       : createDoc({attached_cell_id, ...})
+//
+// Edit-Mode-Specials (O.8.M.2/3):
+//   - Removals (deselected pre-checked feature): bei structural mit
+//     Inhalt → showConfirm; deleteNode + null-FK.
+//   - „Zelle leeren"-Button im Step-1-Footer: alle Sub-Nodes weg +
+//     delCellRow.
+//   - Existing Features behalten ihren Namen — User aendert via
+//     NodeTree-Sidebar (mit O.8.L atomic rename).
 
 import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
 import { validateAlias } from '../lib/alias';
