@@ -1,3 +1,10 @@
+// CellOverlay (Cell-Edit Toggle-UI). Phase 3 O.8 (2026-04-29):
+// Fuer LEERE Zellen wurde der Anlage-Pfad an NewCellWizard.tsx
+// uebergeben (siehe MatrixView-Routing). CellOverlay bleibt aktiv
+// fuer befuellte Zellen — Toggle-Off existing Features, Alias-Edit,
+// "Zelle leeren". Vollstaendige Wizard-Ablöse (Add/Remove im Wizard)
+// ist Defer-Sprint nach O.8.
+
 import { useNavigate } from '@solidjs/router';
 import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
 import { validateAlias } from '../lib/alias';
