@@ -32,6 +32,7 @@ import {
 import type { PresenceUser } from '../lib/presence';
 import { presenceMatchesEntry } from '../lib/presence-filter';
 import { endProgress, startProgress } from '../lib/progress';
+import { fetchBoardCardDropTarget } from '../lib/queries';
 import { useVis } from '../lib/settings';
 import { useSidebarChips } from '../lib/sidebar-chips';
 import {
@@ -46,7 +47,6 @@ import {
   executeSubtreeImportIntoMatrix,
   parseImportPayload,
 } from '../lib/subtree-import';
-import { supabase } from '../lib/supabase';
 import { showToast } from '../lib/toasts';
 import { useTreeExpand } from '../lib/tree-expand';
 import type { CellFeature, CellRow, TreeEntry } from '../lib/types';
@@ -998,39 +998,19 @@ const NodeTree: Component<Props> = (props) => {
     }
 
     try {
-      // Ziel-Spalten + hoechste Position in deren ersten Spalte laden.
-      const [colsRes] = await Promise.all([
-        supabase
-          .from('kb_cols')
-          .select('id, position')
-          .eq('board_id', boardId)
-          .eq('workspace_id', props.workspaceId)
-          .order('position', { ascending: true })
-          .limit(1),
-      ]);
-      if (colsRes.error) throw colsRes.error;
-      const firstCol = (colsRes.data ?? [])[0] as { id: string; position: number } | undefined;
-      if (!firstCol) {
+      // AU-B1 K2 (B1-D-001): Ziel-Spalte + Top-Position via gewrappter
+      // Helper laden — ersetzt zwei direkte supabase.from()-Reads, gibt
+      // IDB-Cache-Fallback im Offline-Fall.
+      const target = await fetchBoardCardDropTarget(boardId, props.workspaceId);
+      if (!target) {
         showToast('Ziel-Board hat keine Spalte.', 'error');
         return;
       }
 
-      const posRes = await supabase
-        .from('kb_cards')
-        .select('position')
-        .eq('col_id', firstCol.id)
-        .eq('workspace_id', props.workspaceId)
-        .order('position', { ascending: false })
-        .limit(1);
-      if (posRes.error) throw posRes.error;
-      const topPos =
-        posRes.data && posRes.data.length > 0
-          ? (posRes.data[0] as { position: number }).position
-          : -1;
-
-      await moveCardToBoard(cardId, boardId, firstCol.id, topPos + 1);
+      await moveCardToBoard(cardId, boardId, target.firstColId, target.topPosition);
       showToast('Karte verschoben.', 'success');
     } catch (err) {
+      console.error('onCardDrop:', err);
       showToast(translateDbError(err), 'error');
     }
   }

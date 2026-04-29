@@ -29,6 +29,7 @@
 //   - kind: 'new' → workspace muss erst per createWorkspace angelegt
 //     werden, dann fuellen.
 
+import { addCol, addKbCol, addRow, insertCell } from './mutations';
 import { supabase } from './supabase';
 import type {
   ApplyFailure,
@@ -195,28 +196,25 @@ async function applyBoardChildren(
   if (signal?.aborted) return;
   tick('Default-Spalte "Inbox" anlegen…');
 
-  const { data: colRows, error: colErr } = await supabase
-    .from('kb_cols')
-    .insert({
-      workspace_id: workspaceId,
-      board_id: boardId,
+  // AU-B1 K2 (B1-B-002): gewrappter addKbCol statt direktem Insert,
+  // damit der Onboarding-Workspace im IDB-Cache landet + offline replay-faehig ist.
+  let colId: string;
+  try {
+    const created = await addKbCol({
+      workspaceId,
+      boardId,
       label: 'Inbox',
-      position: 0,
-    })
-    .select('id')
-    .single();
-
-  if (colErr || !colRows) {
+    });
+    colId = created.id;
+  } catch (colErr) {
     failures.push({
       scope: 'col',
       label: 'Inbox',
-      error: colErr?.message ?? 'kb_col-Insert fehlgeschlagen',
+      error: errMsg(colErr) || 'kb_col-Insert fehlgeschlagen',
     });
     // Ohne kb_col koennen wir keine Karten anlegen. Skip board-children.
     return;
   }
-
-  const colId = (colRows as { id: string }).id;
 
   // Cards
   for (const child of selectedChildren) {
@@ -259,81 +257,70 @@ async function applyMatrixChildren(
   if (signal?.aborted) return;
   tick('Default-Spalte "Themen" anlegen…');
 
-  const { data: colRows, error: colErr } = await supabase
-    .from('cols')
-    .insert({
-      workspace_id: workspaceId,
-      matrix_id: matrixId,
+  // AU-B1 K2 (B1-B-002): gewrappte addCol/addRow/insertCell statt
+  // direkten Inserts. IDB-Cache + offline-replay konsistent.
+  let colId: string;
+  try {
+    const created = await addCol({
+      workspaceId,
+      matrixId,
       label: 'Themen',
-      position: 0,
-    })
-    .select('id')
-    .single();
-
-  if (colErr || !colRows) {
+    });
+    colId = created.id;
+  } catch (colErr) {
     failures.push({
       scope: 'col',
       label: 'Themen',
-      error: colErr?.message ?? 'cols-Insert fehlgeschlagen',
+      error: errMsg(colErr) || 'cols-Insert fehlgeschlagen',
     });
     return;
   }
-  const colId = (colRows as { id: string }).id;
 
-  let rowPos = 0;
   for (const child of selectedChildren) {
     if (signal?.aborted) return;
     if (!child.cell_label) continue;
     tick(`Zeile "${child.cell_label}" anlegen…`);
 
     // Row anlegen
-    const { data: rowRow, error: rowErr } = await supabase
-      .from('rows')
-      .insert({
-        workspace_id: workspaceId,
-        matrix_id: matrixId,
+    let rowId: string;
+    try {
+      const created = await addRow({
+        workspaceId,
+        matrixId,
         label: child.cell_label,
-        position: rowPos,
-      })
-      .select('id')
-      .single();
-    rowPos += 1;
-
-    if (rowErr || !rowRow) {
+      });
+      rowId = created.id;
+    } catch (rowErr) {
       failures.push({
         scope: 'row',
         label: child.cell_label,
-        error: rowErr?.message ?? 'rows-Insert fehlgeschlagen',
+        error: errMsg(rowErr) || 'rows-Insert fehlgeschlagen',
       });
       continue;
     }
-    const rowId = (rowRow as { id: string }).id;
 
     // Cell an (row, col) mit features
     const selectedChecklists = child.checklists.filter((cl) => cl.selected);
     const features = selectedChecklists.length > 0 ? ['checklists'] : [];
 
-    const { data: cellRow, error: cellErr } = await supabase
-      .from('cells')
-      .insert({
-        workspace_id: workspaceId,
-        matrix_id: matrixId,
-        row_id: rowId,
-        col_id: colId,
-        features,
-      })
-      .select('id')
-      .single();
-
-    if (cellErr || !cellRow) {
+    let cellId: string;
+    try {
+      const created = await insertCell({
+        workspaceId,
+        matrixId,
+        rowId,
+        colId,
+        patch: { features },
+      });
+      cellId = created.id;
+    } catch (cellErr) {
       failures.push({
         scope: 'cell',
         label: child.cell_label,
-        error: cellErr?.message ?? 'cells-Insert fehlgeschlagen',
+        error: errMsg(cellErr) || 'cells-Insert fehlgeschlagen',
       });
       continue;
     }
-    const cellId = (cellRow as { id: string }).id;
 
     for (const cl of selectedChecklists) {
       if (signal?.aborted) return;

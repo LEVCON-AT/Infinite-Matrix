@@ -378,6 +378,64 @@ export async function fetchBoardContent(
   }
 }
 
+// AU-B1 K2 (B1-D-001): Card-Drop-Helper.
+// Liefert die erste Spalte eines Boards + die hoechste Position
+// in deren Card-Liste. Wird vom NodeTree-Drop-Handler benoetigt
+// um Karten ans Top der ersten Spalte zu schieben. Online-Pfad mit
+// IDB-Fallback analog zu fetchBoardContent.
+export async function fetchBoardCardDropTarget(
+  boardId: string,
+  workspaceId: string,
+): Promise<{ firstColId: string; topPosition: number } | null> {
+  try {
+    const colsRes = await supabase
+      .from('kb_cols')
+      .select('id, position')
+      .eq('board_id', boardId)
+      .eq('workspace_id', workspaceId)
+      .order('position', { ascending: true })
+      .limit(1);
+    if (colsRes.error) throw colsRes.error;
+    const firstCol = (colsRes.data ?? [])[0] as { id: string; position: number } | undefined;
+    if (!firstCol) return null;
+
+    const posRes = await supabase
+      .from('kb_cards')
+      .select('position')
+      .eq('col_id', firstCol.id)
+      .eq('workspace_id', workspaceId)
+      .order('position', { ascending: false })
+      .limit(1);
+    if (posRes.error) throw posRes.error;
+    const topPos =
+      posRes.data && posRes.data.length > 0
+        ? (posRes.data[0] as { position: number }).position
+        : -1;
+    markLiveSuccess();
+    return { firstColId: firstCol.id, topPosition: topPos + 1 };
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const [allCols, allCards] = await Promise.all([
+      getByWorkspace<KbColRow>('kb_cols', workspaceId),
+      getByWorkspace<KbCardRow>('kb_cards', workspaceId),
+    ]);
+    const cols = allCols
+      .filter((c) => c.board_id === boardId)
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    const firstCol = cols[0];
+    if (!firstCol) {
+      markCacheFallback();
+      return null;
+    }
+    const colCards = allCards
+      .filter((c) => c.col_id === firstCol.id)
+      .sort((a, b) => (b.position ?? 0) - (a.position ?? 0));
+    const topPos = colCards.length > 0 ? (colCards[0].position ?? 0) : -1;
+    markCacheFallback();
+    return { firstColId: firstCol.id, topPosition: topPos + 1 };
+  }
+}
+
 // ─── Cell-Checklisten (cell_id=X, board_id=NULL) ──────────────────
 // Wie der Board-Pfad, aber gefiltert auf eine Zelle. RLS + workspace_id
 // als Guard.

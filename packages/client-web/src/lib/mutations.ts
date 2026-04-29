@@ -197,6 +197,13 @@ export function renameAndLinkRow(rowId: string, label: string, objectId: string)
   return updateRow(rowId, { label, object_id: objectId });
 }
 
+// AU-B1 K2 (B1-B-001): gewrappte Setter fuer Object-Layer-FK. Loest die
+// direkte supabase.from(...).update()-Stelle in lib/objects.ts auf —
+// jetzt offline-replay-faehig, IDB-Cache wird mitgepflegt.
+export function setRowObjectId(rowId: string, objectId: string | null): Promise<RowRow> {
+  return updateRow(rowId, { object_id: objectId });
+}
+
 export async function setRowPosition(rowId: string, position: number): Promise<void> {
   await updateRow(rowId, { position });
 }
@@ -286,6 +293,11 @@ export function renameCol(colId: string, label: string): Promise<ColRow> {
 
 export function renameAndLinkCol(colId: string, label: string, objectId: string): Promise<ColRow> {
   return updateCol(colId, { label, object_id: objectId });
+}
+
+// AU-B1 K2 (B1-B-001): siehe setRowObjectId.
+export function setColObjectId(colId: string, objectId: string | null): Promise<ColRow> {
+  return updateCol(colId, { object_id: objectId });
 }
 
 export async function setColPosition(colId: string, position: number): Promise<void> {
@@ -834,6 +846,11 @@ export function renameAndLinkKbCol(
   objectId: string,
 ): Promise<KbColRow> {
   return updateKbCol(colId, { label, object_id: objectId });
+}
+
+// AU-B1 K2 (B1-B-001): siehe setRowObjectId.
+export function setKbColObjectId(colId: string, objectId: string | null): Promise<KbColRow> {
+  return updateKbCol(colId, { object_id: objectId });
 }
 
 export function setKbColColor(colId: string, color: string | null): Promise<KbColRow> {

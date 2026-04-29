@@ -15,7 +15,14 @@
 // Kommt mit O.2b: Autocomplete-Dropdown + UI-Integration in
 // MatrixView/BoardView Row/Col/Kb_col-Edit.
 
-import { addCol, addKbCol, addRow } from './mutations';
+import {
+  addCol,
+  addKbCol,
+  addRow,
+  setColObjectId,
+  setKbColObjectId,
+  setRowObjectId,
+} from './mutations';
 import { supabase } from './supabase';
 import type {
   ColRow,
@@ -323,6 +330,19 @@ export async function addColWithObject(args: {
 // leer ist, no-op. Sonst: Object anlegen + verlinken + home_ref
 // setzen. Aufruf vom Caller nach renameRow/renameCol-Mutation
 // (Background-Task, kein Wait).
+//
+// AU-B1 K2 (B1-B-001 / CC1):
+//  - Update der FK `object_id` laeuft jetzt durch gewrappte
+//    setRow/Col/KbColObjectId-Helper (`runOptimisticUpdate`),
+//    nicht mehr direkt via supabase.from(...).update().
+//    Konsequenz: bei Offline wird der Update als Mutation gequeued
+//    und nach Reconnect repliziert; IDB-Cache bleibt konsistent.
+//  - Inflight-Guard pro rowId verhindert Doppel-Object-Anlage bei
+//    schnellem Rename (Race aus B1-H-005). Erste Anlage haelt den
+//    Lock, parallele Aufrufer sehen pendentes Promise und teilen
+//    sich das Resultat.
+
+const inflightEnsureObject = new Map<string, Promise<ObjectRow | null>>();
 
 async function ensureObjectFor(args: {
   table: 'rows' | 'cols' | 'kb_cols';
@@ -333,27 +353,40 @@ async function ensureObjectFor(args: {
   const label = args.row.label.trim();
   if (!label) return null;
 
-  const object = await createObject({
-    workspaceId: args.row.workspace_id,
-    label,
-  });
+  const lockKey = `${args.table}:${args.row.id}`;
+  const existing = inflightEnsureObject.get(lockKey);
+  if (existing) return existing;
 
-  const { error } = await supabase
-    .from(args.table)
-    .update({ object_id: object.id })
-    .eq('id', args.row.id);
-  if (error) {
-    console.warn(`ensureObjectFor (${args.table}) link failed:`, error);
-    return object;
-  }
+  const promise = (async () => {
+    try {
+      const object = await createObject({
+        workspaceId: args.row.workspace_id,
+        label,
+      });
 
-  try {
-    await setObjectHomeRef(object.id, args.homeRefKind, args.row.id);
-  } catch (err) {
-    console.warn(`ensureObjectFor (${args.table}) home_ref failed:`, err);
-  }
+      try {
+        if (args.table === 'rows') await setRowObjectId(args.row.id, object.id);
+        else if (args.table === 'cols') await setColObjectId(args.row.id, object.id);
+        else await setKbColObjectId(args.row.id, object.id);
+      } catch (err) {
+        console.warn(`ensureObjectFor (${args.table}) link failed:`, err);
+        return object;
+      }
 
-  return object;
+      try {
+        await setObjectHomeRef(object.id, args.homeRefKind, args.row.id);
+      } catch (err) {
+        console.warn(`ensureObjectFor (${args.table}) home_ref failed:`, err);
+      }
+
+      return object;
+    } finally {
+      inflightEnsureObject.delete(lockKey);
+    }
+  })();
+
+  inflightEnsureObject.set(lockKey, promise);
+  return promise;
 }
 
 export function ensureObjectForRow(row: {
