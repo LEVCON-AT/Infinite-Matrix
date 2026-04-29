@@ -36,8 +36,10 @@ import { signOut, useUser } from '../lib/auth';
 import { clearDocsRequest, openDocsPopup, useDocsRequest } from '../lib/docs-ui';
 import { setEditModeValue, toggleEditMode, useEditMode } from '../lib/edit-mode';
 import { toggleIncognito, useIncognito } from '../lib/incognito';
+import { resolveNodeLabel } from '../lib/label-template';
 import { fetchMembers } from '../lib/members';
 import { pendingMutationCount, refreshCountForWorkspace, replayQueue } from '../lib/mutation-queue';
+import { fetchObjects } from '../lib/objects';
 import { offlineState } from '../lib/offline-state';
 import { type PresencePosition, type PresenceUser, usePresence } from '../lib/presence';
 import { installPromptSignal, triggerInstallPrompt } from '../lib/pwa';
@@ -55,8 +57,6 @@ import {
   fetchWorkspaceAttachedDocs,
   fetchWorkspaceLinks,
 } from '../lib/queries';
-import { resolveNodeLabel } from '../lib/label-template';
-import { fetchObjects } from '../lib/objects';
 import { subscribeWorkspace } from '../lib/realtime';
 import { useSettingsBodyClassSync } from '../lib/settings';
 import { useSidebarChips } from '../lib/sidebar-chips';

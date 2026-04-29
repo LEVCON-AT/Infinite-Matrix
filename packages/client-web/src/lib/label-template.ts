@@ -18,15 +18,7 @@
 // ResolveContext. Convenience-Wrapper liefern Context-Builder fuer
 // Node/Doc/Checklist.
 
-import type {
-  CellRow,
-  ChecklistRow,
-  ColRow,
-  DocRow,
-  NodeRow,
-  ObjectRow,
-  RowRow,
-} from './types';
+import type { CellRow, ChecklistRow, ColRow, DocRow, NodeRow, ObjectRow, RowRow } from './types';
 
 // ─── Context-Type ──────────────────────────────────────────────
 // Was der Resolver wissen muss, um {row.object} / {column.object}

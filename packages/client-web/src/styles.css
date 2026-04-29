@@ -8890,7 +8890,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 }
 
 .group-matrix-member-row.is-manual .group-matrix-member-label::before {
-  content: '+ ';
+  content: "+ ";
   color: var(--text3);
   font-weight: 600;
 }
@@ -10781,8 +10781,14 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 }
 
 @keyframes subStepIn {
-  from { opacity: 0; transform: translateX(8px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .new-cell-wizard-alias-row {
@@ -11010,7 +11016,9 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 }
 
 @keyframes wizardSpin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ── Cell-Feature-Bloop (Phase 3 O.8.F) ─────────────────────
@@ -11020,9 +11028,18 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
    wieder entfernt. prefers-reduced-motion: keine Animation. */
 
 @keyframes featureBloop {
-  0%   { opacity: 0; transform: scale(0.6); }
-  60%  { opacity: 1; transform: scale(1.08); }
-  100% { opacity: 1; transform: scale(1); }
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .mx-cell [data-just-added="yes"],

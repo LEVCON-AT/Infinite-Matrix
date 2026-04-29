@@ -8,7 +8,6 @@ import { showChoice, showPrompt } from '../lib/dialog';
 import { openDocsPopup } from '../lib/docs-ui';
 import { useEditMode } from '../lib/edit-mode';
 import { translateDbError } from '../lib/errors';
-import { type ContextMaps, resolveNodeLabel } from '../lib/label-template';
 import {
   type WorkspaceExport,
   downloadSubtreeExport,
@@ -18,6 +17,7 @@ import {
   exportSubtree,
   summarizeExport,
 } from '../lib/export';
+import { type ContextMaps, resolveNodeLabel } from '../lib/label-template';
 import type { WorkspaceMember } from '../lib/members';
 import {
   addCellChecklist,

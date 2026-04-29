@@ -43,9 +43,9 @@ import {
 } from '../lib/use-object-suggest';
 import BulkAddModal, { type BulkAddMode } from './BulkAddModal';
 import CellOverlay from './CellOverlay';
-import NewCellWizard from './NewCellWizard';
 import Icon, { type IconName } from './Icon';
 import MatrixAggregateSection from './MatrixAggregateSection';
+import NewCellWizard from './NewCellWizard';
 import PresenceMini from './PresenceMini';
 
 const FEATURE_ORDER: CellFeature[] = ['matrix', 'board', 'info', 'checklists'];
@@ -687,7 +687,7 @@ const MatrixView: Component<Props> = (p) => {
           const t = target();
           const isEmpty =
             !t.cell ||
-            (((t.cell.features ?? []).length === 0) &&
+            ((t.cell.features ?? []).length === 0 &&
               !t.cell.child_matrix_id &&
               !t.cell.board_id &&
               !t.cell.alias);

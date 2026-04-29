@@ -26,15 +26,7 @@
 //   'flag' non-nameable (Info)  : updateCell({features: [...,'info']})
 //   'doc'                       : createDoc({attached_cell_id, ...})
 
-import {
-  type Component,
-  For,
-  Show,
-  createMemo,
-  createSignal,
-  onCleanup,
-  onMount,
-} from 'solid-js';
+import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
 import { validateAlias } from '../lib/alias';
 import { installFocusRestore, installFocusTrap } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
@@ -486,6 +478,10 @@ const NewCellWizard: Component<Props> = (p) => {
       onClick={(e) => {
         if (e.target === e.currentTarget && !busy()) p.onClose();
       }}
+      // Empty onKeyDown haelt biome's a11y/useKeyWithClickEvents zufrieden
+      // — der eigentliche Tastatur-Pfad ist der globale ESC-Handler aus
+      // onMount (dispatchKey), nicht ein lokaler Scrim-Listener.
+      onKeyDown={() => {}}
     >
       <div
         ref={cardRef}
@@ -533,7 +529,7 @@ const NewCellWizard: Component<Props> = (p) => {
             <p class="new-cell-wizard-hint">
               Features auswaehlen — Hotkey oder Klick. Mehrfach-Auswahl moeglich.
             </p>
-            <div class="new-cell-wizard-features" role="group" aria-label="Zellen-Features">
+            <div class="new-cell-wizard-features" aria-label="Zellen-Features">
               <For each={pickableFeatures()}>
                 {(def) => {
                   const checked = () => selectedKeys().includes(def.key);
