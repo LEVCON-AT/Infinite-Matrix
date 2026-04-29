@@ -118,6 +118,10 @@ const NewCellWizard: Component<Props> = (p) => {
   let cardRef: HTMLDivElement | undefined;
   let aliasInputRef: HTMLInputElement | undefined;
   let nameInputRef: HTMLInputElement | undefined;
+  // Phase 3 O.8.M.5: Pro Sub-Step nur einmal initial-fokussieren +
+  // selektieren. Verhindert dass Re-Renders (z.B. bei busy-Toggle) die
+  // User-Selection ueberschreiben.
+  const nameInputInitialized = new Set<string>();
 
   // ─── Resolver-Context fuer Live-Vorschau ────────────────────
   const resolveCtx = createMemo(() => {
@@ -751,6 +755,14 @@ const NewCellWizard: Component<Props> = (p) => {
                   // uebernimmt cycle() das Setzen.
                   ref={(el: HTMLInputElement) => {
                     nameInputRef = el;
+                    // Phase 3 O.8.M.5: nur beim ersten Mount fuer
+                    // diesen Sub-Step fokussieren + selektieren.
+                    // Spaeter werden Selection-Aenderungen explizit
+                    // aus cycle() gesetzt (Cycle-Wechsel). User-
+                    // Eingabe waehrend des Tippens darf nicht durch
+                    // erneuten select() ueberschrieben werden.
+                    if (nameInputInitialized.has(def.key)) return;
+                    nameInputInitialized.add(def.key);
                     queueMicrotask(() => {
                       el.focus();
                       const pos = cyclePos().get(def.key) ?? 1;
