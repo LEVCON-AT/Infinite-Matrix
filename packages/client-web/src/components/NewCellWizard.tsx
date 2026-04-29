@@ -37,6 +37,7 @@ import {
   createChildBoard,
   createChildMatrix,
   createDoc,
+  delCellRow,
   deleteNode,
   insertCell,
   updateCell,
@@ -423,6 +424,45 @@ const NewCellWizard: Component<Props> = (p) => {
     }
   }
 
+  // ─── Zelle leeren (Phase 3 O.8.M.3) ──────────────────────────
+  // Loescht alle Sub-Nodes + Cell-Row. Confirm nur wenn echte Sub-
+  // Struktur (Matrix/Board) mitgeloescht wird; Alias/Features sind
+  // leicht rekonstruierbar.
+  async function doClearCell() {
+    if (busy()) return;
+    const c = p.cell;
+    if (!c) {
+      p.onClose();
+      return;
+    }
+    const hasSubNodes = !!c.child_matrix_id || !!c.board_id;
+    if (hasSubNodes) {
+      const matrixEmpty = c.child_matrix_id ? await isNodeEmpty(c.child_matrix_id, 'matrix') : true;
+      const boardEmpty = c.board_id ? await isNodeEmpty(c.board_id, 'board') : true;
+      if (!matrixEmpty || !boardEmpty) {
+        const ok = await showConfirm({
+          title: 'Zelle leeren?',
+          message: 'Zelle leeren? Sub-Strukturen werden mit geloescht.',
+          variant: 'danger',
+          confirmLabel: 'Leeren',
+        });
+        if (!ok) return;
+      }
+    }
+    setBusy(true);
+    try {
+      if (c.child_matrix_id) await deleteNode(c.child_matrix_id);
+      if (c.board_id) await deleteNode(c.board_id);
+      await delCellRow(c.id);
+      p.onCreated?.([]);
+      p.onClose();
+    } catch (err) {
+      console.error('NewCellWizard.doClearCell:', err);
+      showToast(translateDbError(err), 'error');
+      setBusy(false);
+    }
+  }
+
   // ─── Hotkey-Handler im Pick-Step ────────────────────────────
   function onPickKeyDown(e: KeyboardEvent) {
     if (busy()) return;
@@ -654,6 +694,17 @@ const NewCellWizard: Component<Props> = (p) => {
             <span class="new-cell-wizard-tip">
               <kbd>↩</kbd> weiter · <kbd>Strg</kbd>+<kbd>↩</kbd> ohne Naming · <kbd>Esc</kbd>
             </span>
+            <Show when={isEditMode}>
+              <button
+                type="button"
+                class="btn-subtle new-cell-wizard-clear-btn"
+                onClick={() => void doClearCell()}
+                disabled={busy()}
+                title="Alle Features + Sub-Strukturen entfernen, Cell-Row loeschen"
+              >
+                Zelle leeren
+              </button>
+            </Show>
             <button type="button" class="btn-subtle" onClick={p.onClose} disabled={busy()}>
               Abbrechen
             </button>
@@ -661,9 +712,9 @@ const NewCellWizard: Component<Props> = (p) => {
               type="button"
               class="btn btn-p"
               onClick={() => startNameSteps()}
-              disabled={busy() || selectedKeys().length === 0}
+              disabled={busy()}
             >
-              Weiter
+              {isEditMode ? 'Anwenden' : 'Weiter'}
             </button>
           </footer>
         </Show>

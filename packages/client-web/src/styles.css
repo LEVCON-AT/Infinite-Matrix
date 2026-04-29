@@ -10909,6 +10909,15 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   margin-top: var(--space-sm);
 }
 
+.new-cell-wizard-clear-btn {
+  color: var(--danger, #c53030);
+}
+
+.new-cell-wizard-clear-btn:hover:not(:disabled),
+.new-cell-wizard-clear-btn:focus-visible {
+  background: color-mix(in srgb, var(--danger, #c53030) 12%, transparent);
+}
+
 .new-cell-wizard-tip {
   flex: 1 1 auto;
   font-size: 11px;
