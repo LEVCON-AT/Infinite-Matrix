@@ -92,6 +92,19 @@ function db(): Promise<IDBPDatabase<MatrixCacheSchema>> {
         // Anderer Tab haelt eine aeltere Version offen — wir loggen es
         // und machen trotzdem weiter, damit die App nicht haengt.
         console.warn('[offline-cache] upgrade blocked by other tab');
+        // AU-B1 K11d (B1-H-016): User-sichtbare Meldung — sonst sieht
+        // der User nur einen weissen "Lade..."-Screen ohne Erklaerung.
+        // import dynamisch um Module-Cycle zu vermeiden (toasts → ?).
+        void import('./toasts')
+          .then(({ showToast }) =>
+            showToast(
+              'Bitte andere Matrix-Tabs schliessen oder neu laden, damit der Cache aktualisiert werden kann.',
+              'error',
+            ),
+          )
+          .catch(() => {
+            /* import failed — bleibt bei console.warn */
+          });
       },
     });
   }

@@ -105,12 +105,13 @@ const AccountVisibility = () => {
         )}
       </For>
 
-      <Show when={pendingMutationCount() > 0 && params.workspaceId}>
+      <Show when={pendingMutationCount(params.workspaceId ?? '') > 0 && params.workspaceId}>
         <section class="settings-form-section">
           <h3 id="sync-section-head">Synchronisation</h3>
           <p class="hint">
-            {pendingMutationCount()} offline-Aenderungen warten auf Synchronisation. Beim naechsten
-            Online-Event laufen sie automatisch durch — du kannst aber auch direkt anstossen.
+            {pendingMutationCount(params.workspaceId ?? '')} offline-Aenderungen warten auf
+            Synchronisation. Beim naechsten Online-Event laufen sie automatisch durch — du kannst
+            aber auch direkt anstossen.
           </p>
           <div class="settings-foot">
             <button

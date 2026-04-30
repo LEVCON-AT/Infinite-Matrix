@@ -104,17 +104,38 @@ function newId(): string {
 // UI bindet sich an dieses Signal fuer das Badge "N Aenderungen
 // pending". Wir aktualisieren es bei enqueue, remove, replay und
 // initial nach openDb.
-const [pendingCount, setPendingCount] = createSignal(0);
+//
+// AU-B1 K11d (B1-H-007): per-Workspace-Signal (Map). Vorher war ein
+// einziges globales Signal das den zuletzt-abgefragten Workspace-Count
+// hielt — Multi-Tab auf verschiedenen Workspaces hat sich gegenseitig
+// kontaminiert (Tab A zeigte Tab Bs Count + umgekehrt).
+type CountAccessor = ReturnType<typeof createSignal<number>>;
+const pendingCounts = new Map<string, CountAccessor>();
 
-export function pendingMutationCount() {
-  return pendingCount();
+function ensureCountSignal(workspaceId: string): CountAccessor {
+  let entry = pendingCounts.get(workspaceId);
+  if (!entry) {
+    entry = createSignal(0);
+    pendingCounts.set(workspaceId, entry);
+  }
+  return entry;
+}
+
+export function pendingMutationCount(workspaceId: string): number {
+  return ensureCountSignal(workspaceId)[0]();
+}
+
+// Globaler Wipe — fuer SIGNED_OUT-Pfad (clearAllMutationQueues setzt
+// alle Counter auf 0).
+function setPendingCount(value: number): void {
+  for (const [, sig] of pendingCounts) sig[1](value);
 }
 
 async function refreshPendingCount(workspaceId: string): Promise<void> {
   const inst = await db();
   const all = await inst.getAllFromIndex('mutation_queue', 'by_workspace', workspaceId);
   const pending = all.filter((e) => e.status === 'pending').length;
-  setPendingCount(pending);
+  ensureCountSignal(workspaceId)[1](pending);
 }
 
 // ─── API ───────────────────────────────────────────────────────

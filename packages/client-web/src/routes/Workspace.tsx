@@ -87,7 +87,9 @@ const Workspace: Component = () => {
   // Mutation-Queue: pendingCount-Signal fuer das Header-Badge,
   // online-Event triggert Auto-Replay. Initial-Hydration der Count-
   // Anzeige passiert per refreshCountForWorkspace im Effect unten.
-  const pendingMuts = pendingMutationCount;
+  // AU-B1 K11d (B1-H-007): pendingMutationCount ist jetzt workspace-
+  // spezifisch — Multi-Tab-Cross-Kontamination geschlossen.
+  const pendingMuts = () => pendingMutationCount(params.workspaceId ?? '');
 
   // Sidebar-Modus pro Workspace. Bei fehlendem workspaceId wird die
   // Registry mit einem leeren String angelegt — die Funktionen sind

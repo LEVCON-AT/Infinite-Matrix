@@ -73,6 +73,29 @@ export function bootstrapAuth(): void {
       void validateUserExists();
     }
   });
+
+  // AU-B1 K11d (B1-H-008): Cross-Tab-SignOut-Sync via storage-Event.
+  // Supabase-JS speichert die Session unter `sb-<projectRef>-auth-token`
+  // im localStorage. Bei signOut() in Tab A wird der Key entfernt;
+  // andere Tabs bekommen das `storage`-Event mit newValue=null. Dann
+  // setSession(null) lokal + clearLocalUserData(). Ohne diesen Handler
+  // bleibt Tab B mit aktivem Session-Signal und faellt erst beim
+  // naechsten Token-Refresh oder API-Call auf 401 (Firefox-Bug:
+  // Supabase-eigener Cross-Tab-Sync funktioniert dort unzuverlaessig).
+  if (typeof window !== 'undefined') {
+    window.addEventListener('storage', (e) => {
+      // Wir reagieren nur auf das Supabase-Auth-Token-Key-Pattern.
+      // newValue === null bedeutet Logout in einem anderen Tab.
+      if (!e.key) return;
+      if (!e.key.startsWith('sb-') || !e.key.endsWith('-auth-token')) return;
+      if (e.newValue !== null) return;
+      // Lokal session leeren + cleanup. supabase.auth merkt das
+      // beim naechsten getSession()/getUser()-Roundtrip auch, aber
+      // wir geben dem UI sofort Feedback.
+      setSession(null);
+      void clearLocalUserData();
+    });
+  }
 }
 
 // AU-B1 K3 (B1-H-002 / B1-C-001): zentrale Cleanup-Funktion fuer
