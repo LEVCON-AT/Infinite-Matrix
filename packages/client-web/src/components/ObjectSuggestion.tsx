@@ -42,7 +42,7 @@ const ObjectSuggestion: Component = () => {
             top: `${anchorPos().top}px`,
             'min-width': `${anchorPos().minWidth}px`,
             'max-width': `${POPUP_MAX_W}px`,
-            'z-index': '10000',
+            'z-index': 'var(--z-popup)',
           }}
           // biome-ignore lint/a11y/useSemanticElements: bewusst <div role="listbox"> — fixed-Popup, kein nativer <select> moeglich.
           role="listbox"

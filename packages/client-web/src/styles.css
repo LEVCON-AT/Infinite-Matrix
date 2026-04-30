@@ -112,6 +112,11 @@
   /* Layout */
   --sidebar-w: 280px;
 
+  /* AU-B1 K11e (B1-D-014): z-index-Skala fuer Popups + Modale.
+     `--z-popup` deckt Floating-Listen (Autocomplete, ObjectSuggestion).
+     Modale liegen darueber via `.overlay-scrim` (CSS-Wert direkt). */
+  --z-popup: 10000;
+
   /* Basis-Font */
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, sans-serif;
   color-scheme: light;

@@ -43,11 +43,18 @@ type ChatMessage =
   | { kind: 'assistant'; text: string; toolCalls: ChatToolCall[] }
   | { kind: 'system'; text: string };
 
+// AU-B1 K11e (B1-H-013): Tool-Use-Args + Tool-Result mitspeichern,
+// damit eine Folge-Frage in derselben Konversation die korrekten
+// `tool_use`/`tool_result`-Pairs an die Anthropic-API senden kann.
+// Ohne diese Felder antwortet die API mit 400 "Missing tool_result".
 type ChatToolCall = {
   toolUseId: string;
   name: string;
   status: 'pending' | 'ok' | 'error';
   errorMsg?: string;
+  // Optional: Tool-Args + Result fuer Conversation-Replay.
+  args?: Record<string, unknown>;
+  result?: unknown;
 };
 
 const AiHelpDrawer: Component = () => {
@@ -196,14 +203,37 @@ const AiHelpDrawer: Component = () => {
     setError(null);
     // AU-B1 K4 (B1-D-002 / B1-H-004): Conversation-Snapshot VOR dem
     // setMessages bauen, sonst wird die neue User-Message doppelt
-    // angehaengt (einmal im setMessages, einmal in der for-Loop, weil
-    // messages() den aktualisierten Wert liefert). Konsequenz war:
-    // Anthropic-API bekam die letzte User-Message zweimal.
+    // angehaengt.
+    // AU-B1 K11e (B1-H-013): Tool-Use + Tool-Result-Pairs aus den
+    // gespeicherten toolCalls rekonstruieren. Anthropic-API verlangt
+    // dass jeder assistant.tool_use ein folgendes user-tool_result
+    // hat — sonst 400 "Missing tool_result" bei Folge-Frage.
     const prevMessages = messages();
     const conversation: AssistMessage[] = [];
     for (const m of prevMessages) {
-      if (m.kind === 'user') conversation.push({ role: 'user', content: m.text });
-      else if (m.kind === 'assistant') conversation.push({ role: 'assistant', content: m.text });
+      if (m.kind === 'user') {
+        conversation.push({ role: 'user', content: m.text });
+      } else if (m.kind === 'assistant') {
+        const toolUses = m.toolCalls
+          .filter((tc) => tc.args !== undefined)
+          .map((tc) => ({ toolUseId: tc.toolUseId, name: tc.name, args: tc.args ?? {} }));
+        conversation.push({
+          role: 'assistant',
+          content: m.text,
+          toolUses: toolUses.length > 0 ? toolUses : undefined,
+        });
+        // Pro tool_use ein folgendes tool_result.
+        for (const tc of m.toolCalls) {
+          if (tc.args === undefined) continue;
+          conversation.push({
+            role: 'tool_result',
+            toolUseId: tc.toolUseId,
+            ok: tc.status === 'ok',
+            result: tc.status === 'ok' ? tc.result : undefined,
+            error: tc.status === 'error' ? tc.errorMsg : undefined,
+          });
+        }
+      }
     }
     conversation.push({ role: 'user', content: text });
 
@@ -289,7 +319,13 @@ const AiHelpDrawer: Component = () => {
       case 'tool_call':
         setActiveTools((prev) => [
           ...prev,
-          { toolUseId: e.toolUseId, name: e.tool, status: 'pending' },
+          {
+            toolUseId: e.toolUseId,
+            name: e.tool,
+            status: 'pending',
+            // AU-B1 K11e (B1-H-013): Args mitspeichern fuer Conversation-Replay.
+            args: e.args,
+          },
         ]);
         setToolCount((c) => c + 1);
         break;
@@ -297,7 +333,13 @@ const AiHelpDrawer: Component = () => {
         setActiveTools((prev) =>
           prev.map((t) =>
             t.toolUseId === e.toolUseId
-              ? { ...t, status: e.ok ? 'ok' : 'error', errorMsg: e.error }
+              ? {
+                  ...t,
+                  status: e.ok ? 'ok' : 'error',
+                  errorMsg: e.error,
+                  // AU-B1 K11e (B1-H-013): Result mitspeichern fuer Replay.
+                  result: e.ok ? e.result : undefined,
+                }
               : t,
           ),
         );
