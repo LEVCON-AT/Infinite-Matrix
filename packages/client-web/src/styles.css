@@ -11851,3 +11851,113 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── T.1.X Polish: Click-Pulse-Klassen ─────────────────────── */
+.click-pulse:active {
+  transform: scale(0.97);
+  transition: transform 90ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .click-pulse:active {
+    transform: none;
+  }
+}
+
+/* ── T.1.X Mobile-Sweep: Agenda / TaskDetail / Calendar / Summary ── */
+
+@media (max-width: 1023px) {
+  .agenda-page,
+  .task-detail-page,
+  .calendar-page {
+    padding: var(--space-md);
+  }
+  .calendar-toolbar .calendar-recur-hint {
+    text-align: left;
+    flex-basis: 100%;
+  }
+}
+
+@media (max-width: 767px) {
+  .agenda-page,
+  .task-detail-page,
+  .calendar-page {
+    padding: var(--space-sm);
+    gap: var(--space-sm);
+  }
+  .agenda-presets {
+    gap: 4px;
+  }
+  .agenda-preset-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+  .agenda-search-row {
+    flex-direction: column;
+  }
+  .agenda-search-input,
+  .agenda-who-input {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+  .agenda-row {
+    padding: 8px 10px;
+    gap: var(--space-sm);
+  }
+  .agenda-row-meta {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .task-detail-meta {
+    grid-template-columns: 100px 1fr;
+    gap: 4px var(--space-sm);
+  }
+  .calendar-day {
+    min-height: 60px;
+    padding: 3px 4px;
+  }
+  .calendar-event {
+    padding: 1px 4px;
+    font-size: 10px;
+  }
+  .calendar-event-time {
+    display: none;
+  }
+  .smart-summary-list {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 479px) {
+  .agenda-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .agenda-row-meta {
+    justify-content: flex-start;
+  }
+  .agenda-status {
+    font-size: 10px;
+    padding: 1px 6px;
+  }
+  .calendar-day {
+    min-height: 48px;
+  }
+  .calendar-event-label {
+    max-width: 60px;
+  }
+  .task-detail-meta {
+    grid-template-columns: 1fr;
+  }
+  .task-detail-meta dt {
+    margin-top: var(--space-sm);
+  }
+}
+
+@media (pointer: coarse) {
+  .agenda-preset-btn,
+  .agenda-row,
+  .task-status-btn {
+    min-height: 36px;
+  }
+}

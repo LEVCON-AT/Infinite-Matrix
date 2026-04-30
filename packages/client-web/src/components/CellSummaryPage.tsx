@@ -15,6 +15,8 @@
 
 import { useNavigate } from '@solidjs/router';
 import { type Component, For, Show, createMemo } from 'solid-js';
+import { pageEnter } from '../lib/animations';
+import { installEscReturn } from '../lib/keyboard-nav';
 import { buildCellTaskSummaries, todayIso } from '../lib/task-aggregate';
 import type {
   CellRow,
@@ -89,8 +91,15 @@ const CellSummaryPage: Component<Props> = (p) => {
 
   const matrixHref = () => `/w/${p.workspaceId}/n/${p.cell.matrix_id}`;
 
+  installEscReturn(() => navigate(matrixHref()));
+
   return (
-    <div class="cell-info-page">
+    <div
+      class="cell-info-page"
+      ref={(el) => {
+        pageEnter(el);
+      }}
+    >
       <header class="cell-page-head">
         <div class="cell-page-head-text">
           <h3>Smart Summary</h3>

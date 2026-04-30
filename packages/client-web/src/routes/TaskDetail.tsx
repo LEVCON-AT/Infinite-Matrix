@@ -12,7 +12,9 @@
 import { useNavigate, useParams } from '@solidjs/router';
 import { type Component, For, Show, createMemo, createResource, createSignal } from 'solid-js';
 import Icon from '../components/Icon';
+import { pageEnter } from '../lib/animations';
 import { translateDbError } from '../lib/errors';
+import { installEscReturn } from '../lib/keyboard-nav';
 import { fetchAllChecklists } from '../lib/queries';
 import { fetchManifestationsByTask, fetchTask, setTaskStatus } from '../lib/tasks';
 import { showToast } from '../lib/toasts';
@@ -92,6 +94,8 @@ const TaskDetail: Component = () => {
     navigate(`/w/${params.workspaceId}/agenda`);
   }
 
+  installEscReturn(backToAgenda);
+
   async function setStatus(s: TaskStatus) {
     const t = task();
     if (!t || busy() || t.status === s) return;
@@ -122,11 +126,16 @@ const TaskDetail: Component = () => {
   }
 
   return (
-    <div class="task-detail-page">
+    <div
+      class="task-detail-page"
+      ref={(el) => {
+        pageEnter(el);
+      }}
+    >
       <header class="agenda-head">
         <button
           type="button"
-          class="obj-detail-back"
+          class="obj-detail-back click-pulse"
           onClick={backToAgenda}
           aria-label="Zurueck zur Agenda"
         >
@@ -158,7 +167,7 @@ const TaskDetail: Component = () => {
                   {(opt) => (
                     <button
                       type="button"
-                      class="task-status-btn"
+                      class="task-status-btn click-pulse"
                       classList={{ 'task-status-active': t().status === opt.value }}
                       onClick={() => void setStatus(opt.value)}
                       disabled={busy()}

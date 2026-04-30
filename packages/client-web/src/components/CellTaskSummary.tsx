@@ -70,7 +70,7 @@ const CellTaskSummary: Component<Props> = (p) => {
     <Show when={hasContent()}>
       <button
         type="button"
-        class="mx-task-sum"
+        class="mx-task-sum click-pulse"
         aria-label={buildAriaLabel(p.summary)}
         onClick={onClick}
         onKeyDown={onKeyDown}

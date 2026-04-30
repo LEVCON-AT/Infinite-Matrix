@@ -9,9 +9,19 @@
 // (kommt mit T.SS-Welle, die ohnehin Filter-Stack persistiert).
 
 import { useNavigate, useParams } from '@solidjs/router';
-import { type Component, For, Show, createMemo, createResource, createSignal } from 'solid-js';
+import {
+  type Component,
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createResource,
+  createSignal,
+} from 'solid-js';
 import Icon from '../components/Icon';
+import { listStaggerEnter, pageEnter } from '../lib/animations';
 import { translateDbError } from '../lib/errors';
+import { installEscReturn, useArrowListNav } from '../lib/keyboard-nav';
 import { type AgendaFilter, type AgendaTask, fetchAgendaTasks } from '../lib/queries';
 import { todayIso } from '../lib/task-aggregate';
 import { showToast } from '../lib/toasts';
@@ -178,12 +188,35 @@ const Agenda: Component = () => {
     navigate(`/w/${params.workspaceId}`);
   }
 
+  // ESC → zurueck zum Workspace.
+  installEscReturn(backToWorkspace);
+
+  // List-Container ref fuer Stagger-Enter + Pfeil-Navigation.
+  let listRef: HTMLDivElement | undefined;
+  // Re-stagger bei jedem Filter-/Search-Wechsel — Items kommen frisch
+  // rein. Mit der bestehenden listStaggerEnter-Idempotenz brauchen wir
+  // ein Reset des data-Attributs.
+  createEffect(() => {
+    void filter();
+    const el = listRef;
+    if (el) {
+      el.dataset.staggered = '';
+      // rAF damit Solid den neuen DOM-Stand schon committed hat.
+      requestAnimationFrame(() => listStaggerEnter(el));
+    }
+  });
+
   return (
-    <div class="agenda-page">
+    <div
+      class="agenda-page"
+      ref={(el) => {
+        pageEnter(el);
+      }}
+    >
       <header class="agenda-head">
         <button
           type="button"
-          class="obj-detail-back"
+          class="obj-detail-back click-pulse"
           onClick={backToWorkspace}
           aria-label="Zurueck zum Workspace"
         >
@@ -203,7 +236,7 @@ const Agenda: Component = () => {
             {(preset) => (
               <button
                 type="button"
-                class="agenda-preset-btn"
+                class="agenda-preset-btn click-pulse"
                 classList={{ 'agenda-preset-active': presetKey() === preset.key }}
                 onClick={() => setPresetKey(preset.key)}
                 role="tab"
@@ -232,7 +265,13 @@ const Agenda: Component = () => {
         </div>
       </div>
 
-      <div class="agenda-list">
+      <div
+        class="agenda-list"
+        ref={(el) => {
+          listRef = el;
+          useArrowListNav(el, '.agenda-row');
+        }}
+      >
         <Show when={!tasks.loading && (tasks() ?? []).length === 0} fallback={null}>
           <p class="hint agenda-empty">Keine Aufgaben mit diesen Filtern.</p>
         </Show>

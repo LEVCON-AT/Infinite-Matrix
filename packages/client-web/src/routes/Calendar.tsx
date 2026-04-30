@@ -23,6 +23,7 @@
 import { useNavigate, useParams, useSearchParams } from '@solidjs/router';
 import { type Component, For, Show, createMemo, createResource } from 'solid-js';
 import Icon from '../components/Icon';
+import { pageEnter, slideIn, slideOut } from '../lib/animations';
 import {
   type CalendarEvent,
   addMonths,
@@ -35,6 +36,7 @@ import {
   startOfMonth,
 } from '../lib/calendar';
 import { translateDbError } from '../lib/errors';
+import { installEscReturn, useGridNav } from '../lib/keyboard-nav';
 import { fetchAgendaTasks } from '../lib/queries';
 import { todayIso } from '../lib/task-aggregate';
 import { showToast } from '../lib/toasts';
@@ -115,12 +117,22 @@ const Calendar: Component = () => {
 
   const grid = createMemo(() => buildMonthGrid(anchorIso(), today));
 
+  let gridRef: HTMLDivElement | undefined;
+
   function setAnchor(iso: string) {
     setSearchParams({ date: iso });
   }
 
-  function navMonth(delta: number) {
+  // Monats-Wechsel mit Slide-L/R-Animation. Aktuelles Grid sliched
+  // zur Quell-Seite raus, dann setzen wir den neuen Anchor; Solid
+  // re-rendered, danach sliched die neue Range rein.
+  async function navMonth(delta: number) {
+    const dir: 'left' | 'right' = delta > 0 ? 'left' : 'right';
+    if (gridRef) await slideOut(gridRef, dir);
     setAnchor(addMonths(anchorIso(), delta));
+    requestAnimationFrame(() => {
+      if (gridRef) slideIn(gridRef, dir);
+    });
   }
 
   function goToday() {
@@ -130,6 +142,8 @@ const Calendar: Component = () => {
   function backToWorkspace() {
     navigate(`/w/${params.workspaceId}`);
   }
+
+  installEscReturn(backToWorkspace);
 
   function openEvent(e: CalendarEvent, ev: MouseEvent) {
     ev.stopPropagation();
@@ -143,11 +157,16 @@ const Calendar: Component = () => {
   }
 
   return (
-    <div class="calendar-page">
+    <div
+      class="calendar-page"
+      ref={(el) => {
+        pageEnter(el);
+      }}
+    >
       <header class="agenda-head">
         <button
           type="button"
-          class="obj-detail-back"
+          class="obj-detail-back click-pulse"
           onClick={backToWorkspace}
           aria-label="Zurueck zum Workspace"
         >
@@ -164,29 +183,41 @@ const Calendar: Component = () => {
       <div class="calendar-toolbar">
         <button
           type="button"
-          class="agenda-preset-btn"
-          onClick={() => navMonth(-1)}
+          class="agenda-preset-btn click-pulse"
+          onClick={() => void navMonth(-1)}
           aria-label="Vorheriger Monat"
         >
           <Icon name="chevron-left" size={14} />
         </button>
-        <button type="button" class="agenda-preset-btn" onClick={goToday}>
+        <button type="button" class="agenda-preset-btn click-pulse" onClick={goToday}>
           Heute
         </button>
         <button
           type="button"
-          class="agenda-preset-btn"
-          onClick={() => navMonth(1)}
+          class="agenda-preset-btn click-pulse"
+          onClick={() => void navMonth(1)}
           aria-label="Naechster Monat"
         >
           <Icon name="chevron-right" size={14} />
         </button>
         <span class="hint calendar-recur-hint">
-          Wiederkehrende Termine erscheinen V1 nur am Original-Datum (recurFiresOn folgt).
+          Wiederkehrende Termine erscheinen V1 nur am Original-Datum (recurFiresOn folgt). Pfeile
+          fuer Tag-Navigation, Bild-auf/-ab fuer Monats-Wechsel, T fuer Heute.
         </span>
       </div>
 
-      <div class="calendar-grid" aria-label={`Kalender ${monthLabelDe(anchorIso())}`}>
+      <div
+        class="calendar-grid"
+        aria-label={`Kalender ${monthLabelDe(anchorIso())}`}
+        ref={(el) => {
+          gridRef = el;
+          useGridNav(el, '.calendar-day', 7, {
+            onPageNext: () => void navMonth(1),
+            onPagePrev: () => void navMonth(-1),
+            onHome: goToday,
+          });
+        }}
+      >
         <For each={WEEKDAY_HEADERS}>{(w) => <div class="calendar-weekday-head">{w}</div>}</For>
         <For each={grid()}>
           {(day) => {
