@@ -2160,6 +2160,8 @@ type AnyRow = Record<string, unknown>;
 async function restoreRow(
   table:
     | 'kb_cards'
+    | 'kb_cols'
+    | 'nodes'
     | 'links'
     | 'rows'
     | 'cols'
@@ -2197,6 +2199,28 @@ async function restoreRow(
 
 export async function restoreCard(snapshot: KbCardRow): Promise<void> {
   await restoreRow('kb_cards', snapshot as unknown as AnyRow);
+}
+
+// AU-B1 K10 (B1-B-003): Node-Restore. Die DB-Cascade beim deleteNode hat
+// rows/cols/cells/kb_cols/kb_cards/checklists/items/links/docs mit-
+// geloescht — die sind ueber Cascade nicht wiederherstellbar. Diese
+// Funktion stellt nur den Top-Level-Node wieder her; der Caller muss
+// im Toast klar kommunizieren dass Sub-Inhalte ggf. via Export-Backup
+// re-importiert werden muessen.
+export async function restoreNode(snapshot: NodeRow): Promise<void> {
+  await restoreRow('nodes', snapshot as unknown as AnyRow);
+}
+
+// AU-B1 K10 (B1-B-006): KbCol + ihre Cards restore. Reihenfolge:
+// erst kb_col (FK-Parent), dann kb_cards (FK-Child).
+export async function restoreKbColWithCards(
+  colSnap: KbColRow,
+  cardSnaps: KbCardRow[],
+): Promise<void> {
+  await restoreRow('kb_cols', colSnap as unknown as AnyRow);
+  for (const card of cardSnaps) {
+    await restoreRow('kb_cards', card as unknown as AnyRow);
+  }
 }
 
 export async function restoreBoardLink(snapshot: LinkRow): Promise<void> {

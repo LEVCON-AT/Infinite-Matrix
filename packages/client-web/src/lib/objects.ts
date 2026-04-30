@@ -603,6 +603,41 @@ export async function deleteGroup(groupId: string): Promise<void> {
   if (error) throw error;
 }
 
+// AU-B1 K10 (B1-B-004): Object-Restore. Direkter INSERT mit alter id —
+// das `objects`-Schema (Migration 030) hat keine Trigger, die uns
+// blockieren (auth.uid() wird nicht in NOT-NULL-Spalten verlangt). Tags
+// werden separat ueber addObjectTag wiederhergestellt; Backlinks
+// (rows/cols.object_id auf alte object-id) sind via DB-Cascade beim
+// delete auf NULL gesetzt — die kann der Restore nicht automatisch
+// rekonstruieren. Caller muss im Toast-Hinweis kommunizieren.
+export async function restoreObject(snap: ObjectRow, tags: string[] = []): Promise<ObjectRow> {
+  const { data, error } = await supabase
+    .from('objects')
+    .insert({
+      id: snap.id,
+      workspace_id: snap.workspace_id,
+      label: snap.label,
+      alias: snap.alias,
+      type_label: snap.type_label,
+      parent_id: snap.parent_id,
+      attrs: snap.attrs,
+      home_ref_kind: snap.home_ref_kind,
+      home_ref_id: snap.home_ref_id,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  // Tags optional re-attachen.
+  for (const t of tags) {
+    try {
+      await addObjectTag(snap.id, t);
+    } catch (err) {
+      console.warn('restoreObject tag re-attach failed:', err);
+    }
+  }
+  return data as ObjectRow;
+}
+
 // Soft-Gruppe: ephemere Multi-Select-Auswahl. Wird vom BulkAddModal
 // im Hintergrund gespeichert wenn der User KEIN "Als Gruppe speichern"
 // aktiviert hat — Quick-Vorschlag fuer naechste aehnliche Aktion.

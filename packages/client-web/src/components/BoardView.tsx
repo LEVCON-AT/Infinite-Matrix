@@ -25,6 +25,7 @@ import {
   renameKbCol,
   restoreBoardLink,
   restoreCard,
+  restoreKbColWithCards,
   setBoardLinkLabel,
   setBoardLinkType,
   setBoardLinkUrl,
@@ -593,7 +594,23 @@ const BoardView: Component<Props> = (p) => {
       });
       if (!ok) return;
     }
-    await wrap(() => delKbCol(col.id), 'Spalte geloescht.');
+    // AU-B1 K10 (B1-B-006): Snapshot der Spalte + ihrer Karten fuer Undo.
+    // Reihenfolge im Restore: erst kb_col (FK-Parent), dann kb_cards.
+    const colSnap = { ...col };
+    const cardSnaps = (cardsByCol().get(col.id) ?? []).map((c) => ({ ...c }));
+    await wrap(() => delKbCol(col.id));
+    showUndoToast(`Spalte "${col.label || '(leer)'}" geloescht.`, () => {
+      void (async () => {
+        try {
+          await restoreKbColWithCards(colSnap, cardSnaps);
+          showToast('Spalte wiederhergestellt.', 'success');
+          p.onChanged?.();
+        } catch (err) {
+          console.error('restoreKbColWithCards:', err);
+          showToast(translateDbError(err), 'error');
+        }
+      })();
+    });
   }
 
   async function onAddCard(col: KbColRow) {

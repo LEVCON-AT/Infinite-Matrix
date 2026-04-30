@@ -27,6 +27,7 @@ import {
   deleteNode,
   moveCardToBoard,
   renameNode,
+  restoreNode,
   updateCell,
 } from '../lib/mutations';
 import type { PresenceUser } from '../lib/presence';
@@ -47,7 +48,7 @@ import {
   executeSubtreeImportIntoMatrix,
   parseImportPayload,
 } from '../lib/subtree-import';
-import { showToast } from '../lib/toasts';
+import { showToast, showUndoToast } from '../lib/toasts';
 import { useTreeExpand } from '../lib/tree-expand';
 import type { CellFeature, CellRow, TreeEntry } from '../lib/types';
 import { sanitizeUrl } from '../lib/url';
@@ -766,6 +767,14 @@ const NodeTree: Component<Props> = (props) => {
     exportFn: () => Promise<void>;
     deleteFn: () => Promise<void>;
     successMsg: string;
+    // AU-B1 K10 (B1-B-003): optionaler Undo-Restore-Pfad. Wenn gesetzt,
+    // wird `showUndoToast` statt `showToast` mit success-Pfad gerufen.
+    // Caller liefert die Snapshot-basierte Restore-Closure (typischer-
+    // weise `() => restoreNode(snap)`). Cascade-Inhalte werden durch
+    // die DB-Loeschung nicht wiederhergestellt — caller-message muss
+    // das klar kommunizieren.
+    undoFn?: () => Promise<void>;
+    undoCascadeHint?: string;
   }): Promise<void> {
     const choice = await showChoice({
       title: 'Loeschen',
@@ -785,15 +794,35 @@ const NodeTree: Component<Props> = (props) => {
       try {
         await args.exportFn();
       } catch (err) {
+        console.error('deleteWithExportPrompt.exportFn:', err);
         showToast(translateDbError(err), 'error');
         return; // Export fehlgeschlagen → kein Loeschen, Daten sind sicher
       }
     }
     try {
       await args.deleteFn();
-      showToast(args.successMsg, 'success');
       props.onChanged?.();
+      if (args.undoFn) {
+        const undoLabel = args.undoCascadeHint
+          ? `${args.successMsg} ${args.undoCascadeHint}`
+          : args.successMsg;
+        showUndoToast(undoLabel, () => {
+          void (async () => {
+            try {
+              await args.undoFn?.();
+              showToast('Wiederhergestellt.', 'success');
+              props.onChanged?.();
+            } catch (err) {
+              console.error('deleteWithExportPrompt.undoFn:', err);
+              showToast(translateDbError(err), 'error');
+            }
+          })();
+        });
+      } else {
+        showToast(args.successMsg, 'success');
+      }
     } catch (err) {
+      console.error('deleteWithExportPrompt.deleteFn:', err);
       showToast(translateDbError(err), 'error');
     }
   }
@@ -1194,6 +1223,11 @@ const NodeTree: Component<Props> = (props) => {
           icon: '✕',
           danger: true,
           onClick: () => {
+            // AU-B1 K10 (B1-B-003): Snapshot des Top-Level-Node fuer Undo.
+            // Cascade-Inhalte (rows/cols/cells/...) werden DB-seitig
+            // mitgeloescht und sind ueber restoreNode allein NICHT
+            // wiederherstellbar — daher der explizite Hint im Toast.
+            const nodeSnap = entry.node;
             void deleteWithExportPrompt({
               label: entry.node.label,
               exportFn: async () => {
@@ -1202,6 +1236,8 @@ const NodeTree: Component<Props> = (props) => {
               },
               deleteFn: () => deleteNode(entry.id),
               successMsg: `"${entry.node.label}" geloescht.`,
+              undoFn: () => restoreNode(nodeSnap),
+              undoCascadeHint: '(Inhalte muessen via Export wiederhergestellt werden.)',
             });
           },
         });

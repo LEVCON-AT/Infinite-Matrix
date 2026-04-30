@@ -27,10 +27,11 @@ import {
   fetchObjectTags,
   fetchObjects,
   removeObjectTag,
+  restoreObject,
   setObjectParent,
   updateObject,
 } from '../lib/objects';
-import { showToast } from '../lib/toasts';
+import { showToast, showUndoToast } from '../lib/toasts';
 import type { ObjectRow } from '../lib/types';
 import {
   closeObjectSuggest,
@@ -465,11 +466,27 @@ const ObjectDetail: Component = () => {
       confirmLabel: 'Loeschen',
     });
     if (!ok) return;
+    // AU-B1 K10 (B1-B-004): Snapshot vor Delete fuer Undo. Tags werden
+    // separat gemerkt und beim Restore re-attached. Backlinks
+    // (rows.object_id etc.) werden DB-seitig auf NULL gesetzt und sind
+    // ueber restoreObject NICHT wiederherstellbar — Hint im Toast.
+    const snap = o;
+    const tagSnap = (tags() ?? []).map((t) => t.tag_object_id);
     setBusy(true);
     try {
       await deleteObject(o.id);
-      showToast('Object geloescht.', 'success');
       navBack();
+      showUndoToast('Object geloescht. (Verknuepfungen muessen neu gesetzt werden.)', () => {
+        void (async () => {
+          try {
+            await restoreObject(snap, tagSnap);
+            showToast('Object wiederhergestellt.', 'success');
+          } catch (err) {
+            console.error('restoreObject:', err);
+            showToast(translateDbError(err), 'error');
+          }
+        })();
+      });
     } catch (err) {
       console.error('deleteObject:', err);
       showToast(translateDbError(err), 'error');
