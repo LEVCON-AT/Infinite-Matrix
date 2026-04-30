@@ -33,15 +33,17 @@ type CacheRow = { id: string; workspace_id: string } & Record<string, unknown>;
 
 // Tabellen-Liste als const-Tuple, damit wir sowohl die Typ-Union als
 // auch die Runtime-Iteration aus einer Quelle bekommen.
+//
+// T.1.J (DB_VERSION=6): kb_cards + checklist_items entfernt — Daten
+// leben nur noch in tasks + task_manifestations. Der upgrade()-Callback
+// loescht die alten Stores aus IDB-Installations < V6.
 const TABLES = [
   'nodes',
   'cells',
   'rows',
   'cols',
   'kb_cols',
-  'kb_cards',
   'checklists',
-  'checklist_items',
   'links',
   'docs',
   'invites',
@@ -73,9 +75,7 @@ interface MatrixCacheSchema extends DBSchema {
   rows: StoreDef;
   cols: StoreDef;
   kb_cols: StoreDef;
-  kb_cards: StoreDef;
   checklists: StoreDef;
-  checklist_items: StoreDef;
   links: StoreDef;
   docs: StoreDef;
   invites: StoreDef;
@@ -90,9 +90,13 @@ interface MatrixCacheSchema extends DBSchema {
 const DB_NAME = 'matrix-cache';
 // V2: docs-Store. V3: invites-Store. V4 (AU-B1 K11c.1): objects-Layer
 // (objects, object_tags, groups, group_members). V5 (T.1.C): task-Layer
-// (tasks, task_manifestations). Der `contains(t)`-Guard im Loop laesst
-// V1..V4-Installs die fehlenden Stores idempotent nachzugefuegt bekommen.
-const DB_VERSION = 5;
+// (tasks, task_manifestations). V6 (T.1.J): kb_cards + checklist_items
+// Stores entfernt — Daten leben nur noch in tasks + task_manifestations.
+// Der `contains(t)`-Guard im Loop laesst alte Installs die fehlenden
+// Stores idempotent nachzufuegt bekommen; der zweite Block loescht
+// die obsoleten Stores aus V<6 Installs.
+const DB_VERSION = 6;
+const OBSOLETE_STORES = ['kb_cards', 'checklist_items'] as const;
 
 let dbPromise: Promise<IDBPDatabase<MatrixCacheSchema>> | null = null;
 
@@ -104,6 +108,21 @@ function db(): Promise<IDBPDatabase<MatrixCacheSchema>> {
           if (!inst.objectStoreNames.contains(t)) {
             const store = inst.createObjectStore(t, { keyPath: 'id' });
             store.createIndex('by_workspace', 'workspace_id');
+          }
+        }
+        // T.1.J: V<6-Installs hatten kb_cards + checklist_items als
+        // eigene Stores. Nach dem Schema-Sweep sind sie obsolet —
+        // explizit deleteObjectStore, sonst bleiben sie als toter
+        // Ballast in der IDB-Datei und der naechste Schema-Drift
+        // koennte sie versehentlich wieder ansprechen. Cast ueber
+        // DOMStringList weil das Schema-Type die Store-Namen nicht
+        // mehr kennt.
+        const stores = inst.objectStoreNames as unknown as DOMStringList;
+        for (const obsolete of OBSOLETE_STORES) {
+          if (stores.contains(obsolete)) {
+            (inst as unknown as { deleteObjectStore(name: string): void }).deleteObjectStore(
+              obsolete,
+            );
           }
         }
       },
