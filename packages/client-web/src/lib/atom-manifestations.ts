@@ -87,21 +87,27 @@ export async function fetchAtomCalendarManifestations(
   );
 
   return rows.map((r) => {
+    // Snapshot-First: wenn display_meta.label gesetzt ist, bevorzugen
+    // wir den (InfoLinks haben kein FK-Pendant in den Source-Tabellen,
+    // ihre Label leben nur im Snapshot).
+    const dm = r.display_meta ?? {};
+    const snapLabel = (dm as Record<string, unknown>).label as string | undefined;
+    const snapUrl = (dm as Record<string, unknown>).url as string | undefined;
     if (r.atom_type === 'link') {
       const e = linkById.get(r.atom_id);
       return {
         ...r,
-        label: e?.label ?? '(Link geloescht)',
-        url: e?.url ?? null,
+        label: snapLabel ?? e?.label ?? '(Link geloescht)',
+        url: snapUrl ?? e?.url ?? null,
       };
     }
     if (r.atom_type === 'checklist') {
       return {
         ...r,
-        label: checklistById.get(r.atom_id) ?? '(Liste geloescht)',
+        label: snapLabel ?? checklistById.get(r.atom_id) ?? '(Liste geloescht)',
       };
     }
-    return { ...r, label: '(Atom)' };
+    return { ...r, label: snapLabel ?? '(Atom)' };
   });
 }
 
@@ -170,6 +176,11 @@ type DropAtomOnDateArgs = {
   atomType: AtomKind;
   atomId: string;
   atomLabel?: string;
+  // Snapshot fuer InfoLinks (cell.data.links jsonb, kein FK auf links-
+  // Tabelle). Wir schreiben Label + URL ins display_meta, damit das
+  // Calendar-Event self-contained bleibt — egal ob die Quelle eine
+  // Tabelle oder eine jsonb-Position ist.
+  atomUrl?: string;
   newDate: string;
   // Bestand fuer Idempotenz.
   existing: AtomManifestationRow[];
@@ -203,13 +214,18 @@ export async function dropAtomOnDate(args: DropAtomOnDateArgs): Promise<void> {
     }
     return;
   }
+  // Snapshot: label + url ins display_meta. So bleibt das Event auch
+  // sichtbar, wenn die Source-Tabelle kein passendes Row hat (InfoLinks).
+  const meta: Record<string, unknown> = { start_date: args.newDate };
+  if (args.atomLabel) meta.label = args.atomLabel;
+  if (args.atomUrl) meta.url = args.atomUrl;
   try {
     const created = await addAtomManifestation({
       workspaceId: args.workspaceId,
       atomType: args.atomType,
       atomId: args.atomId,
       kind: 'calendar',
-      displayMeta: { start_date: args.newDate },
+      displayMeta: meta,
     });
     showUndoToast('Im Kalender eingetragen', () => {
       void removeAtomManifestation(created.id).catch(() => {});

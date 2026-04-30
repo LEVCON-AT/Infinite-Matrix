@@ -195,7 +195,13 @@ const SidebarCalendarMini: Component<Props> = (p) => {
   //     Modal — non-task-Atoms haben heute kein Modal-Pendant.
   function handleDrop(
     iso: string,
-    src: { atom: string; atomId: string; label?: string; sourceManifId?: string },
+    src: {
+      atom: string;
+      atomId: string;
+      label?: string;
+      sourceManifId?: string;
+      url?: string;
+    },
   ) {
     setDragOverIso(null);
     if (src.atom === 'task') {
@@ -226,6 +232,7 @@ const SidebarCalendarMini: Component<Props> = (p) => {
         atomType: src.atom,
         atomId: src.atomId,
         atomLabel: src.label,
+        atomUrl: src.url,
         newDate: iso,
         existing: p.atomManifestations ?? [],
       }).then(() => p.onAtomManifestationsChanged?.());

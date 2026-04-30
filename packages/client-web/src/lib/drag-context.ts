@@ -25,6 +25,11 @@ export type DragSource = {
   sourceManifId?: string;
   // Display-Hilfen fuer Visual-Feedback (Drag-Ghost spaeter).
   label?: string;
+  // Optional fuer atom='link': URL fuer den Snapshot in
+  // atom_manifestations.display_meta.url. Damit InfoLinks (cell.data.links
+  // jsonb, kein FK) auch nach dem Drop ohne Source-Lookup angezeigt
+  // werden koennen — die display_meta sind self-contained.
+  url?: string;
 };
 
 const [active, setActive] = createSignal<DragSource | null>(null);

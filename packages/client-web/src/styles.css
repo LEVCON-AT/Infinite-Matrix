@@ -4864,6 +4864,16 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   background: var(--bg2);
 }
 
+/* T.AC.B: View-Mode-Drag der ganzen InfoLink-Row in den Sidebar-
+   Calendar. grab nur am LI-Rand — der Anchor (Klick → URL) hat
+   draggable=false, damit der Browser nicht den URL-Drag uebernimmt. */
+.info-link-draggable {
+  cursor: grab;
+}
+.info-link-draggable:active {
+  cursor: grabbing;
+}
+
 .info-link-hd {
   display: flex;
   align-items: center;

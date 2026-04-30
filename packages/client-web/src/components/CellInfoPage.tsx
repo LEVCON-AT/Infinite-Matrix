@@ -18,6 +18,7 @@ import { type Component, For, Show, createMemo, createSignal, onCleanup } from '
 import { readCellLinksFromCell, readInfoFieldsFromCell } from '../lib/cell-data';
 import { showConfirm, showPrompt } from '../lib/dialog';
 import { openDocsPopup } from '../lib/docs-ui';
+import { bindDragSource } from '../lib/drag-context';
 import { useEditMode } from '../lib/edit-mode';
 import { translateDbError } from '../lib/errors';
 import type { ContextMaps } from '../lib/label-template';
@@ -351,59 +352,105 @@ const CellInfoPage: Component<Props> = (p) => {
         >
           <ul class="info-link-list">
             <For each={links()}>
-              {(l) => (
-                <li
-                  class="info-link"
-                  attr:data-edit={editMode() ? 'true' : 'false'}
-                  onMouseEnter={() => p.onFieldHover?.(l.id)}
-                  onMouseLeave={() => p.onFieldHover?.(undefined)}
-                >
-                  <PresenceMini users={presenceByField().get(l.id) ?? []} />
-                  <div class="info-link-hd" classList={{ 'mx-editable': editMode() }}>
-                    <div class="info-arrow-stack">
+              {(l) => {
+                // T.AC.B: InfoLinks in den Sidebar-Calendar droppbar.
+                // InfoLinks leben in cell.data.links (jsonb), nicht in
+                // der `links`-Tabelle — wir snapshotten Label + URL ins
+                // display_meta, damit das Calendar-Event self-contained
+                // bleibt (keine Source-Lookup-Abhaengigkeit).
+                const linkDrag = bindDragSource({
+                  build: () => ({
+                    atom: 'link',
+                    atomId: l.id,
+                    label: l.label || l.url,
+                    url: l.url,
+                  }),
+                });
+                return (
+                  <li
+                    class="info-link"
+                    classList={{ 'info-link-draggable': !editMode() }}
+                    attr:data-edit={editMode() ? 'true' : 'false'}
+                    draggable={!editMode()}
+                    onDragStart={!editMode() ? linkDrag.onDragStart : undefined}
+                    onDragEnd={!editMode() ? linkDrag.onDragEnd : undefined}
+                    onMouseEnter={() => p.onFieldHover?.(l.id)}
+                    onMouseLeave={() => p.onFieldHover?.(undefined)}
+                  >
+                    <PresenceMini users={presenceByField().get(l.id) ?? []} />
+                    <div class="info-link-hd" classList={{ 'mx-editable': editMode() }}>
+                      <div class="info-arrow-stack">
+                        <button
+                          type="button"
+                          class="info-arrow"
+                          title="Nach oben"
+                          aria-label="Link nach oben verschieben"
+                          tabIndex={editMode() ? 0 : -1}
+                          onClick={() => onMoveLink(l, -1)}
+                          disabled={busy() || !editMode()}
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          class="info-arrow"
+                          title="Nach unten"
+                          aria-label="Link nach unten verschieben"
+                          tabIndex={editMode() ? 0 : -1}
+                          onClick={() => onMoveLink(l, 1)}
+                          disabled={busy() || !editMode()}
+                        >
+                          ▼
+                        </button>
+                      </div>
+                      <Show
+                        when={editMode()}
+                        fallback={
+                          <a
+                            class="info-link-label info-link-label-anchor"
+                            href={sanitizeUrl(l.url) ?? '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={l.url}
+                            draggable={false}
+                          >
+                            {l.label || l.url}
+                          </a>
+                        }
+                      >
+                        <input
+                          class="mx-head-input info-link-label-input"
+                          type="text"
+                          value={l.label}
+                          placeholder="(Bezeichnung)"
+                          onBlur={(e) => onRenameLink(l, e.currentTarget.value.trim())}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              (e.currentTarget as HTMLInputElement).blur();
+                            }
+                          }}
+                        />
+                      </Show>
                       <button
                         type="button"
-                        class="info-arrow"
-                        title="Nach oben"
-                        aria-label="Link nach oben verschieben"
+                        class="mx-del-btn info-del"
+                        title="Link loeschen"
+                        aria-label="Link loeschen"
                         tabIndex={editMode() ? 0 : -1}
-                        onClick={() => onMoveLink(l, -1)}
+                        onClick={() => onDelLink(l)}
                         disabled={busy() || !editMode()}
                       >
-                        ▲
-                      </button>
-                      <button
-                        type="button"
-                        class="info-arrow"
-                        title="Nach unten"
-                        aria-label="Link nach unten verschieben"
-                        tabIndex={editMode() ? 0 : -1}
-                        onClick={() => onMoveLink(l, 1)}
-                        disabled={busy() || !editMode()}
-                      >
-                        ▼
+                        ✕
                       </button>
                     </div>
-                    <Show
-                      when={editMode()}
-                      fallback={
-                        <a
-                          class="info-link-label info-link-label-anchor"
-                          href={sanitizeUrl(l.url) ?? '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title={l.url}
-                        >
-                          {l.label || l.url}
-                        </a>
-                      }
-                    >
+                    <Show when={editMode()}>
                       <input
-                        class="mx-head-input info-link-label-input"
-                        type="text"
-                        value={l.label}
-                        placeholder="(Bezeichnung)"
-                        onBlur={(e) => onRenameLink(l, e.currentTarget.value.trim())}
+                        class="mx-head-input info-link-url-input"
+                        type="url"
+                        value={l.url}
+                        placeholder="https://..."
+                        onBlur={(e) => onSetLinkUrl(l, e.currentTarget.value.trim())}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
@@ -412,35 +459,9 @@ const CellInfoPage: Component<Props> = (p) => {
                         }}
                       />
                     </Show>
-                    <button
-                      type="button"
-                      class="mx-del-btn info-del"
-                      title="Link loeschen"
-                      aria-label="Link loeschen"
-                      tabIndex={editMode() ? 0 : -1}
-                      onClick={() => onDelLink(l)}
-                      disabled={busy() || !editMode()}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <Show when={editMode()}>
-                    <input
-                      class="mx-head-input info-link-url-input"
-                      type="url"
-                      value={l.url}
-                      placeholder="https://..."
-                      onBlur={(e) => onSetLinkUrl(l, e.currentTarget.value.trim())}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          (e.currentTarget as HTMLInputElement).blur();
-                        }
-                      }}
-                    />
-                  </Show>
-                </li>
-              )}
+                  </li>
+                );
+              }}
             </For>
           </ul>
         </Show>
