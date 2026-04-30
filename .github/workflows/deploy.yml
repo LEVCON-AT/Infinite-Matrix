@@ -335,8 +335,17 @@ jobs:
       - name: Smoke test
         env:
           HOST: ${{ secrets.DEPLOY_HOST }}
+          BRIDGE_HOST: ${{ secrets.BRIDGE_HOST }}
         run: |
           set -euo pipefail
-          curl -fsS "https://$HOST/healthz" | grep -q '"ok":true'
-          curl -fsS -o /dev/null -w "%{http_code}\n" "https://$HOST/" | grep -q 200
-          curl -fsS -o /dev/null -w "%{http_code}\n" "https://$HOST/standalone/" | grep -q 200
+          # AU-B1 K11b (B1-G-004): Smoke-Test trifft jetzt die korrekten
+          # Endpunkte. Der SaaS-Client lebt unter /app/ auf $HOST
+          # (staging.matrix.levcon.at). Die Bridge mit /healthz lebt auf
+          # $BRIDGE_HOST (matrix.levcon.at) — separater nginx-Vhost.
+          # Falls BRIDGE_HOST nicht gesetzt ist, faellt Smoke nur auf
+          # SaaS-Client zurueck.
+          curl -fsS -o /dev/null -w "%{http_code}\n" "https://$HOST/app/" | grep -q 200
+          if [[ -n "${BRIDGE_HOST:-}" ]]; then
+            curl -fsS "https://$BRIDGE_HOST/healthz" | grep -q '"ok":true'
+            curl -fsS -o /dev/null -w "%{http_code}\n" "https://$BRIDGE_HOST/standalone/" | grep -q 200
+          fi

@@ -152,7 +152,10 @@ services:
         - /dev/null
         - -H
         - "Authorization: Bearer ${ANON_KEY}"
-        - http://localhost:4000/api/tenants/realtime-dev/health
+        # AU-B1 K11b (B1-I-014): Tenant heisst "realtime" (Migration 006
+        # hat den Alias angelegt), nicht "realtime-dev". Vorher Silent-
+        # Failure bei tatsaechlichen Realtime-Ausfaellen.
+        - http://localhost:4000/api/tenants/realtime/health
       timeout: 5s
       interval: 15s
       retries: 5

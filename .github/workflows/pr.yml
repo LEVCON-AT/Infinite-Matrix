@@ -53,9 +53,10 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - name: Typecheck + Build (client-web)
+      - name: Lint + Typecheck + Build (client-web)
         working-directory: packages/client-web
         run: |
+          pnpm lint
           pnpm typecheck
           pnpm build
 
