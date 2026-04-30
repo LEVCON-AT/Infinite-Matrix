@@ -42,11 +42,16 @@ export async function findAliasConflict(args: {
 
   const results = await Promise.all(
     TABLES.map(async (t) => {
+      // Phase 4 T.1.D: Karten-Alias liegt in tasks.attrs.alias, nicht
+      // mehr in einer kb_cards-Spalte. AliasTable bleibt 'kb_cards' fuer
+      // das UI-Label ("Karte"); intern leiten wir auf tasks um.
+      const dbTable = t === 'kb_cards' ? 'tasks' : t;
+      const aliasFilter = t === 'kb_cards' ? 'attrs->>alias' : 'alias';
       let q = supabase
-        .from(t)
+        .from(dbTable)
         .select('id')
         .eq('workspace_id', args.workspaceId)
-        .ilike('alias', a)
+        .ilike(aliasFilter, a)
         .limit(1);
       if (args.exclude && args.exclude.table === t) {
         q = q.neq('id', args.exclude.id);

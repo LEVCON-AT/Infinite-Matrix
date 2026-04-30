@@ -211,7 +211,7 @@ async function reserveAliases(
   // nehmen eine einzige aliasIndex-Query an — im Projekt existiert
   // alias_index als Materialized Aggregate, aber fuer V1 nutzen wir
   // direkten Union-Call.
-  const tables = ['nodes', 'cells', 'kb_cards', 'checklists', 'links', 'docs'];
+  const tables = ['nodes', 'cells', 'checklists', 'links', 'docs'];
   const existing = new Set<string>();
   for (const t of tables) {
     const { data, error } = await supabase
@@ -222,6 +222,18 @@ async function reserveAliases(
     if (error) continue;
     for (const row of (data ?? []) as Array<{ alias: string | null }>) {
       if (row.alias) existing.add(row.alias.toLowerCase());
+    }
+  }
+  // Phase 4 T.1.D: Karten-Aliases via tasks.attrs.alias.
+  const taskRes = await supabase
+    .from('tasks')
+    .select('attrs')
+    .eq('workspace_id', workspaceId)
+    .not('attrs->>alias', 'is', null);
+  if (!taskRes.error) {
+    for (const row of (taskRes.data ?? []) as Array<{ attrs: Record<string, unknown> | null }>) {
+      const alias = (row.attrs as Record<string, unknown> | null)?.alias as string | undefined;
+      if (alias) existing.add(alias.toLowerCase());
     }
   }
   for (const a of aliases) {

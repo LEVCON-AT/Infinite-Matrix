@@ -144,19 +144,30 @@ export async function executeImport(
     onProgress,
   );
 
-  // 4b) checklist_items
+  // 4b) Phase 4 T.1.D: checklist_items → tasks + task_manifestations.
   await insertBatch(
-    'checklist_items',
+    'tasks',
     plan.checklistItems.map((it) => ({
       id: it.id,
       workspace_id: ws,
-      checklist_id: it.checklist_id,
-      text: it.text,
-      done: it.done,
+      label: it.text,
+      status: it.done ? 'done' : 'open',
+      attrs: { legacy_kind: 'checklist_item' },
+    })),
+    'tasks',
+    onProgress,
+  );
+  await insertBatch(
+    'task_manifestations',
+    plan.checklistItems.map((it) => ({
+      task_id: it.id,
+      workspace_id: ws,
+      kind: 'checklist',
+      container_id: it.checklist_id,
       level: it.level,
       position: it.position,
     })),
-    'checklist_items',
+    'task_manifestations',
     onProgress,
   );
 
@@ -179,32 +190,48 @@ export async function executeImport(
     onProgress,
   );
 
-  // 6) kb_cards (FKs auf kb_cols + checklists sind jetzt auffuellbar)
+  // 6) Phase 4 T.1.D: kb_cards → tasks + task_manifestations.
+  //    Karten-Feldern auf tasks/attrs/manifestation aufgeteilt
+  //    (siehe lib/task-projections.ts fuer das Mapping).
   await insertBatch(
-    'kb_cards',
+    'tasks',
+    plan.kbCards.map((c) => {
+      const status = c.archived ? 'archived' : c.done ? 'done' : 'open';
+      const attrs: Record<string, unknown> = { legacy_kind: 'kb_card' };
+      if (c.priority != null) attrs.priority = c.priority;
+      if (c.tags && c.tags.length > 0) attrs.tags = c.tags;
+      if (c.alias != null) attrs.alias = c.alias;
+      if (c.checklist != null) attrs.checklist_inline = c.checklist;
+      if (c.checklist_ref != null) attrs.checklist_ref = c.checklist_ref;
+      if (c.source_cl_id != null) attrs.source_cl_id = c.source_cl_id;
+      if (c.source_label != null) attrs.source_label = c.source_label;
+      return {
+        id: c.id,
+        workspace_id: ws,
+        label: c.name,
+        note: c.note ?? null,
+        status,
+        deadline: c.deadline,
+        who: c.who ?? [],
+        recur: c.recur,
+        done_occurrences: c.done_occurrences ?? [],
+        attrs,
+      };
+    }),
+    'tasks',
+    onProgress,
+  );
+  await insertBatch(
+    'task_manifestations',
     plan.kbCards.map((c) => ({
-      id: c.id,
+      task_id: c.id,
       workspace_id: ws,
-      board_id: c.board_id,
-      col_id: c.col_id,
-      alias: c.alias,
-      name: c.name,
-      note: c.note,
-      tags: c.tags,
-      who: c.who,
-      deadline: c.deadline,
-      priority: c.priority,
-      done: c.done,
-      archived: c.archived,
+      kind: 'kanban',
+      container_id: c.col_id,
       position: c.position,
-      recur: c.recur,
-      done_occurrences: c.done_occurrences,
-      source_cl_id: c.source_cl_id,
-      source_label: c.source_label,
-      checklist_ref: c.checklist_ref,
-      checklist: c.checklist,
+      display_meta: { board_id: c.board_id },
     })),
-    'kb_cards',
+    'task_manifestations',
     onProgress,
   );
 
