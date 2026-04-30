@@ -45,6 +45,13 @@ const TABLES = [
   'links',
   'docs',
   'invites',
+  // AU-B1 K11c.1 (B1-B-010 / B1-H-006 / CC7): Object-Layer-Stores. Damit
+  // resolverMaps in Workspace.tsx auch offline funktioniert (vorher:
+  // {row.object}/{column.object}-Templates rendered als "(ohne Label)").
+  'objects',
+  'object_tags',
+  'groups',
+  'group_members',
 ] as const;
 
 export type CacheTable = (typeof TABLES)[number];
@@ -67,13 +74,18 @@ interface MatrixCacheSchema extends DBSchema {
   links: StoreDef;
   docs: StoreDef;
   invites: StoreDef;
+  objects: StoreDef;
+  object_tags: StoreDef;
+  groups: StoreDef;
+  group_members: StoreDef;
 }
 
 const DB_NAME = 'matrix-cache';
-// V2 ergaenzte den `docs`-Store. V3 ergaenzt den `invites`-Store fuer
-// die Phase-1-Settings/Members-Page. Der `contains(t)`-Guard im Loop
-// laesst V1/V2-Installs den fehlenden Store nachzugefuegt bekommen.
-const DB_VERSION = 3;
+// V2: docs-Store. V3: invites-Store. V4 (AU-B1 K11c.1): objects-Layer
+// (objects, object_tags, groups, group_members). Der `contains(t)`-Guard
+// im Loop laesst V1/V2/V3-Installs die fehlenden Stores idempotent
+// nachzugefuegt bekommen.
+const DB_VERSION = 4;
 
 let dbPromise: Promise<IDBPDatabase<MatrixCacheSchema>> | null = null;
 

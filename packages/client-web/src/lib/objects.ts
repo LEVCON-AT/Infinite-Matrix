@@ -15,6 +15,7 @@
 // Kommt mit O.2b: Autocomplete-Dropdown + UI-Integration in
 // MatrixView/BoardView Row/Col/Kb_col-Edit.
 
+import { isNetworkError } from './mutation-queue';
 import {
   addCol,
   addKbCol,
@@ -23,6 +24,8 @@ import {
   setKbColObjectId,
   setRowObjectId,
 } from './mutations';
+import { getById, getByWorkspace, mergeRows } from './offline-cache';
+import { markCacheFallback, markLiveSuccess } from './offline-state';
 import { supabase } from './supabase';
 import type {
   ColRow,
@@ -75,30 +78,51 @@ export type ObjectSearchHit = {
 };
 
 // ─── Read: fetchObjects ──────────────────────────────────────
-// Workspace-scoped Liste. Online-only in O.2a — IDB-Cache-Fallback
-// folgt mit O.4 wenn die offline-cache.ts-TABLES-Liste um 'objects'
-// erweitert wird (DB_VERSION-Bump).
+// AU-B1 K11c.1 (B1-B-010 / B1-H-006 / CC7): mit IDB-Cache-Fallback.
+// resolverMaps in Workspace.tsx baut auf objects() — ohne Cache
+// zerstoerte Network-Loss den ganzen Memo + alle dynamischen
+// Templates ({row.object}/{column.object}).
 export async function fetchObjects(workspaceId: string): Promise<ObjectRow[]> {
   if (!workspaceId) return [];
-  const { data, error } = await supabase
-    .from('objects')
-    .select('*')
-    .eq('workspace_id', workspaceId)
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as ObjectRow[];
+  try {
+    const { data, error } = await supabase
+      .from('objects')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    const rows = (data ?? []) as ObjectRow[];
+    void mergeRows('objects', rows).catch(() => {});
+    markLiveSuccess();
+    return rows;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const cached = await getByWorkspace<ObjectRow>('objects', workspaceId);
+    markCacheFallback();
+    return cached.sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''));
+  }
 }
 
 // ─── Read: fetchObject (single) ──────────────────────────────
 export async function fetchObject(objectId: string): Promise<ObjectRow | null> {
   if (!objectId) return null;
-  const { data, error } = await supabase
-    .from('objects')
-    .select('*')
-    .eq('id', objectId)
-    .maybeSingle();
-  if (error) throw error;
-  return (data ?? null) as ObjectRow | null;
+  try {
+    const { data, error } = await supabase
+      .from('objects')
+      .select('*')
+      .eq('id', objectId)
+      .maybeSingle();
+    if (error) throw error;
+    const row = (data ?? null) as ObjectRow | null;
+    if (row) void mergeRows('objects', [row]).catch(() => {});
+    markLiveSuccess();
+    return row;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const cached = await getById<ObjectRow>('objects', objectId);
+    markCacheFallback();
+    return cached;
+  }
 }
 
 // ─── Read: fetchObjectChildren (parent_id-Tree) ─────────────
@@ -107,14 +131,26 @@ export async function fetchObjectChildren(
   parentId: string,
 ): Promise<ObjectRow[]> {
   if (!workspaceId || !parentId) return [];
-  const { data, error } = await supabase
-    .from('objects')
-    .select('*')
-    .eq('workspace_id', workspaceId)
-    .eq('parent_id', parentId)
-    .order('label', { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as ObjectRow[];
+  try {
+    const { data, error } = await supabase
+      .from('objects')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .eq('parent_id', parentId)
+      .order('label', { ascending: true });
+    if (error) throw error;
+    const rows = (data ?? []) as ObjectRow[];
+    void mergeRows('objects', rows).catch(() => {});
+    markLiveSuccess();
+    return rows;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const all = await getByWorkspace<ObjectRow>('objects', workspaceId);
+    markCacheFallback();
+    return all
+      .filter((o) => o.parent_id === parentId)
+      .sort((a, b) => (a.label ?? '').localeCompare(b.label ?? ''));
+  }
 }
 
 // ─── Read: object_backlinks_v ───────────────────────────────
@@ -164,24 +200,57 @@ export async function fetchAllBacklinks(workspaceId: string): Promise<ObjectBack
 // Paare; fetchAllGroupMembers liefert alle (group_id, object_id)-Paare.
 // Skaliert bis ~50k Tags/Members; daruber Server-side-Filter via RPC.
 
+// AU-B1 K11c.1: object_tags + group_members haben Composite-PKs ohne
+// `id`-Spalte. IDB-Cache erwartet aber `id`-keyPath — wir generieren
+// synthetic-ids beim Schreiben und entfernen sie beim Lesen wieder.
+function withSyntheticTagId<T extends ObjectTagRow>(t: T): T & { id: string } {
+  return { ...t, id: `${t.object_id}:${t.tag_object_id}` };
+}
+function withSyntheticMemberId<T extends GroupMemberRow>(m: T): T & { id: string } {
+  return { ...m, id: `${m.group_id}:${m.object_id}` };
+}
+
 export async function fetchAllObjectTags(workspaceId: string): Promise<ObjectTagRow[]> {
   if (!workspaceId) return [];
-  const { data, error } = await supabase
-    .from('object_tags')
-    .select('*')
-    .eq('workspace_id', workspaceId);
-  if (error) throw error;
-  return (data ?? []) as ObjectTagRow[];
+  try {
+    const { data, error } = await supabase
+      .from('object_tags')
+      .select('*')
+      .eq('workspace_id', workspaceId);
+    if (error) throw error;
+    const rows = (data ?? []) as ObjectTagRow[];
+    void mergeRows('object_tags', rows.map(withSyntheticTagId)).catch(() => {});
+    markLiveSuccess();
+    return rows;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const cached = await getByWorkspace<ObjectTagRow & { id: string }>('object_tags', workspaceId);
+    markCacheFallback();
+    return cached;
+  }
 }
 
 export async function fetchAllGroupMembers(workspaceId: string): Promise<GroupMemberRow[]> {
   if (!workspaceId) return [];
-  const { data, error } = await supabase
-    .from('group_members')
-    .select('*')
-    .eq('workspace_id', workspaceId);
-  if (error) throw error;
-  return (data ?? []) as GroupMemberRow[];
+  try {
+    const { data, error } = await supabase
+      .from('group_members')
+      .select('*')
+      .eq('workspace_id', workspaceId);
+    if (error) throw error;
+    const rows = (data ?? []) as GroupMemberRow[];
+    void mergeRows('group_members', rows.map(withSyntheticMemberId)).catch(() => {});
+    markLiveSuccess();
+    return rows;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const cached = await getByWorkspace<GroupMemberRow & { id: string }>(
+      'group_members',
+      workspaceId,
+    );
+    markCacheFallback();
+    return cached;
+  }
 }
 
 // ─── Read: fetchObjectGroups (welche Groups enthalten dieses Object?) ──
@@ -464,13 +533,23 @@ export async function searchObjects(
 
 export async function fetchGroups(workspaceId: string): Promise<GroupRow[]> {
   if (!workspaceId) return [];
-  const { data, error } = await supabase
-    .from('groups')
-    .select('*')
-    .eq('workspace_id', workspaceId)
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as GroupRow[];
+  try {
+    const { data, error } = await supabase
+      .from('groups')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    const rows = (data ?? []) as GroupRow[];
+    void mergeRows('groups', rows).catch(() => {});
+    markLiveSuccess();
+    return rows;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const cached = await getByWorkspace<GroupRow>('groups', workspaceId);
+    markCacheFallback();
+    return cached.sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''));
+  }
 }
 
 export async function fetchGroupMembers(
@@ -478,13 +557,23 @@ export async function fetchGroupMembers(
   groupId: string,
 ): Promise<GroupMemberRow[]> {
   if (!workspaceId || !groupId) return [];
-  const { data, error } = await supabase
-    .from('group_members')
-    .select('*')
-    .eq('workspace_id', workspaceId)
-    .eq('group_id', groupId);
-  if (error) throw error;
-  return (data ?? []) as GroupMemberRow[];
+  try {
+    const { data, error } = await supabase
+      .from('group_members')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .eq('group_id', groupId);
+    if (error) throw error;
+    const rows = (data ?? []) as GroupMemberRow[];
+    void mergeRows('group_members', rows.map(withSyntheticMemberId)).catch(() => {});
+    markLiveSuccess();
+    return rows;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const all = await getByWorkspace<GroupMemberRow & { id: string }>('group_members', workspaceId);
+    markCacheFallback();
+    return all.filter((m) => m.group_id === groupId);
+  }
 }
 
 export async function fetchSoftGroups(workspaceId: string): Promise<SoftGroupRow[]> {
