@@ -442,6 +442,148 @@ export const TOOL_REGISTRY: ReadonlyArray<ToolDef> = [
     riskLevel: 'destructive',
     allowedInModes: ['help'],
   },
+
+  // ─── Task-Layer (Phase 4 / Migration 043) ─────────────────────
+  // Layer 0 + Layer 1 fuer den ECS-Task-Layer. mcp_add_manifestation
+  // ist der Cross-Cut: dieselbe Task in mehreren Sichten (Kanban,
+  // Checklist, Calendar, Standalone).
+  {
+    name: 'mcp_search_tasks',
+    description:
+      'Trigram-Fuzzy-Suche ueber tasks.label im Workspace. Optional Filter status (Array) und deadline-Range. Default-Limit 8, max 50. Liefert {id, label, status, deadline, similarity}.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        p_workspace_id: UUID,
+        p_query: {
+          type: 'string',
+          description: 'Such-String (kann leer sein → Top-N nach updated_at).',
+        },
+        p_status: {
+          type: ['array', 'null'],
+          items: {
+            type: 'string',
+            enum: ['open', 'in_progress', 'blocked', 'done', 'archived'],
+          },
+          description: 'Optional: nur Tasks mit Status aus dieser Liste.',
+        },
+        p_deadline_from: {
+          type: ['string', 'null'],
+          description: 'Optional: deadline >= diesem Datum (YYYY-MM-DD).',
+        },
+        p_deadline_to: {
+          type: ['string', 'null'],
+          description: 'Optional: deadline <= diesem Datum (YYYY-MM-DD).',
+        },
+        p_limit: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 50,
+          description: 'Max Treffer. Default 8.',
+        },
+      },
+      required: ['p_workspace_id', 'p_query'],
+    },
+    riskLevel: 'safe',
+    allowedInModes: ['help', 'cell-suggest'],
+  },
+  {
+    name: 'mcp_create_task',
+    description:
+      'Legt ein neues Task-Atom (Layer 0) an. Status default "open". Note max 5000 Zeichen. Liefert {task_id, label, status, deadline}. Eine Task ohne Manifestation ist sichtbar, aber „heimatlos" — meist direkt ein mcp_add_manifestation hinterher.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        p_workspace_id: UUID,
+        p_label: { type: 'string', description: 'Anzeige-Name, max 200 Zeichen.' },
+        p_note: {
+          type: ['string', 'null'],
+          description: 'Optional: Beschreibung, max 5000 Zeichen.',
+        },
+        p_status: {
+          type: ['string', 'null'],
+          enum: ['open', 'in_progress', 'blocked', 'done', 'archived', null],
+          description: 'Status. Default "open".',
+        },
+        p_deadline: {
+          type: ['string', 'null'],
+          description: 'Optional: Deadline als YYYY-MM-DD.',
+        },
+        p_who: {
+          type: ['array', 'null'],
+          items: { type: 'string' },
+          description: 'Optional: zustaendige Personen (Frei-Text, V1).',
+        },
+      },
+      required: ['p_workspace_id', 'p_label'],
+    },
+    riskLevel: 'safe',
+    allowedInModes: ['help', 'cell-suggest'],
+  },
+  {
+    name: 'mcp_update_task',
+    description:
+      'Patcht ein Task-Atom. Pro Feld ein p_set_*-Flag — nur wenn true wird der entsprechende Wert geschrieben (sonst bleibt der alte). Erlaubte Felder: label, note, status, deadline.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        p_task_id: UUID,
+        p_label: { type: ['string', 'null'] },
+        p_set_label: { type: 'boolean', description: 'true = label uebernehmen.' },
+        p_note: { type: ['string', 'null'] },
+        p_set_note: { type: 'boolean', description: 'true = note uebernehmen.' },
+        p_status: {
+          type: ['string', 'null'],
+          enum: ['open', 'in_progress', 'blocked', 'done', 'archived', null],
+        },
+        p_set_status: { type: 'boolean', description: 'true = status uebernehmen.' },
+        p_deadline: { type: ['string', 'null'], description: 'YYYY-MM-DD oder null.' },
+        p_set_deadline: { type: 'boolean', description: 'true = deadline uebernehmen.' },
+      },
+      required: ['p_task_id'],
+    },
+    riskLevel: 'safe',
+    allowedInModes: ['help'],
+  },
+  {
+    name: 'mcp_add_manifestation',
+    description:
+      'Fuegt einer existierenden Task eine zusaetzliche Sicht hinzu — der ECS-Cross-Cut. kind ∈ {kanban, checklist, calendar, standalone}. Bei kanban/checklist ist container_id Pflicht (kb_cols.id bzw. checklists.id). Bei calendar optional (display_meta haelt date/time). Liefert {manifestation_id, task_id, kind, container_id, position}.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        p_task_id: UUID,
+        p_kind: {
+          type: 'string',
+          enum: ['kanban', 'checklist', 'calendar', 'standalone'],
+          description: 'Art der Sicht.',
+        },
+        p_container_id: {
+          ...NULLABLE_UUID,
+          description:
+            'Container-ID (kb_cols.id fuer kanban, checklists.id fuer checklist, optional fuer calendar).',
+        },
+        p_position: {
+          type: ['number', 'null'],
+          description: 'Optional: Position im Container. Default = max + 1.',
+        },
+        p_level: {
+          type: ['integer', 'null'],
+          minimum: 0,
+          maximum: 2,
+          description: 'Optional: Einrueckungs-Level (nur kind=checklist).',
+        },
+        p_display_meta: {
+          type: ['object', 'null'],
+          description:
+            'Kind-spezifische Felder (z.B. {start_date, end_date, time, duration_min} bei calendar).',
+        },
+      },
+      required: ['p_task_id', 'p_kind'],
+    },
+    riskLevel: 'safe',
+    allowedInModes: ['help', 'cell-suggest'],
+  },
 ];
 
 // ─── Wizard-only: Preview-Pattern (Mitigation H) ───────────────
