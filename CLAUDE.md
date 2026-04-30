@@ -25,6 +25,7 @@ Nutzerprofil: jemand, der strukturiert denkt und ein Werkzeug will, das seinen D
 - **Matrix** — ein Gitter aus Zeilen und Spalten. Jede Schnittzelle kann Inhalt halten.
 - **Zelle** — eine Zeilen/Spalten-Kombination. Trägt eine beliebige Kombination von Features.
 - **Features einer Zelle** — `Info` (Freitext + Links + Mailvorlagen), `Aufgaben` (Kanban-Board), `Checklisten`, `Sub-Matrix` (rekursive Vertiefung).
+- **Task-Atom (ECS, Phase 4)** — eine Aufgabe lebt als **`tasks`-Row** (Aggregate Root: label/note/status/deadline/who/recur/attrs) und kann in beliebig vielen **`task_manifestations`** auftauchen (kind ∈ kanban/checklist/calendar/standalone). Eine Wahrheit, viele Linsen. Drag-to-Create-Manifestation kreuzt Sichten: dieselbe Task wird Karte UND Termin UND Checklisten-Punkt. Heutige `BoardView`/`ChecklistPanel` lesen ueber Projection-Helper (`task-projections.ts` → `KbCardRow`/`ChecklistItemRow`) — Schreib-Pfad geht durch `lib/tasks.ts`.
 - **Alias** — User-vergebenes Kürzel zu einer Zelle/Matrix/Karte/Link, für `^kürzel`-Schnellsprünge. Case-insensitiv geloggt, Original-Casing bleibt für Display.
 - **Stack** — aktuelle Navigations-Tiefe (Breadcrumb).
 - **Sidebar-Tree** — räumliche Übersicht über den ganzen Baum, filterbar, navigierbar. Verbindungslinien in Feature-Farben (blau=Matrix, teal=Board, amber=Info/Cell, lila=Checklisten, grau=Cellbox, `text3`=Link/Mail).
