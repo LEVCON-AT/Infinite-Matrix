@@ -90,8 +90,12 @@ const TaskDetail: Component = () => {
     () => new Map((checklists() ?? []).map((c) => [c.id, c])),
   );
 
+  // History-aware: navigate(-1) erhaelt den Filter-State der Agenda
+  // (inkl. customDate aus Calendar-Drilldown). Wenn der User direkt
+  // /task/:taskId aufgerufen hat, faellt Browser-Default auf
+  // vorherige History-Page.
   function backToAgenda() {
-    navigate(`/w/${params.workspaceId}/agenda`);
+    navigate(-1);
   }
 
   installEscReturn(backToAgenda);

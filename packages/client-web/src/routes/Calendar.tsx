@@ -21,7 +21,7 @@
 //     ihrem Original-deadline gerendert. TODO-Hinweis im Header.
 
 import { useNavigate, useParams, useSearchParams } from '@solidjs/router';
-import { type Component, For, Show, createMemo, createResource } from 'solid-js';
+import { type Component, For, Show, createMemo, createResource, onMount } from 'solid-js';
 import Icon from '../components/Icon';
 import { pageEnter, slideIn, slideOut } from '../lib/animations';
 import {
@@ -144,6 +144,24 @@ const Calendar: Component = () => {
   }
 
   installEscReturn(backToWorkspace);
+
+  // Auto-Focus Heute (oder Anchor) beim Mount, damit Enter direkt
+  // greift. Nur wenn Page frisch geladen ist (Focus auf body) — sonst
+  // klauen wir den User-Focus bei Back-Navigation aus TaskDetail/Agenda.
+  onMount(() => {
+    const a = document.activeElement as HTMLElement | null;
+    if (a && a !== document.body && a !== document.documentElement) return;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!gridRef) return;
+        const target =
+          gridRef.querySelector<HTMLElement>('.calendar-day-anchor') ??
+          gridRef.querySelector<HTMLElement>('.calendar-day-today') ??
+          gridRef.querySelector<HTMLElement>('.calendar-day');
+        target?.focus();
+      });
+    });
+  });
 
   function openEvent(e: CalendarEvent, ev: MouseEvent) {
     ev.stopPropagation();

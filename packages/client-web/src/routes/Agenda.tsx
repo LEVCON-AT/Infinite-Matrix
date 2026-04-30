@@ -20,6 +20,7 @@ import {
 } from 'solid-js';
 import Icon from '../components/Icon';
 import { listStaggerEnter, pageEnter } from '../lib/animations';
+import { addDays, endOfMonth, fromIso } from '../lib/calendar';
 import { translateDbError } from '../lib/errors';
 import { installEscReturn, useArrowListNav } from '../lib/keyboard-nav';
 import { type AgendaFilter, type AgendaTask, fetchAgendaTasks } from '../lib/queries';
@@ -37,22 +38,16 @@ type Preset = {
   build: (today: string) => Partial<AgendaFilter>;
 };
 
+// Datums-Helper: alle Range-Builder nutzen lib/calendar.ts (lokale
+// Komponenten, kein UTC-Drift). Ende der Woche = naechster Sonntag
+// inklusiv (deutsches Mo-So-Layout).
 function endOfWeekIso(today: string): string {
-  // Sonntag als Wochenende. JS-Date getDay(): 0=So, 1=Mo, ..., 6=Sa.
-  // Wir nehmen Mon-Sun als Woche → Tage bis Sonntag = 7 - dayOfWeek
-  // (mit Sonntag=0 → 0 Tage).
-  const d = new Date(`${today}T00:00:00`);
-  const dow = d.getDay();
-  const daysUntilSunday = dow === 0 ? 0 : 7 - dow;
-  d.setDate(d.getDate() + daysUntilSunday);
-  return d.toISOString().slice(0, 10);
+  const dow = (fromIso(today).getDay() + 6) % 7; // Mo=0, So=6
+  return addDays(today, 6 - dow);
 }
 
-function endOfMonthIso(today: string): string {
-  const d = new Date(`${today}T00:00:00`);
-  d.setMonth(d.getMonth() + 1);
-  d.setDate(0);
-  return d.toISOString().slice(0, 10);
+function yesterdayIso(today: string): string {
+  return addDays(today, -1);
 }
 
 const PRESETS: Preset[] = [
@@ -72,6 +67,7 @@ const PRESETS: Preset[] = [
       statusIn: ['open', 'in_progress', 'blocked'],
       deadlineFrom: today,
       deadlineTo: today,
+      hasDeadline: true,
     }),
   },
   {
@@ -81,6 +77,7 @@ const PRESETS: Preset[] = [
       statusIn: ['open', 'in_progress', 'blocked'],
       deadlineFrom: today,
       deadlineTo: endOfWeekIso(today),
+      hasDeadline: true,
     }),
   },
   {
@@ -89,34 +86,27 @@ const PRESETS: Preset[] = [
     build: (today) => ({
       statusIn: ['open', 'in_progress', 'blocked'],
       deadlineFrom: today,
-      deadlineTo: endOfMonthIso(today),
+      deadlineTo: endOfMonth(today),
+      hasDeadline: true,
     }),
   },
   {
     key: 'active',
     label: 'Alle aktiven',
-    build: () => ({ statusIn: ['open', 'in_progress', 'blocked'] }),
-  },
-  {
-    key: 'no_deadline',
-    label: 'Kein Datum',
     build: () => ({
       statusIn: ['open', 'in_progress', 'blocked'],
-      hasDeadline: false,
+      hasDeadline: true,
     }),
   },
   {
     key: 'done',
     label: 'Erledigt',
-    build: () => ({ statusIn: ['done'] }),
+    build: () => ({
+      statusIn: ['done'],
+      hasDeadline: true,
+    }),
   },
 ];
-
-function yesterdayIso(today: string): string {
-  const d = new Date(`${today}T00:00:00`);
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
-}
 
 function statusLabel(s: TaskStatus): string {
   switch (s) {
@@ -182,6 +172,7 @@ const Agenda: Component = () => {
         workspaceId: params.workspaceId,
         deadlineFrom: cd,
         deadlineTo: cd,
+        hasDeadline: true,
         search: search().trim() || undefined,
         whoIncludes: who().trim() || undefined,
       };
@@ -224,12 +215,18 @@ const Agenda: Component = () => {
     navigate(`/w/${params.workspaceId}/task/${taskId}`);
   }
 
-  function backToWorkspace() {
-    navigate(`/w/${params.workspaceId}`);
+  // History-aware: wenn customDate aktiv (User kam aus Calendar-Tag-
+  // Click), browser-back zum Calendar mit erhaltenem ?date=. Sonst
+  // direkt zum Workspace.
+  function backFromAgenda() {
+    if (customDate()) {
+      navigate(-1);
+    } else {
+      navigate(`/w/${params.workspaceId}`);
+    }
   }
 
-  // ESC → zurueck zum Workspace.
-  installEscReturn(backToWorkspace);
+  installEscReturn(backFromAgenda);
 
   // List-Container ref fuer Stagger-Enter + Pfeil-Navigation.
   let listRef: HTMLDivElement | undefined;
@@ -257,8 +254,8 @@ const Agenda: Component = () => {
         <button
           type="button"
           class="obj-detail-back click-pulse"
-          onClick={backToWorkspace}
-          aria-label="Zurueck zum Workspace"
+          onClick={backFromAgenda}
+          aria-label="Zurueck"
         >
           <Icon name="arrow-left" size={18} />
         </button>
@@ -308,20 +305,27 @@ const Agenda: Component = () => {
           </For>
         </div>
         <div class="agenda-search-row">
-          <input
-            type="search"
-            class="agenda-search-input"
-            placeholder="Suche im Label…"
-            value={search()}
-            onInput={(e) => setSearch(e.currentTarget.value)}
-          />
-          <input
-            type="text"
-            class="agenda-who-input"
-            placeholder="Wer (z.B. mb)"
-            value={who()}
-            onInput={(e) => setWho(e.currentTarget.value)}
-          />
+          <div class="agenda-search-wrap">
+            <Icon name="search" size={14} />
+            <input
+              type="search"
+              class="agenda-search-input"
+              placeholder="Suche im Label…"
+              value={search()}
+              onInput={(e) => setSearch(e.currentTarget.value)}
+            />
+          </div>
+          <div class="agenda-search-wrap agenda-who-wrap">
+            <Icon name="user" size={14} />
+            <input
+              type="text"
+              class="agenda-who-input"
+              placeholder="Wer (Frei-Text, z.B. mb)"
+              title="Filter nach Eintrag in tasks.who. Object-basierter Filter folgt mit T.2."
+              value={who()}
+              onInput={(e) => setWho(e.currentTarget.value)}
+            />
+          </div>
         </div>
       </div>
 
@@ -340,6 +344,13 @@ const Agenda: Component = () => {
             const dl = deadlineLabel(item.task.deadline, today);
             return (
               <button type="button" class="agenda-row" onClick={() => openTask(item.task.id)}>
+                <span
+                  class="agenda-row-date"
+                  classList={{ [`agenda-row-date-${dl.variant}`]: true }}
+                >
+                  <Icon name="calendar" size={12} />
+                  {dl.text}
+                </span>
                 <div class="agenda-row-main">
                   <span class="agenda-row-label">{item.task.label || '(ohne Label)'}</span>
                   <Show when={item.task.note}>
@@ -354,13 +365,6 @@ const Agenda: Component = () => {
                     }}
                   >
                     {statusLabel(item.task.status)}
-                  </span>
-                  <span
-                    class="agenda-deadline"
-                    classList={{ [`agenda-deadline-${dl.variant}`]: true }}
-                  >
-                    <Icon name="calendar" size={12} />
-                    {dl.text}
                   </span>
                   <span class="agenda-manifs">
                     <For each={item.manifestations}>

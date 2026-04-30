@@ -8634,14 +8634,22 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 }
 
 .agenda-preset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 4px 12px;
   border-radius: 999px;
   border: 0.5px solid var(--border);
   background: var(--bg2);
   color: var(--text2);
   font-size: 13px;
+  white-space: nowrap;
   cursor: pointer;
   transition: background var(--tr-std), color var(--tr-std), border-color var(--tr-std);
+}
+
+.agenda-preset-btn svg {
+  flex-shrink: 0;
 }
 
 .agenda-preset-btn:hover {
@@ -8666,28 +8674,43 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   flex-wrap: wrap;
 }
 
-.agenda-search-input,
-.agenda-who-input {
+/* Wrapper mit Lupen-/User-Icon links neben dem Input. */
+.agenda-search-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px 10px;
   border: 1px solid var(--border);
   border-radius: var(--rs);
   background: var(--bg);
+  color: var(--text3);
+  flex: 1 1 220px;
+  transition: border-color var(--tr-std);
+}
+
+.agenda-who-wrap {
+  flex: 0 1 200px;
+}
+
+.agenda-search-wrap:focus-within {
+  border-color: var(--p, var(--text));
+  color: var(--text2);
+}
+
+.agenda-search-wrap svg {
+  flex-shrink: 0;
+}
+
+.agenda-search-input,
+.agenda-who-input {
+  flex: 1 1 auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--text);
   font-size: 13px;
-}
-
-.agenda-search-input {
-  flex: 1 1 220px;
-}
-
-.agenda-who-input {
-  flex: 0 1 160px;
-}
-
-.agenda-search-input:focus,
-.agenda-who-input:focus {
   outline: none;
-  border-color: var(--p, var(--text));
+  min-width: 0;
 }
 
 .agenda-list {
@@ -8703,7 +8726,8 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 }
 
 .agenda-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 96px 1fr auto;
   align-items: center;
   gap: var(--space-md);
   padding: 10px 12px;
@@ -8720,8 +8744,38 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   border-color: var(--border2);
 }
 
+/* Datum-Cell: feste Breite damit alle Zeilen fluchten. Variants
+   spiegeln die Deadline-Variante (overdue/today/soon/plain). */
+.agenda-row-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text2);
+}
+
+.agenda-row-date svg {
+  flex-shrink: 0;
+}
+
+.agenda-row-date-overdue {
+  color: var(--red);
+  font-weight: 600;
+}
+.agenda-row-date-today {
+  color: var(--amber);
+  font-weight: 600;
+}
+.agenda-row-date-soon {
+  color: var(--text2);
+}
+.agenda-row-date-plain {
+  color: var(--text3);
+}
+
 .agenda-row-main {
-  flex: 1 1 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -11998,6 +12052,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   .agenda-row {
     padding: 8px 10px;
     gap: var(--space-sm);
+    grid-template-columns: 84px 1fr auto;
   }
   .agenda-row-meta {
     flex-wrap: wrap;
@@ -12025,8 +12080,8 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 
 @media (max-width: 479px) {
   .agenda-row {
-    flex-direction: column;
-    align-items: stretch;
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
   .agenda-row-meta {
     justify-content: flex-start;
