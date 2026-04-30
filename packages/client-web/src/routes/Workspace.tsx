@@ -46,6 +46,7 @@ import { installPromptSignal, triggerInstallPrompt } from '../lib/pwa';
 import {
   type SidebarChipData,
   buildSidebarTree,
+  fetchAllChecklists,
   fetchBoardContent,
   fetchCellIdsWithDocs,
   fetchCellsForWorkspace,
@@ -61,6 +62,7 @@ import { subscribeWorkspace } from '../lib/realtime';
 import { useSettingsBodyClassSync } from '../lib/settings';
 import { useSidebarChips } from '../lib/sidebar-chips';
 import { useSidebarMode } from '../lib/sidebar-mode';
+import { fetchManifestationsByWorkspace, fetchTasks } from '../lib/tasks';
 import { toggleTheme, useTheme } from '../lib/theme';
 import { showToast } from '../lib/toasts';
 import { useTreeExpand } from '../lib/tree-expand';
@@ -321,6 +323,23 @@ const Workspace: Component = () => {
         ? { workspaceId: params.workspaceId as string }
         : null,
     async (key) => (key ? fetchWorkspaceLinks(key.workspaceId) : []),
+  );
+
+  // Phase 4 T.1.E: Workspace-weite Tasks + Manifestations + Checklisten
+  // fuer das Smart-Summary-Widget pro Cell. Eine Task kann via mehrerer
+  // Manifestations in mehreren Cells erscheinen — die Aggregation pro
+  // Cell laeuft im task-aggregate.ts ueber diese drei Datasets.
+  const [wsTasks, { refetch: refetchWsTasks }] = createResource(
+    () => params.workspaceId,
+    async (wid) => (wid ? fetchTasks(wid) : []),
+  );
+  const [wsManifestations, { refetch: refetchWsManifestations }] = createResource(
+    () => params.workspaceId,
+    async (wid) => (wid ? fetchManifestationsByWorkspace(wid) : []),
+  );
+  const [wsChecklists, { refetch: refetchWsChecklists }] = createResource(
+    () => params.workspaceId,
+    async (wid) => (wid ? fetchAllChecklists(wid) : []),
   );
   const [wsDocs] = createResource(
     () =>
@@ -808,16 +827,24 @@ const Workspace: Component = () => {
       kb_cards: () => {
         void refetchBoard();
         setRtCards((v) => v + 1);
+        // Phase 4 T.1.E: Smart-Summary lebt von wsTasks + wsManifestations.
+        // Realtime-Tasks-Events kommen ueber den kb_cards-Slot
+        // (siehe realtime.ts kind-Routing), also hier mit-bumpen.
+        void refetchWsTasks();
+        void refetchWsManifestations();
         scheduleAliasRefresh(wid);
       },
       checklists: () => {
         void refetchBoard();
         setRtCellChecklists((v) => v + 1);
+        void refetchWsChecklists();
         scheduleAliasRefresh(wid);
       },
       checklist_items: () => {
         void refetchBoard();
         setRtCellChecklists((v) => v + 1);
+        void refetchWsTasks();
+        void refetchWsManifestations();
       },
       links: () => {
         void refetchBoard();
@@ -1266,6 +1293,9 @@ const Workspace: Component = () => {
                       wsCells={cells() ?? []}
                       wsRows={rows() ?? []}
                       wsCols={colsData() ?? []}
+                      wsTasks={wsTasks() ?? []}
+                      wsManifestations={wsManifestations() ?? []}
+                      wsChecklists={wsChecklists() ?? []}
                       cardsRealtimeVersion={rtCards()}
                       presence={presenceUsers}
                       selfUserId={user()?.id}

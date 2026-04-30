@@ -3475,6 +3475,47 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   filter: brightness(0.92);
 }
 
+/* ── Smart-Summary-Widget pro Cell (Phase 4 T.1.E) ─────────── */
+/* Sitzt im mx-cell-feats neben den Feature-Chips. Pills sind etwas
+   schmaler als Feature-Chips (zaehlen sind 1-2 Ziffern), Hoehe gleich. */
+.mx-task-sum {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.mx-task-sum-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--rs);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.mx-task-sum-pill svg {
+  flex-shrink: 0;
+}
+
+.mx-task-sum-overdue {
+  background: var(--redbg);
+  color: var(--redtxt);
+}
+
+.mx-task-sum-today {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+}
+
+.mx-task-sum-active {
+  background: var(--tealbg);
+  color: var(--tealtxt);
+}
+
 /* ── Board / Kanban ──────────────────────────────────────────── */
 .board {
   display: flex;

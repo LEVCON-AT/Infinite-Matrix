@@ -32,8 +32,19 @@ import { rememberFocus, useLastFocus } from '../lib/navigation-focus';
 import { ensureObjectForCol, ensureObjectForRow } from '../lib/objects';
 import type { PresenceUser } from '../lib/presence';
 import { useVis } from '../lib/settings';
+import { buildCellTaskSummaries, todayIso } from '../lib/task-aggregate';
 import { showToast, showUndoToast } from '../lib/toasts';
-import type { CellFeature, CellRow, ColRow, MatrixContent, NodeRow, RowRow } from '../lib/types';
+import type {
+  CellFeature,
+  CellRow,
+  ChecklistRow,
+  ColRow,
+  MatrixContent,
+  NodeRow,
+  RowRow,
+  TaskManifestationRow,
+  TaskRow,
+} from '../lib/types';
 import {
   closeObjectSuggest,
   commitObjectSuggest,
@@ -42,6 +53,7 @@ import {
   openObjectSuggest,
 } from '../lib/use-object-suggest';
 import BulkAddModal, { type BulkAddMode } from './BulkAddModal';
+import CellTaskSummary from './CellTaskSummary';
 import Icon, { type IconName } from './Icon';
 import MatrixAggregateSection from './MatrixAggregateSection';
 import NewCellWizard from './NewCellWizard';
@@ -78,6 +90,12 @@ type Props = {
   wsCells: CellRow[];
   wsRows: RowRow[];
   wsCols: ColRow[];
+  // Phase 4 T.1.E: Workspace-weite Task-Daten fuer das Smart-Summary-
+  // Widget. Aggregation laeuft pro Cell rekursiv ueber Tasks +
+  // Manifestations + Checklisten (siehe lib/task-aggregate.ts).
+  wsTasks: TaskRow[];
+  wsManifestations: TaskManifestationRow[];
+  wsChecklists: ChecklistRow[];
   // Realtime-Version fuer Cards-Fetch in der Aggregat-Sektion.
   cardsRealtimeVersion: number;
   onChanged?: () => void;
@@ -98,6 +116,22 @@ const MatrixView: Component<Props> = (p) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const editMode = useEditMode();
+
+  // Phase 4 T.1.E: Smart-Summary-Map pro Cell. Eine einzige Aggregation
+  // ueber wsTasks + wsManifestations + wsChecklists, danach pro Cell
+  // O(1)-Lookup. Recomputed bei jedem Resource-Bump (Realtime-Trigger
+  // siehe Workspace.tsx kb_cards/checklist_items-Slots).
+  const cellSummaries = createMemo(() =>
+    buildCellTaskSummaries({
+      matrixId: p.matrixId,
+      nodes: p.wsNodes,
+      cells: p.wsCells,
+      checklists: p.wsChecklists,
+      tasks: p.wsTasks,
+      manifestations: p.wsManifestations,
+      today: todayIso(),
+    }),
+  );
 
   // P1.D: Live-Cursor-Map. Bei jedem Presence-Update einmal eine
   // Map<cellId, PresenceUser[]> aufbauen statt pro Cell zu filtern —
@@ -1010,6 +1044,18 @@ const MatrixView: Component<Props> = (p) => {
                                     >
                                       <Icon name="document-text" size={14} />
                                     </span>
+                                  </Show>
+                                  {/* Phase 4 T.1.E: Smart-Summary-Pills.
+                                      Rendert nur, wenn die Cell oder ihr Subtree
+                                      Tasks mit relevanten Counts hat (active /
+                                      overdue / due_today). Sonst no-op. */}
+                                  <Show
+                                    when={(() => {
+                                      const c = cell();
+                                      return c ? cellSummaries().get(c.id) : undefined;
+                                    })()}
+                                  >
+                                    {(summary) => <CellTaskSummary summary={summary()} />}
                                   </Show>
                                 </div>
                               </Show>

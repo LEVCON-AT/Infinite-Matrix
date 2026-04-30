@@ -1088,6 +1088,22 @@ export async function fetchDocsForCell(cellId: string, workspaceId: string): Pro
   }
 }
 
+// Phase 4 T.1.E: Alle Checklisten eines Workspaces. Fuer Smart-Summary-
+// Widget pro Cell — wir muessen wissen, welche Checklisten an welcher
+// Cell oder welchem Board haengen, damit wir ihre Items (= tasks) der
+// richtigen Cell zuordnen koennen.
+export async function fetchAllChecklists(workspaceId: string): Promise<ChecklistRow[]> {
+  return cachedList<ChecklistRow>('checklists', workspaceId, async () => {
+    const { data, error } = await supabase
+      .from('checklists')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .order('position', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as ChecklistRow[];
+  });
+}
+
 // Alle Board-Links im Workspace. Fuer den Sidebar-Tree-Links-Chip
 // (SB.2) — wenn aktiv, haengen die Links unter dem jeweiligen
 // Board-Node. Erwartete Groesse: wenige hundert Rows, tragbar ohne
