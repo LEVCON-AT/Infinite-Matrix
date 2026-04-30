@@ -1045,17 +1045,26 @@ const MatrixView: Component<Props> = (p) => {
                                       <Icon name="document-text" size={14} />
                                     </span>
                                   </Show>
-                                  {/* Phase 4 T.1.E: Smart-Summary-Pills.
-                                      Rendert nur, wenn die Cell oder ihr Subtree
+                                  {/* Phase 4 T.1.E.2: Smart-Summary-Container.
+                                      Rendert nur wenn die Cell oder ihr Subtree
                                       Tasks mit relevanten Counts hat (active /
-                                      overdue / due_today). Sonst no-op. */}
+                                      overdue / due_today). Click navigiert zur
+                                      Stub-Page (T.SS fuellt sie spaeter). */}
                                   <Show
                                     when={(() => {
                                       const c = cell();
-                                      return c ? cellSummaries().get(c.id) : undefined;
+                                      if (!c) return undefined;
+                                      const s = cellSummaries().get(c.id);
+                                      return s ? { cell: c, summary: s } : undefined;
                                     })()}
                                   >
-                                    {(summary) => <CellTaskSummary summary={summary()} />}
+                                    {(ctx) => (
+                                      <CellTaskSummary
+                                        workspaceId={p.workspaceId}
+                                        cellId={ctx().cell.id}
+                                        summary={ctx().summary}
+                                      />
+                                    )}
                                   </Show>
                                 </div>
                               </Show>

@@ -15,6 +15,7 @@ import BoardView from '../components/BoardView';
 import CellChecklistsPage from '../components/CellChecklistsPage';
 import CellDocsPage from '../components/CellDocsPage';
 import CellInfoPage from '../components/CellInfoPage';
+import CellSummaryPage from '../components/CellSummaryPage';
 import CommandPalette from '../components/CommandPalette';
 import ContextMenu from '../components/ContextMenu';
 import DocsPopup from '../components/DocsPopup';
@@ -147,13 +148,24 @@ const Workspace: Component = () => {
 
   // Zell-Page-Section: der letzte URL-Segment hinter /c/:cellId/ entscheidet,
   // welches Feature-Panel gerendert wird.
-  const cellSection = createMemo<'checklists' | 'info' | 'docs' | null>(() => {
+  const cellSection = createMemo<'checklists' | 'info' | 'docs' | 'summary' | null>(() => {
     const p = location.pathname;
     if (!params.cellId) return null;
     if (p.endsWith('/checklists')) return 'checklists';
     if (p.endsWith('/info')) return 'info';
     if (p.endsWith('/docs')) return 'docs';
+    if (p.endsWith('/summary')) return 'summary';
     return null;
+  });
+
+  // Abgeleitetes Feature-Signal fuer NodeTree-Highlight + Presence-Payload.
+  // Nur die klassischen Cell-Features (info/checklists/docs) werden hier
+  // sichtbar; 'summary' ist Phase 4 T.1.E.2-Stub und hat (noch) keinen
+  // NodeTree-/Presence-Slot.
+  const cellFeature = createMemo<'checklists' | 'info' | 'docs' | undefined>(() => {
+    const s = cellSection();
+    if (s === 'checklists' || s === 'info' || s === 'docs') return s;
+    return undefined;
   });
 
   const [workspaces] = createResource(() => fetchMyWorkspaces());
@@ -499,7 +511,7 @@ const Workspace: Component = () => {
   const presencePosition = createMemo<PresencePosition>(() => ({
     nodeId: currentNode()?.id,
     cellId: params.cellId,
-    feature: cellSection() ?? undefined,
+    feature: cellFeature(),
     hoverCellId: hoverCellId(),
     hoverCardId: hoverCardId(),
     hoverItemId: hoverItemId(),
@@ -906,7 +918,7 @@ const Workspace: Component = () => {
             workspaceId={params.workspaceId as string}
             tree={tree()}
             currentNodeId={params.nodeId ?? params.cellId}
-            currentFeature={cellSection() ?? undefined}
+            currentFeature={cellFeature()}
             presence={presenceUsers}
             selfUserId={user()?.id}
             members={() => workspaceMembers() ?? []}
@@ -969,7 +981,7 @@ const Workspace: Component = () => {
           workspaceId={params.workspaceId as string}
           currentNode={currentNode()}
           currentCellId={params.cellId}
-          currentFeature={cellSection() ?? undefined}
+          currentFeature={cellFeature()}
           onClose={() => setShowCommand(false)}
           onShowHelp={() => setShowHelp(true)}
         />
@@ -1061,7 +1073,7 @@ const Workspace: Component = () => {
                 workspaceId={params.workspaceId as string}
                 currentNode={currentNode()}
                 currentCellId={params.cellId}
-                currentFeature={cellSection() ?? undefined}
+                currentFeature={cellFeature()}
                 onShowHelp={() => setShowHelp(true)}
                 registerFocus={(fn) => {
                   focusHeaderSearch = fn;
@@ -1250,6 +1262,19 @@ const Workspace: Component = () => {
                       col={cellCol()}
                       realtimeDocsVersion={rtDocs()}
                       resolverMaps={resolverMaps}
+                    />
+                  </Show>
+                  <Show when={cellSection() === 'summary'}>
+                    <CellSummaryPage
+                      workspaceId={cell().workspace_id}
+                      cell={cell()}
+                      row={cellRow()}
+                      col={cellCol()}
+                      wsNodes={nodes() ?? []}
+                      wsCells={cells() ?? []}
+                      wsChecklists={wsChecklists() ?? []}
+                      wsTasks={wsTasks() ?? []}
+                      wsManifestations={wsManifestations() ?? []}
                     />
                   </Show>
                 </section>

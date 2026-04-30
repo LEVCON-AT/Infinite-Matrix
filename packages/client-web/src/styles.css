@@ -3475,45 +3475,90 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   filter: brightness(0.92);
 }
 
-/* ── Smart-Summary-Widget pro Cell (Phase 4 T.1.E) ─────────── */
-/* Sitzt im mx-cell-feats neben den Feature-Chips. Pills sind etwas
-   schmaler als Feature-Chips (zaehlen sind 1-2 Ziffern), Hoehe gleich. */
+/* ── Smart-Summary-Widget pro Cell (Phase 4 T.1.E.2) ─────── */
+/* Ein einziger laenglicher Container — bewusst NICHT wie Feature-Chips
+   (die sind farbig + 22×22 quadratisch). Hoehe = 22px fuer Baseline-
+   Aligning. Status-Counts mit Mid-Dot-Trennern, dann groesserer Gap,
+   dann Drilldown-Chevron in --text3. Click → Smart-Summary-Stub-Page.
+   KEIN title-Tooltip — aria-label fuer Screen-Reader (siehe TSX). */
 .mx-task-sum {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-}
-
-.mx-task-sum-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
   height: 22px;
-  padding: 0 6px;
+  padding: 0 6px 0 8px;
+  background: var(--bg2);
+  border: 0.5px solid var(--border);
   border-radius: var(--rs);
   font-size: 11px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background var(--tr-std), border-color var(--tr-std);
 }
 
-.mx-task-sum-pill svg {
+.mx-task-sum:hover {
+  background: var(--bg-hover);
+  border-color: var(--border2);
+}
+
+.mx-task-sum:focus-visible {
+  outline: 2px solid var(--focus, var(--accent, #3b82f6));
+  outline-offset: 1px;
+}
+
+.mx-task-sum-counts {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mx-task-sum-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.mx-task-sum-count svg {
   flex-shrink: 0;
 }
 
-.mx-task-sum-overdue {
-  background: var(--redbg);
-  color: var(--redtxt);
+/* Icon-Farben: nur das SVG bekommt die Akzentfarbe, die Zahl bleibt
+   --text (lesbar gegen Container-Background). */
+.mx-task-sum-overdue svg {
+  color: var(--red);
+}
+.mx-task-sum-today svg {
+  color: var(--amber);
+}
+.mx-task-sum-active svg {
+  color: var(--teal);
 }
 
-.mx-task-sum-today {
-  background: var(--amberbg);
-  color: var(--ambertxt);
+.mx-task-sum-num {
+  color: var(--text);
 }
 
-.mx-task-sum-active {
-  background: var(--tealbg);
-  color: var(--tealtxt);
+/* Mid-Dot-Trenner zwischen sichtbaren Counts. Subtler Grau. */
+.mx-task-sum-dot {
+  color: var(--text3);
+  font-weight: 400;
+  /* Optisch zentrieren — Dot sitzt im Mittel der x-Hoehe. */
+  line-height: 1;
+  padding: 0 1px;
+}
+
+/* Chevron-Bereich: groesserer Gap zur Trennung „Daten vs. Action".
+   Variante A des UX-Vorschlags — kein vertikaler Strich, nur Whitespace. */
+.mx-task-sum-chev {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  color: var(--text3);
+  transition: color var(--tr-std);
+}
+
+.mx-task-sum:hover .mx-task-sum-chev {
+  color: var(--text2);
 }
 
 /* ── Board / Kanban ──────────────────────────────────────────── */
@@ -4487,6 +4532,112 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+}
+
+/* ── Smart-Summary-Stub-Page (Phase 4 T.1.E.2) ───────────── */
+/* Reused .cell-info-page als Wrapper, damit Header-Spacing und
+   Container-Width identisch zu Info/Checklists/Docs-Pages sind.
+   Hier nur die Stub-spezifischen Sektionen. */
+.smart-summary-counts h4,
+.smart-summary-coming-soon h4 {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--fs-subtitle, 15px);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.smart-summary-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 360px;
+}
+
+.smart-summary-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-radius: var(--rs);
+  background: var(--bg2);
+  border: 0.5px solid var(--border);
+}
+
+.smart-summary-list li.smart-summary-divider {
+  background: transparent;
+  border: 0;
+  height: 4px;
+  padding: 0;
+}
+
+.smart-summary-list li.smart-summary-warn {
+  background: var(--amberbg);
+  border-color: var(--amber);
+}
+
+.smart-summary-list li.smart-summary-warn .smart-summary-num {
+  color: var(--ambertxt);
+}
+
+.smart-summary-list li.smart-summary-danger {
+  background: var(--redbg);
+  border-color: var(--red);
+}
+
+.smart-summary-list li.smart-summary-danger .smart-summary-num {
+  color: var(--redtxt);
+}
+
+.smart-summary-list li.smart-summary-muted {
+  opacity: 0.7;
+}
+
+.smart-summary-label {
+  color: var(--text2);
+  font-size: 13px;
+}
+
+.smart-summary-num {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.smart-summary-coming-soon {
+  padding: var(--space-md);
+  background: var(--bg2);
+  border: 0.5px dashed var(--border2);
+  border-radius: var(--rs);
+}
+
+.smart-summary-coming-soon p {
+  margin: 0 0 var(--space-sm);
+  color: var(--text2);
+  line-height: 1.5;
+}
+
+.smart-summary-coming-soon p.hint {
+  margin-top: var(--space-md);
+  font-size: 13px;
+  color: var(--text3);
+}
+
+.smart-summary-roadmap {
+  list-style: disc inside;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text2);
+}
+
+.smart-summary-roadmap-desc {
+  color: var(--text3);
+  font-weight: 400;
 }
 
 .info-list {

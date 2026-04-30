@@ -49,6 +49,7 @@ render(
       <Route path="/w/:workspaceId/c/:cellId/checklists" component={Workspace} />
       <Route path="/w/:workspaceId/c/:cellId/info" component={Workspace} />
       <Route path="/w/:workspaceId/c/:cellId/docs" component={Workspace} />
+      <Route path="/w/:workspaceId/c/:cellId/summary" component={Workspace} />
       <Route path="/w/:workspaceId/o/:objectId" component={ObjectDetail} />
       <Route path="/w/:workspaceId/objects" component={ObjectsList} />
       <Route path="/w/:workspaceId/settings" component={Settings}>

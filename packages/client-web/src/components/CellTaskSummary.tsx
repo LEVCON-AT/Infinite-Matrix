@@ -1,71 +1,114 @@
-// Smart-Summary-Widget pro Cell (Phase 4 T.1.E).
+// Smart-Summary-Widget pro Cell (Phase 4 T.1.E + T.1.E.2).
 //
-// Kompakter Pill-Block der die Task-Counts der Cell + Subtree anzeigt:
-//   - Active-Bubble: open + in_progress + blocked (offene Aufgaben).
-//   - Overdue-Bubble: nicht-erledigte Tasks mit deadline < heute.
-//   - Due-Today-Bubble: nicht-erledigte Tasks mit deadline === heute.
+// Ein einziger laenglicher Container statt drei separater Pills — klar
+// abgesetzt von Feature-Chips (die sind farbig + 22×22 quadratisch).
+// Inhalt:
+//   - Status-Cluster (Counts) mit Mid-Dot-Trennern: nur sichtbar bei
+//     count > 0.
+//       overdue:   flag-Icon (rot) + Zahl in --text
+//       due_today: clock-Icon (amber) + Zahl in --text
+//       active:    list-bullet-Icon (teal) + Zahl in --text
+//   - Gap vor dem Chevron (Variante A des UX-Vorschlags) — Whitespace
+//     allein kommuniziert die Trennung „Daten vs. Action".
+//   - chevron-right (12px) in --text3, damit klar wird: das ist ein
+//     Action-Indikator, nicht eine weitere Daten-Zelle.
 //
-// Erscheint im mx-cell-feats-Block neben den Feature-Chips. Bubbles
-// werden nur gerendert, wenn ihr Count > 0 ist — leere Cells erzeugen
-// keinen Visual-Noise.
-//
-// Tooltip (title-Attribut) zeigt die volle Status-Aufschluesselung.
-// Click + a11y kommen mit T.1.F (Agenda-Filter pro Cell) — V1 ist
-// reines Anzeige-Widget.
+// Click oeffnet die Stub-Page /w/:wsId/c/:cellId/summary (T.1.E.2);
+// dort wird in der Folge-Welle T.SS das eigentliche Dashboard
+// implementiert. KEIN title-Tooltip — aria-label fuer Screen-Reader.
 
+import { useNavigate } from '@solidjs/router';
 import { type Component, Show } from 'solid-js';
 import type { CellTaskSummary as CellTaskSummaryData } from '../lib/task-aggregate';
 import Icon from './Icon';
 
-// Symbol vor dem Count: bewusst kompakt, da der Pill in der Cell eng
-// zwischen Feature-Chips wohnt. Tooltip uebernimmt die Erklaerung.
-
 type Props = {
+  workspaceId: string;
+  cellId: string;
   summary: CellTaskSummaryData;
 };
 
-function buildTooltip(s: CellTaskSummaryData): string {
+function buildAriaLabel(s: CellTaskSummaryData): string {
   // Reihenfolge: am dringendsten zuerst.
   const lines: string[] = [];
-  if (s.overdue > 0) lines.push(`${s.overdue}× ueberfaellig`);
-  if (s.due_today > 0) lines.push(`${s.due_today}× heute faellig`);
-  if (s.in_progress > 0) lines.push(`${s.in_progress}× in Arbeit`);
-  if (s.blocked > 0) lines.push(`${s.blocked}× blockiert`);
-  if (s.open > 0) lines.push(`${s.open}× offen`);
-  if (s.done > 0) lines.push(`${s.done}× erledigt`);
-  if (s.archived > 0) lines.push(`${s.archived}× archiviert`);
-  if (lines.length === 0) return 'Keine Aufgaben';
-  return lines.join(' · ');
+  if (s.overdue > 0) lines.push(`${s.overdue} ueberfaellig`);
+  if (s.due_today > 0) lines.push(`${s.due_today} heute faellig`);
+  if (s.active > 0) lines.push(`${s.active} offen`);
+  if (lines.length === 0) return 'Smart Summary oeffnen';
+  return `${lines.join(', ')} — Smart Summary oeffnen`;
 }
 
 const CellTaskSummary: Component<Props> = (p) => {
-  const tooltip = () => buildTooltip(p.summary);
+  const navigate = useNavigate();
+
   // Render nur wenn IRGENDWAS sinnvolles drin ist. active 0 + overdue 0
-  // + due_today 0 → der Pill-Block wuerde leer aussehen.
+  // + due_today 0 → der Container wuerde leer aussehen (nur Chevron).
   const hasContent = () => p.summary.active > 0 || p.summary.overdue > 0 || p.summary.due_today > 0;
+
+  // Mid-Dot zwischen Counts: nur einfuegen wenn DAVOR ein anderer Count
+  // steht. Verhindert „· 5 active" bei nur active.
+  const showDotBeforeToday = () => p.summary.overdue > 0 && p.summary.due_today > 0;
+  const showDotBeforeActive = () =>
+    (p.summary.overdue > 0 || p.summary.due_today > 0) && p.summary.active > 0;
+
+  function onClick(e: MouseEvent) {
+    // stopPropagation — Cell-Hintergrund hat im Edit-Mode einen eigenen
+    // onClick-Handler (Overlay). Smart-Summary-Click ist eigene Aktion.
+    e.stopPropagation();
+    navigate(`/w/${p.workspaceId}/c/${p.cellId}/summary`);
+  }
+
+  function onKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      navigate(`/w/${p.workspaceId}/c/${p.cellId}/summary`);
+    }
+  }
 
   return (
     <Show when={hasContent()}>
-      <span class="mx-task-sum" title={tooltip()} aria-label={tooltip()}>
-        <Show when={p.summary.overdue > 0}>
-          <span class="mx-task-sum-pill mx-task-sum-overdue">
-            <Icon name="flag" size={12} />
-            {p.summary.overdue}
-          </span>
-        </Show>
-        <Show when={p.summary.due_today > 0}>
-          <span class="mx-task-sum-pill mx-task-sum-today">
-            <Icon name="clock" size={12} />
-            {p.summary.due_today}
-          </span>
-        </Show>
-        <Show when={p.summary.active > 0}>
-          <span class="mx-task-sum-pill mx-task-sum-active">
-            <Icon name="list-bullet" size={12} />
-            {p.summary.active}
-          </span>
-        </Show>
-      </span>
+      <button
+        type="button"
+        class="mx-task-sum"
+        aria-label={buildAriaLabel(p.summary)}
+        onClick={onClick}
+        onKeyDown={onKeyDown}
+      >
+        <span class="mx-task-sum-counts">
+          <Show when={p.summary.overdue > 0}>
+            <span class="mx-task-sum-count mx-task-sum-overdue">
+              <Icon name="flag" size={12} />
+              <span class="mx-task-sum-num">{p.summary.overdue}</span>
+            </span>
+          </Show>
+          <Show when={showDotBeforeToday()}>
+            <span class="mx-task-sum-dot" aria-hidden="true">
+              ·
+            </span>
+          </Show>
+          <Show when={p.summary.due_today > 0}>
+            <span class="mx-task-sum-count mx-task-sum-today">
+              <Icon name="clock" size={12} />
+              <span class="mx-task-sum-num">{p.summary.due_today}</span>
+            </span>
+          </Show>
+          <Show when={showDotBeforeActive()}>
+            <span class="mx-task-sum-dot" aria-hidden="true">
+              ·
+            </span>
+          </Show>
+          <Show when={p.summary.active > 0}>
+            <span class="mx-task-sum-count mx-task-sum-active">
+              <Icon name="list-bullet" size={12} />
+              <span class="mx-task-sum-num">{p.summary.active}</span>
+            </span>
+          </Show>
+        </span>
+        <span class="mx-task-sum-chev" aria-hidden="true">
+          <Icon name="chevron-right" size={12} />
+        </span>
+      </button>
     </Show>
   );
 };
