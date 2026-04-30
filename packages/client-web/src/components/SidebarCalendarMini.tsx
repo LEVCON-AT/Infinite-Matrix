@@ -124,7 +124,14 @@ const SidebarCalendarMini: Component<Props> = (p) => {
         e.preventDefault();
         if (e.dataTransfer) e.dataTransfer.dropEffect = 'none';
       },
-      onDragLeave: () => {
+      onDragLeave: (e: DragEvent) => {
+        // dragleave feuert auch wenn der Cursor auf ein KIND-Element
+        // wechselt (z.B. das SVG-Icon im Button). Ohne den
+        // relatedTarget-Filter schiesst es den Hold-Timer ab, bevor
+        // die 350 ms voll sind — und der Auto-Nav loest nie aus.
+        const ct = e.currentTarget as HTMLElement | null;
+        const rt = e.relatedTarget as Node | null;
+        if (ct && rt && ct.contains(rt)) return;
         clear();
       },
       onDrop: () => {
