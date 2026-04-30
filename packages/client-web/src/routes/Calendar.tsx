@@ -46,8 +46,10 @@ type RouteParams = { workspaceId: string };
 
 const WEEKDAY_HEADERS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 
-function statusKey(s: TaskStatus): string {
-  return s; // 1:1; wir verwenden das in CSS-Klassen.
+function statusKey(s: TaskStatus | null): string {
+  // Non-task-Atoms (Link/Checklist) haben keinen task-status — wir
+  // mappen sie auf 'open' damit sie eine konsistente CSS-Klasse kriegen.
+  return s ?? 'open';
 }
 
 const MAX_PER_DAY = 4;

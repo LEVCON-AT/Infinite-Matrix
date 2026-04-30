@@ -129,23 +129,43 @@ export function buildMonthGrid(monthAnchorIso: string, todayIso: string): Calend
 // erzeugt wenn die Task schon eine explicit Calendar-Manifestation hat.
 
 export type CalendarEvent = {
-  taskId: string;
+  // Phase 4 T.AC.B: polymorpher Diskriminator. Fuer atomType='task' ist
+  // taskId === atomId. Fuer 'link'/'checklist' steht atomId fuer die
+  // Source-Entity-ID (links.id bzw. checklists.id), taskId duplizieren
+  // wir fuer Backward-Compat in Render-Komponenten, die schon taskId
+  // lesen — dort fungiert der Wert als generischer Atom-Key.
+  atomType: 'task' | 'link' | 'checklist' | 'doc';
+  atomId: string;
+  taskId: string; // = atomId; bleibt drin damit bestehender Render-Code unveraendert bleibt
   manifId: string | null; // null = virtual aus tasks.deadline
   label: string;
-  status: TaskStatus;
+  status: TaskStatus | null; // nur task hat einen status
   startDate: string;
   endDate: string; // Single-Day: identisch zu startDate
   isRange: boolean;
   isRecurring: boolean; // task.recur != null — fuer Recur-Symbol in der Tagesansicht
   time: string | null;
   durationMin: number | null;
+  // Fuer atomType='link': originale URL (Click oeffnet sie).
+  url?: string | null;
 };
 
 export function buildEvents(args: {
   tasks: TaskRow[];
   manifestations: TaskManifestationRow[];
+  // Phase 4 T.AC.B: enriched non-task atom_manifestations (kind='calendar'
+  // mit atom_type IN ('link','checklist','doc')). Optional — alte
+  // Aufrufer geben das Feld nicht mit, dann nur task-Events.
+  atomManifestations?: Array<{
+    id: string;
+    atom_type: 'link' | 'checklist' | 'doc';
+    atom_id: string;
+    label: string;
+    display_meta: Record<string, unknown>;
+    url?: string | null;
+  }>;
 }): CalendarEvent[] {
-  const { tasks, manifestations } = args;
+  const { tasks, manifestations, atomManifestations } = args;
   const taskById = new Map(tasks.map((t) => [t.id, t]));
   const explicitTaskIds = new Set<string>();
   const out: CalendarEvent[] = [];
@@ -160,6 +180,8 @@ export function buildEvents(args: {
     if (!startDate) continue;
     const endDate = (dm.end_date as string | undefined) ?? startDate;
     out.push({
+      atomType: 'task',
+      atomId: t.id,
       taskId: t.id,
       manifId: m.id,
       label: t.label,
@@ -177,6 +199,8 @@ export function buildEvents(args: {
     if (!t.deadline) continue;
     if (explicitTaskIds.has(t.id)) continue;
     out.push({
+      atomType: 'task',
+      atomId: t.id,
       taskId: t.id,
       manifId: null,
       label: t.label,
@@ -187,6 +211,31 @@ export function buildEvents(args: {
       isRecurring: t.recur != null,
       time: null,
       durationMin: null,
+    });
+  }
+
+  // T.AC.B: non-task Atoms (Link/Checklist/Doc) als Calendar-Events.
+  // Status-Konzept gilt fuer sie nicht → null. Recur, Range erstmal
+  // optional aus display_meta (start_date/end_date/time/duration_min).
+  for (const a of atomManifestations ?? []) {
+    const dm = (a.display_meta ?? {}) as Record<string, unknown>;
+    const startDate = dm.start_date as string | undefined;
+    if (!startDate) continue;
+    const endDate = (dm.end_date as string | undefined) ?? startDate;
+    out.push({
+      atomType: a.atom_type,
+      atomId: a.atom_id,
+      taskId: a.atom_id,
+      manifId: a.id,
+      label: a.label,
+      status: null,
+      startDate,
+      endDate,
+      isRange: endDate > startDate,
+      isRecurring: false,
+      time: (dm.time as string | undefined) ?? null,
+      durationMin: (dm.duration_min as number | undefined) ?? null,
+      url: a.url ?? null,
     });
   }
 

@@ -2695,6 +2695,15 @@ button[type="submit"]:hover:not(:disabled) {
   font-weight: 500;
 }
 
+/* T.AC.B: Link-Tree-Rows sind draggable (Calendar-Drop). grab-Cursor
+   nur auf der Link-Variante — andere Tree-Kinder bleiben Click-Links. */
+.tree-link[draggable="true"] {
+  cursor: grab;
+}
+.tree-link[draggable="true"]:active {
+  cursor: grabbing;
+}
+
 .tree-ico {
   width: 14px;
   text-align: center;
@@ -4287,6 +4296,26 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 
 .cl-head-input {
   flex: 1;
+}
+
+/* T.AC.B: View-Mode-Span (statt Input) erlaubt Drag der Checkliste
+   ohne Pointer-Capture im Input. Optisch identisch zum Edit-Input. */
+.cl-head-static {
+  display: inline-block;
+  padding: 2px 0;
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: inherit;
+}
+
+.cl-head-draggable {
+  cursor: grab;
+}
+.cl-head-draggable:active {
+  cursor: grabbing;
 }
 
 .cl-alias-input {
@@ -12269,6 +12298,32 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
 .sb-cal-mini-expand-btn:hover:not(:disabled) {
   background: var(--bg-hover);
   color: var(--text);
+}
+
+/* Phase 4 T.AC: Drag-Hover-Feedback auf den Chevron-Nav-Buttons.
+   Pulsiert leicht — User soll wissen "halten loest gleich Auto-Nav aus". */
+.sb-cal-mini-nav-btn[data-drag-hover="1"] {
+  background: color-mix(in srgb, var(--accent) 22%, var(--bg2));
+  color: var(--accent);
+  outline: 1.5px solid var(--accent);
+  outline-offset: -1px;
+  animation: sbCalNavDragPulse 700ms ease-in-out infinite;
+}
+
+@keyframes sbCalNavDragPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sb-cal-mini-nav-btn[data-drag-hover="1"] {
+    animation: none;
+  }
 }
 
 .sb-cal-mini-expand-btn:disabled {

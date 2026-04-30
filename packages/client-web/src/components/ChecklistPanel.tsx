@@ -126,6 +126,18 @@ const ChecklistPanel: Component<Props> = (p) => {
   const navigate = useNavigate();
   let aliasInputRef: HTMLInputElement | undefined;
 
+  // T.AC.B: Checklist-Header als Drag-Source. Atom='checklist' →
+  // Drop-Targets im Calendar legen eine atom_manifestation (atom_type=
+  // 'checklist') an. View-Mode-only: im Edit-Mode klickt man den Input
+  // zum Rename, also waere draggable kontraproduktiv.
+  const headerDrag = bindDragSource({
+    build: () => ({
+      atom: 'checklist',
+      atomId: p.checklist.id,
+      label: displayLabel() || p.checklist.label,
+    }),
+  });
+
   // Cross-View-Drop (T.1.G.2.C): Task aus Sidebar/Calendar wird zur
   // Checklisten-Position. Idempotent: bestehende Checklist-Manif derselben
   // Task wird gemoved, sonst neu angelegt.
@@ -438,26 +450,37 @@ const ChecklistPanel: Component<Props> = (p) => {
 
   return (
     <li class="cl-item" attr:data-edit={editMode() ? 'true' : 'false'}>
-      <header class="cl-head" classList={{ 'mx-editable': editMode() }}>
-        <input
-          class="mx-head-input cl-head-input"
-          type="text"
-          value={p.checklist.label}
-          placeholder="(Liste)"
-          readOnly={!editMode()}
-          tabIndex={editMode() ? 0 : -1}
-          onBlur={(e) => {
-            if (!editMode()) return;
-            onRename(e.currentTarget.value);
-          }}
-          onKeyDown={(e) => {
-            if (!editMode()) return;
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              (e.currentTarget as HTMLInputElement).blur();
-            }
-          }}
-        />
+      <header
+        class="cl-head"
+        classList={{ 'mx-editable': editMode(), 'cl-head-draggable': !editMode() }}
+        draggable={!editMode()}
+        onDragStart={headerDrag.onDragStart}
+        onDragEnd={headerDrag.onDragEnd}
+      >
+        {/* View-Mode: nur Span (nicht draggable-stoerend). Edit-Mode: Input. */}
+        <Show
+          when={editMode()}
+          fallback={
+            <span class="mx-head-input cl-head-input cl-head-static">
+              {displayLabel() || '(Liste)'}
+            </span>
+          }
+        >
+          <input
+            class="mx-head-input cl-head-input"
+            type="text"
+            value={p.checklist.label}
+            placeholder="(Liste)"
+            tabIndex={0}
+            onBlur={(e) => onRename(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                (e.currentTarget as HTMLInputElement).blur();
+              }
+            }}
+          />
+        </Show>
         <input
           ref={aliasInputRef}
           class="cl-alias-input"

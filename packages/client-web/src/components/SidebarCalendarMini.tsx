@@ -8,7 +8,8 @@
 // navigate zur grossen Calendar-Route mit Datum vorausgewaehlt.
 
 import { useNavigate } from '@solidjs/router';
-import { type Component, For, Show, createMemo, createSignal } from 'solid-js';
+import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
+import { type AtomManifestationRow, dropAtomOnDate } from '../lib/atom-manifestations';
 import {
   type CalendarEvent,
   addMonths,
@@ -39,6 +40,10 @@ type Props = {
   // bereits geladen — durchgereicht statt nochmal zu fetchen.
   tasksById: Map<string, TaskRow>;
   manifestationsById: Map<string, TaskManifestationRow>;
+  // T.AC.B: workspace-weite atom_manifestations (atom_type IN ('link',
+  // 'checklist','doc')) fuer Idempotenz-Check beim Drop.
+  atomManifestations?: AtomManifestationRow[];
+  onAtomManifestationsChanged?: () => void;
 };
 
 const SidebarCalendarMini: Component<Props> = (p) => {
@@ -94,10 +99,18 @@ const SidebarCalendarMini: Component<Props> = (p) => {
   // Drag-Hover auf den ‹/›-Nav-Buttons → nach 350ms Hover springt der
   // Anker einen Monat weiter. Damit kann der User eine Karte in einen
   // anderen Monat draggen ohne den Drag abzubrechen. Solange er auf
-  // dem Chevron haelt, navigiert es weiter (auto-repeat alle 700ms).
+  // dem Chevron haelt, navigiert es weiter (auto-repeat alle 1100ms —
+  // langsam genug fuer normales Tempo, sonst rast der Kalender).
+  //
+  // Wichtige Invariante: jedes navAnchor-Tick + jeder Timer-Start
+  // prueft activeDrag(). Wenn der Drag ohne dragleave/drop endet
+  // (z.B. ESC oder Drop ausserhalb), bleibt der Interval sonst
+  // kleben und schaltet weiter — User-Bug 2026-05-01.
+  const REPEAT_MS = 1100;
   function bindDragNav(delta: number) {
     let firstTimer: ReturnType<typeof setTimeout> | null = null;
     let repeatTimer: ReturnType<typeof setInterval> | null = null;
+    let btnEl: HTMLElement | null = null;
     function clear() {
       if (firstTimer != null) {
         clearTimeout(firstTimer);
@@ -107,16 +120,31 @@ const SidebarCalendarMini: Component<Props> = (p) => {
         clearInterval(repeatTimer);
         repeatTimer = null;
       }
+      btnEl?.removeAttribute('data-drag-hover');
     }
     return {
+      ref: (el: HTMLElement) => {
+        btnEl = el;
+      },
       onDragEnter: (e: DragEvent) => {
         if (!activeDrag()) return;
         e.preventDefault();
-        if (firstTimer != null) return;
+        btnEl?.setAttribute('data-drag-hover', '1');
+        if (firstTimer != null || repeatTimer != null) return;
         firstTimer = setTimeout(() => {
           firstTimer = null;
+          if (!activeDrag()) {
+            clear();
+            return;
+          }
           navAnchor(delta);
-          repeatTimer = setInterval(() => navAnchor(delta), 700);
+          repeatTimer = setInterval(() => {
+            if (!activeDrag()) {
+              clear();
+              return;
+            }
+            navAnchor(delta);
+          }, REPEAT_MS);
         }, 350);
       },
       onDragOver: (e: DragEvent) => {
@@ -140,41 +168,69 @@ const SidebarCalendarMini: Component<Props> = (p) => {
     };
   }
 
-  // Drop-Handler: zwei Faelle.
-  //   - sourceManifId vorhanden ODER virtual mit deadline → MOVE
-  //     (ohne Modal, mit Undo-Toast). Datum aendert sich, ggf. Range-
-  //     Delta erhalten.
-  //   - Sonst → ADD: oeffnet das Manifestation-Modal.
+  // Sicherheitsnetz auf document-Ebene: wenn der Drag ausserhalb des
+  // Chevron-Buttons endet (z.B. Drop auf einen Tag, oder ESC), kommt
+  // kein dragleave/drop auf dem Button — also kein clear(). Der
+  // activeDrag()-Check im Interval bremst die Auto-Nav, aber das
+  // data-drag-hover-Attribut bleibt sichtbar. Hier ziehen wir es weg.
+  onMount(() => {
+    const onDocDragEnd = () => {
+      for (const el of document.querySelectorAll('.sb-cal-mini-nav-btn[data-drag-hover]')) {
+        el.removeAttribute('data-drag-hover');
+      }
+    };
+    document.addEventListener('dragend', onDocDragEnd);
+    document.addEventListener('drop', onDocDragEnd);
+    onCleanup(() => {
+      document.removeEventListener('dragend', onDocDragEnd);
+      document.removeEventListener('drop', onDocDragEnd);
+    });
+  });
+
+  // Drop-Handler: drei Faelle.
+  //   - atom='task': existing path (Move via deadline / Calendar-Manif,
+  //     sonst Modal-Add).
+  //   - atom='link' | 'checklist' (T.AC.B): legt eine atom_manifestation
+  //     mit kind='calendar' an (oder Move, wenn schon vorhanden). Kein
+  //     Modal — non-task-Atoms haben heute kein Modal-Pendant.
   function handleDrop(
     iso: string,
     src: { atom: string; atomId: string; label?: string; sourceManifId?: string },
   ) {
-    if (src.atom !== 'task') return;
     setDragOverIso(null);
-    const task = p.tasksById.get(src.atomId);
-    const manif = src.sourceManifId ? p.manifestationsById.get(src.sourceManifId) : undefined;
-    // Move-Pfad wenn:
-    //   (a) explicit Calendar-Manifestation → Update display_meta.
-    //   (b) virtual aus tasks.deadline → setTaskDeadline.
-    if (manif?.kind === 'calendar' || task?.deadline) {
-      void moveByDate({
+    if (src.atom === 'task') {
+      const task = p.tasksById.get(src.atomId);
+      const manif = src.sourceManifId ? p.manifestationsById.get(src.sourceManifId) : undefined;
+      if (manif?.kind === 'calendar' || task?.deadline) {
+        void moveByDate({
+          workspaceId: p.workspaceId,
+          taskId: src.atomId,
+          manifId: manif?.kind === 'calendar' ? manif.id : undefined,
+          currentManif: manif?.kind === 'calendar' ? manif : undefined,
+          currentDeadline: task?.deadline ?? null,
+          newDate: iso,
+        });
+        return;
+      }
+      openManifestationModal({
         workspaceId: p.workspaceId,
         taskId: src.atomId,
-        manifId: manif?.kind === 'calendar' ? manif.id : undefined,
-        currentManif: manif?.kind === 'calendar' ? manif : undefined,
-        currentDeadline: task?.deadline ?? null,
-        newDate: iso,
+        taskLabel: src.label ?? '',
+        defaultDate: iso,
       });
       return;
     }
-    // ADD-Pfad: Task ohne deadline + ohne explicit Calendar-Manifestation
-    // → Modal mit Datum-Vorbelegung.
-    openManifestationModal({
-      workspaceId: p.workspaceId,
-      taskId: src.atomId,
-      taskLabel: src.label ?? '',
-      defaultDate: iso,
-    });
+    if (src.atom === 'link' || src.atom === 'checklist') {
+      void dropAtomOnDate({
+        workspaceId: p.workspaceId,
+        atomType: src.atom,
+        atomId: src.atomId,
+        atomLabel: src.label,
+        newDate: iso,
+        existing: p.atomManifestations ?? [],
+      }).then(() => p.onAtomManifestationsChanged?.());
+      return;
+    }
   }
 
   return (
@@ -186,6 +242,7 @@ const SidebarCalendarMini: Component<Props> = (p) => {
             <button
               type="button"
               class="sb-cal-mini-nav-btn click-pulse"
+              ref={prev.ref}
               onClick={() => navAnchor(-1)}
               aria-label="Vorheriger Monat"
               title="Vorheriger Monat"
@@ -212,6 +269,7 @@ const SidebarCalendarMini: Component<Props> = (p) => {
             <button
               type="button"
               class="sb-cal-mini-nav-btn click-pulse"
+              ref={next.ref}
               onClick={() => navAnchor(1)}
               aria-label="Naechster Monat"
               title="Naechster Monat"
@@ -276,7 +334,8 @@ const SidebarCalendarMini: Component<Props> = (p) => {
                       const status = () =>
                         dayStatus(eventsByDay().get(day.iso) ?? [], today, day.iso);
                       const dropHandlers = bindDropTarget({
-                        accepts: (src) => src.atom === 'task',
+                        accepts: (src) =>
+                          src.atom === 'task' || src.atom === 'link' || src.atom === 'checklist',
                         onEnter: () => setDragOverIso(day.iso),
                         onLeave: () => {
                           if (dragOverIso() === day.iso) setDragOverIso(null);

@@ -36,6 +36,10 @@ import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
 import { useAggregateView } from '../lib/aggregate-view';
 import { aliasChipMenuState, closeAliasChipMenu } from '../lib/alias-chip-menu';
 import { clearAliasIndex, fetchAliasIndex, scheduleAliasRefresh } from '../lib/alias-index';
+import {
+  type AtomManifestationRow,
+  fetchAtomCalendarManifestations,
+} from '../lib/atom-manifestations';
 import { signOut, useUser } from '../lib/auth';
 import { buildEvents } from '../lib/calendar';
 import { clearDocsRequest, openDocsPopup, useDocsRequest } from '../lib/docs-ui';
@@ -366,6 +370,12 @@ const Workspace: Component = () => {
     () => params.workspaceId,
     async (wid) => (wid ? fetchAllChecklists(wid) : []),
   );
+  // T.AC.B: enriched non-task atom_manifestations (Link/Checklist im
+  // Calendar). Tasks gehen weiterhin den wsManifestations-Pfad.
+  const [wsAtomManifestations, { refetch: refetchAtomManifs }] = createResource(
+    () => params.workspaceId,
+    async (wid) => (wid ? fetchAtomCalendarManifestations(wid) : []),
+  );
   const [wsDocs] = createResource(
     () =>
       params.workspaceId && chips && chips.isOn('docs')
@@ -422,11 +432,20 @@ const Workspace: Component = () => {
 
   // CalendarEvents fuer Mini-Calendar-Dots + Tagesansicht. Reuse von
   // buildEvents aus lib/calendar.ts; Quelle sind die wsTasks +
-  // wsManifestations-Resources (bereits geladen).
+  // wsManifestations-Resources (bereits geladen). T.AC.B: zusaetzlich
+  // wsAtomManifestations (Link/Checklist).
   const calendarEvents = createMemo(() =>
     buildEvents({
       tasks: wsTasks() ?? [],
       manifestations: wsManifestations() ?? [],
+      atomManifestations: (wsAtomManifestations() ?? []).map((a) => ({
+        id: a.id,
+        atom_type: a.atom_type as 'link' | 'checklist' | 'doc',
+        atom_id: a.atom_id,
+        label: a.label,
+        display_meta: a.display_meta,
+        url: a.url ?? null,
+      })),
     }),
   );
 
@@ -993,6 +1012,10 @@ const Workspace: Component = () => {
                   events={calendarEvents()}
                   tasksById={tasksById()}
                   manifestationsById={manifestationsById()}
+                  atomManifestations={
+                    (wsAtomManifestations() ?? []) as unknown as AtomManifestationRow[]
+                  }
+                  onAtomManifestationsChanged={() => void refetchAtomManifs()}
                 />
                 <SidebarDayView
                   workspaceId={params.workspaceId as string}

@@ -6,6 +6,7 @@ import type { ParsedPasteItem } from '../lib/checklist-paste-parse';
 import { decryptPayload, isEncrypted } from '../lib/crypto';
 import { showChoice, showPrompt } from '../lib/dialog';
 import { openDocsPopup } from '../lib/docs-ui';
+import { bindDragSource } from '../lib/drag-context';
 import { useEditMode } from '../lib/edit-mode';
 import { translateDbError } from '../lib/errors';
 import {
@@ -356,6 +357,20 @@ const TreeItem: Component<{
 
   const dotStyle = { background: dotColorFor(p.entry) };
   const isBoard = () => p.entry.kind === 'node' && p.entry.node.type === 'board';
+  const isLink = () => p.entry.kind === 'link';
+
+  // T.AC.B: Link-Rows als Drag-Source. atom='link' → Drop-Targets im
+  // Calendar legen eine atom_manifestation (atom_type='link') an.
+  const linkDrag = bindDragSource({
+    build: () =>
+      p.entry.kind === 'link'
+        ? {
+            atom: 'link',
+            atomId: p.entry.id,
+            label: p.entry.label,
+          }
+        : null,
+  });
 
   return (
     <li>
@@ -420,6 +435,9 @@ const TreeItem: Component<{
               ? 'noopener noreferrer'
               : undefined
           }
+          draggable={isLink() ? true : undefined}
+          onDragStart={isLink() ? linkDrag.onDragStart : undefined}
+          onDragEnd={isLink() ? linkDrag.onDragEnd : undefined}
           onClick={
             p.entry.kind === 'doc'
               ? (e: MouseEvent) => {
