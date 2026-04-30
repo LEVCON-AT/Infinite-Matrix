@@ -194,6 +194,12 @@ const CellSummaryPage: Component<Props> = (p) => {
           ← Zurueck zur Matrix
         </a>
       </p>
+
+      <footer class="kb-hint-bar">
+        <span>
+          <kbd>Esc</kbd> zurueck zur Matrix
+        </span>
+      </footer>
     </div>
   );
 };

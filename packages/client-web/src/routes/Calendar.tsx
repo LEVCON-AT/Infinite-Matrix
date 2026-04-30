@@ -151,9 +151,11 @@ const Calendar: Component = () => {
   }
 
   function onDayClick(iso: string) {
-    // T.1.G.A: setzt nur den Anker neu. T.1.G.B nutzt das fuer die
-    // Tagesansicht-Selektion.
-    setAnchor(iso);
+    // T.1.G.A-Refinement: Click/Enter auf einem Tag → Agenda gefiltert
+    // auf genau dieses Datum. Befuellter Tag → Liste der Tasks. Leerer
+    // Tag → "Keine Aufgaben" + Anlege-Pfad (wird in T.1.G.2 wie ein
+    // Drag-Drop ergaenzt). Konsistenter Drilldown ohne Sonderfaelle.
+    navigate(`/w/${params.workspaceId}/agenda?date=${iso}`);
   }
 
   return (
@@ -201,8 +203,7 @@ const Calendar: Component = () => {
           <Icon name="chevron-right" size={14} />
         </button>
         <span class="hint calendar-recur-hint">
-          Wiederkehrende Termine erscheinen V1 nur am Original-Datum (recurFiresOn folgt). Pfeile
-          fuer Tag-Navigation, Bild-auf/-ab fuer Monats-Wechsel, T fuer Heute.
+          Wiederkehrende Termine erscheinen V1 nur am Original-Datum.
         </span>
       </div>
 
@@ -272,6 +273,31 @@ const Calendar: Component = () => {
           }}
         </For>
       </div>
+
+      <footer class="kb-hint-bar">
+        <span>
+          <kbd>↩</kbd> Tag oeffnen
+        </span>
+        <span class="kb-hint-sep">·</span>
+        <span>
+          <kbd>←</kbd>
+          <kbd>→</kbd>
+          <kbd>↑</kbd>
+          <kbd>↓</kbd> Tag
+        </span>
+        <span class="kb-hint-sep">·</span>
+        <span>
+          <kbd>Bild ↑↓</kbd> Monat
+        </span>
+        <span class="kb-hint-sep">·</span>
+        <span>
+          <kbd>T</kbd> Heute
+        </span>
+        <span class="kb-hint-sep">·</span>
+        <span>
+          <kbd>Esc</kbd> zurueck
+        </span>
+      </footer>
     </div>
   );
 };

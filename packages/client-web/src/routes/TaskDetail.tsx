@@ -237,6 +237,12 @@ const TaskDetail: Component = () => {
           </div>
         )}
       </Show>
+
+      <footer class="kb-hint-bar">
+        <span>
+          <kbd>Esc</kbd> zurueck zur Agenda
+        </span>
+      </footer>
     </div>
   );
 };

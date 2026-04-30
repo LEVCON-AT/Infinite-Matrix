@@ -11904,6 +11904,49 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   outline-offset: 2px;
 }
 
+/* ── T.1.X Polish: Tasten-Hinweis-Footer (Standard-Pattern) ── */
+/* Pattern uebernommen aus NewCellWizard.overlay-foot — dezenter Top-
+   Border, Surface-Background, kbd-Items mit Mid-Dot-Trennern. Soll
+   Standard fuer alle neuen Routes/Modals werden. */
+.kb-hint-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 8px var(--space-md);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text2);
+  font-size: 11px;
+  flex-shrink: 0;
+  margin-top: auto;
+}
+
+.kb-hint-bar kbd {
+  /* Erbt vom global kbd, nur etwas kompakter im Footer-Kontext. */
+  padding: 1px 5px;
+  font-size: 10px;
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+}
+
+.kb-hint-bar .kb-hint-sep {
+  color: var(--text3);
+  user-select: none;
+}
+
+@media (max-width: 479px) {
+  .kb-hint-bar {
+    font-size: 10px;
+    gap: 2px 8px;
+    padding: 6px var(--space-sm);
+  }
+  .kb-hint-bar kbd {
+    font-size: 9px;
+    padding: 0 4px;
+  }
+}
+
 /* ── T.1.X Polish: Click-Pulse-Klassen ─────────────────────── */
 .click-pulse:active {
   transform: scale(0.97);

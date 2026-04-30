@@ -8,7 +8,7 @@
 // Filter-State liegt in createSignal — keine URL-Persistenz fuer V1
 // (kommt mit T.SS-Welle, die ohnehin Filter-Stack persistiert).
 
-import { useNavigate, useParams } from '@solidjs/router';
+import { useNavigate, useParams, useSearchParams } from '@solidjs/router';
 import {
   type Component,
   For,
@@ -146,9 +146,18 @@ function deadlineLabel(
   return { text: deadline, variant: 'soon' };
 }
 
+function formatGermanDate(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}.${month}.${year}`;
+}
+
 const Agenda: Component = () => {
   const params = useParams<RouteParams>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [presetKey, setPresetKey] = createSignal<string>('active');
   const [search, setSearch] = createSignal('');
@@ -156,7 +165,27 @@ const Agenda: Component = () => {
 
   const today = todayIso();
 
+  // Custom-Day-Filter aus URL: ?date=YYYY-MM-DD. Wird vom Calendar-
+  // Tag-Click gesetzt. Validiertes ISO; ungueltig → null (= preset
+  // greift wie ueblich).
+  const customDate = createMemo<string | null>(() => {
+    const raw = (searchParams.date as string | undefined) ?? '';
+    return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
+  });
+
   const filter = createMemo<AgendaFilter>(() => {
+    const cd = customDate();
+    if (cd) {
+      // Custom-Tag-Filter: deadline=cd, kein Status-Filter (User soll
+      // alles am Tag sehen — incl. erledigt/archiviert).
+      return {
+        workspaceId: params.workspaceId,
+        deadlineFrom: cd,
+        deadlineTo: cd,
+        search: search().trim() || undefined,
+        whoIncludes: who().trim() || undefined,
+      };
+    }
     const preset = PRESETS.find((p) => p.key === presetKey()) ?? PRESETS[4];
     return {
       workspaceId: params.workspaceId,
@@ -165,6 +194,17 @@ const Agenda: Component = () => {
       whoIncludes: who().trim() || undefined,
     };
   });
+
+  function setPreset(key: string) {
+    setPresetKey(key);
+    // Wenn der User einen Standard-Preset waehlt, Custom-Day-Filter
+    // verwerfen (sonst wuerde er den Preset wirkungslos machen).
+    if (customDate()) setSearchParams({ date: undefined });
+  }
+
+  function clearCustomDate() {
+    setSearchParams({ date: undefined });
+  }
 
   const [tasks] = createResource(
     () => filter(),
@@ -222,7 +262,11 @@ const Agenda: Component = () => {
         >
           <Icon name="arrow-left" size={18} />
         </button>
-        <h1 class="agenda-title">Agenda</h1>
+        <h1 class="agenda-title">
+          <Show when={customDate()} fallback="Agenda">
+            {(d) => `Agenda — ${formatGermanDate(d())}`}
+          </Show>
+        </h1>
         <span class="agenda-count">
           <Show when={!tasks.loading} fallback={<span class="hint">Lade…</span>}>
             {(tasks() ?? []).length} Aufgaben
@@ -232,15 +276,31 @@ const Agenda: Component = () => {
 
       <div class="agenda-filters">
         <div class="agenda-presets" role="tablist" aria-label="Filter-Presets">
+          <Show when={customDate()}>
+            {(d) => (
+              <button
+                type="button"
+                class="agenda-preset-btn agenda-preset-active click-pulse"
+                onClick={clearCustomDate}
+                title="Tag-Filter entfernen"
+              >
+                <Icon name="calendar" size={12} />
+                {formatGermanDate(d())}
+                <Icon name="x" size={12} />
+              </button>
+            )}
+          </Show>
           <For each={PRESETS}>
             {(preset) => (
               <button
                 type="button"
                 class="agenda-preset-btn click-pulse"
-                classList={{ 'agenda-preset-active': presetKey() === preset.key }}
-                onClick={() => setPresetKey(preset.key)}
+                classList={{
+                  'agenda-preset-active': !customDate() && presetKey() === preset.key,
+                }}
+                onClick={() => setPreset(preset.key)}
                 role="tab"
-                aria-selected={presetKey() === preset.key}
+                aria-selected={!customDate() && presetKey() === preset.key}
               >
                 {preset.label}
               </button>
@@ -333,6 +393,21 @@ const Agenda: Component = () => {
           }}
         </For>
       </div>
+
+      <footer class="kb-hint-bar">
+        <span>
+          <kbd>↩</kbd> oeffnen
+        </span>
+        <span class="kb-hint-sep">·</span>
+        <span>
+          <kbd>↑</kbd>
+          <kbd>↓</kbd> Eintrag
+        </span>
+        <span class="kb-hint-sep">·</span>
+        <span>
+          <kbd>Esc</kbd> zurueck
+        </span>
+      </footer>
     </div>
   );
 };
