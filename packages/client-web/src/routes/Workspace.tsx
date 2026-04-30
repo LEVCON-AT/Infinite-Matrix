@@ -1193,6 +1193,19 @@ const Workspace: Component = () => {
               class="theme-toggle-btn"
               onClick={() => {
                 const wsId = params.workspaceId;
+                if (wsId) navigate(`/w/${wsId}/calendar`);
+              }}
+              title="Kalender"
+              aria-label="Kalender"
+              disabled={!params.workspaceId}
+            >
+              <Icon name="calendar" size={18} />
+            </button>
+            <button
+              type="button"
+              class="theme-toggle-btn"
+              onClick={() => {
+                const wsId = params.workspaceId;
                 if (wsId) navigate(`/w/${wsId}/objects`);
               }}
               title="Objekte"
