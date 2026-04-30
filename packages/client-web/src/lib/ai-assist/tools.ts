@@ -209,6 +209,239 @@ export const TOOL_REGISTRY: ReadonlyArray<ToolDef> = [
     riskLevel: 'safe',
     allowedInModes: ['help'],
   },
+
+  // ─── Object-Layer (Phase 3 / Migrations 033-035) ──────────────
+  // AU-B1 K11c.3 (B1-G-005 / CC2): Schema-Quad-Vervollstaendigung —
+  // Bridge-Tools fuer Object-Layer waren bisher nicht verfuegbar.
+  // KI konnte First-Class-Entities nicht ansprechen (mcp_create_object,
+  // mcp_search_objects etc.).
+  {
+    name: 'mcp_search_objects',
+    description:
+      'Trigram-Fuzzy-Suche ueber objects.label. Gibt {object_id, label, alias, type_label, parent_id, similarity} zurueck. Default-Limit 8, max 50.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        p_workspace_id: UUID,
+        p_query: { type: 'string', description: 'Such-String, min 2 Zeichen.' },
+        p_limit: { type: 'number', description: 'Max Treffer (1-50). Default 8.' },
+      },
+      required: ['p_workspace_id', 'p_query'],
+    },
+    riskLevel: 'safe',
+    allowedInModes: ['help', 'cell-suggest'],
+  },
+  {
+    name: 'mcp_create_object',
+    description:
+      'Legt ein neues First-Class-Object an (z.B. Person, Projekt, Tag). Gibt {object_id, workspace_id, label, alias} zurueck. Optional: type_label (Klassifizierung), parent_id (Hierarchie), home_ref_kind/id (initialer Anker).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        p_workspace_id: UUID,
+        p_label: { type: 'string', description: 'Anzeige-Name, max 200 Zeichen.' },
+        p_alias: NULLABLE_UUID,
+        p_type_label: {
+          type: ['string', 'null'],
+          description: 'Optional: Typ-Klassifizierung (z.B. "Person", "Projekt").',
+        },
+        p_parent_id: NULLABLE_UUID,
+        p_attrs: {
+          type: 'object',
+          description: 'Optional: typ-spezifische Attribute als JSON.',
+        },
+        p_home_ref_kind: {
+          type: ['string', 'null'],
+          enum: ['row', 'col', 'kb_col', 'node', null],
+          description: 'Optional: Anker-Typ. NULL = standalone Object.',
+        },
+        p_home_ref_id: NULLABLE_UUID,
+      },
+      required: ['p_workspace_id', 'p_label'],
+    },
+    riskLevel: 'safe',
+    allowedInModes: ['help', 'cell-suggest'],
+  },
+  {
+    name: 'mcp_update_object',
+    description: 'Aktualisiert Label/Alias/Type-Label/Attrs eines Objects.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        p_object_id: UUID,
+        p_label: { type: ['string', 'null'], description: 'Neuer Name oder NULL.' },
+        p_alias: NULLABLE_UUID,
+        p_type_label: { type: ['string', 'null'] },
+        p_attrs: { type: ['object', 'null'] },
+      },
+      required: ['p_object_id'],
+    },
+    riskLevel: 'safe',
+    allowedInModes: ['help'],
+  },
+  {
+    name: 'mcp_set_object_parent',
+    description: 'Setzt parent_id eines Objects (Hierarchie). NULL = Top-Level.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        p_object_id: UUID,
+        p_parent_id: NULLABLE_UUID,
+      },
+      required: ['p_object_id', 'p_parent_id'],
+    },
+    riskLevel: 'safe',
+    allowedInModes: ['help'],
+  },
+  {
+    name: 'mcp_set_object_home_ref',
+    description:
+      'Setzt den Home-Anker eines Objects (row/col/kb_col/node). Backfill-Pfad nach Auto-Anlage.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        p_object_id: UUID,
+        p_home_ref_kind: {
+          type: 'string',
+          enum: ['row', 'col', 'kb_col', 'node'],
+          description: 'Anker-Typ.',
+        },
+        p_home_ref_id: UUID,
+      },
+      required: ['p_object_id', 'p_home_ref_kind', 'p_home_ref_id'],
+    },
+    riskLevel: 'safe',
+    allowedInModes: ['help'],
+  },
+  {
+    name: 'mcp_add_object_tag',
+    description: 'Fuegt einen Tag-Pfeil hinzu (object_id → tag_object_id, M:N).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        p_object_id: UUID,
+        p_tag_object_id: UUID,
+      },
+      required: ['p_object_id', 'p_tag_object_id'],
+    },
+    riskLevel: 'safe',
+    allowedInModes: ['help'],
+  },
+  {
+    name: 'mcp_remove_object_tag',
+    description: 'Entfernt einen Tag-Pfeil.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        p_object_id: UUID,
+        p_tag_object_id: UUID,
+      },
+      required: ['p_object_id', 'p_tag_object_id'],
+    },
+    riskLevel: 'safe',
+    allowedInModes: ['help'],
+  },
+  {
+    name: 'mcp_delete_object',
+    description:
+      'Loescht ein Object. Backlinks (rows/cols/kb_cols.object_id) werden DB-seitig auf NULL gesetzt — Tags werden cascadiert geloescht. Nicht trivial wiederherstellbar.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        p_object_id: UUID,
+      },
+      required: ['p_object_id'],
+    },
+    riskLevel: 'destructive',
+    allowedInModes: ['help'],
+  },
+
+  // ─── Groups (Migration 034) ──────────────────────────────────
+  {
+    name: 'mcp_create_group',
+    description:
+      'Legt eine neue Gruppe an (workspace-scoped Container fuer Objects). Optional initial members.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        p_workspace_id: UUID,
+        p_name: { type: 'string', description: 'Gruppen-Name, max 200 Zeichen.' },
+        p_description: { type: ['string', 'null'] },
+        p_initial_member_ids: {
+          type: ['array', 'null'],
+          items: { type: 'string' },
+          description: 'Optional: Object-IDs als initiale Mitglieder.',
+        },
+      },
+      required: ['p_workspace_id', 'p_name'],
+    },
+    riskLevel: 'safe',
+    allowedInModes: ['help'],
+  },
+  {
+    name: 'mcp_add_group_members',
+    description: 'Fuegt Object-IDs einer Gruppe hinzu. Gibt {added: number} zurueck.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        p_group_id: UUID,
+        p_object_ids: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Object-IDs zum Hinzufuegen.',
+        },
+      },
+      required: ['p_group_id', 'p_object_ids'],
+    },
+    riskLevel: 'safe',
+    allowedInModes: ['help'],
+  },
+  {
+    name: 'mcp_remove_group_members',
+    description: 'Entfernt Object-IDs aus einer Gruppe. Gibt {removed: number} zurueck.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        p_group_id: UUID,
+        p_object_ids: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Object-IDs zum Entfernen.',
+        },
+      },
+      required: ['p_group_id', 'p_object_ids'],
+    },
+    riskLevel: 'safe',
+    allowedInModes: ['help'],
+  },
+  {
+    name: 'mcp_rename_group',
+    description: 'Benennt eine Gruppe um.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        p_group_id: UUID,
+        p_new_name: { type: 'string', description: 'Neuer Gruppen-Name.' },
+      },
+      required: ['p_group_id', 'p_new_name'],
+    },
+    riskLevel: 'safe',
+    allowedInModes: ['help'],
+  },
+  {
+    name: 'mcp_delete_group',
+    description:
+      'Loescht eine Gruppe inkl. aller Memberships. Die Member-Objects bleiben erhalten.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        p_group_id: UUID,
+      },
+      required: ['p_group_id'],
+    },
+    riskLevel: 'destructive',
+    allowedInModes: ['help'],
+  },
 ];
 
 // ─── Wizard-only: Preview-Pattern (Mitigation H) ───────────────
