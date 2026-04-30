@@ -38,6 +38,17 @@ export type WorkspaceExport = {
   // freie Docs (attached_cell_id=NULL) werden nur vom Full-Workspace-
   // Export erfasst. Default leer, damit alte Parser nichts brechen.
   docs: Record<string, unknown>[];
+  // AU-B1 K11c.2 (B1-A-006 / B1-F-003 / CC2): Object-Layer-Tabellen.
+  // Optional, damit V0-Parser ohne Object-Awareness alte Exports
+  // weiterhin lesen koennen. rows/cols/kb_cols/nodes haben
+  // `object_id`-FKs in den Object-Layer; ohne diese Tabellen im Export
+  // wird der Re-Import zu einem Lueckenexport (FKs zeigen ins Leere).
+  // soft_groups/soft_group_members bewusst ausgelassen — ephemer mit
+  // 60-Tage-TTL.
+  objects?: Record<string, unknown>[];
+  object_tags?: Record<string, unknown>[];
+  groups?: Record<string, unknown>[];
+  group_members?: Record<string, unknown>[];
   // Nur bei Cell-Subtree-Exports gesetzt: Meta-Info zur Quell-Zelle,
   // damit der Importer ihre info-Felder/Links und Feature-Flags in
   // die Ziel-Zelle mergen kann — ohne die Zelle selbst in cells[]
@@ -62,6 +73,9 @@ export type ExportStats = {
   infoFields: number;
   infoLinks: number;
   docs: number;
+  // AU-B1 K11c.2: Object-Layer-Counts.
+  objects: number;
+  groups: number;
 };
 
 function statsOf(e: WorkspaceExport): ExportStats {
@@ -94,6 +108,8 @@ function statsOf(e: WorkspaceExport): ExportStats {
     infoFields,
     infoLinks,
     docs: e.docs.length,
+    objects: (e.objects ?? []).length,
+    groups: (e.groups ?? []).length,
   };
 }
 
@@ -114,6 +130,8 @@ export function formatExportStats(s: ExportStats): string {
     parts.push(`${s.infoFields} ${s.infoFields === 1 ? 'Info-Feld' : 'Info-Felder'}`);
   if (s.infoLinks) parts.push(`${s.infoLinks} ${s.infoLinks === 1 ? 'Info-Link' : 'Info-Links'}`);
   if (s.docs) parts.push(`${s.docs} ${s.docs === 1 ? 'Doku' : 'Dokus'}`);
+  if (s.objects) parts.push(`${s.objects} ${s.objects === 1 ? 'Object' : 'Objects'}`);
+  if (s.groups) parts.push(`${s.groups} ${s.groups === 1 ? 'Gruppe' : 'Gruppen'}`);
   return parts.length === 0 ? '(leer)' : parts.join(' · ');
 }
 
@@ -140,6 +158,10 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     checklistItemsRes,
     linksRes,
     docsRes,
+    objectsRes,
+    objectTagsRes,
+    groupsRes,
+    groupMembersRes,
   ] = await Promise.all([
     supabase.from('nodes').select('*').eq('workspace_id', workspaceId),
     supabase.from('rows').select('*').eq('workspace_id', workspaceId),
@@ -151,6 +173,10 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     supabase.from('checklist_items').select('*').eq('workspace_id', workspaceId),
     supabase.from('links').select('*').eq('workspace_id', workspaceId),
     supabase.from('docs').select('*').eq('workspace_id', workspaceId),
+    supabase.from('objects').select('*').eq('workspace_id', workspaceId),
+    supabase.from('object_tags').select('*').eq('workspace_id', workspaceId),
+    supabase.from('groups').select('*').eq('workspace_id', workspaceId),
+    supabase.from('group_members').select('*').eq('workspace_id', workspaceId),
   ]);
 
   for (const res of [
@@ -164,6 +190,10 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     checklistItemsRes,
     linksRes,
     docsRes,
+    objectsRes,
+    objectTagsRes,
+    groupsRes,
+    groupMembersRes,
   ]) {
     if (res.error) throw res.error;
   }
@@ -183,6 +213,10 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     checklist_items: (checklistItemsRes.data ?? []) as Record<string, unknown>[],
     links: (linksRes.data ?? []) as Record<string, unknown>[],
     docs: (docsRes.data ?? []) as Record<string, unknown>[],
+    objects: (objectsRes.data ?? []) as Record<string, unknown>[],
+    object_tags: (objectTagsRes.data ?? []) as Record<string, unknown>[],
+    groups: (groupsRes.data ?? []) as Record<string, unknown>[],
+    group_members: (groupMembersRes.data ?? []) as Record<string, unknown>[],
   };
 }
 
@@ -238,6 +272,9 @@ type SubtreeRowSet = {
 async function fetchWorkspaceRowsForExport(workspaceId: string) {
   // Dieselben Tabellen wie exportWorkspace, aber ohne workspace-Row.
   // Nur einmal laden + danach filtern — spart runden gegen Supabase.
+  // AU-B1 K11c.2: Object-Layer-Tabellen (objects, object_tags, groups,
+  // group_members) ergaenzt, damit Subtree-Export sie pro Subtree
+  // filtern kann.
   const [
     nodesRes,
     rowsRes,
@@ -249,6 +286,10 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     checklistItemsRes,
     linksRes,
     docsRes,
+    objectsRes,
+    objectTagsRes,
+    groupsRes,
+    groupMembersRes,
     wsRes,
   ] = await Promise.all([
     supabase.from('nodes').select('*').eq('workspace_id', workspaceId),
@@ -261,6 +302,10 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     supabase.from('checklist_items').select('*').eq('workspace_id', workspaceId),
     supabase.from('links').select('*').eq('workspace_id', workspaceId),
     supabase.from('docs').select('*').eq('workspace_id', workspaceId),
+    supabase.from('objects').select('*').eq('workspace_id', workspaceId),
+    supabase.from('object_tags').select('*').eq('workspace_id', workspaceId),
+    supabase.from('groups').select('*').eq('workspace_id', workspaceId),
+    supabase.from('group_members').select('*').eq('workspace_id', workspaceId),
     supabase.from('workspaces').select('*').eq('id', workspaceId).single(),
   ]);
   for (const res of [
@@ -274,6 +319,10 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     checklistItemsRes,
     linksRes,
     docsRes,
+    objectsRes,
+    objectTagsRes,
+    groupsRes,
+    groupMembersRes,
     wsRes,
   ]) {
     if (res.error) throw res.error;
@@ -284,9 +333,18 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
       id: string;
       parent_cell_id: string | null;
       type: string;
+      object_id?: string | null;
     }>,
-    rows: (rowsRes.data ?? []) as Array<{ id: string; matrix_id: string }>,
-    cols: (colsRes.data ?? []) as Array<{ id: string; matrix_id: string }>,
+    rows: (rowsRes.data ?? []) as Array<{
+      id: string;
+      matrix_id: string;
+      object_id?: string | null;
+    }>,
+    cols: (colsRes.data ?? []) as Array<{
+      id: string;
+      matrix_id: string;
+      object_id?: string | null;
+    }>,
     cells: (cellsRes.data ?? []) as Array<{
       id: string;
       matrix_id: string;
@@ -297,7 +355,11 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
       data: Record<string, unknown>;
       features: string[];
     }>,
-    kb_cols: (kbColsRes.data ?? []) as Array<{ id: string; board_id: string }>,
+    kb_cols: (kbColsRes.data ?? []) as Array<{
+      id: string;
+      board_id: string;
+      object_id?: string | null;
+    }>,
     kb_cards: (kbCardsRes.data ?? []) as Array<{ id: string; board_id: string }>,
     checklists: (checklistsRes.data ?? []) as Array<{
       id: string;
@@ -312,6 +374,16 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     docs: (docsRes.data ?? []) as Array<{
       id: string;
       attached_cell_id: string | null;
+    }>,
+    objects: (objectsRes.data ?? []) as Array<{ id: string }>,
+    object_tags: (objectTagsRes.data ?? []) as Array<{
+      object_id: string;
+      tag_object_id: string;
+    }>,
+    groups: (groupsRes.data ?? []) as Array<{ id: string }>,
+    group_members: (groupMembersRes.data ?? []) as Array<{
+      group_id: string;
+      object_id: string;
     }>,
   };
 }
@@ -403,6 +475,31 @@ export async function exportSubtree(
   // Docs wandern mit, wenn sie an einer Subtree-Cell kleben.
   const filteredDocs = all.docs.filter((d) => d.attached_cell_id && inCells(d.attached_cell_id));
 
+  // AU-B1 K11c.2 (B1-A-006): Object-Layer-Subtree-Filter. Sammeln alle
+  // object_ids, die von Subtree-Rows/Cols/KbCols/Nodes referenziert
+  // werden — diese Objects + ihre Tags + Group-Memberships gehoeren
+  // zum Subtree-Export.
+  const referencedObjectIds = new Set<string>();
+  for (const r of filteredRows) if (r.object_id) referencedObjectIds.add(r.object_id);
+  for (const c of filteredCols) if (c.object_id) referencedObjectIds.add(c.object_id);
+  for (const k of filteredKbCols) if (k.object_id) referencedObjectIds.add(k.object_id);
+  for (const n of filteredNodes) if (n.object_id) referencedObjectIds.add(n.object_id);
+  const filteredObjectTags = all.object_tags.filter(
+    (t) => referencedObjectIds.has(t.object_id) || referencedObjectIds.has(t.tag_object_id),
+  );
+  // Tag-Pfeile koennen auf Objects ausserhalb des Subtree zeigen — die
+  // muessen wir mit-exportieren, sonst zerreisst der Import die Tag-Kette.
+  for (const t of filteredObjectTags) {
+    referencedObjectIds.add(t.object_id);
+    referencedObjectIds.add(t.tag_object_id);
+  }
+  const filteredObjects = all.objects.filter((o) => referencedObjectIds.has(o.id));
+  const filteredGroupMembers = all.group_members.filter((m) =>
+    referencedObjectIds.has(m.object_id),
+  );
+  const referencedGroupIds = new Set(filteredGroupMembers.map((m) => m.group_id));
+  const filteredGroups = all.groups.filter((g) => referencedGroupIds.has(g.id));
+
   return {
     version: WORKSPACE_EXPORT_VERSION,
     payloadType: 'subtree',
@@ -418,6 +515,10 @@ export async function exportSubtree(
     checklist_items: filteredChecklistItems as unknown as Record<string, unknown>[],
     links: filteredLinks as unknown as Record<string, unknown>[],
     docs: filteredDocs as unknown as Record<string, unknown>[],
+    objects: filteredObjects as unknown as Record<string, unknown>[],
+    object_tags: filteredObjectTags as unknown as Record<string, unknown>[],
+    groups: filteredGroups as unknown as Record<string, unknown>[],
+    group_members: filteredGroupMembers as unknown as Record<string, unknown>[],
   };
 }
 
