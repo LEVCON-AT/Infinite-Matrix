@@ -1,12 +1,14 @@
 import { Route, Router } from '@solidjs/router';
 import { render } from 'solid-js/web';
 import App from './App';
+import Agenda from './routes/Agenda';
 import Invite from './routes/Invite';
 import Login from './routes/Login';
 import ObjectDetail from './routes/ObjectDetail';
 import ObjectsList from './routes/ObjectsList';
 import Onboarding from './routes/Onboarding';
 import Settings from './routes/Settings';
+import TaskDetail from './routes/TaskDetail';
 import Workspace from './routes/Workspace';
 import AccountAi from './routes/settings/AccountAi';
 import AccountProfile from './routes/settings/AccountProfile';
@@ -52,6 +54,8 @@ render(
       <Route path="/w/:workspaceId/c/:cellId/summary" component={Workspace} />
       <Route path="/w/:workspaceId/o/:objectId" component={ObjectDetail} />
       <Route path="/w/:workspaceId/objects" component={ObjectsList} />
+      <Route path="/w/:workspaceId/agenda" component={Agenda} />
+      <Route path="/w/:workspaceId/task/:taskId" component={TaskDetail} />
       <Route path="/w/:workspaceId/settings" component={Settings}>
         <Route path="/" component={AccountProfile} />
         <Route path="/account/profile" component={AccountProfile} />

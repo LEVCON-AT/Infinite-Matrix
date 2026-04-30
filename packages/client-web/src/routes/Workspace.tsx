@@ -1180,6 +1180,19 @@ const Workspace: Component = () => {
               class="theme-toggle-btn"
               onClick={() => {
                 const wsId = params.workspaceId;
+                if (wsId) navigate(`/w/${wsId}/agenda`);
+              }}
+              title="Agenda"
+              aria-label="Agenda"
+              disabled={!params.workspaceId}
+            >
+              <Icon name="list-bullet" size={18} />
+            </button>
+            <button
+              type="button"
+              class="theme-toggle-btn"
+              onClick={() => {
+                const wsId = params.workspaceId;
                 if (wsId) navigate(`/w/${wsId}/objects`);
               }}
               title="Objekte"

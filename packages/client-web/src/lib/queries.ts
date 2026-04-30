@@ -1088,6 +1088,126 @@ export async function fetchDocsForCell(cellId: string, workspaceId: string): Pro
   }
 }
 
+// Phase 4 T.1.F — Agenda-Fetch mit Filter (Status, Deadline-Range,
+// Who-Match, Trigram-Search). Liefert Tasks + ihre Manifestations
+// in einem Roundtrip via PostgREST-Embed. RLS scoped auf Workspace-
+// Membership; explizite workspace_id-Eq als Defense-in-Depth.
+//
+// `overdue` ist kein DB-Status — der Frontend-Caller mappt das
+// Preset auf die korrekte Kombination aus statusIn + deadlineTo.
+//
+// Limit: Default 200, Caller kann erweitern bei Bedarf.
+
+export type AgendaTask = {
+  task: TaskRow;
+  manifestations: TaskManifestationRow[];
+};
+
+export type AgendaFilter = {
+  workspaceId: string;
+  // Status-Set: leeres Array oder undefined → kein Filter.
+  statusIn?: Array<'open' | 'in_progress' | 'blocked' | 'done' | 'archived'>;
+  // Deadline-Range. Beide inklusiv. ISO 'YYYY-MM-DD'.
+  deadlineFrom?: string;
+  deadlineTo?: string;
+  // hasDeadline = false → nur Tasks ohne deadline.
+  hasDeadline?: boolean;
+  // Who-Array enthaelt diesen String (case-insensitive Match).
+  whoIncludes?: string;
+  // Trigram-Search auf label (label.ilike). Leerer String → kein Filter.
+  search?: string;
+  limit?: number;
+};
+
+export async function fetchAgendaTasks(filter: AgendaFilter): Promise<AgendaTask[]> {
+  const { workspaceId } = filter;
+  if (!workspaceId) return [];
+  try {
+    let q = supabase
+      .from('tasks')
+      .select('*, manifestations:task_manifestations(*)')
+      .eq('workspace_id', workspaceId)
+      .order('deadline', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .limit(filter.limit ?? 200);
+    if (filter.statusIn && filter.statusIn.length > 0) {
+      q = q.in('status', filter.statusIn);
+    }
+    if (filter.deadlineFrom) q = q.gte('deadline', filter.deadlineFrom);
+    if (filter.deadlineTo) q = q.lte('deadline', filter.deadlineTo);
+    if (filter.hasDeadline === false) q = q.is('deadline', null);
+    else if (filter.hasDeadline === true) q = q.not('deadline', 'is', null);
+    if (filter.whoIncludes && filter.whoIncludes.trim().length > 0) {
+      // Postgres-Array contains-Operator ueber PostgREST: ?who=cs.{val}
+      q = q.contains('who', [filter.whoIncludes.trim()]);
+    }
+    if (filter.search && filter.search.trim().length >= 2) {
+      // Trigram-Index existiert (Migration 040: tasks_label_trgm_idx).
+      // ilike fallback fuer Substring-Match — pg_trgm.* Operatoren waeren
+      // schneller, aber PostgREST exposed sie nicht out-of-the-box.
+      const pat = `%${filter.search.trim().replace(/[%_]/g, (m) => `\\${m}`)}%`;
+      q = q.ilike('label', pat);
+    }
+    const { data, error } = await q;
+    if (error) throw error;
+    type Joined = TaskRow & { manifestations: TaskManifestationRow[] | null };
+    const rows = (data ?? []) as Joined[];
+    const tasks: TaskRow[] = [];
+    const manifs: TaskManifestationRow[] = [];
+    const out: AgendaTask[] = rows.map((r) => {
+      const { manifestations: m, ...task } = r;
+      tasks.push(task as TaskRow);
+      const mlist = (m ?? []) as TaskManifestationRow[];
+      manifs.push(...mlist);
+      return { task: task as TaskRow, manifestations: mlist };
+    });
+    void mergeRows('tasks', tasks).catch(() => {});
+    void mergeRows('task_manifestations', manifs).catch(() => {});
+    markLiveSuccess();
+    return out;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    // Offline-Fallback: aus IDB-Cache, dieselben Filter client-side.
+    const [allTasks, allManifs] = await Promise.all([
+      getByWorkspace<TaskRow>('tasks', workspaceId),
+      getByWorkspace<TaskManifestationRow>('task_manifestations', workspaceId),
+    ]);
+    const manifsByTask = new Map<string, TaskManifestationRow[]>();
+    for (const m of allManifs) {
+      const arr = manifsByTask.get(m.task_id) ?? [];
+      arr.push(m);
+      manifsByTask.set(m.task_id, arr);
+    }
+    const statusSet = filter.statusIn ? new Set(filter.statusIn) : null;
+    const search = (filter.search ?? '').trim().toLowerCase();
+    const who = (filter.whoIncludes ?? '').trim();
+    const filtered = allTasks.filter((t) => {
+      if (statusSet && !statusSet.has(t.status)) return false;
+      if (filter.deadlineFrom && (!t.deadline || t.deadline < filter.deadlineFrom)) return false;
+      if (filter.deadlineTo && (!t.deadline || t.deadline > filter.deadlineTo)) return false;
+      if (filter.hasDeadline === false && t.deadline) return false;
+      if (filter.hasDeadline === true && !t.deadline) return false;
+      if (who && !(t.who ?? []).includes(who)) return false;
+      if (search.length >= 2 && !t.label.toLowerCase().includes(search)) return false;
+      return true;
+    });
+    filtered.sort((a, b) => {
+      // deadline asc (nulls last), dann created_at desc
+      const ad = a.deadline ?? '~';
+      const bd = b.deadline ?? '~';
+      if (ad !== bd) return ad < bd ? -1 : 1;
+      return (b.created_at ?? '').localeCompare(a.created_at ?? '');
+    });
+    const limit = filter.limit ?? 200;
+    const out = filtered.slice(0, limit).map((t) => ({
+      task: t,
+      manifestations: manifsByTask.get(t.id) ?? [],
+    }));
+    markCacheFallback();
+    return out;
+  }
+}
+
 // Phase 4 T.1.E: Alle Checklisten eines Workspaces. Fuer Smart-Summary-
 // Widget pro Cell — wir muessen wissen, welche Checklisten an welcher
 // Cell oder welchem Board haengen, damit wir ihre Items (= tasks) der

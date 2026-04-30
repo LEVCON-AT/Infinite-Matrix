@@ -8584,6 +8584,403 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   gap: var(--space-md);
 }
 
+/* ── Agenda + TaskDetail (Phase 4 T.1.F) ─────────────────── */
+/* Reused max-width + padding-Gerüst von .objects-list-page. */
+.agenda-page,
+.task-detail-page {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: var(--space-md) var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.agenda-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border);
+}
+
+.agenda-title {
+  margin: 0;
+  font-size: var(--fs-h1, 24px);
+  font-weight: 600;
+  color: var(--text);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agenda-count {
+  color: var(--text2);
+  font-size: 13px;
+}
+
+.agenda-filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.agenda-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.agenda-preset-btn {
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 0.5px solid var(--border);
+  background: var(--bg2);
+  color: var(--text2);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background var(--tr-std), color var(--tr-std), border-color var(--tr-std);
+}
+
+.agenda-preset-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.agenda-preset-active {
+  background: var(--p, var(--text));
+  color: var(--bg2);
+  border-color: var(--p, var(--text));
+}
+
+.agenda-preset-active:hover {
+  background: var(--p, var(--text));
+  color: var(--bg2);
+}
+
+.agenda-search-row {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.agenda-search-input,
+.agenda-who-input {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.agenda-search-input {
+  flex: 1 1 220px;
+}
+
+.agenda-who-input {
+  flex: 0 1 160px;
+}
+
+.agenda-search-input:focus,
+.agenda-who-input:focus {
+  outline: none;
+  border-color: var(--p, var(--text));
+}
+
+.agenda-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.agenda-empty {
+  padding: var(--space-lg) var(--space-md);
+  text-align: center;
+  color: var(--text3);
+}
+
+.agenda-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 10px 12px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--bg2);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--tr-std), border-color var(--tr-std);
+}
+
+.agenda-row:hover {
+  background: var(--bg-hover);
+  border-color: var(--border2);
+}
+
+.agenda-row-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.agenda-row-label {
+  color: var(--text);
+  font-weight: 500;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agenda-row-note {
+  color: var(--text3);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agenda-row-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+  color: var(--text3);
+  font-size: 12px;
+}
+
+.agenda-status {
+  padding: 2px 8px;
+  border-radius: var(--rs);
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  font-weight: 500;
+  font-size: 11px;
+}
+
+.agenda-status-open {
+  color: var(--tealtxt);
+  background: var(--tealbg);
+}
+.agenda-status-in_progress {
+  color: var(--bluetxt, var(--text));
+  background: var(--bluebg, var(--bg));
+}
+.agenda-status-blocked {
+  color: var(--redtxt);
+  background: var(--redbg);
+}
+.agenda-status-done {
+  color: var(--text3);
+  background: var(--bg);
+}
+.agenda-status-archived {
+  color: var(--text3);
+  background: var(--bg);
+  opacity: 0.6;
+}
+
+.agenda-deadline {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.agenda-deadline svg {
+  flex-shrink: 0;
+}
+
+.agenda-deadline-overdue {
+  color: var(--red);
+  font-weight: 600;
+}
+.agenda-deadline-today {
+  color: var(--amber);
+  font-weight: 600;
+}
+.agenda-deadline-soon {
+  color: var(--text2);
+}
+.agenda-deadline-plain {
+  color: var(--text3);
+}
+
+.agenda-manifs {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.agenda-manif {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  color: var(--text3);
+}
+
+.agenda-manif-kanban {
+  background: var(--tealbg);
+  color: var(--tealtxt);
+}
+.agenda-manif-checklist {
+  background: var(--purplebg);
+  color: var(--purpletxt);
+}
+.agenda-manif-calendar {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+}
+.agenda-manif-standalone {
+  background: var(--bg);
+  color: var(--text3);
+  border: 0.5px solid var(--border);
+}
+
+/* TaskDetail */
+.task-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.task-detail-section h3 {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--fs-subtitle, 15px);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.task-status-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.task-status-btn {
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 0.5px solid var(--border);
+  background: var(--bg2);
+  color: var(--text2);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background var(--tr-std), border-color var(--tr-std);
+}
+
+.task-status-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border2);
+}
+
+.task-status-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.task-status-active {
+  background: var(--p, var(--text));
+  color: var(--bg2);
+  border-color: var(--p, var(--text));
+}
+
+.task-status-active:hover:not(:disabled) {
+  background: var(--p, var(--text));
+  color: var(--bg2);
+}
+
+.task-detail-meta {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 4px var(--space-md);
+  margin: 0;
+}
+
+.task-detail-meta dt {
+  color: var(--text3);
+  font-size: 13px;
+}
+
+.task-detail-meta dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.task-detail-note {
+  margin: 0;
+  padding: var(--space-md);
+  background: var(--bg2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  white-space: pre-wrap;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.task-manif-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.task-manif-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 8px 12px;
+  background: var(--bg2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  font-size: 13px;
+}
+
+.task-manif-row svg {
+  flex-shrink: 0;
+}
+
+.task-manif-kind {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.task-manif-container {
+  flex: 1 1 auto;
+  color: var(--text2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-manif-pos {
+  color: var(--text3);
+  font-variant-numeric: tabular-nums;
+}
+
+.task-manif-add-stub {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: var(--space-sm);
+  padding: 6px 12px;
+  border: 1px dashed var(--border2);
+  border-radius: var(--rs);
+  background: transparent;
+  color: var(--text3);
+  font-size: 13px;
+  cursor: not-allowed;
+}
+
 .objects-list-head {
   display: flex;
   align-items: center;
