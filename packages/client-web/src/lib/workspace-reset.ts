@@ -49,17 +49,56 @@ export type ResetScope =
   | { kind: 'feature-info'; cellId: string }
   | { kind: 'feature-checklists'; cellId: string };
 
-// Board-Inhalt leeren: alle kb_cards, kb_cols, links + cell-freie
-// Checklisten mit board_id=target. Board-Node + Label + Alias bleiben.
+// Board-Inhalt leeren: alle Karten + kb_cols + Checklisten + Links
+// mit board_id=target. Board-Node + Label + Alias bleiben.
+//
+// Phase 4 T.1.D: Karten = task_manifestations(kind='kanban',
+// display_meta.board_id=board). Items = task_manifestations(kind=
+// 'checklist', container_id IN board.checklists). Wir loeschen die
+// Tasks der jeweiligen Manifestations (CASCADE killt die Manifestations
+// selbst), dann kb_cols / checklists / links via FK.
 async function clearBoardContents(boardNodeId: string): Promise<void> {
-  // kb_cards + kb_cols + links haben alle board_id als FK.
-  // Reihenfolge: kb_cards zuerst (FK auf kb_cols), dann kb_cols, dann
-  // checklists (mit Cascade auf items), dann links.
-  const { error: cardsErr } = await supabase.from('kb_cards').delete().eq('board_id', boardNodeId);
-  if (cardsErr) throw cardsErr;
+  // 1. Tasks mit kanban-Manif auf diesem Board.
+  const { data: kbManifs, error: kbErr } = await supabase
+    .from('task_manifestations')
+    .select('task_id, display_meta')
+    .eq('kind', 'kanban');
+  if (kbErr) throw kbErr;
+  const cardTaskIds = (kbManifs ?? [])
+    .filter(
+      (m: { task_id: string; display_meta: Record<string, unknown> | null }) =>
+        (m.display_meta as Record<string, unknown> | null)?.board_id === boardNodeId,
+    )
+    .map((m: { task_id: string }) => m.task_id);
+
+  // 2. Tasks mit checklist-Manif in einer Checkliste dieses Boards.
+  const { data: cls, error: clQErr } = await supabase
+    .from('checklists')
+    .select('id')
+    .eq('board_id', boardNodeId);
+  if (clQErr) throw clQErr;
+  const clIds = (cls ?? []).map((c: { id: string }) => c.id);
+  let itemTaskIds: string[] = [];
+  if (clIds.length > 0) {
+    const { data: itManifs, error: imErr } = await supabase
+      .from('task_manifestations')
+      .select('task_id')
+      .eq('kind', 'checklist')
+      .in('container_id', clIds);
+    if (imErr) throw imErr;
+    itemTaskIds = (itManifs ?? []).map((m: { task_id: string }) => m.task_id);
+  }
+
+  // 3. Tasks-Bulk-Delete (CASCADE entfernt manifestations).
+  const allTaskIds = [...cardTaskIds, ...itemTaskIds];
+  if (allTaskIds.length > 0) {
+    const { error: tasksErr } = await supabase.from('tasks').delete().in('id', allTaskIds);
+    if (tasksErr) throw tasksErr;
+  }
+
+  // 4. kb_cols + checklists + links.
   const { error: colsErr } = await supabase.from('kb_cols').delete().eq('board_id', boardNodeId);
   if (colsErr) throw colsErr;
-  // Checklisten mit board_id=target — Cascade auf checklist_items.
   const { error: clErr } = await supabase.from('checklists').delete().eq('board_id', boardNodeId);
   if (clErr) throw clErr;
   const { error: linksErr } = await supabase.from('links').delete().eq('board_id', boardNodeId);

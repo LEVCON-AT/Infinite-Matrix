@@ -15,7 +15,7 @@ import { isNetworkError } from './mutation-queue';
 import { getByWorkspace } from './offline-cache';
 import { markCacheFallback, markLiveSuccess } from './offline-state';
 import { supabase } from './supabase';
-import type { CellRow, ChecklistRow, DocRow, KbCardRow, LinkRow, NodeRow } from './types';
+import type { CellRow, ChecklistRow, DocRow, LinkRow, NodeRow, TaskRow } from './types';
 
 export type AliasKind = 'node' | 'cell' | 'card' | 'checklist' | 'link' | 'doc';
 
@@ -184,7 +184,9 @@ function buildAliasEntries(input: AliasInput): AliasEntry[] {
 }
 
 async function fetchAliasIndexLive(wsId: string, s: WsState): Promise<void> {
-  const [nodes, cells, cards, checklists, links, docs] = await Promise.all([
+  // Phase 4 T.1.D: Karten-Aliases leben in tasks.attrs.alias (string).
+  // Wir holen alle tasks mit attrs->>alias != NULL und mappen.
+  const [nodes, cells, cardTasks, checklists, links, docs] = await Promise.all([
     supabase
       .from('nodes')
       .select('id, alias, label, type')
@@ -192,10 +194,10 @@ async function fetchAliasIndexLive(wsId: string, s: WsState): Promise<void> {
       .not('alias', 'is', null),
     supabase.from('cells').select('id, alias').eq('workspace_id', wsId).not('alias', 'is', null),
     supabase
-      .from('kb_cards')
-      .select('id, alias, name')
+      .from('tasks')
+      .select('id, label, attrs')
       .eq('workspace_id', wsId)
-      .not('alias', 'is', null),
+      .not('attrs->>alias', 'is', null),
     supabase
       .from('checklists')
       .select('id, alias, label')
@@ -213,12 +215,24 @@ async function fetchAliasIndexLive(wsId: string, s: WsState): Promise<void> {
       .not('alias', 'is', null),
   ]);
 
+  const cards = (
+    (cardTasks.data ?? []) as Array<{
+      id: string;
+      label: string | null;
+      attrs: Record<string, unknown> | null;
+    }>
+  ).map((t) => ({
+    id: t.id,
+    alias: ((t.attrs as Record<string, unknown> | null)?.alias as string | null) ?? null,
+    name: t.label,
+  }));
+
   commitEntries(
     s,
     buildAliasEntries({
       nodes: (nodes.data ?? []) as AliasInput['nodes'],
       cells: (cells.data ?? []) as AliasInput['cells'],
-      cards: (cards.data ?? []) as AliasInput['cards'],
+      cards,
       checklists: (checklists.data ?? []) as AliasInput['checklists'],
       links: (links.data ?? []) as AliasInput['links'],
       docs: (docs.data ?? []) as AliasInput['docs'],
@@ -230,14 +244,21 @@ async function fetchAliasIndexLive(wsId: string, s: WsState): Promise<void> {
 // Cache. Wenn der Cache leer ist (frische Tab-Sitzung, noch nie
 // online), bleibt der Index leer.
 async function fetchAliasIndexFromCache(wsId: string, s: WsState): Promise<void> {
-  const [nodes, cells, cards, checklists, links, docs] = await Promise.all([
+  const [nodes, cells, tasks, checklists, links, docs] = await Promise.all([
     getByWorkspace<NodeRow>('nodes', wsId),
     getByWorkspace<CellRow>('cells', wsId),
-    getByWorkspace<KbCardRow>('kb_cards', wsId),
+    getByWorkspace<TaskRow>('tasks', wsId),
     getByWorkspace<ChecklistRow>('checklists', wsId),
     getByWorkspace<LinkRow>('links', wsId),
     getByWorkspace<DocRow>('docs', wsId),
   ]);
+  const cards = tasks
+    .map((t) => ({
+      id: t.id,
+      alias: ((t.attrs as Record<string, unknown> | null)?.alias as string | null) ?? null,
+      name: t.label,
+    }))
+    .filter((c) => c.alias != null);
   commitEntries(s, buildAliasEntries({ nodes, cells, cards, checklists, links, docs }));
 }
 

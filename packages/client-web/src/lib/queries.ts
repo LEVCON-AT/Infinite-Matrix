@@ -2,6 +2,7 @@ import { isNetworkError } from './mutation-queue';
 import { getById, getByWorkspace, mergeRows, withCache } from './offline-cache';
 import { markCacheFallback, markLiveSuccess } from './offline-state';
 import { supabase } from './supabase';
+import { taskAndManifToCard, taskAndManifToItem } from './task-projections';
 import type {
   BoardContent,
   CellChecklistsContent,
@@ -17,6 +18,8 @@ import type {
   MatrixContent,
   NodeRow,
   RowRow,
+  TaskManifestationRow,
+  TaskRow,
   TreeEntry,
   TreeNode,
   WorkspaceWithRole,
@@ -128,17 +131,7 @@ export async function fetchMyWorkspaces(): Promise<WorkspaceWithRole[]> {
 // der Cache die zuletzt bekannten Daten. Das hebt den Sidebar-Tree +
 // Stack-Navigation auch offline.
 async function cachedList<T extends { id: string; workspace_id: string }>(
-  table:
-    | 'nodes'
-    | 'cells'
-    | 'rows'
-    | 'cols'
-    | 'kb_cols'
-    | 'kb_cards'
-    | 'checklists'
-    | 'checklist_items'
-    | 'links'
-    | 'docs',
+  table: 'nodes' | 'cells' | 'rows' | 'cols' | 'kb_cols' | 'checklists' | 'links' | 'docs',
   workspaceId: string,
   fetch: () => Promise<T[]>,
 ): Promise<T[]> {
@@ -190,6 +183,11 @@ export async function fetchColsForWorkspace(workspaceId: string): Promise<ColRow
 // Laedt alle Karten der angegebenen Boards in einem Query. Genutzt
 // von der Aggregat-Sektion (Intervallmatrix / Aufgabenuebersicht),
 // um alle Karten im Subtree einer Matrix zu holen.
+//
+// Phase 4 T.1.D: Native gegen tasks + task_manifestations. Manifestations
+// (kind='kanban') tragen den board_id-Bezug in display_meta.board_id —
+// der Filter laeuft client-side, weil ein JSONB-Index dafuer (noch)
+// fehlt und die Fall-Datenmenge pro Workspace klein ist.
 export async function fetchCardsForBoards(
   boardIds: string[],
   workspaceId: string,
@@ -197,22 +195,53 @@ export async function fetchCardsForBoards(
   if (boardIds.length === 0) return [];
   try {
     const { data, error } = await supabase
-      .from('kb_cards')
-      .select('*')
-      .in('board_id', boardIds)
-      .eq('workspace_id', workspaceId);
+      .from('task_manifestations')
+      .select('*, task:tasks(*)')
+      .eq('workspace_id', workspaceId)
+      .eq('kind', 'kanban');
     if (error) throw error;
-    const rows = (data ?? []) as KbCardRow[];
-    void mergeRows('kb_cards', rows).catch(() => {});
+    const idSet = new Set(boardIds);
+    type Joined = TaskManifestationRow & { task: TaskRow | null };
+    const joined = (data ?? []) as Joined[];
+    const cards: KbCardRow[] = [];
+    const tasks: TaskRow[] = [];
+    const manifs: TaskManifestationRow[] = [];
+    for (const m of joined) {
+      const t = m.task;
+      if (!t) continue;
+      const boardId = (m.display_meta as Record<string, unknown> | null)?.board_id as
+        | string
+        | undefined;
+      if (!boardId || !idSet.has(boardId)) continue;
+      cards.push(taskAndManifToCard(t, m));
+      tasks.push(t);
+      manifs.push({ ...m, task: undefined } as unknown as TaskManifestationRow);
+    }
+    void mergeRows('tasks', tasks).catch(() => {});
+    void mergeRows('task_manifestations', manifs).catch(() => {});
     markLiveSuccess();
-    return rows;
+    return cards;
   } catch (err) {
     if (!isNetworkError(err)) throw err;
-    const set = new Set(boardIds);
-    const all = await getByWorkspace<KbCardRow>('kb_cards', workspaceId);
-    const filtered = all.filter((c) => set.has(c.board_id));
+    const idSet = new Set(boardIds);
+    const [allTasks, allManifs] = await Promise.all([
+      getByWorkspace<TaskRow>('tasks', workspaceId),
+      getByWorkspace<TaskManifestationRow>('task_manifestations', workspaceId),
+    ]);
+    const taskById = new Map(allTasks.map((t) => [t.id, t]));
+    const cards: KbCardRow[] = [];
+    for (const m of allManifs) {
+      if (m.kind !== 'kanban') continue;
+      const boardId = (m.display_meta as Record<string, unknown> | null)?.board_id as
+        | string
+        | undefined;
+      if (!boardId || !idSet.has(boardId)) continue;
+      const t = taskById.get(m.task_id);
+      if (!t) continue;
+      cards.push(taskAndManifToCard(t, m));
+    }
     markCacheFallback();
-    return filtered;
+    return cards;
   }
 }
 
@@ -282,12 +311,17 @@ export async function fetchMatrixContent(
 // 4 parallele Queries. checklist_items werden via in-Filter auf die
 // Board-Checklisten eingeschraenkt — nicht via RLS-only, weil es sonst
 // alle items ueber den Workspace laedt.
+//
+// Phase 4 T.1.D: Karten + Items kommen ueber tasks + task_manifestations.
+// Karten = manifestations(kind='kanban') WHERE display_meta.board_id =
+// boardId. Items = manifestations(kind='checklist') WHERE container_id
+// IN (board.checklists).
 export async function fetchBoardContent(
   boardId: string,
   workspaceId: string,
 ): Promise<BoardContent> {
   try {
-    const [colsRes, cardsRes, checklistsRes, linksRes] = await Promise.all([
+    const [colsRes, manifsRes, checklistsRes, linksRes] = await Promise.all([
       supabase
         .from('kb_cols')
         .select('*')
@@ -295,11 +329,10 @@ export async function fetchBoardContent(
         .eq('workspace_id', workspaceId)
         .order('position', { ascending: true }),
       supabase
-        .from('kb_cards')
-        .select('*')
-        .eq('board_id', boardId)
+        .from('task_manifestations')
+        .select('*, task:tasks(*)')
         .eq('workspace_id', workspaceId)
-        .order('position', { ascending: true }),
+        .eq('kind', 'kanban'),
       supabase
         .from('checklists')
         .select('*')
@@ -315,62 +348,107 @@ export async function fetchBoardContent(
     ]);
 
     if (colsRes.error) throw colsRes.error;
-    if (cardsRes.error) throw cardsRes.error;
+    if (manifsRes.error) throw manifsRes.error;
     if (checklistsRes.error) throw checklistsRes.error;
     if (linksRes.error) throw linksRes.error;
 
     const kbCols = (colsRes.data ?? []) as KbColRow[];
-    const kbCards = (cardsRes.data ?? []) as KbCardRow[];
     const checklists = (checklistsRes.data ?? []) as ChecklistRow[];
     const links = (linksRes.data ?? []) as LinkRow[];
 
-    let checklistItems: ChecklistItemRow[] = [];
+    type Joined = TaskManifestationRow & { task: TaskRow | null };
+    const cardManifs = (manifsRes.data ?? []) as Joined[];
+    const cachedTasks: TaskRow[] = [];
+    const cachedCardManifs: TaskManifestationRow[] = [];
+    const kbCards: KbCardRow[] = [];
+    for (const m of cardManifs) {
+      const t = m.task;
+      if (!t) continue;
+      const bId = (m.display_meta as Record<string, unknown> | null)?.board_id as
+        | string
+        | undefined;
+      if (bId !== boardId) continue;
+      kbCards.push(taskAndManifToCard(t, m));
+      cachedTasks.push(t);
+      cachedCardManifs.push({ ...m, task: undefined } as unknown as TaskManifestationRow);
+    }
+    kbCards.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+
+    // Items: manifestations(kind='checklist') wo container_id in checklists.
+    const checklistItems: ChecklistItemRow[] = [];
+    const cachedItemTasks: TaskRow[] = [];
+    const cachedItemManifs: TaskManifestationRow[] = [];
     if (checklists.length > 0) {
       const ids = checklists.map((c) => c.id);
       const itemsRes = await supabase
-        .from('checklist_items')
-        .select('*')
-        .in('checklist_id', ids)
+        .from('task_manifestations')
+        .select('*, task:tasks(*)')
         .eq('workspace_id', workspaceId)
-        .order('position', { ascending: true });
+        .eq('kind', 'checklist')
+        .in('container_id', ids);
       if (itemsRes.error) throw itemsRes.error;
-      checklistItems = (itemsRes.data ?? []) as ChecklistItemRow[];
+      const itemJoined = (itemsRes.data ?? []) as Joined[];
+      for (const m of itemJoined) {
+        const t = m.task;
+        if (!t) continue;
+        checklistItems.push(taskAndManifToItem(t, m));
+        cachedItemTasks.push(t);
+        cachedItemManifs.push({ ...m, task: undefined } as unknown as TaskManifestationRow);
+      }
+      checklistItems.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
     }
 
     void mergeRows('kb_cols', kbCols).catch(() => {});
-    void mergeRows('kb_cards', kbCards).catch(() => {});
     void mergeRows('checklists', checklists).catch(() => {});
     void mergeRows('links', links).catch(() => {});
-    void mergeRows('checklist_items', checklistItems).catch(() => {});
+    void mergeRows('tasks', [...cachedTasks, ...cachedItemTasks]).catch(() => {});
+    void mergeRows('task_manifestations', [...cachedCardManifs, ...cachedItemManifs]).catch(
+      () => {},
+    );
     markLiveSuccess();
 
     return { kbCols, kbCards, checklists, checklistItems, links };
   } catch (err) {
     if (!isNetworkError(err)) throw err;
-    // Offline: workspace-weite Caches filtern auf board_id.
-    const [allCols, allCards, allCl, allLinks, allItems] = await Promise.all([
+    // Offline: workspace-weite Caches projizieren.
+    const [allCols, allTasks, allManifs, allCl, allLinks] = await Promise.all([
       getByWorkspace<KbColRow>('kb_cols', workspaceId),
-      getByWorkspace<KbCardRow>('kb_cards', workspaceId),
+      getByWorkspace<TaskRow>('tasks', workspaceId),
+      getByWorkspace<TaskManifestationRow>('task_manifestations', workspaceId),
       getByWorkspace<ChecklistRow>('checklists', workspaceId),
       getByWorkspace<LinkRow>('links', workspaceId),
-      getByWorkspace<ChecklistItemRow>('checklist_items', workspaceId),
     ]);
     const checklists = allCl
       .filter((c) => c.board_id === boardId)
       .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
     const clIds = new Set(checklists.map((c) => c.id));
+    const taskById = new Map(allTasks.map((t) => [t.id, t]));
+    const kbCards: KbCardRow[] = [];
+    const checklistItems: ChecklistItemRow[] = [];
+    for (const m of allManifs) {
+      const t = taskById.get(m.task_id);
+      if (!t) continue;
+      if (m.kind === 'kanban') {
+        const bId = (m.display_meta as Record<string, unknown> | null)?.board_id as
+          | string
+          | undefined;
+        if (bId === boardId) kbCards.push(taskAndManifToCard(t, m));
+      } else if (m.kind === 'checklist') {
+        if (m.container_id && clIds.has(m.container_id)) {
+          checklistItems.push(taskAndManifToItem(t, m));
+        }
+      }
+    }
+    kbCards.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    checklistItems.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
     markCacheFallback();
     return {
       kbCols: allCols
         .filter((c) => c.board_id === boardId)
         .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
-      kbCards: allCards
-        .filter((c) => c.board_id === boardId)
-        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+      kbCards,
       checklists,
-      checklistItems: allItems
-        .filter((it) => clIds.has(it.checklist_id))
-        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+      checklistItems,
       links: allLinks
         .filter((l) => l.board_id === boardId)
         .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
@@ -381,8 +459,11 @@ export async function fetchBoardContent(
 // AU-B1 K2 (B1-D-001): Card-Drop-Helper.
 // Liefert die erste Spalte eines Boards + die hoechste Position
 // in deren Card-Liste. Wird vom NodeTree-Drop-Handler benoetigt
-// um Karten ans Top der ersten Spalte zu schieben. Online-Pfad mit
-// IDB-Fallback analog zu fetchBoardContent.
+// um Karten ans Top der ersten Spalte zu schieben.
+//
+// Phase 4 T.1.D: Position kommt aus task_manifestations(kind='kanban',
+// container_id = firstCol.id) — die Cards leben dort, nicht mehr in
+// einer kb_cards-Tabelle.
 export async function fetchBoardCardDropTarget(
   boardId: string,
   workspaceId: string,
@@ -400,9 +481,10 @@ export async function fetchBoardCardDropTarget(
     if (!firstCol) return null;
 
     const posRes = await supabase
-      .from('kb_cards')
+      .from('task_manifestations')
       .select('position')
-      .eq('col_id', firstCol.id)
+      .eq('container_id', firstCol.id)
+      .eq('kind', 'kanban')
       .eq('workspace_id', workspaceId)
       .order('position', { ascending: false })
       .limit(1);
@@ -415,9 +497,9 @@ export async function fetchBoardCardDropTarget(
     return { firstColId: firstCol.id, topPosition: topPos + 1 };
   } catch (err) {
     if (!isNetworkError(err)) throw err;
-    const [allCols, allCards] = await Promise.all([
+    const [allCols, allManifs] = await Promise.all([
       getByWorkspace<KbColRow>('kb_cols', workspaceId),
-      getByWorkspace<KbCardRow>('kb_cards', workspaceId),
+      getByWorkspace<TaskManifestationRow>('task_manifestations', workspaceId),
     ]);
     const cols = allCols
       .filter((c) => c.board_id === boardId)
@@ -427,10 +509,10 @@ export async function fetchBoardCardDropTarget(
       markCacheFallback();
       return null;
     }
-    const colCards = allCards
-      .filter((c) => c.col_id === firstCol.id)
+    const colManifs = allManifs
+      .filter((m) => m.kind === 'kanban' && m.container_id === firstCol.id)
       .sort((a, b) => (b.position ?? 0) - (a.position ?? 0));
-    const topPos = colCards.length > 0 ? (colCards[0].position ?? 0) : -1;
+    const topPos = colManifs.length > 0 ? (colManifs[0].position ?? 0) : -1;
     markCacheFallback();
     return { firstColId: firstCol.id, topPosition: topPos + 1 };
   }
@@ -439,6 +521,8 @@ export async function fetchBoardCardDropTarget(
 // ─── Cell-Checklisten (cell_id=X, board_id=NULL) ──────────────────
 // Wie der Board-Pfad, aber gefiltert auf eine Zelle. RLS + workspace_id
 // als Guard.
+//
+// Phase 4 T.1.D: Items kommen aus task_manifestations(kind='checklist').
 export async function fetchCellChecklists(
   cellId: string,
   workspaceId: string,
@@ -453,40 +537,56 @@ export async function fetchCellChecklists(
     if (clErr) throw clErr;
 
     const checklists = (clData ?? []) as ChecklistRow[];
-    let checklistItems: ChecklistItemRow[] = [];
+    const checklistItems: ChecklistItemRow[] = [];
+    const cachedTasks: TaskRow[] = [];
+    const cachedManifs: TaskManifestationRow[] = [];
     if (checklists.length > 0) {
       const ids = checklists.map((c) => c.id);
       const { data: itData, error: itErr } = await supabase
-        .from('checklist_items')
-        .select('*')
-        .in('checklist_id', ids)
+        .from('task_manifestations')
+        .select('*, task:tasks(*)')
         .eq('workspace_id', workspaceId)
-        .order('position', { ascending: true });
+        .eq('kind', 'checklist')
+        .in('container_id', ids);
       if (itErr) throw itErr;
-      checklistItems = (itData ?? []) as ChecklistItemRow[];
+      type Joined = TaskManifestationRow & { task: TaskRow | null };
+      for (const m of (itData ?? []) as Joined[]) {
+        const t = m.task;
+        if (!t) continue;
+        checklistItems.push(taskAndManifToItem(t, m));
+        cachedTasks.push(t);
+        cachedManifs.push({ ...m, task: undefined } as unknown as TaskManifestationRow);
+      }
+      checklistItems.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
     }
 
     void mergeRows('checklists', checklists).catch(() => {});
-    void mergeRows('checklist_items', checklistItems).catch(() => {});
+    void mergeRows('tasks', cachedTasks).catch(() => {});
+    void mergeRows('task_manifestations', cachedManifs).catch(() => {});
     markLiveSuccess();
     return { checklists, checklistItems };
   } catch (err) {
     if (!isNetworkError(err)) throw err;
-    const [allCl, allItems] = await Promise.all([
+    const [allCl, allTasks, allManifs] = await Promise.all([
       getByWorkspace<ChecklistRow>('checklists', workspaceId),
-      getByWorkspace<ChecklistItemRow>('checklist_items', workspaceId),
+      getByWorkspace<TaskRow>('tasks', workspaceId),
+      getByWorkspace<TaskManifestationRow>('task_manifestations', workspaceId),
     ]);
     const checklists = allCl
       .filter((c) => c.cell_id === cellId)
       .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
     const clIds = new Set(checklists.map((c) => c.id));
+    const taskById = new Map(allTasks.map((t) => [t.id, t]));
+    const checklistItems: ChecklistItemRow[] = [];
+    for (const m of allManifs) {
+      if (m.kind !== 'checklist' || !m.container_id || !clIds.has(m.container_id)) continue;
+      const t = taskById.get(m.task_id);
+      if (!t) continue;
+      checklistItems.push(taskAndManifToItem(t, m));
+    }
+    checklistItems.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
     markCacheFallback();
-    return {
-      checklists,
-      checklistItems: allItems
-        .filter((it) => clIds.has(it.checklist_id))
-        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
-    };
+    return { checklists, checklistItems };
   }
 }
 
@@ -614,13 +714,21 @@ export async function isNodeEmpty(nodeId: string, nodeType: 'matrix' | 'board'):
     ]);
     return (r.count ?? 0) === 0 && (c.count ?? 0) === 0;
   }
-  const [cards, cols, cls, links] = await Promise.all([
-    supabase.from('kb_cards').select('id', { head: true, count: 'exact' }).eq('board_id', nodeId),
+  // Karten = task_manifestations(kind='kanban', display_meta.board_id=nodeId).
+  // Wir fragen dafuer alle kanban-Manifestations des Workspaces ab und
+  // zaehlen client-seitig — JSONB-Index fehlt (s. fetchBoardContent).
+  // Bei "leerem" Board geht das durch wenn die Tabelle ohnehin klein ist.
+  const [cardManifs, cols, cls, links] = await Promise.all([
+    supabase.from('task_manifestations').select('display_meta').eq('kind', 'kanban'),
     supabase.from('kb_cols').select('id', { head: true, count: 'exact' }).eq('board_id', nodeId),
     supabase.from('checklists').select('id', { head: true, count: 'exact' }).eq('board_id', nodeId),
     supabase.from('links').select('id', { head: true, count: 'exact' }).eq('board_id', nodeId),
   ]);
-  return [cards, cols, cls, links].every((res) => (res.count ?? 0) === 0);
+  const cardCount = (cardManifs.data ?? []).filter(
+    (m: { display_meta: Record<string, unknown> | null }) =>
+      (m.display_meta as Record<string, unknown> | null)?.board_id === nodeId,
+  ).length;
+  return cardCount === 0 && [cols, cls, links].every((res) => (res.count ?? 0) === 0);
 }
 
 // ─── Tree-Aufbau ─────────────────────────────────────────────────

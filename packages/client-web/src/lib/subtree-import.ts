@@ -295,6 +295,142 @@ async function insertBatch(table: string, rows: Record<string, unknown>[]): Prom
   }
 }
 
+// ─── Phase 4 T.1.D Helpers: Legacy-Payload → Task-Layer ────────
+// Import-Payloads tragen weiterhin die kb_cards / checklist_items
+// Form aus historischen Exporten. Diese Helper transformieren sie in
+// die native (TaskRow, TaskManifestationRow{kanban|checklist}) Form,
+// bevor wir per insertBatch in tasks + task_manifestations schreiben.
+type AnyRecord = Record<string, unknown>;
+
+function kbCardPayloadToTaskAndManif(
+  k: AnyRecord,
+  workspaceId: string,
+): { task: AnyRecord; manif: AnyRecord } {
+  const r = k as {
+    id: string;
+    name?: string;
+    note?: string | null;
+    done?: boolean;
+    archived?: boolean;
+    deadline?: string | null;
+    who?: string[];
+    recur?: AnyRecord | null;
+    done_occurrences?: string[];
+    priority?: number | null;
+    tags?: string[];
+    alias?: string | null;
+    color?: string | null;
+    checklist?: AnyRecord[] | null;
+    checklist_ref?: string | null;
+    source_cl_id?: string | null;
+    source_label?: string | null;
+    board_id: string;
+    col_id: string;
+    position?: number;
+  };
+  const status = r.archived ? 'archived' : r.done ? 'done' : 'open';
+  const attrs: AnyRecord = { legacy_kind: 'kb_card' };
+  if (r.priority != null) attrs.priority = r.priority;
+  if (r.tags && r.tags.length > 0) attrs.tags = r.tags;
+  if (r.alias != null) attrs.alias = r.alias;
+  if (r.color != null) attrs.color = r.color;
+  if (r.checklist != null) attrs.checklist_inline = r.checklist;
+  if (r.checklist_ref != null) attrs.checklist_ref = r.checklist_ref;
+  if (r.source_cl_id != null) attrs.source_cl_id = r.source_cl_id;
+  if (r.source_label != null) attrs.source_label = r.source_label;
+  return {
+    task: {
+      id: r.id,
+      workspace_id: workspaceId,
+      label: r.name ?? '',
+      note: r.note ?? null,
+      status,
+      deadline: r.deadline ?? null,
+      who: r.who ?? [],
+      recur: r.recur ?? null,
+      done_occurrences: r.done_occurrences ?? [],
+      attrs,
+    },
+    manif: {
+      task_id: r.id,
+      workspace_id: workspaceId,
+      kind: 'kanban',
+      container_id: r.col_id,
+      position: r.position ?? 0,
+      display_meta: { board_id: r.board_id },
+    },
+  };
+}
+
+function itemPayloadToTaskAndManif(
+  it: AnyRecord,
+  workspaceId: string,
+): { task: AnyRecord; manif: AnyRecord } {
+  const r = it as {
+    id: string;
+    text?: string;
+    done?: boolean;
+    level?: number;
+    position?: number;
+    checklist_id: string;
+  };
+  return {
+    task: {
+      id: r.id,
+      workspace_id: workspaceId,
+      label: r.text ?? '',
+      status: r.done ? 'done' : 'open',
+      attrs: { legacy_kind: 'checklist_item' },
+    },
+    manif: {
+      task_id: r.id,
+      workspace_id: workspaceId,
+      kind: 'checklist',
+      container_id: r.checklist_id,
+      level: r.level ?? 0,
+      position: r.position ?? 0,
+    },
+  };
+}
+
+// Bulk-Variante: Eingabe sind die schon ID-remappten Payload-Rows mit
+// final-targets fuer board_id/col_id/checklist_id. Output sind zwei
+// Arrays bereit fuer insertBatch('tasks', ...) + insertBatch('task_-
+// manifestations', ...).
+function splitKbCards(
+  rows: AnyRecord[],
+  workspaceId: string,
+): {
+  tasks: AnyRecord[];
+  manifs: AnyRecord[];
+} {
+  const tasks: AnyRecord[] = [];
+  const manifs: AnyRecord[] = [];
+  for (const r of rows) {
+    const { task, manif } = kbCardPayloadToTaskAndManif(r, workspaceId);
+    tasks.push(task);
+    manifs.push(manif);
+  }
+  return { tasks, manifs };
+}
+
+function splitChecklistItems(
+  rows: AnyRecord[],
+  workspaceId: string,
+): {
+  tasks: AnyRecord[];
+  manifs: AnyRecord[];
+} {
+  const tasks: AnyRecord[] = [];
+  const manifs: AnyRecord[] = [];
+  for (const r of rows) {
+    const { task, manif } = itemPayloadToTaskAndManif(r, workspaceId);
+    tasks.push(task);
+    manifs.push(manif);
+  }
+  return { tasks, manifs };
+}
+
 // Best-effort Cleanup nach Partial-Insert. Faellt waehrend der Phase-
 // Sequenz eine Insert um (Netz weg, RLS-Fehler, FK-Kollision), bleiben
 // sonst Nodes/Rows/Cols/Cells als Waisen zurueck. Per Cascade-Delete
@@ -378,6 +514,10 @@ export async function clearCellInfoData(cellId: string): Promise<void> {
 
 // Loescht alle Cell-scoped Checklisten + Items + nimmt 'checklists'
 // aus features.
+//
+// Phase 4 T.1.D: Items leben in task_manifestations(kind='checklist').
+// Wir loeschen erst die Tasks dieser Manifestations (CASCADE killt
+// die Manifestations), dann die Checklisten.
 export async function clearCellChecklistsData(cellId: string): Promise<void> {
   const { data: lists, error } = await supabase
     .from('checklists')
@@ -386,11 +526,19 @@ export async function clearCellChecklistsData(cellId: string): Promise<void> {
   if (error) throw error;
   const ids = ((lists ?? []) as Array<{ id: string }>).map((l) => l.id);
   if (ids.length > 0) {
-    const { error: itErr } = await supabase
-      .from('checklist_items')
-      .delete()
-      .in('checklist_id', ids);
-    if (itErr) throw itErr;
+    // 1. Tasks der checklist-Manifestations dieser Listen ermitteln.
+    const { data: itManifs, error: imErr } = await supabase
+      .from('task_manifestations')
+      .select('task_id')
+      .eq('kind', 'checklist')
+      .in('container_id', ids);
+    if (imErr) throw imErr;
+    const taskIds = ((itManifs ?? []) as Array<{ task_id: string }>).map((m) => m.task_id);
+    if (taskIds.length > 0) {
+      const { error: tasksErr } = await supabase.from('tasks').delete().in('id', taskIds);
+      if (tasksErr) throw tasksErr;
+    }
+    // 2. Checklisten loeschen.
     const { error: clErr } = await supabase.from('checklists').delete().in('id', ids);
     if (clErr) throw clErr;
   }
@@ -454,19 +602,95 @@ async function collectDescendantNodeIds(rootMatrixId: string): Promise<string[]>
   return descendants;
 }
 
+// Pre-Cleanup-Helper fuer Phase 4 T.1.D: das Schema 040 hat keinen FK
+// von task_manifestations.container_id auf kb_cols/checklists (poly-
+// morpher Container). Damit cascadet ein DELETE auf nodes/kb_cols/
+// checklists NICHT auf manifestations + tasks. Wir muessen die Tasks
+// vorher loeschen — der CASCADE laeuft dann ueber tasks.id.
+async function cleanupTasksForNodeIds(nodeIds: string[]): Promise<void> {
+  if (nodeIds.length === 0) return;
+  // 1. kanban-Manifestations mit display_meta.board_id ∈ nodeIds.
+  //    Wir holen alle (workspace-scoped via RLS) und filtern client-side
+  //    — JSONB-Index fehlt.
+  const { data: kbManifs, error: kbErr } = await supabase
+    .from('task_manifestations')
+    .select('task_id, display_meta')
+    .eq('kind', 'kanban');
+  if (kbErr) throw kbErr;
+  const idSet = new Set(nodeIds);
+  const cardTaskIds = (
+    (kbManifs ?? []) as Array<{
+      task_id: string;
+      display_meta: Record<string, unknown> | null;
+    }>
+  )
+    .filter((m) => {
+      const bId = (m.display_meta as Record<string, unknown> | null)?.board_id;
+      return typeof bId === 'string' && idSet.has(bId);
+    })
+    .map((m) => m.task_id);
+
+  // 2. Checklisten in diesen Boards.
+  const { data: cls, error: clQErr } = await supabase
+    .from('checklists')
+    .select('id')
+    .in('board_id', nodeIds);
+  if (clQErr) throw clQErr;
+  const clIds = ((cls ?? []) as Array<{ id: string }>).map((c) => c.id);
+
+  // 3. checklist-Manifestations in diesen Checklisten.
+  let itemTaskIds: string[] = [];
+  if (clIds.length > 0) {
+    const { data: itManifs, error: imErr } = await supabase
+      .from('task_manifestations')
+      .select('task_id')
+      .eq('kind', 'checklist')
+      .in('container_id', clIds);
+    if (imErr) throw imErr;
+    itemTaskIds = ((itManifs ?? []) as Array<{ task_id: string }>).map((m) => m.task_id);
+  }
+
+  // 4. Tasks bulk-delete (CASCADE killt manifestations).
+  const allTaskIds = [...cardTaskIds, ...itemTaskIds];
+  if (allTaskIds.length > 0) {
+    const { error: tasksErr } = await supabase.from('tasks').delete().in('id', allTaskIds);
+    if (tasksErr) throw tasksErr;
+  }
+}
+
+async function cleanupTasksForCellIds(cellIds: string[]): Promise<void> {
+  if (cellIds.length === 0) return;
+  const { data: cls, error: clErr } = await supabase
+    .from('checklists')
+    .select('id')
+    .in('cell_id', cellIds);
+  if (clErr) throw clErr;
+  const clIds = ((cls ?? []) as Array<{ id: string }>).map((c) => c.id);
+  if (clIds.length === 0) return;
+  const { data: itManifs, error: imErr } = await supabase
+    .from('task_manifestations')
+    .select('task_id')
+    .eq('kind', 'checklist')
+    .in('container_id', clIds);
+  if (imErr) throw imErr;
+  const taskIds = ((itManifs ?? []) as Array<{ task_id: string }>).map((m) => m.task_id);
+  if (taskIds.length > 0) {
+    const { error: tasksErr } = await supabase.from('tasks').delete().in('id', taskIds);
+    if (tasksErr) throw tasksErr;
+  }
+}
+
 // Leert eine Matrix komplett: descendant-Nodes rekursiv loeschen
 // (sonst werden sie beim Cell-Delete orphan wegen nodes.parent_cell_id
 // ON DELETE SET NULL), dann Docs, dann Cells/Rows/Cols der Matrix.
 // Der Matrix-Node selbst (mit Label/Alias/Notizen) bleibt unberuehrt.
+//
+// Phase 4 T.1.D: Tasks der descendant-Boards/Checklisten muessen vor
+// dem Node-Delete gepurged werden (kein FK-Cascade). Der target-Matrix
+// hat eigene cell-attached Checklisten — auch dafuer cleanup.
 export async function clearMatrixContents(matrixId: string): Promise<void> {
-  // 1. Alle descendant-Nodes sammeln (sub-Matrizen / sub-Boards
-  //    rekursiv). Diese muessen explizit geloescht werden — das
-  //    Schema hat nodes.parent_cell_id ON DELETE SET NULL, nicht
-  //    CASCADE, sonst wuerden Sub-Matrizen zu Root-Nodes "promovieren".
   const descendants = await collectDescendantNodeIds(matrixId);
 
-  // 2. Alle Cell-IDs (Target-Matrix + alle descendant-Matrizen) fuer
-  //    Doc-Cleanup einsammeln.
   const matrixIdsForCells = [matrixId, ...descendants];
   const { data: cells, error: cellsQueryErr } = await supabase
     .from('cells')
@@ -474,22 +698,23 @@ export async function clearMatrixContents(matrixId: string): Promise<void> {
     .in('matrix_id', matrixIdsForCells);
   if (cellsQueryErr) throw cellsQueryErr;
   const cellIds = ((cells ?? []) as Array<{ id: string }>).map((c) => c.id);
+
+  // Phase 4 T.1.D: Tasks der descendant-Boards (kanban + ihre Checklisten)
+  // vorher loeschen, sonst orphaned manifestations.
+  await cleanupTasksForNodeIds(descendants);
+  // cell-attached Checklisten der Matrix-Cells mit cleanup.
+  await cleanupTasksForCellIds(cellIds);
+
   if (cellIds.length > 0) {
     const { error: dErr } = await supabase.from('docs').delete().in('attached_cell_id', cellIds);
     if (dErr) throw dErr;
   }
 
-  // 3. Descendant-Nodes loeschen. Cascade via FK raeumt ihre rows /
-  //    cols / cells / kb_cols / kb_cards / checklists / items / links
-  //    mit auf (matrix_id / board_id FKs sind ON DELETE CASCADE).
   if (descendants.length > 0) {
     const { error: dnErr } = await supabase.from('nodes').delete().in('id', descendants);
     if (dnErr) throw dnErr;
   }
 
-  // 4. Target-Matrix eigene Cells/Rows/Cols loeschen — Matrix-Node
-  //    selbst bleibt stehen, damit Label/Alias erhalten bleiben
-  //    (bzw. separat vom Caller ersetzt werden koennen).
   const { error: cErr } = await supabase.from('cells').delete().eq('matrix_id', matrixId);
   if (cErr) throw cErr;
   const { error: rErr } = await supabase.from('rows').delete().eq('matrix_id', matrixId);
@@ -862,11 +1087,19 @@ export async function executeSubtreeImportIntoCell(args: {
     step('Kanban-Spalten einfuegen…');
     await insertBatch('kb_cols', kbColsOut);
     step('Karten einfuegen…');
-    await insertBatch('kb_cards', kbCardsOut);
+    {
+      const { tasks, manifs } = splitKbCards(kbCardsOut, workspaceId);
+      await insertBatch('tasks', tasks);
+      await insertBatch('task_manifestations', manifs);
+    }
     step('Checklisten einfuegen…');
     await insertBatch('checklists', checklistsOut);
     step('Checklist-Eintraege einfuegen…');
-    await insertBatch('checklist_items', checklistItemsOut);
+    {
+      const { tasks, manifs } = splitChecklistItems(checklistItemsOut, workspaceId);
+      await insertBatch('tasks', tasks);
+      await insertBatch('task_manifestations', manifs);
+    }
     step('Links einfuegen…');
     await insertBatch('links', linksOut);
     step('Dokus einfuegen…');
@@ -1114,7 +1347,11 @@ async function executeCellContainerMerge(args: {
       checklist_id: remap((it as { checklist_id: string }).checklist_id, remapMap),
     }));
     await insertBatch('checklists', checklistsOut);
-    await insertBatch('checklist_items', itemsOut);
+    {
+      const { tasks, manifs } = splitChecklistItems(itemsOut, workspaceId);
+      await insertBatch('tasks', tasks);
+      await insertBatch('task_manifestations', manifs);
+    }
   }
 
   // 3. Docs aus dem Payload auf die Ziel-Zelle umhaengen.
@@ -1323,7 +1560,11 @@ export async function executeFeatureChecklistsImport(args: {
   step('Checklisten einfuegen…');
   await insertBatch('checklists', checklistsOut);
   step('Checklist-Eintraege einfuegen…');
-  await insertBatch('checklist_items', itemsOut);
+  {
+    const { tasks, manifs } = splitChecklistItems(itemsOut, workspaceId);
+    await insertBatch('tasks', tasks);
+    await insertBatch('task_manifestations', manifs);
+  }
 
   // Cell-Feature-Flag sicherstellen.
   const { data: targetCell } = await supabase
@@ -1668,11 +1909,19 @@ export async function executeSubtreeImportIntoMatrix(args: {
     step('Kanban-Spalten einfuegen…');
     await insertBatch('kb_cols', kbColsOut);
     step('Karten einfuegen…');
-    await insertBatch('kb_cards', kbCardsOut);
+    {
+      const { tasks, manifs } = splitKbCards(kbCardsOut, workspaceId);
+      await insertBatch('tasks', tasks);
+      await insertBatch('task_manifestations', manifs);
+    }
     step('Checklisten einfuegen…');
     await insertBatch('checklists', checklistsOut);
     step('Checklist-Eintraege einfuegen…');
-    await insertBatch('checklist_items', checklistItemsOut);
+    {
+      const { tasks, manifs } = splitChecklistItems(checklistItemsOut, workspaceId);
+      await insertBatch('tasks', tasks);
+      await insertBatch('task_manifestations', manifs);
+    }
     step('Links einfuegen…');
     await insertBatch('links', linksOut);
     step('Dokus einfuegen…');
@@ -1772,13 +2021,9 @@ export async function executeSubtreeImportIntoBoard(args: {
   }
   if (mode === 'overwrite' || mode === 'export-overwrite') {
     step('Ziel-Board leeren…');
-    // Ziel-Board leeren: kb_cards, kb_cols, board-scoped checklists
-    // (Cascade auf items), links.
-    const { error: cardsErr } = await supabase
-      .from('kb_cards')
-      .delete()
-      .eq('board_id', targetBoardId);
-    if (cardsErr) throw cardsErr;
+    // Ziel-Board leeren: Tasks (Karten + Items via cleanupTasksForNodeIds),
+    // dann kb_cols, checklists, links.
+    await cleanupTasksForNodeIds([targetBoardId]);
     const { error: colsErr } = await supabase
       .from('kb_cols')
       .delete()
@@ -1925,11 +2170,19 @@ export async function executeSubtreeImportIntoBoard(args: {
   step('Kanban-Spalten einfuegen…');
   await insertBatch('kb_cols', kbColsOut);
   step('Karten einfuegen…');
-  await insertBatch('kb_cards', kbCardsOut);
+  {
+    const { tasks, manifs } = splitKbCards(kbCardsOut, workspaceId);
+    await insertBatch('tasks', tasks);
+    await insertBatch('task_manifestations', manifs);
+  }
   step('Checklisten einfuegen…');
   await insertBatch('checklists', checklistsOut);
   step('Checklist-Eintraege einfuegen…');
-  await insertBatch('checklist_items', checklistItemsOut);
+  {
+    const { tasks, manifs } = splitChecklistItems(checklistItemsOut, workspaceId);
+    await insertBatch('tasks', tasks);
+    await insertBatch('task_manifestations', manifs);
+  }
   step('Links einfuegen…');
   await insertBatch('links', linksOut);
   step('Ziel-Board anpassen…');

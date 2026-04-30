@@ -40,7 +40,7 @@ import { supabase } from './supabase';
 // zieht (z.B. board_id + col_id matchen). Liefert 0 wenn der Scope
 // noch leer ist.
 async function nextPositionFromCache(
-  table: 'rows' | 'cols' | 'kb_cols' | 'kb_cards' | 'checklists' | 'links' | 'checklist_items',
+  table: 'rows' | 'cols' | 'kb_cols' | 'checklists' | 'links' | 'task_manifestations',
   workspaceId: string,
   filter: (r: Record<string, unknown> & { position?: number }) => boolean,
 ): Promise<number> {
@@ -59,6 +59,18 @@ import {
   readInfoFieldsFromData as readInfoFields,
   readCellLinksFromData as readInfoLinks,
 } from './cell-data';
+import {
+  type CardPatchInput,
+  type ItemPatchInput,
+  cardSnapshotToTaskAndManif,
+  itemSnapshotToTaskAndManif,
+  mergeAttrs,
+  splitCardPatch,
+  splitItemPatch,
+  taskAndManifToCard,
+  taskAndManifToItem,
+} from './task-projections';
+import { addManifestation, createTask, deleteTask, updateManifestation, updateTask } from './tasks';
 import type {
   CardRecur,
   CellRow,
@@ -76,6 +88,8 @@ import type {
   LinkType,
   NodeRow,
   RowRow,
+  TaskManifestationRow,
+  TaskRow,
 } from './types';
 import { sanitizeUrl } from './url';
 
@@ -98,19 +112,17 @@ async function nextPosition(
 }
 
 async function nextBoardPosition(
-  table: 'kb_cols' | 'kb_cards' | 'checklists' | 'links',
+  table: 'kb_cols' | 'checklists' | 'links',
   boardId: string,
   workspaceId: string,
-  extraEq?: { col_id?: string },
 ): Promise<number> {
-  let q = supabase
+  const q = supabase
     .from(table)
     .select('position')
     .eq('board_id', boardId)
     .eq('workspace_id', workspaceId)
     .order('position', { ascending: false })
     .limit(1);
-  if (extraEq?.col_id) q = q.eq('col_id', extraEq.col_id);
   const { data, error } = await q;
   if (error) throw error;
   const top = data && data.length > 0 ? (data[0] as { position: number }).position : -1;
@@ -881,74 +893,90 @@ export async function delKbCol(colId: string): Promise<void> {
 }
 
 // ─── Karten ────────────────────────────────────────────────────
-// Positions-Scoping pro Spalte (col_id), damit Karten innerhalb der
-// Spalte eine eigene Reihenfolge haben. Move zwischen Spalten setzt
-// die Position neu auf das Ende der Ziel-Spalte.
+// Phase 4 T.1.D: Karten leben als (TaskRow, TaskManifestationRow{kind:
+// 'kanban'}). Diese Helper kapseln die Kombination und projizieren die
+// Antwort auf die Legacy-KbCardRow-Form fuer bestehende UI-Konsumenten
+// (BoardView/CardOverlay; Migration auf compound type folgt T.1.D5).
+//
+// Schema-Mapping siehe lib/task-projections.ts.
+
+// Naechste Position einer kanban-Manifestation in einer Spalte. Online:
+// max(position) der Manifestations + 1. Offline: max aus IDB-Cache.
+async function nextManifPosition(containerId: string, workspaceId: string): Promise<number> {
+  try {
+    const { data, error } = await supabase
+      .from('task_manifestations')
+      .select('position')
+      .eq('container_id', containerId)
+      .eq('kind', 'kanban')
+      .eq('workspace_id', workspaceId)
+      .order('position', { ascending: false })
+      .limit(1);
+    if (error) throw error;
+    return data && data.length > 0 ? (data[0] as { position: number }).position + 1 : 0;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    return nextPositionFromCache(
+      'task_manifestations',
+      workspaceId,
+      (r) => r.kind === 'kanban' && r.container_id === containerId,
+    );
+  }
+}
+
+// Findet die kanban-Manifestation einer Task. Wird vor Move/Position-
+// Updates gebraucht, weil mutations.ts die Manif-Id explizit kennen
+// muss (cardId == taskId nach Migration 041, manif.id ist neu).
+async function findKanbanManif(taskId: string): Promise<TaskManifestationRow | null> {
+  try {
+    const { data, error } = await supabase
+      .from('task_manifestations')
+      .select('*')
+      .eq('task_id', taskId)
+      .eq('kind', 'kanban')
+      .maybeSingle();
+    if (error) throw error;
+    return (data as TaskManifestationRow) ?? null;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    // Offline: Task im IDB lookup um workspace_id zu lernen, dann manif filtern.
+    const task = await getById<TaskRow>('tasks', taskId);
+    if (!task) return null;
+    const cached = await getByWorkspace<TaskManifestationRow>(
+      'task_manifestations',
+      task.workspace_id,
+    );
+    return cached.find((m) => m.task_id === taskId && m.kind === 'kanban') ?? null;
+  }
+}
+
+async function fetchTaskFresh(taskId: string): Promise<TaskRow | null> {
+  try {
+    const { data, error } = await supabase.from('tasks').select('*').eq('id', taskId).maybeSingle();
+    if (error) throw error;
+    return (data as TaskRow) ?? null;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    return getById<TaskRow>('tasks', taskId);
+  }
+}
+
 export async function addCard(args: {
   workspaceId: string;
   boardId: string;
   colId: string;
   name?: string;
 }): Promise<KbCardRow> {
-  return runOptimisticInsert<KbCardRow>({
-    table: 'kb_cards',
-    workspaceId: args.workspaceId,
-    label: 'Karte anlegen',
-    run: async () => {
-      const pos = await nextBoardPosition('kb_cards', args.boardId, args.workspaceId, {
-        col_id: args.colId,
-      });
-      const { data, error } = await supabase
-        .from('kb_cards')
-        .insert({
-          workspace_id: args.workspaceId,
-          board_id: args.boardId,
-          col_id: args.colId,
-          name: args.name ?? '',
-          position: pos,
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      return data as KbCardRow;
-    },
-    buildOffline: async (id) => {
-      const pos = await nextPositionFromCache(
-        'kb_cards',
-        args.workspaceId,
-        (r) => r.board_id === args.boardId && r.col_id === args.colId,
-      );
-      const now = new Date().toISOString();
-      // Vollstaendige Default-Row, damit UI-Renderings nicht auf
-      // undefined-Felder laufen. Server vergibt beim Replay neue
-      // timestamps; wir setzen die clientseitigen jetzt.
-      return {
-        id,
-        workspace_id: args.workspaceId,
-        board_id: args.boardId,
-        col_id: args.colId,
-        name: args.name ?? '',
-        note: '',
-        tags: [],
-        who: [],
-        deadline: null,
-        priority: null,
-        done: false,
-        archived: false,
-        recur: null,
-        position: pos,
-        alias: null,
-        source_cl_id: null,
-        source_label: null,
-        checklist_ref: null,
-        checklist: null,
-        color: null,
-        done_occurrences: [],
-        created_at: now,
-        updated_at: now,
-      } as unknown as KbCardRow;
-    },
+  const pos = await nextManifPosition(args.colId, args.workspaceId);
+  const task = await createTask(args.workspaceId, { label: args.name ?? '' });
+  const manif = await addManifestation(args.workspaceId, {
+    task_id: task.id,
+    kind: 'kanban',
+    container_id: args.colId,
+    position: pos,
+    display_meta: { board_id: args.boardId },
   });
+  return taskAndManifToCard(task, manif);
 }
 
 // Transform-to-Card: legt eine neue Karte auf dem Ziel-Board/Col an,
@@ -968,134 +996,65 @@ export async function createCardFromChecklist(args: {
   targetBoardId: string;
   targetColId: string;
 }): Promise<KbCardRow> {
-  return runOptimisticInsert<KbCardRow>({
-    table: 'kb_cards',
-    workspaceId: args.workspaceId,
-    label: 'Karte aus Checkliste',
-    run: async () => {
-      const pos = await nextBoardPosition('kb_cards', args.targetBoardId, args.workspaceId, {
-        col_id: args.targetColId,
-      });
-      const { data, error } = await supabase
-        .from('kb_cards')
-        .insert({
-          workspace_id: args.workspaceId,
-          board_id: args.targetBoardId,
-          col_id: args.targetColId,
-          name: args.name,
-          position: pos,
-          checklist_ref: args.checklistId,
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      return data as KbCardRow;
-    },
-    buildOffline: async (id) => {
-      const pos = await nextPositionFromCache(
-        'kb_cards',
-        args.workspaceId,
-        (r) => r.board_id === args.targetBoardId && r.col_id === args.targetColId,
-      );
-      const now = new Date().toISOString();
-      return {
-        id,
-        workspace_id: args.workspaceId,
-        board_id: args.targetBoardId,
-        col_id: args.targetColId,
-        name: args.name,
-        note: '',
-        tags: [],
-        who: [],
-        deadline: null,
-        priority: null,
-        done: false,
-        archived: false,
-        recur: null,
-        position: pos,
-        alias: null,
-        source_cl_id: null,
-        source_label: null,
-        checklist_ref: args.checklistId,
-        checklist: null,
-        color: null,
-        done_occurrences: [],
-        created_at: now,
-        updated_at: now,
-      } as unknown as KbCardRow;
-    },
+  const pos = await nextManifPosition(args.targetColId, args.workspaceId);
+  // checklist_ref liegt in tasks.attrs (siehe task-projections.ts).
+  const task = await createTask(args.workspaceId, {
+    label: args.name,
+    attrs: { checklist_ref: args.checklistId },
   });
+  const manif = await addManifestation(args.workspaceId, {
+    task_id: task.id,
+    kind: 'kanban',
+    container_id: args.targetColId,
+    position: pos,
+    display_meta: { board_id: args.targetBoardId },
+  });
+  return taskAndManifToCard(task, manif);
 }
 
-type CardPatch = Partial<
-  Pick<
-    KbCardRow,
-    | 'name'
-    | 'note'
-    | 'alias'
-    | 'done'
-    | 'deadline'
-    | 'priority'
-    | 'tags'
-    | 'who'
-    | 'archived'
-    | 'color'
-    | 'position'
-    | 'col_id'
-    | 'board_id'
-  >
-> & {
-  recur?: CardRecur | null;
-  // Inline-Checkliste (kb_cards.checklist jsonb) wird ueber denselben
-  // Wrapper geschrieben — sonst muesste mutateCardChecklist seinen
-  // eigenen runOptimisticUpdate-Aufruf bauen, was die Queue-Spec-Form
-  // dupliziert.
-  checklist?: InlineChecklistItem[];
-};
+// Update-Pfad einer Karte. Splittet den Patch in Task-, Manifestation-
+// und Attrs-Teile (siehe lib/task-projections.ts) und ruft die jeweilige
+// Mutation in lib/tasks.ts. Reihenfolge: zuerst Task (haeufigster Fall),
+// dann Manifestation falls col_id/position/board_id geaendert wurden.
+async function updateCard(cardId: string, patch: CardPatchInput): Promise<KbCardRow> {
+  const split = splitCardPatch(patch);
 
-async function updateCard(cardId: string, patch: CardPatch): Promise<KbCardRow> {
-  // Geht durch runOptimisticUpdate: online-Path identisch zu vorher,
-  // bei NetworkError wird die Mutation in die Queue gelegt + die
-  // gecachte Row gepatcht, sodass die UI eine sinnvolle Antwort
-  // bekommt. 14 Setter (renameCard, toggleCardDone, setCardNote,
-  // setCardAlias, setCardDeadline, setCardPriority, setCardTags,
-  // setCardWho, setCardRecur, setCardArchived, setCardColor,
-  // setCardDoneOccurrences via separater Funktion) profitieren
-  // davon ohne weitere Aenderungen.
-  return runOptimisticUpdate<KbCardRow>({
-    table: 'kb_cards',
-    id: cardId,
-    patch: patch as Record<string, unknown>,
-    label: cardLabelFromPatch(patch),
-    run: async () => {
-      const { data, error } = await supabase
-        .from('kb_cards')
-        .update(patch)
-        .eq('id', cardId)
-        .select()
-        .single();
-      if (error) throw error;
-      return data as KbCardRow;
-    },
-  });
-}
+  let updatedTask: TaskRow | null = null;
+  if (split.hasTaskChange || split.hasAttrsChange) {
+    const taskPatch: Record<string, unknown> = { ...split.taskPatch };
+    if (split.hasAttrsChange && split.attrsMerge) {
+      // attrs ist Read-Modify-Write: aktuellen Stand lesen, mergen, schreiben.
+      const fresh = await fetchTaskFresh(cardId);
+      const currentAttrs = (fresh?.attrs ?? {}) as Record<string, unknown>;
+      taskPatch.attrs = mergeAttrs(currentAttrs, split.attrsMerge);
+    }
+    updatedTask = await updateTask(cardId, taskPatch);
+  }
 
-// Liefert ein User-lesbares Label fuer den Offline-Toast je nach
-// Patch-Inhalt — fokussiert auf die haeufigsten Felder, der Rest
-// faellt auf "Karte aktualisieren" zurueck.
-function cardLabelFromPatch(patch: CardPatch): string {
-  if ('done' in patch) return patch.done ? 'Karte erledigen' : 'Karte oeffnen';
-  if ('archived' in patch) return patch.archived ? 'Karte archivieren' : 'Karte zurueckholen';
-  if ('name' in patch) return 'Karte umbenennen';
-  if ('note' in patch) return 'Notiz speichern';
-  if ('alias' in patch) return 'Alias setzen';
-  if ('deadline' in patch) return 'Deadline setzen';
-  if ('priority' in patch) return 'Prioritaet setzen';
-  if ('tags' in patch) return 'Tags setzen';
-  if ('who' in patch) return 'Verantwortliche setzen';
-  if ('recur' in patch) return 'Wiederholung setzen';
-  if ('color' in patch) return 'Karten-Farbe setzen';
-  return 'Karte aktualisieren';
+  let updatedManif: TaskManifestationRow | null = null;
+  if (split.hasManifChange) {
+    const manif = await findKanbanManif(cardId);
+    if (!manif) {
+      throw new Error(`[mutations] kein kanban-Manifest fuer task ${cardId}`);
+    }
+    const manifPatch: Record<string, unknown> = { ...split.manifPatch };
+    if ('__board_id' in manifPatch) {
+      const newBoardId = manifPatch.__board_id as string;
+      manifPatch.__board_id = undefined;
+      const dm = (manif.display_meta ?? {}) as Record<string, unknown>;
+      manifPatch.display_meta = { ...dm, board_id: newBoardId };
+    }
+    updatedManif = await updateManifestation(manif.id, manifPatch);
+  }
+
+  // Final-Projection: bevorzugt frische Refs aus den Updates; fallback
+  // auf erneutes Lesen der nicht-angefassten Schicht.
+  const finalTask = updatedTask ?? (await fetchTaskFresh(cardId));
+  const finalManif = updatedManif ?? (await findKanbanManif(cardId));
+  if (!finalTask || !finalManif) {
+    throw new Error(`[mutations] task ${cardId} oder kanban-Manifest fehlt nach update`);
+  }
+  return taskAndManifToCard(finalTask, finalManif);
 }
 
 export function renameCard(cardId: string, name: string): Promise<KbCardRow> {
@@ -1146,22 +1105,7 @@ export async function setCardDoneOccurrences(
   cardId: string,
   occurrences: string[],
 ): Promise<KbCardRow> {
-  return runOptimisticUpdate<KbCardRow>({
-    table: 'kb_cards',
-    id: cardId,
-    patch: { done_occurrences: occurrences },
-    label: 'Karte erledigen',
-    run: async () => {
-      const { data, error } = await supabase
-        .from('kb_cards')
-        .update({ done_occurrences: occurrences })
-        .eq('id', cardId)
-        .select()
-        .single();
-      if (error) throw error;
-      return data as KbCardRow;
-    },
-  });
+  return updateCard(cardId, { done_occurrences: occurrences });
 }
 
 // Move: innerhalb derselben Spalte oder cross-column. Bei cross-column
@@ -1173,29 +1117,12 @@ export async function moveCard(args: {
   workspaceId: string;
   toColId: string;
 }): Promise<KbCardRow> {
-  // Online: nextBoardPosition vom Server fuer korrektes Anhaengen.
-  // Offline: nextPositionFromCache liefert das letzte gecachte
-  // Maximum +1. Position-Konflikte bei Replay sind moeglich (zwei
-  // Karten landen evtl. gleich), aber Realtime-Refetch normalisiert.
-  // Updates gehen durch updateCard → runOptimisticUpdate.
-  let pos: number;
-  try {
-    pos = await nextBoardPosition('kb_cards', args.boardId, args.workspaceId, {
-      col_id: args.toColId,
-    });
-  } catch (err) {
-    if (!isNetworkError(err)) throw err;
-    pos = await nextPositionFromCache(
-      'kb_cards',
-      args.workspaceId,
-      (r) => r.board_id === args.boardId && r.col_id === args.toColId,
-    );
-  }
+  const pos = await nextManifPosition(args.toColId, args.workspaceId);
   return updateCard(args.cardId, { col_id: args.toColId, position: pos });
 }
 
 export async function setCardPosition(cardId: string, position: number): Promise<void> {
-  await updateCard(cardId, { position } as CardPatch);
+  await updateCard(cardId, { position });
 }
 
 // Cross-Col-Move mit exakter Position. Ein Update statt zweier. Wird
@@ -1220,22 +1147,15 @@ export async function moveCardToBoard(
   toColId: string,
   position: number,
 ): Promise<void> {
-  // Geht durch updateCard, weil CardPatch board_id/col_id/position
-  // alle drei kennt — damit ist die Cross-Board-Verschiebung offline-
-  // tauglich identisch zu setCardColAndPosition.
   await updateCard(cardId, { board_id: toBoardId, col_id: toColId, position });
 }
 
 export async function delCard(cardId: string): Promise<void> {
-  await runOptimisticDelete({
-    table: 'kb_cards',
-    id: cardId,
-    label: 'Karte loeschen',
-    run: async () => {
-      const { error } = await supabase.from('kb_cards').delete().eq('id', cardId);
-      if (error) throw error;
-    },
-  });
+  // deleteTask cascadet auch die Manifestation (DB ON DELETE CASCADE).
+  // Gibt einen TaskSnapshot zurueck — die existierenden Caller verwenden
+  // Undo nicht via delCard direkt (sie haben eigene Snapshots), deshalb
+  // verwerfen wir den Rueckgabewert.
+  await deleteTask(cardId);
 }
 
 // ─── Checklisten (standalone am Board) ─────────────────────────
@@ -1428,17 +1348,52 @@ export async function delChecklist(clId: string): Promise<void> {
 }
 
 // ─── Checklist-Items ───────────────────────────────────────────
+// Phase 4 T.1.D: Items leben als (TaskRow, TaskManifestationRow{kind:
+// 'checklist'}). Helper kapseln die Kombination, projizieren auf
+// Legacy-ChecklistItemRow fuer ChecklistPanel/CellChecklistsPage.
+
 async function nextItemPosition(checklistId: string, workspaceId: string): Promise<number> {
-  const { data, error } = await supabase
-    .from('checklist_items')
-    .select('position')
-    .eq('checklist_id', checklistId)
-    .eq('workspace_id', workspaceId)
-    .order('position', { ascending: false })
-    .limit(1);
-  if (error) throw error;
-  const top = data && data.length > 0 ? (data[0] as { position: number }).position : -1;
-  return top + 1;
+  try {
+    const { data, error } = await supabase
+      .from('task_manifestations')
+      .select('position')
+      .eq('container_id', checklistId)
+      .eq('kind', 'checklist')
+      .eq('workspace_id', workspaceId)
+      .order('position', { ascending: false })
+      .limit(1);
+    if (error) throw error;
+    return data && data.length > 0 ? (data[0] as { position: number }).position + 1 : 0;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    return nextPositionFromCache(
+      'task_manifestations',
+      workspaceId,
+      (r) => r.kind === 'checklist' && r.container_id === checklistId,
+    );
+  }
+}
+
+async function findChecklistManif(taskId: string): Promise<TaskManifestationRow | null> {
+  try {
+    const { data, error } = await supabase
+      .from('task_manifestations')
+      .select('*')
+      .eq('task_id', taskId)
+      .eq('kind', 'checklist')
+      .maybeSingle();
+    if (error) throw error;
+    return (data as TaskManifestationRow) ?? null;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const task = await getById<TaskRow>('tasks', taskId);
+    if (!task) return null;
+    const cached = await getByWorkspace<TaskManifestationRow>(
+      'task_manifestations',
+      task.workspace_id,
+    );
+    return cached.find((m) => m.task_id === taskId && m.kind === 'checklist') ?? null;
+  }
 }
 
 export async function addChecklistItem(args: {
@@ -1447,43 +1402,16 @@ export async function addChecklistItem(args: {
   text?: string;
   level?: 0 | 1 | 2;
 }): Promise<ChecklistItemRow> {
-  return runOptimisticInsert<ChecklistItemRow>({
-    table: 'checklist_items',
-    workspaceId: args.workspaceId,
-    label: 'Eintrag anlegen',
-    run: async () => {
-      const pos = await nextItemPosition(args.checklistId, args.workspaceId);
-      const { data, error } = await supabase
-        .from('checklist_items')
-        .insert({
-          workspace_id: args.workspaceId,
-          checklist_id: args.checklistId,
-          text: args.text ?? '',
-          level: args.level ?? 0,
-          position: pos,
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      return data as ChecklistItemRow;
-    },
-    buildOffline: async (id) => {
-      const pos = await nextPositionFromCache(
-        'checklist_items',
-        args.workspaceId,
-        (r) => r.checklist_id === args.checklistId,
-      );
-      return {
-        id,
-        workspace_id: args.workspaceId,
-        checklist_id: args.checklistId,
-        text: args.text ?? '',
-        done: false,
-        level: args.level ?? 0,
-        position: pos,
-      } as unknown as ChecklistItemRow;
-    },
+  const pos = await nextItemPosition(args.checklistId, args.workspaceId);
+  const task = await createTask(args.workspaceId, { label: args.text ?? '' });
+  const manif = await addManifestation(args.workspaceId, {
+    task_id: task.id,
+    kind: 'checklist',
+    container_id: args.checklistId,
+    position: pos,
+    level: args.level ?? 0,
   });
+  return taskAndManifToItem(task, manif);
 }
 
 // Close-Snapshot fuer History: liest die aktuelle history, prepended
@@ -1589,35 +1517,54 @@ export async function applyChecklistClose(args: {
   checklistId: string;
   recurring: boolean;
 }): Promise<void> {
+  // Phase 4 T.1.D: Bulk-Operation auf tasks (recurring) bzw. tasks via
+  // manifestation-cascade (delete). Beim Delete loeschen wir die Tasks —
+  // das cascadet auf die Manifestation. Beim Recurring updaten wir die
+  // Tasks per kind+container_id Lookup ueber manifestations.
   try {
+    // Erst die Tasks ermitteln, deren Manifestation in dieser Liste lebt.
+    const { data: manifData, error: manifErr } = await supabase
+      .from('task_manifestations')
+      .select('task_id')
+      .eq('container_id', args.checklistId)
+      .eq('kind', 'checklist')
+      .eq('workspace_id', args.workspaceId);
+    if (manifErr) throw manifErr;
+    const taskIds = (manifData ?? []).map((m: { task_id: string }) => m.task_id);
+    if (taskIds.length === 0) return;
+
     if (args.recurring) {
       const { error } = await supabase
-        .from('checklist_items')
-        .update({ done: false })
-        .eq('checklist_id', args.checklistId)
+        .from('tasks')
+        .update({ status: 'open' })
+        .in('id', taskIds)
         .eq('workspace_id', args.workspaceId);
       if (error) throw error;
       return;
     }
+    // Non-recurring: Tasks loeschen → CASCADE killt manifestations.
     const { error } = await supabase
-      .from('checklist_items')
+      .from('tasks')
       .delete()
-      .eq('checklist_id', args.checklistId)
+      .in('id', taskIds)
       .eq('workspace_id', args.workspaceId);
     if (error) throw error;
   } catch (err) {
     if (!isNetworkError(err)) throw err;
-    // Offline-Fallback: aus dem Cache die Items dieser Liste ziehen
-    // und einzeln durch den Wrapper schicken.
-    const items = await getByWorkspace<ChecklistItemRow>('checklist_items', args.workspaceId);
-    const own = items.filter((it) => it.checklist_id === args.checklistId);
+    // Offline-Fallback: aus dem Cache die Manifestations dieser Liste
+    // ziehen und einzeln durch den Wrapper schicken.
+    const manifs = await getByWorkspace<TaskManifestationRow>(
+      'task_manifestations',
+      args.workspaceId,
+    );
+    const own = manifs.filter((m) => m.kind === 'checklist' && m.container_id === args.checklistId);
     if (args.recurring) {
-      for (const it of own) {
-        if (it.done) await updateItem(it.id, { done: false });
+      for (const m of own) {
+        await updateTask(m.task_id, { status: 'open' });
       }
     } else {
-      for (const it of own) {
-        await delChecklistItem(it.id);
+      for (const m of own) {
+        await deleteTask(m.task_id);
       }
     }
   }
@@ -1657,30 +1604,52 @@ export async function restoreChecklistSnapshot(args: {
 }
 
 // Bulk-Insert mehrerer Items am Ende der Checkliste. Wird vom Paste-
-// Popup aufgerufen. Einzelne .insert()-Calls in einer Schleife waeren
-// 10-50 Roundtrips bei grossen Pastes; deshalb Batch mit einem einzigen
-// Request (positions werden lokal berechnet, startend bei nextPos).
+// Popup aufgerufen. Einzelne create-Calls in einer Schleife waeren
+// 10-50 Roundtrips bei grossen Pastes; deshalb Batch.
+//
+// Phase 4 T.1.D: Wir muessen pro Item Task + Manifestation anlegen.
+// Online machen wir das mit zwei Bulk-Inserts (1 Roundtrip pro Tabelle).
+// Offline laeuft pro-Item ueber addChecklistItem.
 export async function bulkAddChecklistItems(args: {
   workspaceId: string;
   checklistId: string;
   items: Array<{ text: string; level: 0 | 1 | 2 }>;
 }): Promise<ChecklistItemRow[]> {
   if (args.items.length === 0) return [];
-  // Online: ein Bulk-Insert (1 Roundtrip). Offline: pro-Item ueber
-  // addChecklistItem (gewrappt). Bei grossen Pastes ist das mehr
-  // Queue-Last, aber jede Insert-Spec ist atomar replay-bar.
   try {
     const startPos = await nextItemPosition(args.checklistId, args.workspaceId);
-    const payload = args.items.map((it, i) => ({
+    // 1. Bulk-Insert tasks.
+    const taskPayload = args.items.map((it) => ({
       workspace_id: args.workspaceId,
-      checklist_id: args.checklistId,
-      text: it.text,
-      level: it.level,
+      label: it.text,
+      attrs: { legacy_kind: 'checklist_item' },
+    }));
+    const { data: taskData, error: taskErr } = await supabase
+      .from('tasks')
+      .insert(taskPayload)
+      .select();
+    if (taskErr) throw taskErr;
+    const tasks = (taskData ?? []) as TaskRow[];
+    if (tasks.length !== args.items.length) {
+      throw new Error('[mutations] bulkAddChecklistItems: task-count mismatch');
+    }
+    // 2. Bulk-Insert manifestations (eine pro task, gleiche Reihenfolge).
+    const manifPayload = tasks.map((t, i) => ({
+      task_id: t.id,
+      workspace_id: args.workspaceId,
+      kind: 'checklist',
+      container_id: args.checklistId,
+      level: args.items[i].level,
       position: startPos + i,
     }));
-    const { data, error } = await supabase.from('checklist_items').insert(payload).select();
-    if (error) throw error;
-    return (data ?? []) as ChecklistItemRow[];
+    const { data: manifData, error: manifErr } = await supabase
+      .from('task_manifestations')
+      .insert(manifPayload)
+      .select();
+    if (manifErr) throw manifErr;
+    const manifs = (manifData ?? []) as TaskManifestationRow[];
+    // 3. Projizieren.
+    return tasks.map((t, i) => taskAndManifToItem(t, manifs[i]));
   } catch (err) {
     if (!isNetworkError(err)) throw err;
     const out: ChecklistItemRow[] = [];
@@ -1697,27 +1666,29 @@ export async function bulkAddChecklistItems(args: {
   }
 }
 
-type ItemPatch = Partial<Pick<ChecklistItemRow, 'text' | 'done' | 'level' | 'position'>>;
+async function updateItem(itemId: string, patch: ItemPatchInput): Promise<ChecklistItemRow> {
+  const split = splitItemPatch(patch);
 
-async function updateItem(itemId: string, patch: ItemPatch): Promise<ChecklistItemRow> {
-  // Geht durch runOptimisticUpdate — toggleChecklistItemDone ist eine
-  // der haeufigsten Klick-Aktionen, die soll auch offline durchgehen.
-  return runOptimisticUpdate<ChecklistItemRow>({
-    table: 'checklist_items',
-    id: itemId,
-    patch: patch as Record<string, unknown>,
-    label: 'done' in patch ? 'Eintrag abhaken' : 'Eintrag aktualisieren',
-    run: async () => {
-      const { data, error } = await supabase
-        .from('checklist_items')
-        .update(patch)
-        .eq('id', itemId)
-        .select()
-        .single();
-      if (error) throw error;
-      return data as ChecklistItemRow;
-    },
-  });
+  let updatedTask: TaskRow | null = null;
+  if (split.hasTaskChange) {
+    updatedTask = await updateTask(itemId, split.taskPatch);
+  }
+
+  let updatedManif: TaskManifestationRow | null = null;
+  if (split.hasManifChange) {
+    const manif = await findChecklistManif(itemId);
+    if (!manif) {
+      throw new Error(`[mutations] kein checklist-Manifest fuer task ${itemId}`);
+    }
+    updatedManif = await updateManifestation(manif.id, split.manifPatch);
+  }
+
+  const finalTask = updatedTask ?? (await fetchTaskFresh(itemId));
+  const finalManif = updatedManif ?? (await findChecklistManif(itemId));
+  if (!finalTask || !finalManif) {
+    throw new Error(`[mutations] task ${itemId} oder checklist-Manifest fehlt nach update`);
+  }
+  return taskAndManifToItem(finalTask, finalManif);
 }
 
 export function renameChecklistItem(itemId: string, text: string): Promise<ChecklistItemRow> {
@@ -1740,15 +1711,8 @@ export function setChecklistItemPosition(
 }
 
 export async function delChecklistItem(itemId: string): Promise<void> {
-  await runOptimisticDelete({
-    table: 'checklist_items',
-    id: itemId,
-    label: 'Eintrag loeschen',
-    run: async () => {
-      const { error } = await supabase.from('checklist_items').delete().eq('id', itemId);
-      if (error) throw error;
-    },
-  });
+  // deleteTask cascadet die Manifestation (DB ON DELETE CASCADE).
+  await deleteTask(itemId);
 }
 
 // ─── Info-Felder (cell.data.infoFields[]) ──────────────────────
@@ -1936,11 +1900,10 @@ export async function delCellLink(cellId: string, linkId: string): Promise<void>
   });
 }
 
-// ─── Karten-Inline-Checkliste (kb_cards.checklist jsonb) ───────
-// Read-modify-write, gleiches Muster wie mutateCellData. Nur relevant,
-// wenn die Karte KEINE checklist_ref hat — im Ref-Modus gehen alle
-// Aenderungen ueber die normalen checklist_item-Mutations, weil die
-// Daten dann in der checklist_items-Tabelle liegen.
+// ─── Karten-Inline-Checkliste (tasks.attrs.checklist_inline jsonb) ──
+// Phase 4 T.1.D: Inline-Checkliste lebt jetzt in tasks.attrs.checklist_inline.
+// Nur relevant wenn die Karte KEINE checklist_ref hat — im Ref-Modus
+// gehen alle Aenderungen ueber die normalen checklist_item-Mutations.
 async function mutateCardChecklist<T>(
   cardId: string,
   mutator: (items: InlineChecklistItem[]) => {
@@ -1948,30 +1911,31 @@ async function mutateCardChecklist<T>(
     result: T;
   },
 ): Promise<T> {
-  // Read-Step analog mutateCellData: live lesen, bei NetworkError aus
-  // dem IDB-Cache nachladen. Sonst waeren Inline-Checklist-Edits
-  // offline blockiert vor dem Write.
+  // Read-Step: live tasks.attrs lesen, bei NetworkError aus dem IDB-Cache.
   let current: InlineChecklistItem[] = [];
   try {
     const { data: cur, error: readErr } = await supabase
-      .from('kb_cards')
-      .select('checklist')
+      .from('tasks')
+      .select('attrs')
       .eq('id', cardId)
       .single();
     if (readErr) throw readErr;
-    const raw = (cur as { checklist: unknown } | null)?.checklist;
+    const attrs = ((cur as { attrs: Record<string, unknown> } | null)?.attrs ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const raw = attrs.checklist_inline;
     current = Array.isArray(raw) ? (raw as InlineChecklistItem[]) : [];
   } catch (err) {
     if (!isNetworkError(err)) throw err;
-    const cached = await getById<KbCardRow>('kb_cards', cardId);
+    const cached = await getById<TaskRow>('tasks', cardId);
     if (!cached) throw err;
-    const raw = (cached as { checklist?: unknown }).checklist;
+    const attrs = (cached.attrs ?? {}) as Record<string, unknown>;
+    const raw = attrs.checklist_inline;
     current = Array.isArray(raw) ? (raw as InlineChecklistItem[]) : [];
   }
   const { items, result } = mutator(current);
-  // Write-Step ueber updateCard → safe-mutation-Wrapper. Bei
-  // NetworkError landet die Card-Patch-Spec in der Queue + Cache wird
-  // gepatcht, damit der naechste Read den frischen Stand sieht.
+  // Write-Step ueber updateCard → schreibt attrs.checklist_inline.
   await updateCard(cardId, { checklist: items });
   return result;
 }
@@ -2158,17 +2122,7 @@ type AnyRow = Record<string, unknown>;
 // die alte id zurueckhaben muss). buildOffline ignoriert das id-
 // Argument und nimmt den Snapshot wie er ist — Cache-Sync klappt.
 async function restoreRow(
-  table:
-    | 'kb_cards'
-    | 'kb_cols'
-    | 'nodes'
-    | 'links'
-    | 'rows'
-    | 'cols'
-    | 'cells'
-    | 'checklists'
-    | 'checklist_items'
-    | 'docs',
+  table: 'kb_cols' | 'nodes' | 'links' | 'rows' | 'cols' | 'cells' | 'checklists' | 'docs',
   row: AnyRow,
 ): Promise<void> {
   const { created_at: _ca, updated_at: _ua, ...clean } = row;
@@ -2197,8 +2151,38 @@ async function restoreRow(
   });
 }
 
+// Phase 4 T.1.D: Card-Restore baut Task + kanban-Manifestation neu auf.
+// Snapshot-Mapping in lib/task-projections.ts:cardSnapshotToTaskAndManif.
 export async function restoreCard(snapshot: KbCardRow): Promise<void> {
-  await restoreRow('kb_cards', snapshot as unknown as AnyRow);
+  const { task, manif } = cardSnapshotToTaskAndManif(snapshot);
+  await runOptimisticInsert<TaskRow>({
+    table: 'tasks',
+    workspaceId: task.workspace_id,
+    label: 'Wiederherstellen',
+    run: async () => {
+      const { created_at: _ca, updated_at: _ua, ...clean } = task;
+      const { data, error } = await supabase.from('tasks').insert(clean).select().single();
+      if (error) throw error;
+      return data as TaskRow;
+    },
+    buildOffline: () => task,
+  });
+  await runOptimisticInsert<TaskManifestationRow>({
+    table: 'task_manifestations',
+    workspaceId: manif.workspace_id,
+    label: 'Wiederherstellen',
+    run: async () => {
+      const { created_at: _ca, id: _id, ...clean } = manif;
+      const { data, error } = await supabase
+        .from('task_manifestations')
+        .insert(clean)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as TaskManifestationRow;
+    },
+    buildOffline: () => manif,
+  });
 }
 
 // AU-B1 K10 (B1-B-003): Node-Restore. Die DB-Cascade beim deleteNode hat
@@ -2212,14 +2196,15 @@ export async function restoreNode(snapshot: NodeRow): Promise<void> {
 }
 
 // AU-B1 K10 (B1-B-006): KbCol + ihre Cards restore. Reihenfolge:
-// erst kb_col (FK-Parent), dann kb_cards (FK-Child).
+// erst kb_col (FK-Parent fuer Manifestations.container_id), dann pro
+// Karte Task + Manifestation.
 export async function restoreKbColWithCards(
   colSnap: KbColRow,
   cardSnaps: KbCardRow[],
 ): Promise<void> {
   await restoreRow('kb_cols', colSnap as unknown as AnyRow);
   for (const card of cardSnaps) {
-    await restoreRow('kb_cards', card as unknown as AnyRow);
+    await restoreCard(card);
   }
 }
 
@@ -2250,12 +2235,41 @@ export async function restoreChecklistWithItems(
 ): Promise<void> {
   await restoreRow('checklists', clSnap as unknown as AnyRow);
   for (const item of itemSnaps) {
-    await restoreRow('checklist_items', item as unknown as AnyRow);
+    await restoreChecklistItem(item);
   }
 }
 
+// Phase 4 T.1.D: Item-Restore baut Task + checklist-Manifestation neu auf.
 export async function restoreChecklistItem(snap: ChecklistItemRow): Promise<void> {
-  await restoreRow('checklist_items', snap as unknown as AnyRow);
+  const { task, manif } = itemSnapshotToTaskAndManif(snap);
+  await runOptimisticInsert<TaskRow>({
+    table: 'tasks',
+    workspaceId: task.workspace_id,
+    label: 'Wiederherstellen',
+    run: async () => {
+      const { created_at: _ca, updated_at: _ua, ...clean } = task;
+      const { data, error } = await supabase.from('tasks').insert(clean).select().single();
+      if (error) throw error;
+      return data as TaskRow;
+    },
+    buildOffline: () => task,
+  });
+  await runOptimisticInsert<TaskManifestationRow>({
+    table: 'task_manifestations',
+    workspaceId: manif.workspace_id,
+    label: 'Wiederherstellen',
+    run: async () => {
+      const { created_at: _ca, id: _id, ...clean } = manif;
+      const { data, error } = await supabase
+        .from('task_manifestations')
+        .insert(clean)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as TaskManifestationRow;
+    },
+    buildOffline: () => manif,
+  });
 }
 
 // ─── Docs ────────────────────────────────────────────────────────

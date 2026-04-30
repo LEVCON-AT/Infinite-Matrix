@@ -143,11 +143,15 @@ export async function searchWorkspace(
       .eq('workspace_id', workspaceId)
       .ilike('alias', pat)
       .limit(perTypeLimit),
+    // Phase 4 T.1.D: Karten-Suche ueber tasks (label/note/attrs).
+    // alias liegt in attrs.alias; tags in attrs.tags. Wir filtern
+    // ueber label + note und holen attrs.alias + tags aus den
+    // Zeilen. attrs->>alias wird zwischen Token-Suche extra abgefragt.
     supabase
-      .from('kb_cards')
-      .select('id, board_id, name, alias, note, tags')
+      .from('tasks')
+      .select('id, label, note, attrs')
       .eq('workspace_id', workspaceId)
-      .or(`name.ilike.${qpat},alias.ilike.${qpat},note.ilike.${qpat}`)
+      .or(`label.ilike.${qpat},note.ilike.${qpat}`)
       .limit(perTypeLimit),
     supabase
       .from('checklists')
@@ -209,22 +213,47 @@ export async function searchWorkspace(
   }
 
   if (cardsRes.data) {
-    for (const c of cardsRes.data as Array<{
+    type TaskHit = {
       id: string;
-      board_id: string;
-      name: string;
-      alias: string | null;
+      label: string;
       note: string | null;
-      tags: string[] | null;
-    }>) {
+      attrs: Record<string, unknown> | null;
+    };
+    const tasks = cardsRes.data as TaskHit[];
+    // Phase 4 T.1.D: board_id kommt aus task_manifestations(kind='kanban').display_meta.board_id.
+    // Batch-Lookup, damit wir nicht pro Treffer einen Roundtrip brauchen.
+    const taskIds = tasks.map((t) => t.id);
+    const boardByTaskId = new Map<string, string>();
+    if (taskIds.length > 0) {
+      const manifsRes = await supabase
+        .from('task_manifestations')
+        .select('task_id, display_meta')
+        .eq('kind', 'kanban')
+        .in('task_id', taskIds);
+      if (manifsRes.data) {
+        for (const m of manifsRes.data as Array<{
+          task_id: string;
+          display_meta: Record<string, unknown> | null;
+        }>) {
+          const bId = (m.display_meta as Record<string, unknown> | null)?.board_id as
+            | string
+            | undefined;
+          if (bId) boardByTaskId.set(m.task_id, bId);
+        }
+      }
+    }
+    for (const t of tasks) {
+      const boardId = boardByTaskId.get(t.id);
+      if (!boardId) continue; // Task ohne Kanban-Manifestation = keine Karte.
+      const attrs = (t.attrs ?? {}) as Record<string, unknown>;
       results.push({
         kind: 'card',
-        cardId: c.id,
-        boardId: c.board_id,
-        title: c.name || '(ohne Name)',
-        alias: c.alias,
-        note: typeof c.note === 'string' ? c.note : '',
-        tags: Array.isArray(c.tags) ? c.tags : [],
+        cardId: t.id,
+        boardId,
+        title: t.label || '(ohne Name)',
+        alias: (attrs.alias as string | null | undefined) ?? null,
+        note: typeof t.note === 'string' ? t.note : '',
+        tags: Array.isArray(attrs.tags) ? (attrs.tags as string[]) : [],
       });
     }
   }

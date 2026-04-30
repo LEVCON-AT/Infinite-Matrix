@@ -554,9 +554,10 @@ const HeaderSearchBar: Component<Props> = (p) => {
     setBusy(true);
     try {
       const posRes = await supabase
-        .from('kb_cards')
+        .from('task_manifestations')
         .select('position')
-        .eq('col_id', col.id)
+        .eq('container_id', col.id)
+        .eq('kind', 'kanban')
         .eq('workspace_id', p.workspaceId)
         .order('position', { ascending: false })
         .limit(1);

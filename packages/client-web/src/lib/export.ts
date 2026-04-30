@@ -10,6 +10,39 @@
 
 import { encryptPayload } from './crypto';
 import { supabase } from './supabase';
+import { taskAndManifToCard, taskAndManifToItem } from './task-projections';
+import type { TaskManifestationRow, TaskRow } from './types';
+
+// Phase 4 T.1.D: kb_cards + checklist_items leben nicht mehr in
+// eigenen Tabellen — wir lesen tasks + task_manifestations und
+// projizieren auf die Legacy-Export-Form (kb_cards[]/checklist_items[]),
+// damit das WorkspaceExport-Format unveraendert bleibt.
+async function fetchLegacyShapesForWorkspace(workspaceId: string): Promise<{
+  kb_cards: Record<string, unknown>[];
+  checklist_items: Record<string, unknown>[];
+}> {
+  const [tasksRes, manifsRes] = await Promise.all([
+    supabase.from('tasks').select('*').eq('workspace_id', workspaceId),
+    supabase.from('task_manifestations').select('*').eq('workspace_id', workspaceId),
+  ]);
+  if (tasksRes.error) throw tasksRes.error;
+  if (manifsRes.error) throw manifsRes.error;
+  const tasks = (tasksRes.data ?? []) as TaskRow[];
+  const manifs = (manifsRes.data ?? []) as TaskManifestationRow[];
+  const taskById = new Map(tasks.map((t) => [t.id, t]));
+  const kb_cards: Record<string, unknown>[] = [];
+  const checklist_items: Record<string, unknown>[] = [];
+  for (const m of manifs) {
+    const t = taskById.get(m.task_id);
+    if (!t) continue;
+    if (m.kind === 'kanban') {
+      kb_cards.push(taskAndManifToCard(t, m) as unknown as Record<string, unknown>);
+    } else if (m.kind === 'checklist') {
+      checklist_items.push(taskAndManifToItem(t, m) as unknown as Record<string, unknown>);
+    }
+  }
+  return { kb_cards, checklist_items };
+}
 
 export const WORKSPACE_EXPORT_VERSION = 1 as const;
 
@@ -153,9 +186,8 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     colsRes,
     cellsRes,
     kbColsRes,
-    kbCardsRes,
+    legacyShapes,
     checklistsRes,
-    checklistItemsRes,
     linksRes,
     docsRes,
     objectsRes,
@@ -168,9 +200,8 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     supabase.from('cols').select('*').eq('workspace_id', workspaceId),
     supabase.from('cells').select('*').eq('workspace_id', workspaceId),
     supabase.from('kb_cols').select('*').eq('workspace_id', workspaceId),
-    supabase.from('kb_cards').select('*').eq('workspace_id', workspaceId),
+    fetchLegacyShapesForWorkspace(workspaceId),
     supabase.from('checklists').select('*').eq('workspace_id', workspaceId),
-    supabase.from('checklist_items').select('*').eq('workspace_id', workspaceId),
     supabase.from('links').select('*').eq('workspace_id', workspaceId),
     supabase.from('docs').select('*').eq('workspace_id', workspaceId),
     supabase.from('objects').select('*').eq('workspace_id', workspaceId),
@@ -185,9 +216,7 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     colsRes,
     cellsRes,
     kbColsRes,
-    kbCardsRes,
     checklistsRes,
-    checklistItemsRes,
     linksRes,
     docsRes,
     objectsRes,
@@ -208,9 +237,9 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     cols: (colsRes.data ?? []) as Record<string, unknown>[],
     cells: (cellsRes.data ?? []) as Record<string, unknown>[],
     kb_cols: (kbColsRes.data ?? []) as Record<string, unknown>[],
-    kb_cards: (kbCardsRes.data ?? []) as Record<string, unknown>[],
+    kb_cards: legacyShapes.kb_cards,
     checklists: (checklistsRes.data ?? []) as Record<string, unknown>[],
-    checklist_items: (checklistItemsRes.data ?? []) as Record<string, unknown>[],
+    checklist_items: legacyShapes.checklist_items,
     links: (linksRes.data ?? []) as Record<string, unknown>[],
     docs: (docsRes.data ?? []) as Record<string, unknown>[],
     objects: (objectsRes.data ?? []) as Record<string, unknown>[],
@@ -281,9 +310,8 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     colsRes,
     cellsRes,
     kbColsRes,
-    kbCardsRes,
+    legacyShapes,
     checklistsRes,
-    checklistItemsRes,
     linksRes,
     docsRes,
     objectsRes,
@@ -297,9 +325,8 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     supabase.from('cols').select('*').eq('workspace_id', workspaceId),
     supabase.from('cells').select('*').eq('workspace_id', workspaceId),
     supabase.from('kb_cols').select('*').eq('workspace_id', workspaceId),
-    supabase.from('kb_cards').select('*').eq('workspace_id', workspaceId),
+    fetchLegacyShapesForWorkspace(workspaceId),
     supabase.from('checklists').select('*').eq('workspace_id', workspaceId),
-    supabase.from('checklist_items').select('*').eq('workspace_id', workspaceId),
     supabase.from('links').select('*').eq('workspace_id', workspaceId),
     supabase.from('docs').select('*').eq('workspace_id', workspaceId),
     supabase.from('objects').select('*').eq('workspace_id', workspaceId),
@@ -314,9 +341,7 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     colsRes,
     cellsRes,
     kbColsRes,
-    kbCardsRes,
     checklistsRes,
-    checklistItemsRes,
     linksRes,
     docsRes,
     objectsRes,
@@ -360,13 +385,13 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
       board_id: string;
       object_id?: string | null;
     }>,
-    kb_cards: (kbCardsRes.data ?? []) as Array<{ id: string; board_id: string }>,
+    kb_cards: legacyShapes.kb_cards as unknown as Array<{ id: string; board_id: string }>,
     checklists: (checklistsRes.data ?? []) as Array<{
       id: string;
       board_id: string | null;
       cell_id: string | null;
     }>,
-    checklist_items: (checklistItemsRes.data ?? []) as Array<{
+    checklist_items: legacyShapes.checklist_items as unknown as Array<{
       id: string;
       checklist_id: string;
     }>,

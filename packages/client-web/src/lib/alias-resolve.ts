@@ -52,7 +52,10 @@ export async function resolveAlias(raw: string, workspaceId: string): Promise<Al
   // nicht reinrutschen. Wenn jemand spaeter den Eingangs-Path lockert,
   // muss hier ein Wildcard-Escape rein.
 
-  const [nodes, cells, cards, checklists, links, docs] = await Promise.all([
+  // Phase 4 T.1.D: Karten-Aliases leben in tasks.attrs.alias. Wir
+  // suchen ueber attrs->>alias und holen anschliessend (lazy) die
+  // Kanban-Manifestation fuer board_id, falls die Karte existiert.
+  const [nodes, cells, cardTasks, checklists, links, docs] = await Promise.all([
     supabase
       .from('nodes')
       .select('id, type, label')
@@ -66,10 +69,10 @@ export async function resolveAlias(raw: string, workspaceId: string): Promise<Al
       .ilike('alias', a)
       .limit(1),
     supabase
-      .from('kb_cards')
-      .select('id, board_id, name')
+      .from('tasks')
+      .select('id, label, attrs')
       .eq('workspace_id', workspaceId)
-      .ilike('alias', a)
+      .ilike('attrs->>alias', a)
       .limit(1),
     supabase
       .from('checklists')
@@ -90,6 +93,27 @@ export async function resolveAlias(raw: string, workspaceId: string): Promise<Al
       .ilike('alias', a)
       .limit(1),
   ]);
+
+  // cardTasks → Kanban-Manifestation Lookup (board_id liegt in display_meta).
+  let cards: { data: Array<{ id: string; board_id: string; name: string }> | null } = {
+    data: null,
+  };
+  if (cardTasks.data && cardTasks.data.length > 0) {
+    const t = cardTasks.data[0] as { id: string; label: string; attrs: Record<string, unknown> };
+    const manif = await supabase
+      .from('task_manifestations')
+      .select('display_meta')
+      .eq('task_id', t.id)
+      .eq('kind', 'kanban')
+      .maybeSingle();
+    const boardId = (
+      (manif.data as { display_meta: Record<string, unknown> | null } | null)
+        ?.display_meta as Record<string, unknown> | null
+    )?.board_id as string | undefined;
+    if (boardId) {
+      cards = { data: [{ id: t.id, board_id: boardId, name: t.label }] };
+    }
+  }
 
   if (nodes.data && nodes.data.length > 0) {
     const n = nodes.data[0] as { id: string; type: 'matrix' | 'board'; label: string };
