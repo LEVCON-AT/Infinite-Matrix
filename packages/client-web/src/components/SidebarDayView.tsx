@@ -18,6 +18,7 @@ import { type Component, For, Show, createEffect, createMemo, createSignal } fro
 import { fadeIn, fadeOut } from '../lib/animations';
 import { type CalendarEvent, fromIso, groupEventsByDay } from '../lib/calendar';
 import { columnGeometry, heightPx, layoutDay, topPx as topPxFn } from '../lib/day-view-layout';
+import { bindDragSource } from '../lib/drag-context';
 import { formatHHMM, visibleRangeForDay, workingHours } from '../lib/working-hours';
 import Icon from './Icon';
 
@@ -152,21 +153,27 @@ const SidebarDayView: Component<Props> = (p) => {
           <Show when={layout().multiDay.length > 0}>
             <div class="sb-day-allday">
               <For each={layout().multiDay.slice(0, 3)}>
-                {(e) => (
-                  <button
-                    type="button"
-                    class="sb-day-allday-item"
-                    classList={{ [`sb-day-event-${e.status}`]: true }}
-                    onClick={(ev) => openEvent(e, ev)}
-                    style={{ height: `${ALL_DAY_BAR_HEIGHT}px` }}
-                    data-draggable="task"
-                    data-task-id={e.taskId}
-                    title={e.label}
-                  >
-                    <Icon name="arrows-pointing-out" size={10} />
-                    <span class="sb-day-allday-label">{e.label || '(ohne Label)'}</span>
-                  </button>
-                )}
+                {(e) => {
+                  const dragHandlers = bindDragSource({
+                    build: () => ({ atom: 'task', atomId: e.taskId, label: e.label }),
+                  });
+                  return (
+                    <button
+                      type="button"
+                      class="sb-day-allday-item"
+                      classList={{ [`sb-day-event-${e.status}`]: true }}
+                      onClick={(ev) => openEvent(e, ev)}
+                      style={{ height: `${ALL_DAY_BAR_HEIGHT}px` }}
+                      draggable={true}
+                      onDragStart={dragHandlers.onDragStart}
+                      onDragEnd={dragHandlers.onDragEnd}
+                      title={e.label}
+                    >
+                      <Icon name="arrows-pointing-out" size={10} />
+                      <span class="sb-day-allday-label">{e.label || '(ohne Label)'}</span>
+                    </button>
+                  );
+                }}
               </For>
               <Show when={layout().multiDay.length > 3}>
                 <span class="sb-day-allday-overflow">+{layout().multiDay.length - 3} weitere</span>
@@ -207,6 +214,14 @@ const SidebarDayView: Component<Props> = (p) => {
             <For each={layout().timed}>
               {(it) => {
                 const geom = columnGeometry(it.column, it.totalCols);
+                const dragHandlers = bindDragSource({
+                  build: () => ({
+                    atom: 'task',
+                    atomId: it.event.taskId,
+                    label: it.event.label,
+                    sourceManifId: it.event.manifId ?? undefined,
+                  }),
+                });
                 return (
                   <button
                     type="button"
@@ -215,6 +230,9 @@ const SidebarDayView: Component<Props> = (p) => {
                       [`sb-day-event-${it.event.status}`]: true,
                       'sb-day-event-no-time': !it.hasTime,
                     }}
+                    draggable={true}
+                    onDragStart={dragHandlers.onDragStart}
+                    onDragEnd={dragHandlers.onDragEnd}
                     style={{
                       top: `${topPx(it.startMin)}px`,
                       height: `${heightPx(it.durationMin, PIXELS_PER_MINUTE)}px`,
@@ -222,8 +240,6 @@ const SidebarDayView: Component<Props> = (p) => {
                       width: `calc(${geom.widthPct}% - 4px)`,
                     }}
                     onClick={(ev) => openEvent(it.event, ev)}
-                    data-draggable="task"
-                    data-task-id={it.event.taskId}
                     title={it.event.label}
                   >
                     <Show when={it.event.time}>

@@ -12540,3 +12540,86 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   margin-left: 4px;
   font-size: 11px;
 }
+
+/* ── T.1.G.2 Drag-Visual + Manifestation-Modal ──────────── */
+.sb-cal-mini-day-dragover {
+  outline: 1.5px dashed var(--p, var(--text));
+  outline-offset: -2px;
+  background: var(--bluebg, var(--bg-hover));
+}
+
+@keyframes dragTargetPulse {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: inset 0 0 0 2px var(--p, var(--text));
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  body[data-dragging] .sb-cal-mini-day-dragover {
+    animation: dragTargetPulse 800ms ease-in-out infinite;
+  }
+}
+
+body[data-dragging] .sb-day-event[draggable="true"]:active,
+body[data-dragging] .sb-day-allday-item[draggable="true"]:active {
+  opacity: 0.5;
+}
+
+.create-manif-card {
+  width: min(420px, 92vw);
+  max-width: 420px;
+}
+
+.create-manif-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+}
+
+.create-manif-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.create-manif-row span {
+  font-size: 12px;
+  color: var(--text2);
+  font-weight: 500;
+}
+
+.create-manif-row input {
+  padding: 6px 10px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.create-manif-row input:focus {
+  outline: none;
+  border-color: var(--p, var(--text));
+}
+
+.create-manif-warn {
+  color: var(--red);
+  font-size: 12px;
+  margin: 0;
+}
+
+.create-manif-tip {
+  font-size: 11px;
+  color: var(--text3);
+}
+
+.create-manif-actions {
+  display: flex;
+  gap: var(--space-sm);
+}

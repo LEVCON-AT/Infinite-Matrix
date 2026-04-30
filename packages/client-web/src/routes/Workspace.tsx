@@ -18,6 +18,7 @@ import CellInfoPage from '../components/CellInfoPage';
 import CellSummaryPage from '../components/CellSummaryPage';
 import CommandPalette from '../components/CommandPalette';
 import ContextMenu from '../components/ContextMenu';
+import CreateManifestationModal from '../components/CreateManifestationModal';
 import DocsPopup from '../components/DocsPopup';
 import GlobalSearch from '../components/GlobalSearch';
 import HeaderSearchBar from '../components/HeaderSearchBar';
@@ -41,6 +42,10 @@ import { clearDocsRequest, openDocsPopup, useDocsRequest } from '../lib/docs-ui'
 import { setEditModeValue, toggleEditMode, useEditMode } from '../lib/edit-mode';
 import { toggleIncognito, useIncognito } from '../lib/incognito';
 import { resolveNodeLabel } from '../lib/label-template';
+import {
+  closeManifestationModal,
+  manifestationModalRequest,
+} from '../lib/manifestation-modal-state';
 import { fetchMembers } from '../lib/members';
 import { pendingMutationCount, refreshCountForWorkspace, replayQueue } from '../lib/mutation-queue';
 import { fetchObjects } from '../lib/objects';
@@ -1050,6 +1055,22 @@ const Workspace: Component = () => {
 
       <Show when={showHelp()}>
         <KeyboardHelp onClose={() => setShowHelp(false)} />
+      </Show>
+
+      <Show when={manifestationModalRequest()}>
+        {(req) => (
+          <CreateManifestationModal
+            workspaceId={req().workspaceId}
+            taskId={req().taskId}
+            taskLabel={req().taskLabel}
+            defaultDate={req().defaultDate}
+            onClose={closeManifestationModal}
+            onCreated={() => {
+              void refetchWsTasks();
+              void refetchWsManifestations();
+            }}
+          />
+        )}
       </Show>
 
       <main class="ws-main">

@@ -8,7 +8,7 @@
 // navigate zur grossen Calendar-Route mit Datum vorausgewaehlt.
 
 import { useNavigate } from '@solidjs/router';
-import { type Component, For, Show, createMemo } from 'solid-js';
+import { type Component, For, Show, createMemo, createSignal } from 'solid-js';
 import {
   type CalendarEvent,
   addMonths,
@@ -17,7 +17,9 @@ import {
   groupEventsByDay,
   monthLabelDe,
 } from '../lib/calendar';
+import { bindDropTarget } from '../lib/drag-context';
 import { useGridNav } from '../lib/keyboard-nav';
+import { openManifestationModal } from '../lib/manifestation-modal-state';
 import {
   clampFutureCount,
   clampPastCount,
@@ -76,6 +78,23 @@ const SidebarCalendarMini: Component<Props> = (p) => {
   }
   function openCalendarRoute(iso: string) {
     navigate(`/w/${p.workspaceId}/calendar?date=${iso}`);
+  }
+
+  // Drag-Hover-State fuer Visual-Feedback (Border-Pulsation auf Tag).
+  const [dragOverIso, setDragOverIso] = createSignal<string | null>(null);
+
+  // Drop-Handler: oeffnet das Manifestation-Modal mit dem ge-droppten
+  // Atom + dem Tag als Default-Datum. T.1.G.2.A handelt nur 'task' —
+  // T.AC erweitert auf andere Atom-Typen.
+  function handleDrop(iso: string, src: { atom: string; atomId: string; label?: string }) {
+    if (src.atom !== 'task') return;
+    setDragOverIso(null);
+    openManifestationModal({
+      workspaceId: p.workspaceId,
+      taskId: src.atomId,
+      taskLabel: src.label ?? '',
+      defaultDate: iso,
+    });
   }
 
   return (
@@ -158,6 +177,14 @@ const SidebarCalendarMini: Component<Props> = (p) => {
                     {(day) => {
                       const status = () =>
                         dayStatus(eventsByDay().get(day.iso) ?? [], today, day.iso);
+                      const dropHandlers = bindDropTarget({
+                        accepts: (src) => src.atom === 'task',
+                        onEnter: () => setDragOverIso(day.iso),
+                        onLeave: () => {
+                          if (dragOverIso() === day.iso) setDragOverIso(null);
+                        },
+                        onDrop: (src) => handleDrop(day.iso, src),
+                      });
                       return (
                         <button
                           type="button"
@@ -166,9 +193,14 @@ const SidebarCalendarMini: Component<Props> = (p) => {
                             'sb-cal-mini-day-out': !day.inMonth,
                             'sb-cal-mini-day-today': day.isToday,
                             'sb-cal-mini-day-selected': day.iso === state().selectedDay,
+                            'sb-cal-mini-day-dragover': dragOverIso() === day.iso,
                           }}
                           onClick={() => selectDay(day.iso)}
                           onDblClick={() => openCalendarRoute(day.iso)}
+                          onDragEnter={dropHandlers.onDragEnter}
+                          onDragOver={dropHandlers.onDragOver}
+                          onDragLeave={dropHandlers.onDragLeave}
+                          onDrop={dropHandlers.onDrop}
                           aria-label={day.iso}
                         >
                           <span class="sb-cal-mini-day-num">
