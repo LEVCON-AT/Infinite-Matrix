@@ -1,7 +1,7 @@
 # Plan: Bridge + MCP + Auto-Deployment
 
 **Erstellt:** 2026-04-18
-**Status:** entworfen, Implementierung steht aus
+**Status:** ✅ live auf `matrix.levcon.at` (Phase 4 + V2.2 deployed). Plan-Dokument als historisches Referenz erhalten — aktueller Stand: Memory-Files `project_phase1_state.md` + `project_object_layer_phase3.md`.
 **Voraus:** Branch `code-review-sprints` → `main` gemerged
 **Repo:** `github.com/LEVCON-AT/Infinite-Matrix`
 **Owner:** admin@levcon.at

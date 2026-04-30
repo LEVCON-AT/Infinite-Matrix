@@ -23,7 +23,9 @@ Member-Lifecycle befuellt. Die folgenden 9 Action-Strings sind live:
 - `member.removed` (013)
 - `member.role_changed` (014)
 - `workspace.ownership_transferred` (015)
-- `workspace.deleted` (015)
+- `workspace.deleted` (Migration 039 — separater `system_audit_log` weil
+  `workspace_audit_log` per Cascade beim Workspace-Delete mitgeloescht
+  werden wuerde. AU-B1 K11a/B1-A-003 hat das nachgezogen.)
 
 **Inhalts-Mutationen (nodes, cells, cards, docs, ...) wurden komplett
 nicht geloggt.** Defizit fuer Compliance/Forensik: man kann nicht

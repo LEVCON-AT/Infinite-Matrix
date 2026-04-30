@@ -1,5 +1,7 @@
 # Backend Phase 0 — Supabase-SaaS-Fundament
 
+> **Status (2026-04-30):** ✅ Phase 0 + Audit-Welle KOMPLETT live, an Phase 1 + 3 übergeben. 8/9 Erfolgs-Kriterien grün, #8 Backup deferred (siehe Stream G B1-G-006). Live auf `staging.matrix.levcon.at/app/`. Aktueller Welle-Stand: Memory `project_object_layer_phase3.md` + `project_phase1_state.md`.
+
 ## Kontext
 
 Nach abgeschlossenem Phase 4 (Bridge + MCP) und V2 (Checklisten) wechselt das Projekt den Charakter: vom lokalen Single-File-Tool mit AI-Bridge zu einer **Multi-User-SaaS** mit echtem Backend. Zentrale Entscheidung siehe `CLAUDE.md` / Session-Protokoll vom 2026-04-21:
