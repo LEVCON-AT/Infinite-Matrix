@@ -3475,6 +3475,14 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   filter: brightness(0.92);
 }
 
+/* Smart-Summary-Container sitzt IMMER in einer eigenen Zeile, nie
+   inline mit Feature-Chips. Eigener Wrapper damit margin-top stabil
+   bleibt — auch wenn die Cell keine Feature-Chips hat. */
+.mx-cell-summary-row {
+  display: flex;
+  margin-top: var(--space-xs);
+}
+
 /* ── Smart-Summary-Widget pro Cell (Phase 4 T.1.E.2) ─────── */
 /* Ein einziger laenglicher Container — bewusst NICHT wie Feature-Chips
    (die sind farbig + 22×22 quadratisch). Hoehe = 22px fuer Baseline-

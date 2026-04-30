@@ -1045,28 +1045,31 @@ const MatrixView: Component<Props> = (p) => {
                                       <Icon name="document-text" size={14} />
                                     </span>
                                   </Show>
-                                  {/* Phase 4 T.1.E.2: Smart-Summary-Container.
-                                      Rendert nur wenn die Cell oder ihr Subtree
-                                      Tasks mit relevanten Counts hat (active /
-                                      overdue / due_today). Click navigiert zur
-                                      Stub-Page (T.SS fuellt sie spaeter). */}
-                                  <Show
-                                    when={(() => {
-                                      const c = cell();
-                                      if (!c) return undefined;
-                                      const s = cellSummaries().get(c.id);
-                                      return s ? { cell: c, summary: s } : undefined;
-                                    })()}
-                                  >
-                                    {(ctx) => (
-                                      <CellTaskSummary
-                                        workspaceId={p.workspaceId}
-                                        cellId={ctx().cell.id}
-                                        summary={ctx().summary}
-                                      />
-                                    )}
-                                  </Show>
                                 </div>
+                              </Show>
+                              {/* Phase 4 T.1.E.2 / Layout-Fix: Smart-Summary-
+                                  Container in eigener Zeile, nie inline mit
+                                  den Feature-Chips. Eigenes Show-Outer, damit
+                                  der Block auch erscheint wenn die Cell keine
+                                  klassischen Features hat (theoretisch — heute
+                                  unmoeglich, defensiv geguardet). */}
+                              <Show
+                                when={(() => {
+                                  const c = cell();
+                                  if (!c) return undefined;
+                                  const s = cellSummaries().get(c.id);
+                                  return s ? { cell: c, summary: s } : undefined;
+                                })()}
+                              >
+                                {(ctx) => (
+                                  <div class="mx-cell-summary-row">
+                                    <CellTaskSummary
+                                      workspaceId={p.workspaceId}
+                                      cellId={ctx().cell.id}
+                                      summary={ctx().summary}
+                                    />
+                                  </div>
+                                )}
                               </Show>
                             </div>
                           );
