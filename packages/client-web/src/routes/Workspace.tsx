@@ -426,6 +426,14 @@ const Workspace: Component = () => {
     }),
   );
 
+  // Lookup-Maps fuer Drop-Handler (T.1.G.2.B): Mini-Calendar-Drop +
+  // Tagesansicht-Hour-Slot brauchen das aktuelle display_meta /
+  // task.deadline um zwischen Move und Add zu entscheiden.
+  const tasksById = createMemo(() => new Map((wsTasks() ?? []).map((t) => [t.id, t])));
+  const manifestationsById = createMemo(
+    () => new Map((wsManifestations() ?? []).map((m) => [m.id, m])),
+  );
+
   // genauso wie Sidebar-Clicks, weil params reaktiv sind.
   createEffect(() => {
     const wsId = params.workspaceId;
@@ -957,11 +965,15 @@ const Workspace: Component = () => {
                 <SidebarCalendarMini
                   workspaceId={params.workspaceId as string}
                   events={calendarEvents()}
+                  tasksById={tasksById()}
+                  manifestationsById={manifestationsById()}
                 />
                 <SidebarDayView
                   workspaceId={params.workspaceId as string}
                   selectedDay={sbCal?.state().selectedDay ?? new Date().toISOString().slice(0, 10)}
                   events={calendarEvents()}
+                  tasksById={tasksById()}
+                  manifestationsById={manifestationsById()}
                 />
               </div>
             </Show>

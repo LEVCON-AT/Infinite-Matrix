@@ -18,7 +18,9 @@ import { type Component, For, Show, createEffect, createMemo, createSignal } fro
 import { fadeIn, fadeOut } from '../lib/animations';
 import { type CalendarEvent, fromIso, groupEventsByDay } from '../lib/calendar';
 import { columnGeometry, heightPx, layoutDay, topPx as topPxFn } from '../lib/day-view-layout';
-import { bindDragSource } from '../lib/drag-context';
+import { bindDragSource, bindDropTarget } from '../lib/drag-context';
+import { moveByTime } from '../lib/manifestation-move';
+import type { TaskManifestationRow, TaskRow } from '../lib/types';
 import { formatHHMM, visibleRangeForDay, workingHours } from '../lib/working-hours';
 import Icon from './Icon';
 
@@ -26,7 +28,12 @@ type Props = {
   workspaceId: string;
   selectedDay: string; // 'YYYY-MM-DD'
   events: CalendarEvent[];
+  tasksById: Map<string, TaskRow>;
+  manifestationsById: Map<string, TaskManifestationRow>;
 };
+
+// Snap auf 15-Min-Raster fuer Hour-Slot-Drops.
+const SNAP_MIN = 15;
 
 const PIXELS_PER_MINUTE = 32 / 60; // 32px pro Stunde
 const ALL_DAY_BAR_HEIGHT = 22;
@@ -122,6 +129,46 @@ const SidebarDayView: Component<Props> = (p) => {
     navigate(`/w/${p.workspaceId}/calendar?date=${renderedDay()}`);
   }
 
+  // Drop-Handler fuer Hour-Slot-Drops im Stunden-Grid. Berechnet die
+  // Drop-Y-Koordinate in Minuten (relativ zum visibleStartMin), snapt
+  // auf 15-Min-Raster und ruft moveByTime mit dem aktuellen day +
+  // newTime. Move-Pfad oder Add-Pfad entscheidet moveByTime intern.
+  let gridEl: HTMLDivElement | undefined;
+  const gridDropHandlers = bindDropTarget({
+    accepts: (src) => src.atom === 'task',
+    onDrop: (src) => {
+      if (!gridEl) return;
+      const rect = gridEl.getBoundingClientRect();
+      // dragover/drop-Event hat clientY — wir haben nur den Source aus
+      // activeDrag(); die Koordinaten sind im DragEvent. bindDropTarget
+      // versteckt das Event aber. Workaround: lokaler dragover-Listener
+      // fuer Y-Capture.
+      const y = lastDropY ?? 0;
+      const minRel = (y - rect.top) / PIXELS_PER_MINUTE;
+      const minAbs = range().startMin + Math.max(0, minRel);
+      const snapped = Math.round(minAbs / SNAP_MIN) * SNAP_MIN;
+      const newTime = `${String(Math.floor(snapped / 60)).padStart(2, '0')}:${String(
+        snapped % 60,
+      ).padStart(2, '0')}`;
+      const manif = src.sourceManifId ? p.manifestationsById.get(src.sourceManifId) : undefined;
+      void moveByTime({
+        workspaceId: p.workspaceId,
+        taskId: src.atomId,
+        manifId: manif?.kind === 'calendar' ? manif.id : undefined,
+        currentManif: manif?.kind === 'calendar' ? manif : undefined,
+        dayIso: renderedDay(),
+        newTime,
+      });
+    },
+  });
+
+  // Y-Koordinate des letzten dragover-Events fuer den Drop-Handler
+  // (bindDropTarget verbirgt das Event).
+  let lastDropY: number | null = null;
+  function captureDragY(e: DragEvent) {
+    lastDropY = e.clientY;
+  }
+
   return (
     <div class="sb-day">
       <header class="sb-day-head">
@@ -181,7 +228,20 @@ const SidebarDayView: Component<Props> = (p) => {
             </div>
           </Show>
 
-          <div class="sb-day-grid" style={{ height: `${gridHeight()}px` }}>
+          <div
+            class="sb-day-grid"
+            style={{ height: `${gridHeight()}px` }}
+            ref={(el) => {
+              gridEl = el;
+            }}
+            onDragEnter={gridDropHandlers.onDragEnter}
+            onDragOver={(e) => {
+              captureDragY(e);
+              gridDropHandlers.onDragOver(e);
+            }}
+            onDragLeave={gridDropHandlers.onDragLeave}
+            onDrop={gridDropHandlers.onDrop}
+          >
             <Show when={bufferBeforeHeight() > 0}>
               <div
                 class="sb-day-buffer sb-day-buffer-before"

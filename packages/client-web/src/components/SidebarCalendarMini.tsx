@@ -20,17 +20,25 @@ import {
 import { bindDropTarget } from '../lib/drag-context';
 import { useGridNav } from '../lib/keyboard-nav';
 import { openManifestationModal } from '../lib/manifestation-modal-state';
+import { moveByDate } from '../lib/manifestation-move';
 import {
   clampFutureCount,
   clampPastCount,
   useSidebarCalendarState,
 } from '../lib/sidebar-calendar-state';
 import { todayIso } from '../lib/task-aggregate';
+import type { TaskManifestationRow, TaskRow } from '../lib/types';
 import Icon from './Icon';
 
 type Props = {
   workspaceId: string;
   events: CalendarEvent[];
+  // Workspace-weite Tasks + Manifestations fuer Move-Drop: der Drop-
+  // Handler muss das aktuelle display_meta lesen (Range-Delta-Erhalt)
+  // bzw. tasks.deadline (virtual-Fallback). Beide sind in Workspace.tsx
+  // bereits geladen — durchgereicht statt nochmal zu fetchen.
+  tasksById: Map<string, TaskRow>;
+  manifestationsById: Map<string, TaskManifestationRow>;
 };
 
 const SidebarCalendarMini: Component<Props> = (p) => {
@@ -83,12 +91,35 @@ const SidebarCalendarMini: Component<Props> = (p) => {
   // Drag-Hover-State fuer Visual-Feedback (Border-Pulsation auf Tag).
   const [dragOverIso, setDragOverIso] = createSignal<string | null>(null);
 
-  // Drop-Handler: oeffnet das Manifestation-Modal mit dem ge-droppten
-  // Atom + dem Tag als Default-Datum. T.1.G.2.A handelt nur 'task' —
-  // T.AC erweitert auf andere Atom-Typen.
-  function handleDrop(iso: string, src: { atom: string; atomId: string; label?: string }) {
+  // Drop-Handler: zwei Faelle.
+  //   - sourceManifId vorhanden ODER virtual mit deadline → MOVE
+  //     (ohne Modal, mit Undo-Toast). Datum aendert sich, ggf. Range-
+  //     Delta erhalten.
+  //   - Sonst → ADD: oeffnet das Manifestation-Modal.
+  function handleDrop(
+    iso: string,
+    src: { atom: string; atomId: string; label?: string; sourceManifId?: string },
+  ) {
     if (src.atom !== 'task') return;
     setDragOverIso(null);
+    const task = p.tasksById.get(src.atomId);
+    const manif = src.sourceManifId ? p.manifestationsById.get(src.sourceManifId) : undefined;
+    // Move-Pfad wenn:
+    //   (a) explicit Calendar-Manifestation → Update display_meta.
+    //   (b) virtual aus tasks.deadline → setTaskDeadline.
+    if (manif?.kind === 'calendar' || task?.deadline) {
+      void moveByDate({
+        workspaceId: p.workspaceId,
+        taskId: src.atomId,
+        manifId: manif?.kind === 'calendar' ? manif.id : undefined,
+        currentManif: manif?.kind === 'calendar' ? manif : undefined,
+        currentDeadline: task?.deadline ?? null,
+        newDate: iso,
+      });
+      return;
+    }
+    // ADD-Pfad: Task ohne deadline + ohne explicit Calendar-Manifestation
+    // → Modal mit Datum-Vorbelegung.
     openManifestationModal({
       workspaceId: p.workspaceId,
       taskId: src.atomId,
