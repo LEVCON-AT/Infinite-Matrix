@@ -142,12 +142,12 @@ DROP FUNCTION IF EXISTS public.mcp_set_card_archived(uuid, boolean);
 DROP FUNCTION IF EXISTS public.mcp_add_checklist_item(uuid, text, int);
 
 -- ─── Schritt 1d: Audit-Trigger-Function fuer kb_cards entfernen ──
--- Migration 020 legte kb_cards_audit_emit() + 3 Trigger an. Der CASCADE
--- auf DROP TABLE entfernt die Trigger; die Function selbst muss explizit
--- weg, sonst bleibt sie als toter Code stehen (kein Trigger mehr → nie
--- mehr aufgerufen, aber TYPE-Referenzen auf kb_cards machen das Object
--- "broken" beim pg_dump).
-DROP FUNCTION IF EXISTS public.kb_cards_audit_emit();
+-- Migration 020 legte kb_cards_audit_emit() + 3 Trigger (insert/update/
+-- delete) an. CASCADE entfernt die abhaengigen Trigger zusammen mit
+-- der Function — der nachfolgende DROP TABLE haette die Trigger zwar
+-- ohnehin gekippt, aber dazwischen waeren sie ein Moment lang ohne
+-- Function gewesen (kein Showstopper, aber unsauber).
+DROP FUNCTION IF EXISTS public.kb_cards_audit_emit() CASCADE;
 
 -- ─── Schritt 2: Realtime-Publication entfernt referenzen automatisch ──
 -- DROP TABLE CASCADE entfernt Eintraege aus supabase_realtime
