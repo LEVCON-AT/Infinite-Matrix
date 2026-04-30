@@ -162,7 +162,7 @@ BEGIN
     RAISE WARNING 'B1-A-001: FORCE RLS nicht auf allen 6 Object-Layer-Tabellen aktiv (count=%)', v_force_count;
   END IF;
 
-  SELECT (relreloptions::text LIKE '%security_invoker=true%') INTO v_view_secinvoker
+  SELECT (reloptions::text LIKE '%security_invoker=true%') INTO v_view_secinvoker
     FROM pg_class WHERE relname = 'object_backlinks_v' AND relkind = 'v';
   IF NOT COALESCE(v_view_secinvoker, false) THEN
     RAISE WARNING 'B1-A-008: object_backlinks_v ohne security_invoker — bitte manuell pruefen';
