@@ -78,22 +78,37 @@ const AiHelpDrawer: Component = () => {
   // Beim Drawer-Open: pruefen ob aktueller Knoten von anderem User
   // ist UND Workspace > 2 Mitglieder. Wenn ja → readOnlyForced=true,
   // User muss explicit "Action-Mode" aktivieren.
+  //
+  // AU-B1 K7 (B1-H-003 / B1-H-010): Effect liest jetzt zusaetzlich
+  // location.pathname reaktiv (vorher nur open()), damit Navigation
+  // bei offenem Drawer den Read-Only-State neu evaluiert. Plus
+  // Mount-Check nach await — bei schnellem Toggle/Workspace-Wechsel
+  // werden Signale eines bereits-geschlossenen Drawer-Renders nicht
+  // mehr ueberschrieben.
   createEffect(() => {
     if (!open()) return;
     const wsId = params.workspaceId;
     if (!wsId) return;
     const selfId = user()?.id ?? null;
     if (!selfId) return;
+    // Reaktiv: location.pathname auch lesen, damit Navigation den
+    // Effect neu triggert.
+    const path = location.pathname;
+    let cancelled = false;
+    onCleanup(() => {
+      cancelled = true;
+    });
     void (async () => {
       try {
-        // Aktuelle Node aus Path lesen.
-        const nodeId = extractNodeIdFromPath(location.pathname);
+        const nodeId = extractNodeIdFromPath(path);
+        if (cancelled) return;
         if (!nodeId) {
           setReadOnlyForced(false);
           setReadOnly(false);
           return;
         }
         const nodes = await fetchNodesForWorkspace(wsId);
+        if (cancelled) return;
         const node = nodes.find((n: { id: string }) => n.id === nodeId);
         if (!node || !node.created_by || node.created_by === selfId) {
           setReadOnlyForced(false);
@@ -101,12 +116,13 @@ const AiHelpDrawer: Component = () => {
           return;
         }
         const members = await fetchMembers(wsId);
+        if (cancelled) return;
         const activeCount = members.filter((m) => !m.deactivated_at).length;
         const force = activeCount > 2;
         setReadOnlyForced(force);
         setReadOnly(force);
       } catch {
-        // Defensive: bei Fehler eher Read-Only.
+        if (cancelled) return;
         setReadOnlyForced(true);
         setReadOnly(true);
       }
@@ -137,9 +153,32 @@ const AiHelpDrawer: Component = () => {
     }
   });
 
+  // AU-B1 K7 (B1-D-004): ESC-Handler in Capture-Phase, schliesst den
+  // Drawer wenn er offen ist. stopImmediatePropagation verhindert dass
+  // ein anderer ESC-Handler (z.B. Matrix-Navigation) das Event mit-
+  // schluckt. Der Handler ist nur registriert wenn open() — sonst
+  // koennte ESC auf der Hauptseite andere ESC-konsumierende Modals
+  // stoeren.
+  createEffect(() => {
+    if (!open()) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      closeDrawer();
+    };
+    document.addEventListener('keydown', onKey, true);
+    onCleanup(() => document.removeEventListener('keydown', onKey, true));
+  });
+
   onMount(() => {
     onCleanup(() => {
-      restoreFocus?.();
+      // AU-B1 K7 (B1-D-004): nur restoreFocus wenn noch nicht durch
+      // den open()-Effect geschlossen-Pfad aufgerufen.
+      if (restoreFocus !== null) {
+        restoreFocus();
+        restoreFocus = null;
+      }
       abortCtrl?.abort();
     });
   });
@@ -357,24 +396,29 @@ const AiHelpDrawer: Component = () => {
               scrollerEl = el;
             }}
           >
+            {/* AU-B1 K7 (B1-D-005 / B1-H-004): EIN For-Loop in
+                Konversations-Reihenfolge. Vorher zwei separate Loops
+                (User dann Assistant) brachen den DOM-Order — Chat zeigte
+                erst alle Fragen, dann alle Antworten als Block. */}
             <For each={messages()}>
               {(m) => (
-                <Show when={m.kind === 'user'}>
-                  <div class="ai-help-msg ai-help-msg-user">{(m as { text: string }).text}</div>
-                </Show>
-              )}
-            </For>
-            <For each={messages()}>
-              {(m) => (
-                <Show when={m.kind === 'assistant'}>
-                  {(_) => {
-                    const am = m as { text: string; toolCalls: ChatToolCall[] };
-                    return (
+                <>
+                  <Show when={m.kind === 'user' ? (m as { text: string }) : null}>
+                    {(u) => <div class="ai-help-msg ai-help-msg-user">{u().text}</div>}
+                  </Show>
+                  <Show
+                    when={
+                      m.kind === 'assistant'
+                        ? (m as { text: string; toolCalls: ChatToolCall[] })
+                        : null
+                    }
+                  >
+                    {(am) => (
                       <div class="ai-help-msg ai-help-msg-assistant">
-                        <Show when={am.text}>
-                          <div class="ai-help-msg-text">{am.text}</div>
+                        <Show when={am().text}>
+                          <div class="ai-help-msg-text">{am().text}</div>
                         </Show>
-                        <For each={am.toolCalls}>
+                        <For each={am().toolCalls}>
                           {(tc) => (
                             <div class={`ai-help-tool ai-help-tool-${tc.status}`}>
                               <Icon
@@ -395,9 +439,9 @@ const AiHelpDrawer: Component = () => {
                           )}
                         </For>
                       </div>
-                    );
-                  }}
-                </Show>
+                    )}
+                  </Show>
+                </>
               )}
             </For>
             <Show when={isStreaming()}>

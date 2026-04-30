@@ -649,6 +649,10 @@ const NewCellWizard: Component<Props> = (p) => {
   function dispatchKey(e: KeyboardEvent) {
     if (busy()) return;
     const cur = step();
+    // AU-B1 K7 (B1-D-007): commit-Phase konsumiert keine Hotkeys mehr —
+    // sonst kann die MatrixView nach onClose() ein 4/d/etc. fangen, das
+    // eigentlich fuer den Wizard war (race waehrend des unmounts).
+    if (cur.kind === 'commit') return;
     if (cur.kind === 'pick') return onPickKeyDown(e);
     if (cur.kind === 'name') return onNameKeyDown(e);
   }

@@ -324,9 +324,19 @@ const GroupMatrixGenerator: Component<Props> = (p) => {
     }
   }
 
+  // AU-B1 K7 (B1-D-006 / B1-E-009): Timer-Handle gespeichert + Cleanup,
+  // damit der setTimeout-Callback nicht nach Component-Unmount Signale
+  // mutiert. Race bei schnellem Modal-Schliessen geschlossen.
+  let pickerBlurTimer: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => {
+    if (pickerBlurTimer) clearTimeout(pickerBlurTimer);
+  });
+
   function onPickerBlur(_axis: 'row' | 'col') {
     // Verzoegert schliessen — Click auf Dropdown-Item soll noch durchgehen.
-    setTimeout(() => {
+    if (pickerBlurTimer) clearTimeout(pickerBlurTimer);
+    pickerBlurTimer = setTimeout(() => {
+      pickerBlurTimer = undefined;
       if (objectSuggestState().open) return; // Dropdown selber kuemmert sich
       setPickerKind(null);
     }, 150);
