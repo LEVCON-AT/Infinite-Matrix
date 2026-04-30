@@ -592,6 +592,12 @@ export async function renameGroup(groupId: string, newName: string): Promise<voi
   if (error) throw error;
 }
 
+// AU-B1 K9 (B1-B-005): Dead Export — heute gibt es keinen UI-Caller fuer
+// `deleteGroup`. Wenn ein Group-Mgmt-Sprint einen Caller einfuehrt, MUSS
+// derselbe Sprint (a) showConfirm vor dem Aufruf und (b) showUndoToast
+// mit restoreGroup-Snapshot anbieten (Memory `feedback_saas_undo_pattern.md`).
+// Bis dahin ist der Export markiert, aber bleibt erhalten — Bridge-Tools
+// brauchen ihn fuer den naechsten Schema-Quad-Sprint (Stream G B1-G-005).
 export async function deleteGroup(groupId: string): Promise<void> {
   const { error } = await supabase.rpc('mcp_delete_group', { p_group_id: groupId });
   if (error) throw error;

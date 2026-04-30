@@ -122,6 +122,11 @@ export async function runAssist(opts: RunAssistOptions): Promise<void> {
 
       // Tool-Calls dispatchen.
       for (const tu of result.toolUses) {
+        // AU-B1 K9 (B1-H-009): Abort-Check zwischen jedem Tool. User-Cancel
+        // mitten in der Tool-Phase soll nicht mehr destruktive RPCs
+        // durchlaufen lassen. signal.throwIfAborted() schmeisst AbortError,
+        // den der outer-catch als Silent-Stop behandelt.
+        opts.signal?.throwIfAborted();
         totalToolCalls += 1;
         const toolResult = await dispatchTool(tu, opts.onEvent, {
           confirmDestructive: opts.confirmDestructive,

@@ -927,7 +927,11 @@ export async function executeSubtreeImportIntoCell(args: {
       .map((l) => ({
         id: newUuid(),
         label: typeof l.label === 'string' ? l.label : '',
-        url: l.url as string,
+        // AU-B1 K9 (B1-I-001 / C6-Partial): javascript:- und andere
+        // gefaehrliche Schemes filtern. Render-Pfad ist seit AU-A1.4
+        // mit sanitizeUrl gehaerted, aber die URL landete bisher
+        // ungefiltert in der DB.
+        url: sanitizeUrl(l.url as string) ?? '',
       }));
     if (newFields.length > 0 || newLinks.length > 0) {
       nextFeatures.add('info');

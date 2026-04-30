@@ -29,6 +29,7 @@
 //     auf dieselbe position+1 landen. Realtime-Refetch beim ersten
 //     Online-Sync normalisiert die Reihenfolge.
 
+import { currentUserIdSync } from './auth';
 import { isNetworkError } from './mutation-queue';
 import { getById, getByWorkspace } from './offline-cache';
 import { runOptimisticDelete, runOptimisticInsert, runOptimisticUpdate } from './safe-mutation';
@@ -455,6 +456,9 @@ async function createChildNode(args: {
         alias: null,
         parent_cell_id: args.parentCellId,
         data: {},
+        // AU-B1 K9 (B1-H-014): created_by sofort setzen, sonst zeigt der
+        // NodeTree-Avatar-Stack nach Reconnect-Replay einen leeren Slot.
+        created_by: currentUserIdSync(),
         created_at: now,
         updated_at: now,
       } as unknown as NodeRow;
@@ -529,6 +533,9 @@ export async function createRootNode(args: {
         alias,
         parent_cell_id: null,
         data: {},
+        // AU-B1 K9 (B1-H-014): created_by sofort setzen — siehe Begruendung
+        // in createChildNode.
+        created_by: currentUserIdSync(),
         created_at: now,
         updated_at: now,
       } as unknown as NodeRow;

@@ -160,6 +160,14 @@ export function useUser(): () => User | null {
   return () => session()?.user ?? null;
 }
 
+// AU-B1 K9 (B1-H-014): synchroner Zugriff auf die aktuelle User-ID
+// fuer Code-Pfade ausserhalb von SolidJS-Reactive-Owners (z.B.
+// buildOffline-Closures in mutations.ts). Liest das Signal direkt;
+// gibt null wenn nicht eingeloggt.
+export function currentUserIdSync(): string | null {
+  return session()?.user?.id ?? null;
+}
+
 // Magic-Link senden. `redirectPath` (ohne fuehrenden Slash) wird an
 // SITE_URL angehaengt und an Supabase als emailRedirectTo uebergeben —
 // damit der Klick auf den Mail-Link direkt auf einer bestimmten Sub-

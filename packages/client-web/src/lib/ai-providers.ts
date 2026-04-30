@@ -52,9 +52,15 @@ function clearCache(userId: string): void {
 
 export async function fetchAiProviders(userId: string): Promise<AiProvider[]> {
   try {
+    // AU-B1 K9 (B1-B-007): explizites user_id-Filter — RLS-Policy auf
+    // user_ai_providers_safe schuetzt zwar, aber Memory
+    // `feedback_rls_select_filter.md`: "RLS gibt Berechtigung, nicht
+    // User-Scope. Self-Listings explizit mit eq('user_id', auth.uid())
+    // filtern." Defense-in-Depth gegen Policy-Drift / service_role-Ausfall.
     const { data, error } = await supabase
       .from('user_ai_providers_safe')
       .select('id, kind, label, model_name, is_default, created_at, updated_at')
+      .eq('user_id', userId)
       .order('is_default', { ascending: false })
       .order('created_at', { ascending: true });
     if (error) throw error;
