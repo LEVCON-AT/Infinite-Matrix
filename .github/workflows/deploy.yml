@@ -188,9 +188,18 @@ jobs:
             set -euo pipefail
             sudo git -C /opt/matrix-repo fetch --quiet origin main
             sudo git -C /opt/matrix-repo reset --hard origin/main
-            # Gezielt nur untracked SQL-Files in migrations/ raeumen.
-            # KEIN globales clean — sonst sind Postgres-Volumes weg.
-            sudo git -C /opt/matrix-repo clean -fd -- infra/supabase/migrations/
+            # AU-B1 K6 (B1-G-002): Pauschal-Clean entfernt. Untracked
+            # SQL-Files in migrations/ koennten Notfall-Patches sein,
+            # die noch nicht im Repo committed wurden — die werden
+            # NICHT geloescht. Pfad-Variation (Tippfehler) wuerde sonst
+            # bind-mount-Volumes treffen (volumes/db/data ist nur 2 Ebenen
+            # darunter). supabase-migrate.sh ist idempotent — untracked
+            # SQLs werden lexikographisch eingeordnet, ueberschreibbar via
+            # Migration mit hoeherer Nummer.
+            #
+            # Falls eine Bereinigung dennoch noetig ist, manuell auf dem
+            # VPS pruefen via:
+            #   git -C /opt/matrix-repo status -- infra/supabase/migrations/
             sudo env SUPABASE_DIR=/opt/matrix-repo/infra/supabase \
               bash /opt/matrix-repo/infra/scripts/supabase-migrate.sh
           REMOTE

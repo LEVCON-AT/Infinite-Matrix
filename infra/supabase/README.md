@@ -20,8 +20,17 @@ Pflichtfelder (markiert mit `[TODO]`):
 - `POSTGRES_PASSWORD` — `openssl rand -base64 32`
 - `JWT_SECRET` — `openssl rand -base64 40`
 - `SECRET_KEY_BASE` — `openssl rand -hex 32`
+- `AI_MASTER_KEY` — `openssl rand -base64 32` (mind. 16 Zeichen)
 - `SMTP_PASS` — aus Ionos-Mail-Panel
 - `DASHBOARD_PASSWORD` — für Studio-Basic-Auth
+
+> **AI-Master-Key:** Ohne diesen Schritt schlagen alle AI-Provider-Calls
+> (Migration 018, `set_ai_provider`/`get_my_provider_credential`-RPCs)
+> mit `ai_master_key_missing` fehl. Nach `.env`-Eintrag muss die GUC am
+> Postgres gesetzt werden — dafuer gibt es das Setup-Script:
+> ```bash
+> bash infra/scripts/supabase-setup-ai-master-key.sh
+> ```
 
 ### 2. Lokal: `ANON_KEY` + `SERVICE_ROLE_KEY` generieren
 
