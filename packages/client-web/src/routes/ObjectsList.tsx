@@ -432,6 +432,7 @@ const ObjectsList: Component = () => {
             value={search()}
             onInput={(e) => setSearch(e.currentTarget.value)}
             placeholder="Label oder ^o.alias suchen…"
+            aria-label="Objekte durchsuchen"
           />
           <Show when={search()}>
             <button
@@ -449,6 +450,8 @@ const ObjectsList: Component = () => {
             class="objects-list-type-filter"
             value={typeFilter()}
             onChange={(e) => setTypeFilter(e.currentTarget.value)}
+            aria-label="Nach Typ filtern"
+            title="Typ-Filter"
           >
             <option value="">Alle Typen</option>
             <For each={typeOptions()}>{(t) => <option value={t}>{t}</option>}</For>
@@ -459,6 +462,7 @@ const ObjectsList: Component = () => {
             class="objects-list-type-filter"
             value={groupFilter()}
             onChange={(e) => setGroupFilter(e.currentTarget.value)}
+            aria-label="Nach Gruppe filtern"
             title="Gruppen-Filter"
           >
             <option value="">Alle Gruppen</option>
@@ -470,6 +474,7 @@ const ObjectsList: Component = () => {
             class="objects-list-type-filter"
             value={parentFilter()}
             onChange={(e) => setParentFilter(e.currentTarget.value)}
+            aria-label="Nach Eltern-Object filtern"
             title="Parent-Filter (recursive Children)"
           >
             <option value="">Alle Eltern</option>

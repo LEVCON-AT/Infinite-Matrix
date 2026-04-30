@@ -654,7 +654,7 @@ const GroupMatrixGenerator: Component<Props> = (p) => {
           <button
             type="button"
             class="btn btn-p"
-            onClick={submit}
+            onClick={() => void submit()}
             disabled={busy() || (rowSelection().size === 0 && colSelection().size === 0)}
           >
             {rowSelection().size}×{colSelection().size}-Matrix anlegen

@@ -529,7 +529,13 @@ button[type="submit"]:hover:not(:disabled) {
 
 /* Rails-Modus: Elemente die nur im full-Modus Sinn ergeben, verstecken.
    Tree-Icons/Chevrons bleiben — der Rest (Filter-Input, Labels,
-   Aliase, Action-Buttons, User-Block) wird auf 0 geschrumpft. */
+   Aliase, Action-Buttons, User-Block) wird auf 0 geschrumpft.
+   AU-B1 K8 (B1-E-005): display:none wird hier bewusst akzeptiert weil
+   der Sidebar-Container tatsaechlich nur ~40px breit ist im Rails-Modus.
+   Eine opacity-Animation wuerde Inhalt ueber die Container-Breite
+   ueberlaufen lassen. Falls eine fade-Transition gewuenscht ist,
+   muesste der Sidebar-Width-Wechsel mit Inhalts-Visibility synchron
+   animiert werden — eigener Sidebar-Animation-Sprint. */
 .ws-sidebar[data-sb-mode="rails"] .ws-actions,
 .ws-sidebar[data-sb-mode="rails"] .ws-user-block,
 .ws-sidebar[data-sb-mode="rails"] .node-tree-head,
@@ -8013,7 +8019,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 }
 
 .bulk-item-remove:hover:not(:disabled) {
-  background: var(--rl);
+  background: var(--surface-hover);
   color: var(--text);
 }
 
@@ -8139,7 +8145,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 }
 
 .obj-detail-edit-btn:hover {
-  background: var(--bg-hover, var(--rl));
+  background: var(--bg-hover);
   color: var(--text);
   border-color: var(--p);
 }
@@ -8215,7 +8221,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 }
 
 .obj-parent-clear-btn:hover {
-  background: var(--rl);
+  background: var(--surface-hover);
   color: var(--danger, #c44);
 }
 
@@ -8269,7 +8275,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 }
 
 .obj-tag-remove-btn:hover {
-  background: var(--rl);
+  background: var(--surface-hover);
   color: var(--danger, #c44);
 }
 
@@ -8320,7 +8326,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 }
 
 .obj-attr-remove-btn:hover {
-  background: var(--rl);
+  background: var(--surface-hover);
   color: var(--danger, #c44);
 }
 
@@ -8434,7 +8440,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 }
 
 .objects-list-search-clear:hover {
-  background: var(--rl);
+  background: var(--surface-hover);
   color: var(--text);
 }
 
@@ -8479,7 +8485,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 }
 
 .objects-list-reset-btn:hover {
-  background: var(--bg-hover, var(--rl));
+  background: var(--bg-hover);
   border-color: var(--danger, #c44);
   color: var(--danger, #c44);
 }
@@ -8522,7 +8528,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 }
 
 .objects-list-tag-chip.active {
-  background: var(--amberbg, var(--rl));
+  background: var(--amberbg);
   border-color: var(--amber, var(--p));
   color: var(--text);
   font-weight: 500;
@@ -8530,7 +8536,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 
 .objects-list-tag-count {
   padding: 0 5px;
-  background: var(--rl);
+  background: var(--surface-hover);
   border-radius: 8px;
   font-size: 10px;
   color: var(--text3);
@@ -8586,7 +8592,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 }
 
 .objects-list-view-btn:hover {
-  background: var(--rl);
+  background: var(--surface-hover);
   color: var(--text);
 }
 
@@ -8638,7 +8644,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 }
 
 .objects-tree-toggle:hover {
-  background: var(--rl);
+  background: var(--surface-hover);
   color: var(--text);
 }
 
@@ -8672,7 +8678,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 
 .group-matrix-empty {
   padding: var(--space-md);
-  background: var(--rl);
+  background: var(--surface-hover);
   border-radius: var(--radius-sm, 6px);
   text-align: center;
 }
@@ -8766,7 +8772,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 }
 
 .group-matrix-member-row:hover {
-  background: var(--rl);
+  background: var(--surface-hover);
 }
 
 .group-matrix-checkbox {
@@ -8812,7 +8818,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 }
 
 .group-matrix-member-remove:hover {
-  background: var(--rl);
+  background: var(--surface-hover);
   color: var(--danger, #c53030);
 }
 
@@ -8844,7 +8850,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 .group-matrix-add-btn:focus-visible {
   border-color: var(--p);
   color: var(--text);
-  background: var(--rl);
+  background: var(--surface-hover);
 }
 
 .group-matrix-add-btn:disabled {
@@ -8942,7 +8948,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 }
 
 .objects-list-item:hover {
-  background: var(--bg-hover, var(--rl));
+  background: var(--bg-hover);
   border-color: var(--p);
   transform: translateY(-1px);
 }
@@ -8964,7 +8970,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 
 .objects-list-item-count {
   padding: 2px 8px;
-  background: var(--amberbg, var(--rl));
+  background: var(--amberbg);
   color: var(--text2);
   border-radius: 10px;
   font-size: 11px;
@@ -9001,7 +9007,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 }
 
 .obj-detail-back:hover {
-  background: var(--bg-hover, var(--rl));
+  background: var(--bg-hover);
   color: var(--text);
   border-color: var(--p);
 }
@@ -9037,7 +9043,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   display: inline-flex;
   align-items: center;
   padding: 2px 10px;
-  background: var(--amberbg, var(--rl));
+  background: var(--amberbg);
   color: var(--amber, var(--text2));
   border-radius: 12px;
   font-size: 12px;
@@ -9143,7 +9149,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 
 .obj-backlink-btn:hover,
 .obj-children-btn:hover {
-  background: var(--bg-hover, var(--rl));
+  background: var(--bg-hover);
   border-color: var(--p);
 }
 
@@ -9173,7 +9179,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 .obj-backlink-node-type {
   margin-left: auto;
   padding: 1px 6px;
-  background: var(--rl);
+  background: var(--surface-hover);
   color: var(--text3);
   border-radius: 8px;
   font-size: 10px;
@@ -9192,7 +9198,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
-  background: var(--rl);
+  background: var(--surface-hover);
   color: var(--text);
   border-radius: 12px;
   font-size: 12px;
@@ -10744,7 +10750,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 .new-cell-wizard-feat:hover:not(:disabled),
 .new-cell-wizard-feat:focus-visible {
   border-color: var(--p);
-  background: var(--rl);
+  background: var(--surface-hover);
 }
 
 .new-cell-wizard-feat.active {
@@ -10766,7 +10772,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   width: 18px;
   height: 18px;
   border-radius: 4px;
-  background: var(--rl);
+  background: var(--surface-hover);
   color: var(--text3);
   font-size: 11px;
   font-weight: 700;
@@ -10775,7 +10781,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 
 .new-cell-wizard-feat.active .new-cell-wizard-feat-hotkey {
   background: var(--p);
-  color: #fff;
+  color: var(--surface);
 }
 
 .new-cell-wizard-feat-ico {
@@ -10878,7 +10884,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--rl);
+  background: var(--surface-hover);
   transition: background var(--tr-std), transform var(--tr-std);
 }
 
