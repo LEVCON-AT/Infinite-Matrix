@@ -13,7 +13,7 @@ import { addCellChecklist } from '../lib/mutations';
 import type { PresenceUser } from '../lib/presence';
 import { fetchCellChecklists } from '../lib/queries';
 import { showToast } from '../lib/toasts';
-import type { CellRow, ColRow, RowRow } from '../lib/types';
+import type { CellRow, ColRow, RowRow, TaskManifestationRow } from '../lib/types';
 import { useViewerActive } from '../lib/workspace-role';
 import CellDocsSection from './CellDocsSection';
 import ChecklistPanel from './ChecklistPanel';
@@ -35,6 +35,8 @@ type Props = {
   onItemHover?: (itemId: string | undefined) => void;
   // Phase 3 O.8.J: Resolver-Maps fuer Live-Aufloesung von doc.title_template.
   resolverMaps?: () => ContextMaps;
+  // Phase 4 T.1.G.2.C: Workspace-weite Manifestations fuer Cross-View-Drop.
+  wsManifestations?: TaskManifestationRow[];
 };
 
 const CellChecklistsPage: Component<Props> = (p) => {
@@ -165,6 +167,7 @@ const CellChecklistsPage: Component<Props> = (p) => {
                     selfUserId={p.selfUserId}
                     onItemHover={p.onItemHover}
                     resolverMaps={p.resolverMaps}
+                    wsManifestations={p.wsManifestations ?? []}
                   />
                 );
               }}

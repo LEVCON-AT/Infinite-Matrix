@@ -1344,6 +1344,7 @@ const Workspace: Component = () => {
                       selfUserId={user()?.id}
                       onItemHover={setHoverItemId}
                       resolverMaps={resolverMaps}
+                      wsManifestations={wsManifestations() ?? []}
                     />
                   </Show>
                   <Show when={cellSection() === 'info'}>
@@ -1459,6 +1460,7 @@ const Workspace: Component = () => {
                       presence={presenceUsers}
                       selfUserId={user()?.id}
                       onCardHover={setHoverCardId}
+                      wsManifestations={wsManifestations() ?? []}
                       onChanged={() => {
                         void refetchBoard();
                       }}

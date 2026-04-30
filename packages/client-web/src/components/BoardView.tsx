@@ -10,7 +10,9 @@ import {
 } from 'solid-js';
 import { useBoardUi } from '../lib/board-ui-state';
 import { showConfirm, showPrompt } from '../lib/dialog';
+import { activeDrag } from '../lib/drag-context';
 import { translateDbError } from '../lib/errors';
+import { dropOnKanbanCol } from '../lib/manifestation-cross-view';
 import {
   InvalidUrlError,
   addBoardLink,
@@ -41,7 +43,14 @@ import type { PresenceUser } from '../lib/presence';
 import { isCardDone, isRecurCard, todayIso, toggleOccurrence } from '../lib/recur';
 import { useVis } from '../lib/settings';
 import { showToast, showUndoToast } from '../lib/toasts';
-import type { BoardContent, KbCardRow, KbColRow, LinkRow, LinkType } from '../lib/types';
+import type {
+  BoardContent,
+  KbCardRow,
+  KbColRow,
+  LinkRow,
+  LinkType,
+  TaskManifestationRow,
+} from '../lib/types';
 import { sanitizeUrl } from '../lib/url';
 import {
   closeObjectSuggest,
@@ -66,6 +75,9 @@ type Props = {
   presence?: () => PresenceUser[];
   selfUserId?: string;
   onCardHover?: (cardId: string | undefined) => void;
+  // Phase 4 T.1.G.2.C: Workspace-weite Manifestations fuer Cross-View-
+  // Drop-Idempotenz (Move-vs-Add-Detect).
+  wsManifestations?: TaskManifestationRow[];
 };
 
 // Liefert N/M fuer eine Karte — inline-Checkliste oder resolved via ref.
@@ -224,10 +236,13 @@ const BoardView: Component<Props> = (p) => {
   }
 
   function onColDragOver(colId: string, e: DragEvent) {
-    // Nur wenn eine Card gezogen wird (draggingCardId gesetzt).
-    // Der dataTransfer-Typ-Check ist unzuverlaessig im dragover-Event
-    // (Firefox/Chrome-Diff), deshalb verlassen wir uns auf das Signal.
-    if (!draggingCardId()) return;
+    // Akzeptiert zwei Quellen:
+    //   (a) interner Card-Drag (draggingCardId gesetzt) — Reorder.
+    //   (b) externer Task-Drag aus Sidebar/Calendar/etc. (activeDrag()
+    //       atom='task') — Cross-View-Drop fuegt eine Kanban-Manifestation
+    //       hinzu (T.1.G.2.C).
+    const externalTask = activeDrag()?.atom === 'task';
+    if (!draggingCardId() && !externalTask) return;
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
     if (dragOverColId() !== colId) setDragOverColId(colId);
@@ -352,6 +367,28 @@ const BoardView: Component<Props> = (p) => {
   }
 
   async function onColDrop(colId: string, e: DragEvent) {
+    // Cross-View-Drop (T.1.G.2.C): externe Task-Manifestation aus
+    // Sidebar/Calendar landet hier → kanban-Manifestation an die Spalte
+    // anfuegen (oder bestehende Kanban-Manif moven). Hat Vorrang vor dem
+    // internen Reorder, weil externe Drags kein draggingCardId haben.
+    const ext = activeDrag();
+    if (ext?.atom === 'task' && !draggingCardId()) {
+      e.preventDefault();
+      e.stopPropagation();
+      clearDragState();
+      const list = cardsByCol().get(colId) ?? [];
+      const tail = list.reduce((max, c) => (c.position > max ? c.position : max), -1) + 1;
+      const taskExisting = (p.wsManifestations ?? []).filter((m) => m.task_id === ext.atomId);
+      void dropOnKanbanCol({
+        workspaceId: p.workspaceId,
+        taskId: ext.atomId,
+        taskLabel: ext.label,
+        targetColId: colId,
+        targetPosition: tail,
+        existingForTask: taskExisting,
+      });
+      return;
+    }
     // Wenn ein Card-Slot-Drop aktiv war, hat onCardDrop das schon
     // abgehandelt. Das Col-Drop-Event feuert bei manchen Browsern
     // zusaetzlich (Drag-Target-Bubble). Guard via dragOverCardId:
@@ -1348,6 +1385,7 @@ const BoardView: Component<Props> = (p) => {
                           checklist={cl}
                           items={items()}
                           workspaceId={p.workspaceId}
+                          wsManifestations={p.wsManifestations ?? []}
                           onChanged={() => p.onChanged?.()}
                         />
                       );

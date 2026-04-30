@@ -4324,6 +4324,13 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   padding: 0;
 }
 
+/* Phase 4 T.1.G.2.C: Cross-View-Drop-Highlight (Task aus Sidebar). */
+.cl-items-dragover {
+  outline: 1.5px dashed var(--accent);
+  outline-offset: 2px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
 .cl-it {
   display: flex;
   align-items: flex-start;

@@ -18,10 +18,12 @@ import { validateAlias } from '../lib/alias';
 import { executeChecklistAction, parseChecklistAction } from '../lib/checklist-action';
 import type { ParsedPasteItem } from '../lib/checklist-paste-parse';
 import { showConfirm } from '../lib/dialog';
+import { bindDropTarget } from '../lib/drag-context';
 import { useEditMode } from '../lib/edit-mode';
 import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
 import { type ContextMaps, resolveChecklistLabel } from '../lib/label-template';
+import { dropOnChecklist } from '../lib/manifestation-cross-view';
 import {
   addChecklistItem,
   applyChecklistClose,
@@ -43,7 +45,12 @@ import {
 } from '../lib/mutations';
 import type { PresenceUser } from '../lib/presence';
 import { showToast, showUndoToast } from '../lib/toasts';
-import type { ChecklistCloseMode, ChecklistItemRow, ChecklistRow } from '../lib/types';
+import type {
+  ChecklistCloseMode,
+  ChecklistItemRow,
+  ChecklistRow,
+  TaskManifestationRow,
+} from '../lib/types';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 import AliasText from './AliasText';
 import ChecklistActionModal from './ChecklistActionModal';
@@ -67,6 +74,10 @@ type Props = {
   // Phase 3 O.8.K: Resolver-Maps fuer Display-Pfade (Toasts, Confirms,
   // History-Snapshot). Edit-Input bleibt auf legacy label.
   resolverMaps?: () => ContextMaps;
+  // Phase 4 T.1.G.2.C: Workspace-weite Manifestations fuer Cross-View-
+  // Drop-Idempotenz (Move-vs-Add-Detect). Optional — Drop-Target ist
+  // dann inactive.
+  wsManifestations?: TaskManifestationRow[];
 };
 
 const ChecklistPanel: Component<Props> = (p) => {
@@ -114,6 +125,29 @@ const ChecklistPanel: Component<Props> = (p) => {
   const [showActionModal, setShowActionModal] = createSignal(false);
   const navigate = useNavigate();
   let aliasInputRef: HTMLInputElement | undefined;
+
+  // Cross-View-Drop (T.1.G.2.C): Task aus Sidebar/Calendar wird zur
+  // Checklisten-Position. Idempotent: bestehende Checklist-Manif derselben
+  // Task wird gemoved, sonst neu angelegt.
+  const [crossViewDragOver, setCrossViewDragOver] = createSignal(false);
+  const crossViewDrop = bindDropTarget({
+    accepts: (src) => src.atom === 'task',
+    onEnter: () => setCrossViewDragOver(true),
+    onLeave: () => setCrossViewDragOver(false),
+    onDrop: (src) => {
+      setCrossViewDragOver(false);
+      const tail = p.items.reduce((max, it) => (it.position > max ? it.position : max), -1) + 1;
+      const taskExisting = (p.wsManifestations ?? []).filter((m) => m.task_id === src.atomId);
+      void dropOnChecklist({
+        workspaceId: p.workspaceId,
+        taskId: src.atomId,
+        taskLabel: src.label,
+        targetChecklistId: p.checklist.id,
+        targetPosition: tail,
+        existingForTask: taskExisting,
+      });
+    },
+  });
 
   async function wrap<T>(fn: () => Promise<T>, successMsg?: string) {
     if (busy()) return;
@@ -503,7 +537,14 @@ const ChecklistPanel: Component<Props> = (p) => {
         </Show>
       </header>
 
-      <ul class="cl-items">
+      <ul
+        class="cl-items"
+        classList={{ 'cl-items-dragover': crossViewDragOver() }}
+        onDragEnter={crossViewDrop.onDragEnter}
+        onDragOver={crossViewDrop.onDragOver}
+        onDragLeave={crossViewDrop.onDragLeave}
+        onDrop={crossViewDrop.onDrop}
+      >
         <For each={p.items}>
           {(it) => (
             <li
