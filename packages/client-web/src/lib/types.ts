@@ -464,3 +464,63 @@ export type SoftGroupMemberRow = {
   object_id: string;
   workspace_id: string;
 };
+
+// ─── Task-Layer Types (Phase 4 T.1) ───────────────────────────────
+// ECS-Architektur: tasks (Layer 0 = Aggregate Root) + task_manifestations
+// (Layer 1 = "wo erscheint die Task"). Layer 2/3/4 (Dependencies, Rules,
+// Comments/Files/Docs) folgen in T.3/T.4/T.2.
+
+export type TaskStatus = 'open' | 'in_progress' | 'blocked' | 'done' | 'archived';
+
+export type TaskManifestationKind = 'kanban' | 'checklist' | 'calendar' | 'standalone';
+
+// recur teilt sich mit kb_cards die Struktur (CardRecur). Identisches
+// Format laesst T.1.B-Datenmigration die JSONB-Spalte 1:1 uebernehmen.
+export type TaskRecur = CardRecur;
+
+export type TaskRow = {
+  id: string;
+  workspace_id: string;
+  label: string;
+  note: string | null;
+  status: TaskStatus;
+  deadline: string | null; // date as ISO 'YYYY-MM-DD'
+  who: string[];
+  recur: TaskRecur | null;
+  done_occurrences: string[]; // date[] als ISO 'YYYY-MM-DD'
+  attrs: Record<string, unknown>;
+  created_at: string;
+  created_by: string | null;
+  updated_at: string;
+};
+
+export type TaskInput = {
+  label: string;
+  note?: string;
+  status?: TaskStatus;
+  deadline?: string | null;
+  who?: string[];
+  recur?: TaskRecur | null;
+  attrs?: Record<string, unknown>;
+};
+
+export type TaskManifestationRow = {
+  id: string;
+  task_id: string;
+  workspace_id: string;
+  kind: TaskManifestationKind;
+  container_id: string | null; // kb_cols.id / checklists.id / null bei calendar/standalone
+  position: number;
+  level: number | null; // nur bei kind='checklist' (0/1/2)
+  display_meta: Record<string, unknown>;
+  created_at: string;
+};
+
+export type TaskManifestationInput = {
+  task_id: string;
+  kind: TaskManifestationKind;
+  container_id?: string | null;
+  position?: number;
+  level?: number | null;
+  display_meta?: Record<string, unknown>;
+};

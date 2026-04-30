@@ -52,6 +52,11 @@ const TABLES = [
   'object_tags',
   'groups',
   'group_members',
+  // T.1.C — Task-Layer Cache. tasks (Layer 0) + task_manifestations
+  // (Layer 1). Smart-Summary, Agenda, Calendar lesen aus diesen Stores
+  // wenn der Server weg ist.
+  'tasks',
+  'task_manifestations',
 ] as const;
 
 export type CacheTable = (typeof TABLES)[number];
@@ -78,14 +83,16 @@ interface MatrixCacheSchema extends DBSchema {
   object_tags: StoreDef;
   groups: StoreDef;
   group_members: StoreDef;
+  tasks: StoreDef;
+  task_manifestations: StoreDef;
 }
 
 const DB_NAME = 'matrix-cache';
 // V2: docs-Store. V3: invites-Store. V4 (AU-B1 K11c.1): objects-Layer
-// (objects, object_tags, groups, group_members). Der `contains(t)`-Guard
-// im Loop laesst V1/V2/V3-Installs die fehlenden Stores idempotent
-// nachzugefuegt bekommen.
-const DB_VERSION = 4;
+// (objects, object_tags, groups, group_members). V5 (T.1.C): task-Layer
+// (tasks, task_manifestations). Der `contains(t)`-Guard im Loop laesst
+// V1..V4-Installs die fehlenden Stores idempotent nachzugefuegt bekommen.
+const DB_VERSION = 5;
 
 let dbPromise: Promise<IDBPDatabase<MatrixCacheSchema>> | null = null;
 
