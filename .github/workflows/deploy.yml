@@ -344,8 +344,15 @@ jobs:
           # $BRIDGE_HOST (matrix.levcon.at) — separater nginx-Vhost.
           # Falls BRIDGE_HOST nicht gesetzt ist, faellt Smoke nur auf
           # SaaS-Client zurueck.
-          curl -fsS -o /dev/null -w "%{http_code}\n" "https://$HOST/app/" | grep -q 200
+          #
+          # --retry 5 + --retry-all-errors faengt das schmale Race-Window
+          # zwischen `systemctl reload nginx` und dem ersten Smoke-Curl
+          # ab — Worker-Swap ist near-instant aber nicht atomar.
+          curl -fsS --retry 5 --retry-delay 2 --retry-all-errors \
+            -o /dev/null -w "%{http_code}\n" "https://$HOST/app/" | grep -q 200
           if [[ -n "${BRIDGE_HOST:-}" ]]; then
-            curl -fsS "https://$BRIDGE_HOST/healthz" | grep -q '"ok":true'
-            curl -fsS -o /dev/null -w "%{http_code}\n" "https://$BRIDGE_HOST/standalone/" | grep -q 200
+            curl -fsS --retry 5 --retry-delay 2 --retry-all-errors \
+              "https://$BRIDGE_HOST/healthz" | grep -q '"ok":true'
+            curl -fsS --retry 5 --retry-delay 2 --retry-all-errors \
+              -o /dev/null -w "%{http_code}\n" "https://$BRIDGE_HOST/standalone/" | grep -q 200
           fi
