@@ -8989,6 +8989,12 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+  /* Voll-Viewport minus minimaler Atemraum, damit das Grid drinnen
+     skaliert statt zu scrollen. Outer-Wrapper (App.tsx) hat keine
+     fixe Hoehe; wir setzen sie hier explizit. */
+  height: 100vh;
+  max-height: 100vh;
+  box-sizing: border-box;
 }
 
 .calendar-toolbar {
@@ -8996,6 +9002,7 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   align-items: center;
   gap: var(--space-sm);
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .calendar-recur-hint {
@@ -9007,11 +9014,20 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
+  /* Header-Zeile + 6 Wochen-Zeilen. Header schrumpft auf seine Hoehe;
+     die 6 Wochen-Zeilen teilen sich den Rest gleich auf (1fr). Mit
+     min-content fuer den Header bleibt die Day-Num lesbar. */
+  grid-template-rows: min-content repeat(6, minmax(48px, 1fr));
   gap: 1px;
   background: var(--border);
   border: 1px solid var(--border);
   border-radius: var(--rs);
   overflow: hidden;
+  /* Grid nimmt den Rest der Page-Hoehe — das ist der Schluessel: kein
+     fixes min-height pro Tag-Zelle mehr, sondern dynamische 1fr-Zeilen
+     die sich verteilen. */
+  flex: 1 1 0;
+  min-height: 0;
 }
 
 .calendar-weekday-head {
@@ -9030,7 +9046,11 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   flex-direction: column;
   gap: 2px;
   align-items: stretch;
-  min-height: 96px;
+  /* min-height entfernt — das Grid-Row verteilt jetzt mit 1fr.
+     min-height: 0 ist wichtig, damit die Cell ueberhaupt schrumpfen
+     darf (Default ist auto = unbeschraenkt). */
+  min-height: 0;
+  overflow: hidden;
   padding: 4px 6px;
   background: var(--bg);
   border: 0;
@@ -11850,6 +11870,38 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   .new-cell-wizard-features {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── T.1.X Polish: Focus-visible-Outlines (verstaerkt) ─────── */
+/* Globales *:focus-visible existiert bereits, aber bei den eng
+   getakteten Calendar-Days + Agenda-Rows ueberlappt es mit dem
+   Grid-Border bzw. dem Row-Spacing. Hier explizite Regeln mit
+   outline-offset = -2px (innen) damit der Indikator klar sichtbar
+   bleibt und nicht abgeschnitten wird. */
+.calendar-day:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: -2px;
+  z-index: 2;
+  position: relative;
+}
+
+.calendar-event:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 1px;
+  z-index: 3;
+  position: relative;
+}
+
+.agenda-row:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 0;
+  border-color: var(--focus-color);
+}
+
+.agenda-preset-btn:focus-visible,
+.task-status-btn:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
 }
 
 /* ── T.1.X Polish: Click-Pulse-Klassen ─────────────────────── */

@@ -50,6 +50,14 @@ export function installEscReturn(handler: () => void): () => void {
 // baren Eintraege im Container. Wraparound am Ende (Down beim letzten
 // → erster, Up beim ersten → letzter). Enter/Space bleiben Default
 // (native button click).
+//
+// Listener auf DOCUMENT: container.addEventListener feuert nur wenn
+// Focus *innerhalb* des Containers ist — das verlangt vom User dass er
+// vorher per Tab reingegangen ist UND dass kein Outer-Layer das Event
+// schluckt. Document-Listener mit activeElement-Filter ist robust.
+// Plus: wenn Pfeil-Down/Up gedrueckt wird und gar nichts fokussiert ist
+// (oder Focus auf body/<App>-Wrapper), focussieren wir das erste Item
+// — der User kommt dann sofort in die Listen-Navigation rein.
 export function useArrowListNav(container: HTMLElement | null, itemSelector: string): void {
   if (!container) return;
   function items(): HTMLElement[] {
@@ -58,10 +66,21 @@ export function useArrowListNav(container: HTMLElement | null, itemSelector: str
   }
   function onKey(e: KeyboardEvent) {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    if (!container) return;
+    const active = document.activeElement as HTMLElement | null;
+    const focusInside =
+      !!active &&
+      active !== document.body &&
+      active !== document.documentElement &&
+      container.contains(active);
+    // Wenn Focus weder im Container noch nirgendwo (body), uns ignorieren.
+    // Damit klauen wir nicht die Pfeile, wenn der User in einem Input
+    // oder anderen Widget arbeitet.
+    const focusNowhere = !active || active === document.body || active === document.documentElement;
+    if (!focusInside && !focusNowhere) return;
     const list = items();
     if (list.length === 0) return;
-    const active = document.activeElement as HTMLElement | null;
-    const idx = active ? list.indexOf(active) : -1;
+    const idx = focusInside ? list.indexOf(active as HTMLElement) : -1;
     let next: number;
     if (e.key === 'ArrowDown') {
       next = idx < 0 ? 0 : (idx + 1) % list.length;
@@ -71,8 +90,14 @@ export function useArrowListNav(container: HTMLElement | null, itemSelector: str
     e.preventDefault();
     list[next]?.focus();
   }
-  container.addEventListener('keydown', onKey);
-  onCleanup(() => container.removeEventListener('keydown', onKey));
+  if (typeof document !== 'undefined') {
+    document.addEventListener('keydown', onKey);
+  }
+  onCleanup(() => {
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('keydown', onKey);
+    }
+  });
 }
 
 // 4-direktionale Grid-Navigation. `cols` ist die Anzahl Spalten;
@@ -99,7 +124,26 @@ export function useGridNav(
     if (!container) return [];
     return Array.from(container.querySelectorAll<HTMLElement>(itemSelector));
   }
+  function isInputLike(el: HTMLElement | null): boolean {
+    if (!el) return false;
+    return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable;
+  }
+  function focusContext(): { focusInside: boolean; focusNowhere: boolean } {
+    if (!container) return { focusInside: false, focusNowhere: true };
+    const active = document.activeElement as HTMLElement | null;
+    const focusInside =
+      !!active &&
+      active !== document.body &&
+      active !== document.documentElement &&
+      container.contains(active);
+    const focusNowhere = !active || active === document.body || active === document.documentElement;
+    return { focusInside, focusNowhere };
+  }
   function onKey(e: KeyboardEvent) {
+    // Page-Tasten: nur reagieren wenn Focus im Grid oder nirgendwo —
+    // nicht wenn der User in einem Input tippt.
+    const ctx = focusContext();
+    if (!ctx.focusInside && !ctx.focusNowhere) return;
     if (e.key === 'PageDown') {
       e.preventDefault();
       opts?.onPageNext?.();
@@ -111,12 +155,11 @@ export function useGridNav(
       return;
     }
     if (e.key === 't' || e.key === 'T' || e.key === 'h' || e.key === 'H') {
-      // T = Today, H = Home — beide setzen den Anchor zurueck.
-      // Nur wenn Fokus im Grid-Container, sonst nicht greifen
-      // (User koennte „T" in einem Input tippen wollen).
+      // T/H nur wenn Focus im Grid (nicht wenn nirgendwo — sonst klauen
+      // wir Tastatur-Tippen das der User vielleicht woanders haben will).
+      if (!ctx.focusInside) return;
       const a = document.activeElement as HTMLElement | null;
-      if (!a || !container?.contains(a)) return;
-      if (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') return;
+      if (isInputLike(a)) return;
       e.preventDefault();
       opts?.onHome?.();
       return;
@@ -132,7 +175,7 @@ export function useGridNav(
     const list = items();
     if (list.length === 0) return;
     const active = document.activeElement as HTMLElement | null;
-    const idx = active ? list.indexOf(active) : -1;
+    const idx = ctx.focusInside ? list.indexOf(active as HTMLElement) : -1;
     let next: number;
     const total = list.length;
     if (idx < 0) {
@@ -157,8 +200,14 @@ export function useGridNav(
     e.preventDefault();
     list[next]?.focus();
   }
-  container.addEventListener('keydown', onKey);
-  onCleanup(() => container.removeEventListener('keydown', onKey));
+  if (typeof document !== 'undefined') {
+    document.addEventListener('keydown', onKey);
+  }
+  onCleanup(() => {
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('keydown', onKey);
+    }
+  });
 }
 
 // Kleiner Helfer: nach Mount einen Solid-`onMount`-Wrapper bauen, der
