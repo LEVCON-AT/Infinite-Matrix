@@ -10,7 +10,7 @@ import {
 } from 'solid-js';
 import { useBoardUi } from '../lib/board-ui-state';
 import { showConfirm, showPrompt } from '../lib/dialog';
-import { activeDrag } from '../lib/drag-context';
+import { activeDrag, endDrag, startDrag } from '../lib/drag-context';
 import { translateDbError } from '../lib/errors';
 import { dropOnKanbanCol } from '../lib/manifestation-cross-view';
 import {
@@ -229,10 +229,25 @@ const BoardView: Component<Props> = (p) => {
     // Fallback fuer Browser die den custom-type ignorieren.
     e.dataTransfer.setData('text/plain', card.id);
     setDraggingCardId(card.id);
+    // Phase 4 T.1.G.2.D: Cross-View-Drag aktivieren — auch fuer Kanban-
+    // Karten. Damit akzeptieren Sidebar-Calendar / Mini-Calendar / Day-
+    // View die Karte als Quelle. KbCardRow.id IS die task_id (Projection-
+    // Shape). Die zugehoerige Kanban-Manifestation suchen wir via
+    // wsManifestations, damit Drop-Targets Move-vs-Add erkennen koennen.
+    const kanbanManif = (p.wsManifestations ?? []).find(
+      (m) => m.kind === 'kanban' && m.task_id === card.id,
+    );
+    startDrag({
+      atom: 'task',
+      atomId: card.id,
+      label: card.name,
+      sourceManifId: kanbanManif?.id,
+    });
   }
 
   function onCardDragEnd() {
     clearDragState();
+    endDrag();
   }
 
   function onColDragOver(colId: string, e: DragEvent) {

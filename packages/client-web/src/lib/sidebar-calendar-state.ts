@@ -15,6 +15,7 @@ export type SidebarCalendarState = {
   anchorIso: string; // 'YYYY-MM-DD' — Anker-Monat (wird vom 1. dieses Monats verwendet)
   selectedDay: string; // 'YYYY-MM-DD' — Tag in der Tagesansicht
   isOpen: boolean; // Calendar-Sektion offen?
+  treeOpen: boolean; // NodeTree-Sektion offen? Default true (heute immer sichtbar).
 };
 
 const MAX_PAST = 5;
@@ -48,6 +49,7 @@ function defaultState(): SidebarCalendarState {
     anchorIso: t,
     selectedDay: t,
     isOpen: false,
+    treeOpen: true,
   };
 }
 
@@ -64,6 +66,7 @@ function load(workspaceId: string): SidebarCalendarState {
       anchorIso: typeof parsed.anchorIso === 'string' ? parsed.anchorIso : def.anchorIso,
       selectedDay: typeof parsed.selectedDay === 'string' ? parsed.selectedDay : def.selectedDay,
       isOpen: typeof parsed.isOpen === 'boolean' ? parsed.isOpen : def.isOpen,
+      treeOpen: typeof parsed.treeOpen === 'boolean' ? parsed.treeOpen : def.treeOpen,
     };
   } catch {
     return defaultState();

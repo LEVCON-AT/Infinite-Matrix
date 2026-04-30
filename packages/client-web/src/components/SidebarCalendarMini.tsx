@@ -17,7 +17,7 @@ import {
   groupEventsByDay,
   monthLabelDe,
 } from '../lib/calendar';
-import { bindDropTarget } from '../lib/drag-context';
+import { activeDrag, bindDropTarget } from '../lib/drag-context';
 import { useGridNav } from '../lib/keyboard-nav';
 import { openManifestationModal } from '../lib/manifestation-modal-state';
 import { moveByDate } from '../lib/manifestation-move';
@@ -91,6 +91,48 @@ const SidebarCalendarMini: Component<Props> = (p) => {
   // Drag-Hover-State fuer Visual-Feedback (Border-Pulsation auf Tag).
   const [dragOverIso, setDragOverIso] = createSignal<string | null>(null);
 
+  // Drag-Hover auf den ‹/›-Nav-Buttons → nach 350ms Hover springt der
+  // Anker einen Monat weiter. Damit kann der User eine Karte in einen
+  // anderen Monat draggen ohne den Drag abzubrechen. Solange er auf
+  // dem Chevron haelt, navigiert es weiter (auto-repeat alle 700ms).
+  function bindDragNav(delta: number) {
+    let firstTimer: ReturnType<typeof setTimeout> | null = null;
+    let repeatTimer: ReturnType<typeof setInterval> | null = null;
+    function clear() {
+      if (firstTimer != null) {
+        clearTimeout(firstTimer);
+        firstTimer = null;
+      }
+      if (repeatTimer != null) {
+        clearInterval(repeatTimer);
+        repeatTimer = null;
+      }
+    }
+    return {
+      onDragEnter: (e: DragEvent) => {
+        if (!activeDrag()) return;
+        e.preventDefault();
+        if (firstTimer != null) return;
+        firstTimer = setTimeout(() => {
+          firstTimer = null;
+          navAnchor(delta);
+          repeatTimer = setInterval(() => navAnchor(delta), 700);
+        }, 350);
+      },
+      onDragOver: (e: DragEvent) => {
+        if (!activeDrag()) return;
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'none';
+      },
+      onDragLeave: () => {
+        clear();
+      },
+      onDrop: () => {
+        clear();
+      },
+    };
+  }
+
   // Drop-Handler: zwei Faelle.
   //   - sourceManifId vorhanden ODER virtual mit deadline → MOVE
   //     (ohne Modal, mit Undo-Toast). Datum aendert sich, ggf. Range-
@@ -131,15 +173,24 @@ const SidebarCalendarMini: Component<Props> = (p) => {
   return (
     <div class="sb-cal-mini">
       <div class="sb-cal-mini-head">
-        <button
-          type="button"
-          class="sb-cal-mini-nav-btn click-pulse"
-          onClick={() => navAnchor(-1)}
-          aria-label="Vorheriger Monat"
-          title="Vorheriger Monat"
-        >
-          <Icon name="chevron-left" size={12} />
-        </button>
+        {(() => {
+          const prev = bindDragNav(-1);
+          return (
+            <button
+              type="button"
+              class="sb-cal-mini-nav-btn click-pulse"
+              onClick={() => navAnchor(-1)}
+              aria-label="Vorheriger Monat"
+              title="Vorheriger Monat"
+              onDragEnter={prev.onDragEnter}
+              onDragOver={prev.onDragOver}
+              onDragLeave={prev.onDragLeave}
+              onDrop={prev.onDrop}
+            >
+              <Icon name="chevron-left" size={12} />
+            </button>
+          );
+        })()}
         <button
           type="button"
           class="sb-cal-mini-today-btn click-pulse"
@@ -148,15 +199,24 @@ const SidebarCalendarMini: Component<Props> = (p) => {
         >
           Heute
         </button>
-        <button
-          type="button"
-          class="sb-cal-mini-nav-btn click-pulse"
-          onClick={() => navAnchor(1)}
-          aria-label="Naechster Monat"
-          title="Naechster Monat"
-        >
-          <Icon name="chevron-right" size={12} />
-        </button>
+        {(() => {
+          const next = bindDragNav(1);
+          return (
+            <button
+              type="button"
+              class="sb-cal-mini-nav-btn click-pulse"
+              onClick={() => navAnchor(1)}
+              aria-label="Naechster Monat"
+              title="Naechster Monat"
+              onDragEnter={next.onDragEnter}
+              onDragOver={next.onDragOver}
+              onDragLeave={next.onDragLeave}
+              onDrop={next.onDrop}
+            >
+              <Icon name="chevron-right" size={12} />
+            </button>
+          );
+        })()}
       </div>
 
       <div

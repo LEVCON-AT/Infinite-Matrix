@@ -72,6 +72,10 @@ import { useSettingsBodyClassSync } from '../lib/settings';
 import { useSidebarCalendarState } from '../lib/sidebar-calendar-state';
 import { useSidebarChips } from '../lib/sidebar-chips';
 import { useSidebarMode } from '../lib/sidebar-mode';
+import {
+  bindSectionDragExpand,
+  installGlobalSectionShortcuts,
+} from '../lib/sidebar-section-controls';
 import { fetchManifestationsByWorkspace, fetchTasks } from '../lib/tasks';
 import { toggleTheme, useTheme } from '../lib/theme';
 import { showToast } from '../lib/toasts';
@@ -713,6 +717,17 @@ const Workspace: Component = () => {
     onCleanup(() => document.removeEventListener('keydown', onKey));
   });
 
+  // Phase 4 T.1.G.2.D: globale Toggle-Shortcuts fuer die Sidebar-
+  // Sektionen. K = Calendar, N = Struktur (NodeTree). Skip in
+  // Inputs/Textareas/contenteditable + offene Modals.
+  onMount(() => {
+    const cleanup = installGlobalSectionShortcuts({
+      onCalendar: () => sbCal?.update({ isOpen: !sbCal.state().isOpen }),
+      onTree: () => sbCal?.update({ treeOpen: !sbCal.state().treeOpen }),
+    });
+    onCleanup(cleanup);
+  });
+
   // Palette-Shortcut: `^` ist der einzige Entry-Point (Ctrl+K und Shift+P
   // entfernt auf User-Wunsch 2026-04-24). Die Palette macht sowohl
   // Alias-Navigation als auch Commands — siehe CommandPalette.tsx.
@@ -950,15 +965,26 @@ const Workspace: Component = () => {
           </button>
         </div>
         <Show when={params.workspaceId && sbCal}>
-          <div class="ws-sb-section">
+          <div
+            class="ws-sb-section"
+            classList={{ 'ws-sb-section-open': sbCal?.state().isOpen ?? false }}
+          >
             <button
               type="button"
               class="ws-sb-section-head click-pulse"
               onClick={() => sbCal?.update({ isOpen: !sbCal.state().isOpen })}
               aria-expanded={sbCal?.state().isOpen ?? false}
+              ref={(el) => {
+                bindSectionDragExpand(el, () => {
+                  if (!sbCal?.state().isOpen) sbCal?.update({ isOpen: true });
+                });
+              }}
             >
               <Icon name={sbCal?.state().isOpen ? 'chevron-down' : 'chevron-right'} size={14} />
               <span>Kalender</span>
+              <span class="ws-sb-section-kbd" aria-hidden="true">
+                K
+              </span>
             </button>
             <Show when={sbCal?.state().isOpen}>
               <div class="ws-sb-section-body">
@@ -979,21 +1005,47 @@ const Workspace: Component = () => {
             </Show>
           </div>
         </Show>
-        <Show when={params.workspaceId}>
-          <NodeTree
-            workspaceId={params.workspaceId as string}
-            tree={tree()}
-            currentNodeId={params.nodeId ?? params.cellId}
-            currentFeature={cellFeature()}
-            presence={presenceUsers}
-            selfUserId={user()?.id}
-            members={() => workspaceMembers() ?? []}
-            resolverMaps={resolverMaps}
-            onChanged={() => {
-              void refetchCells();
-              void refetchCellsWithDocs();
-            }}
-          />
+        <Show when={params.workspaceId && sbCal}>
+          <div
+            class="ws-sb-section"
+            classList={{ 'ws-sb-section-open': sbCal?.state().treeOpen ?? true }}
+          >
+            <button
+              type="button"
+              class="ws-sb-section-head click-pulse"
+              onClick={() => sbCal?.update({ treeOpen: !sbCal.state().treeOpen })}
+              aria-expanded={sbCal?.state().treeOpen ?? true}
+              ref={(el) => {
+                bindSectionDragExpand(el, () => {
+                  if (!sbCal?.state().treeOpen) sbCal?.update({ treeOpen: true });
+                });
+              }}
+            >
+              <Icon name={sbCal?.state().treeOpen ? 'chevron-down' : 'chevron-right'} size={14} />
+              <span>Struktur</span>
+              <span class="ws-sb-section-kbd" aria-hidden="true">
+                N
+              </span>
+            </button>
+            <Show when={sbCal?.state().treeOpen}>
+              <div class="ws-sb-section-body">
+                <NodeTree
+                  workspaceId={params.workspaceId as string}
+                  tree={tree()}
+                  currentNodeId={params.nodeId ?? params.cellId}
+                  currentFeature={cellFeature()}
+                  presence={presenceUsers}
+                  selfUserId={user()?.id}
+                  members={() => workspaceMembers() ?? []}
+                  resolverMaps={resolverMaps}
+                  onChanged={() => {
+                    void refetchCells();
+                    void refetchCellsWithDocs();
+                  }}
+                />
+              </div>
+            </Show>
+          </div>
         </Show>
         {/* Workspace-Level Import/Export haben wir entfernt — Import +
             Export laufen ausschliesslich ueber das Sidebar-Kontextmenue
