@@ -16,8 +16,15 @@ import type { TaskManifestationRow, TaskRow } from './types';
 // Phase 4 T.1.D: kb_cards + checklist_items leben nicht mehr in
 // eigenen Tabellen — wir lesen tasks + task_manifestations und
 // projizieren auf die Legacy-Export-Form (kb_cards[]/checklist_items[]),
-// damit das WorkspaceExport-Format unveraendert bleibt.
-async function fetchLegacyShapesForWorkspace(workspaceId: string): Promise<{
+// damit das WorkspaceExport-Format rueckwaerts-kompatibel bleibt.
+//
+// Phase 4 T.1.I: zusaetzlich wandern die nativen Tabellen `tasks` und
+// `task_manifestations` vollstaendig ins Export. Damit ueberleben auch
+// Calendar-Manifestationen (kind='calendar') + standalone-Tasks ohne
+// Sicht den Round-Trip — die Legacy-Projection allein traegt das nicht.
+async function fetchTaskShapesForWorkspace(workspaceId: string): Promise<{
+  tasks: TaskRow[];
+  manifestations: TaskManifestationRow[];
   kb_cards: Record<string, unknown>[];
   checklist_items: Record<string, unknown>[];
 }> {
@@ -41,7 +48,7 @@ async function fetchLegacyShapesForWorkspace(workspaceId: string): Promise<{
       checklist_items.push(taskAndManifToItem(t, m) as unknown as Record<string, unknown>);
     }
   }
-  return { kb_cards, checklist_items };
+  return { tasks, manifestations: manifs, kb_cards, checklist_items };
 }
 
 export const WORKSPACE_EXPORT_VERSION = 1 as const;
@@ -82,6 +89,15 @@ export type WorkspaceExport = {
   object_tags?: Record<string, unknown>[];
   groups?: Record<string, unknown>[];
   group_members?: Record<string, unknown>[];
+  // Phase 4 T.1.I: Native Task-Layer-Tabellen (Layer 0 + Layer 1).
+  // Optional fuer V0-Parser-Kompatibilitaet — alte Exports tragen
+  // sie nicht; der Importer faellt auf die Legacy-Projection
+  // (kb_cards/checklist_items) zurueck, wenn diese Felder fehlen.
+  // Mit drinne: `tasks` traegt auch standalone-Tasks ohne Manifestation,
+  // `task_manifestations` traegt auch kind='calendar' (Range/Time) —
+  // beide gehen sonst beim Round-Trip verloren.
+  tasks?: Record<string, unknown>[];
+  task_manifestations?: Record<string, unknown>[];
   // Nur bei Cell-Subtree-Exports gesetzt: Meta-Info zur Quell-Zelle,
   // damit der Importer ihre info-Felder/Links und Feature-Flags in
   // die Ziel-Zelle mergen kann — ohne die Zelle selbst in cells[]
@@ -200,7 +216,7 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     supabase.from('cols').select('*').eq('workspace_id', workspaceId),
     supabase.from('cells').select('*').eq('workspace_id', workspaceId),
     supabase.from('kb_cols').select('*').eq('workspace_id', workspaceId),
-    fetchLegacyShapesForWorkspace(workspaceId),
+    fetchTaskShapesForWorkspace(workspaceId),
     supabase.from('checklists').select('*').eq('workspace_id', workspaceId),
     supabase.from('links').select('*').eq('workspace_id', workspaceId),
     supabase.from('docs').select('*').eq('workspace_id', workspaceId),
@@ -246,6 +262,8 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     object_tags: (objectTagsRes.data ?? []) as Record<string, unknown>[],
     groups: (groupsRes.data ?? []) as Record<string, unknown>[],
     group_members: (groupMembersRes.data ?? []) as Record<string, unknown>[],
+    tasks: legacyShapes.tasks as unknown as Record<string, unknown>[],
+    task_manifestations: legacyShapes.manifestations as unknown as Record<string, unknown>[],
   };
 }
 
@@ -325,7 +343,7 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     supabase.from('cols').select('*').eq('workspace_id', workspaceId),
     supabase.from('cells').select('*').eq('workspace_id', workspaceId),
     supabase.from('kb_cols').select('*').eq('workspace_id', workspaceId),
-    fetchLegacyShapesForWorkspace(workspaceId),
+    fetchTaskShapesForWorkspace(workspaceId),
     supabase.from('checklists').select('*').eq('workspace_id', workspaceId),
     supabase.from('links').select('*').eq('workspace_id', workspaceId),
     supabase.from('docs').select('*').eq('workspace_id', workspaceId),
@@ -386,6 +404,8 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
       object_id?: string | null;
     }>,
     kb_cards: legacyShapes.kb_cards as unknown as Array<{ id: string; board_id: string }>,
+    tasks: legacyShapes.tasks,
+    task_manifestations: legacyShapes.manifestations,
     checklists: (checklistsRes.data ?? []) as Array<{
       id: string;
       board_id: string | null;
@@ -496,6 +516,24 @@ export async function exportSubtree(
   const filteredChecklistItems = all.checklist_items.filter((it) =>
     filteredChecklistIds.has(it.checklist_id),
   );
+
+  // Phase 4 T.1.I: Task-Layer-Subtree-Filter. Eine Task gehoert zum
+  // Subtree, wenn mindestens eine ihrer Manifestations einen Container
+  // im Subtree referenziert (oder sie kanban/checklist-projiziert auf
+  // einen subtree-Card/Item ist). Standalone-Tasks (keine Manif) sind
+  // workspace-global — Subtree-Export traegt sie nicht mit.
+  const filteredKbColIds = new Set(filteredKbCols.map((k) => k.id));
+  const filteredManifestations = all.task_manifestations.filter((m) => {
+    if (m.kind === 'kanban') return m.container_id != null && filteredKbColIds.has(m.container_id);
+    if (m.kind === 'checklist')
+      return m.container_id != null && filteredChecklistIds.has(m.container_id);
+    // calendar/standalone: workspace-global, im Subtree-Export nicht
+    // automatisch enthalten — der User exportiert hier Struktur, nicht
+    // den Kalender.
+    return false;
+  });
+  const filteredTaskIds = new Set(filteredManifestations.map((m) => m.task_id));
+  const filteredTasks = all.tasks.filter((t) => filteredTaskIds.has(t.id));
   const filteredLinks = all.links.filter((l) => inNodes(l.board_id));
   // Docs wandern mit, wenn sie an einer Subtree-Cell kleben.
   const filteredDocs = all.docs.filter((d) => d.attached_cell_id && inCells(d.attached_cell_id));
@@ -544,6 +582,8 @@ export async function exportSubtree(
     object_tags: filteredObjectTags as unknown as Record<string, unknown>[],
     groups: filteredGroups as unknown as Record<string, unknown>[],
     group_members: filteredGroupMembers as unknown as Record<string, unknown>[],
+    tasks: filteredTasks as unknown as Record<string, unknown>[],
+    task_manifestations: filteredManifestations as unknown as Record<string, unknown>[],
   };
 }
 
@@ -620,6 +660,18 @@ export async function exportCellSubtree(
     (d) => d.attached_cell_id === cellId || (d.attached_cell_id && inCells(d.attached_cell_id)),
   );
 
+  // Phase 4 T.1.I: Task-Layer-Subtree-Filter (analog exportSubtree).
+  const filteredKbColIdsCell = new Set(filteredKbCols.map((k) => k.id));
+  const filteredManifestationsCell = all.task_manifestations.filter((m) => {
+    if (m.kind === 'kanban')
+      return m.container_id != null && filteredKbColIdsCell.has(m.container_id);
+    if (m.kind === 'checklist')
+      return m.container_id != null && filteredChecklistIds.has(m.container_id);
+    return false;
+  });
+  const filteredTaskIdsCell = new Set(filteredManifestationsCell.map((m) => m.task_id));
+  const filteredTasksCell = all.tasks.filter((t) => filteredTaskIdsCell.has(t.id));
+
   return {
     version: WORKSPACE_EXPORT_VERSION,
     payloadType: 'subtree',
@@ -635,6 +687,8 @@ export async function exportCellSubtree(
     checklist_items: filteredChecklistItems as unknown as Record<string, unknown>[],
     links: filteredLinks as unknown as Record<string, unknown>[],
     docs: filteredDocs as unknown as Record<string, unknown>[],
+    tasks: filteredTasksCell as unknown as Record<string, unknown>[],
+    task_manifestations: filteredManifestationsCell as unknown as Record<string, unknown>[],
     sourceCell: {
       data: cell.data ?? {},
       features: Array.isArray(cell.features) ? cell.features : [],
