@@ -78,6 +78,7 @@ const CellChecklistsPage: Component<Props> = (p) => {
       });
       await refetch();
     } catch (err) {
+      console.error('addCellChecklist:', err);
       showToast(translateDbError(err), 'error');
     } finally {
       setBusy(false);

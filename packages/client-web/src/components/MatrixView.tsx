@@ -218,6 +218,8 @@ const MatrixView: Component<Props> = (p) => {
       if (successMsg) showToast(successMsg, 'success');
       p.onChanged?.();
     } catch (err) {
+      // AU-B1 K5 (B1-F-001 / CC3): console.error fuer Production-Debug.
+      console.error('MatrixView.wrap:', err);
       showToast(translateDbError(err), 'error');
     } finally {
       setBusy(false);

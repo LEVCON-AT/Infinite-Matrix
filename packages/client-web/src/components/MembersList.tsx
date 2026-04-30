@@ -108,6 +108,7 @@ const MembersList: Component<MembersListProps> = (p) => {
       }
       p.onChanged();
     } catch (err) {
+      console.error('handleRoleChange:', err);
       showToast(
         translateMemberError(err, translateDbError(err, 'Rollen-Aenderung fehlgeschlagen.')),
         'error',
@@ -138,6 +139,7 @@ const MembersList: Component<MembersListProps> = (p) => {
       }
       p.onChanged();
     } catch (err) {
+      console.error('handleRevoke:', err);
       showToast(
         translateInviteError(err, translateDbError(err, 'Widerruf fehlgeschlagen.')),
         'error',
@@ -164,6 +166,7 @@ const MembersList: Component<MembersListProps> = (p) => {
       }
       p.onChanged();
     } catch (err) {
+      console.error('handleDeactivate:', err);
       showToast(
         translateMemberError(err, translateDbError(err, 'Deaktivierung fehlgeschlagen.')),
         'error',
@@ -181,6 +184,7 @@ const MembersList: Component<MembersListProps> = (p) => {
       }
       p.onChanged();
     } catch (err) {
+      console.error('handleReactivate:', err);
       showToast(
         translateMemberError(err, translateDbError(err, 'Reaktivierung fehlgeschlagen.')),
         'error',
@@ -203,6 +207,7 @@ const MembersList: Component<MembersListProps> = (p) => {
       showToast(`${memberDisplayLabel(m)} entfernt.`, 'success');
       p.onChanged();
     } catch (err) {
+      console.error('handleRemove:', err);
       showToast(
         translateMemberError(err, translateDbError(err, 'Entfernen fehlgeschlagen.')),
         'error',

@@ -87,6 +87,7 @@ async function runEncryptedExport(args: {
     await downloadSubtreeExport(data, args.filenameLabel, { passphrase: pw });
     showToast(`Verschluesselt exportiert — ${summarizeExport(data)}`, 'success');
   } catch (err) {
+    console.error('downloadEncryptedSubtree:', err);
     showToast(translateDbError(err), 'error');
   }
 }

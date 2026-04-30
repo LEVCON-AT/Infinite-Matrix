@@ -100,6 +100,7 @@ const CellInfoPage: Component<Props> = (p) => {
       if (successMsg) showToast(successMsg, 'success');
       p.onChanged();
     } catch (err) {
+      console.error('CellInfoPage.wrap:', err);
       showToast(translateDbError(err), 'error');
     } finally {
       setBusy(false);

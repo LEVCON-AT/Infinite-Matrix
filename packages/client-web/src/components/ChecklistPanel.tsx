@@ -123,6 +123,7 @@ const ChecklistPanel: Component<Props> = (p) => {
       if (successMsg) showToast(successMsg, 'success');
       p.onChanged();
     } catch (err) {
+      console.error('ChecklistPanel.wrap:', err);
       showToast(translateDbError(err), 'error');
     } finally {
       setBusy(false);
@@ -155,6 +156,7 @@ const ChecklistPanel: Component<Props> = (p) => {
       await setChecklistAlias(p.checklist.id, next);
       p.onChanged();
     } catch (err) {
+      console.error('setChecklistAlias:', err);
       showToast(translateDbError(err), 'error');
       flashError(aliasInputRef);
       if (aliasInputRef) aliasInputRef.value = current ?? '';
@@ -185,6 +187,7 @@ const ChecklistPanel: Component<Props> = (p) => {
           showToast('Checkliste wiederhergestellt.', 'success');
           p.onChanged();
         } catch (err) {
+          console.error('restoreChecklistWithItems:', err);
           showToast(translateDbError(err), 'error');
         }
       })();
@@ -219,6 +222,7 @@ const ChecklistPanel: Component<Props> = (p) => {
           await restoreChecklistItem(snap);
           p.onChanged();
         } catch (err) {
+          console.error('restoreChecklistItem:', err);
           showToast(translateDbError(err), 'error');
         }
       })();
@@ -281,6 +285,7 @@ const ChecklistPanel: Component<Props> = (p) => {
       });
       return true;
     } catch (err) {
+      console.error('performClose:', err);
       showToast(translateDbError(err), 'error');
       return false;
     } finally {
@@ -317,6 +322,7 @@ const ChecklistPanel: Component<Props> = (p) => {
           showToast('Snapshot wiederhergestellt.', 'success');
           p.onChanged();
         } catch (err) {
+          console.error('restoreChecklistSnapshot:', err);
           showToast(translateDbError(err), 'error');
         }
       })();

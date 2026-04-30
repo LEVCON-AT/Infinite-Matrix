@@ -104,6 +104,7 @@ const CardOverlay: Component<Props> = (p) => {
       if (successMsg) showToast(successMsg, 'success');
       p.onChanged?.();
     } catch (err) {
+      console.error('CardOverlay.wrap:', err);
       showToast(translateDbError(err), 'error');
     } finally {
       setBusy(false);
