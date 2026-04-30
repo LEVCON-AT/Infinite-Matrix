@@ -12,6 +12,7 @@ import { checkAndMaybeRedirectToOnboarding, resetOnboardingGate } from './lib/on
 import { useUserPrefsSync } from './lib/settings';
 import { useThemeBootstrap } from './lib/theme';
 import { showToast } from './lib/toasts';
+import { useWorkingHoursSync } from './lib/working-hours';
 import { PENDING_INVITE_KEY } from './routes/Invite';
 
 bootstrapAuth();
@@ -33,6 +34,7 @@ const App: ParentComponent = (props): JSX.Element => {
   useEditModeHotkey();
   useThemeBootstrap();
   useUserPrefsSync();
+  useWorkingHoursSync();
   useDrawerHotkey();
 
   // Account-Health-Toast: wenn die JWT-Session lokal noch existiert, der

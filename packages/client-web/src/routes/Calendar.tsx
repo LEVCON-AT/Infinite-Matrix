@@ -277,6 +277,9 @@ const Calendar: Component = () => {
                         <span class="calendar-event-time">{e.time}</span>
                       </Show>
                       <span class="calendar-event-label">{e.label || '(ohne Label)'}</span>
+                      <Show when={e.isRecurring}>
+                        <Icon name="arrow-path" size={10} />
+                      </Show>
                       <Show when={e.isRange}>
                         <Icon name="arrows-pointing-out" size={10} />
                       </Show>

@@ -136,6 +136,7 @@ export type CalendarEvent = {
   startDate: string;
   endDate: string; // Single-Day: identisch zu startDate
   isRange: boolean;
+  isRecurring: boolean; // task.recur != null — fuer Recur-Symbol in der Tagesansicht
   time: string | null;
   durationMin: number | null;
 };
@@ -166,6 +167,7 @@ export function buildEvents(args: {
       startDate,
       endDate,
       isRange: endDate > startDate,
+      isRecurring: t.recur != null,
       time: (dm.time as string | undefined) ?? null,
       durationMin: (dm.duration_min as number | undefined) ?? null,
     });
@@ -182,6 +184,7 @@ export function buildEvents(args: {
       startDate: t.deadline,
       endDate: t.deadline,
       isRange: false,
+      isRecurring: t.recur != null,
       time: null,
       durationMin: null,
     });

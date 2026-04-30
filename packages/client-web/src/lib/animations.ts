@@ -156,6 +156,53 @@ export function slideIn(container: HTMLElement | null, direction: 'left' | 'righ
   });
 }
 
+// Fade-Swap bei Inhalt-Wechsel: opacity 0→1, KEIN translateX. Fuer
+// Sidebar-Tagesansicht-Tag-Wechsel — wo Slide-L/R bei der schmalen
+// Sidebar-Breite zu hektisch wirkt. Aufruf VOR dem Daten-Update:
+//   await fadeOut(container);
+//   setData(newData);
+//   fadeIn(container);
+export function fadeOut(container: HTMLElement | null): Promise<void> {
+  if (!container || reducedMotion()) return Promise.resolve();
+  return new Promise((resolve) => {
+    container.style.willChange = 'opacity';
+    container.style.transition = 'opacity 80ms ease-out';
+    container.style.opacity = '0';
+    const onEnd = () => {
+      container.removeEventListener('transitionend', onEnd);
+      resolve();
+    };
+    container.addEventListener('transitionend', onEnd);
+    setTimeout(() => {
+      container.removeEventListener('transitionend', onEnd);
+      resolve();
+    }, 160);
+  });
+}
+
+export function fadeIn(container: HTMLElement | null): void {
+  if (!container) return;
+  if (reducedMotion()) {
+    container.style.opacity = '1';
+    return;
+  }
+  container.style.transition = '';
+  container.style.opacity = '0';
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (!container.isConnected) return;
+      container.style.transition = 'opacity 160ms cubic-bezier(.16, 1, .3, 1)';
+      container.style.opacity = '1';
+      const onEnd = () => {
+        container.style.willChange = '';
+        container.style.transition = '';
+        container.removeEventListener('transitionend', onEnd);
+      };
+      container.addEventListener('transitionend', onEnd);
+    });
+  });
+}
+
 // Click-Pulse fuer Aktions-Pills (z.B. Status-Toggle im TaskDetail,
 // Heute-Button im Calendar). 220ms scale 1→1.03→1, ohne Layout-
 // Reflow. Aufruf onClick(e) → clickPulse(e.currentTarget).

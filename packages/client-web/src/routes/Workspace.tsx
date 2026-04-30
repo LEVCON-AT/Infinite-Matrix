@@ -28,12 +28,15 @@ import NodeDescription from '../components/NodeDescription';
 import NodeTree from '../components/NodeTree';
 import ObjectSuggestion from '../components/ObjectSuggestion';
 import PresenceStack from '../components/PresenceStack';
+import SidebarCalendarMini from '../components/SidebarCalendarMini';
+import SidebarDayView from '../components/SidebarDayView';
 import WorkspaceEmptyState from '../components/WorkspaceEmptyState';
 import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
 import { useAggregateView } from '../lib/aggregate-view';
 import { aliasChipMenuState, closeAliasChipMenu } from '../lib/alias-chip-menu';
 import { clearAliasIndex, fetchAliasIndex, scheduleAliasRefresh } from '../lib/alias-index';
 import { signOut, useUser } from '../lib/auth';
+import { buildEvents } from '../lib/calendar';
 import { clearDocsRequest, openDocsPopup, useDocsRequest } from '../lib/docs-ui';
 import { setEditModeValue, toggleEditMode, useEditMode } from '../lib/edit-mode';
 import { toggleIncognito, useIncognito } from '../lib/incognito';
@@ -61,6 +64,7 @@ import {
 } from '../lib/queries';
 import { subscribeWorkspace } from '../lib/realtime';
 import { useSettingsBodyClassSync } from '../lib/settings';
+import { useSidebarCalendarState } from '../lib/sidebar-calendar-state';
 import { useSidebarChips } from '../lib/sidebar-chips';
 import { useSidebarMode } from '../lib/sidebar-mode';
 import { fetchManifestationsByWorkspace, fetchTasks } from '../lib/tasks';
@@ -398,6 +402,25 @@ const Workspace: Component = () => {
   // Target (Cell oder Node) bis zur Root-Matrix ins Expanded-Set
   // injizieren. Additiv — nichts wird geschlossen, bestehende manuelle
   // Expansionen bleiben. Browser-Back/Forward triggert die Effect
+  // Phase 4 T.1.G.B: Sidebar-Calendar-Sektion-State (workspace-scoped).
+  // Mini-Calendar + Tagesansicht teilen sich den State (selectedDay,
+  // pastCount, futureCount, isOpen) ueber das useSidebarCalendarState-
+  // Pattern. Der State wird in localStorage persistiert.
+  const sbCal = (() => {
+    const wsId = params.workspaceId;
+    return wsId ? useSidebarCalendarState(wsId) : null;
+  })();
+
+  // CalendarEvents fuer Mini-Calendar-Dots + Tagesansicht. Reuse von
+  // buildEvents aus lib/calendar.ts; Quelle sind die wsTasks +
+  // wsManifestations-Resources (bereits geladen).
+  const calendarEvents = createMemo(() =>
+    buildEvents({
+      tasks: wsTasks() ?? [],
+      manifestations: wsManifestations() ?? [],
+    }),
+  );
+
   // genauso wie Sidebar-Clicks, weil params reaktiv sind.
   createEffect(() => {
     const wsId = params.workspaceId;
@@ -913,6 +936,32 @@ const Workspace: Component = () => {
             </Show>
           </button>
         </div>
+        <Show when={params.workspaceId && sbCal}>
+          <div class="ws-sb-section">
+            <button
+              type="button"
+              class="ws-sb-section-head click-pulse"
+              onClick={() => sbCal?.update({ isOpen: !sbCal.state().isOpen })}
+              aria-expanded={sbCal?.state().isOpen ?? false}
+            >
+              <Icon name={sbCal?.state().isOpen ? 'chevron-down' : 'chevron-right'} size={14} />
+              <span>Kalender</span>
+            </button>
+            <Show when={sbCal?.state().isOpen}>
+              <div class="ws-sb-section-body">
+                <SidebarCalendarMini
+                  workspaceId={params.workspaceId as string}
+                  events={calendarEvents()}
+                />
+                <SidebarDayView
+                  workspaceId={params.workspaceId as string}
+                  selectedDay={sbCal?.state().selectedDay ?? new Date().toISOString().slice(0, 10)}
+                  events={calendarEvents()}
+                />
+              </div>
+            </Show>
+          </div>
+        </Show>
         <Show when={params.workspaceId}>
           <NodeTree
             workspaceId={params.workspaceId as string}

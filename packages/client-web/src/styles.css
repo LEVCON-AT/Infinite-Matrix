@@ -12111,3 +12111,432 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
     min-height: 36px;
   }
 }
+
+/* ── T.1.G.B Sidebar-Section + Mini-Calendar + Tagesansicht + Working-Hours ── */
+.ws-sb-section {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border);
+}
+
+.ws-sb-section-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px var(--space-sm);
+  border: 0;
+  background: var(--bg2);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--tr-std);
+}
+
+.ws-sb-section-head:hover {
+  background: var(--bg-hover);
+}
+
+.ws-sb-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--bg);
+}
+
+.sb-cal-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sb-cal-mini-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: space-between;
+}
+
+.sb-cal-mini-nav-btn,
+.sb-cal-mini-today-btn,
+.sb-cal-mini-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 3px 6px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--bg2);
+  color: var(--text2);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background var(--tr-std);
+}
+
+.sb-cal-mini-today-btn {
+  flex: 1 1 auto;
+  font-weight: 500;
+}
+
+.sb-cal-mini-nav-btn:hover,
+.sb-cal-mini-today-btn:hover,
+.sb-cal-mini-expand-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.sb-cal-mini-expand-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.sb-cal-mini-expand-btn.sb-cal-mini-expand-top,
+.sb-cal-mini-expand-btn.sb-cal-mini-expand-bot {
+  align-self: center;
+  width: 100%;
+  padding: 2px;
+}
+
+.sb-cal-mini-expand-row {
+  display: flex;
+  justify-content: center;
+}
+
+.sb-cal-mini-month {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sb-cal-mini-month-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text2);
+  padding: 2px 0;
+}
+
+.sb-cal-mini-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  font-size: 9px;
+  color: var(--text3);
+  font-weight: 600;
+  text-align: center;
+}
+
+.sb-cal-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+}
+
+.sb-cal-mini-day {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 1;
+  min-height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: var(--rs);
+  transition: background var(--tr-std);
+}
+
+.sb-cal-mini-day:hover {
+  background: var(--bg-hover);
+}
+
+.sb-cal-mini-day-out {
+  color: var(--text3);
+  opacity: 0.5;
+}
+
+.sb-cal-mini-day-today {
+  background: var(--bluebg, var(--bg2));
+  color: var(--bluetxt, var(--text));
+  font-weight: 700;
+}
+
+.sb-cal-mini-day-selected {
+  outline: 1.5px solid var(--p, var(--text));
+  outline-offset: -1.5px;
+}
+
+.sb-cal-mini-dot {
+  position: absolute;
+  bottom: 1px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+}
+
+.sb-cal-mini-dot-open {
+  background: var(--p, var(--text));
+}
+.sb-cal-mini-dot-overdue {
+  background: var(--red);
+}
+.sb-cal-mini-dot-done {
+  background: var(--teal);
+}
+
+.sb-day {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 0.5px solid var(--border);
+  padding-top: var(--space-sm);
+}
+
+.sb-day-head {
+  display: flex;
+  align-items: center;
+}
+
+.sb-day-head-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--bg2);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--tr-std);
+}
+
+.sb-day-head-label:hover {
+  background: var(--bg-hover);
+}
+
+.sb-day-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sb-day-disabled-hint {
+  font-size: 11px;
+  color: var(--text3);
+  text-align: center;
+  padding: var(--space-sm);
+  margin: 0;
+}
+
+.sb-day-allday {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.sb-day-allday-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--rs);
+  background: var(--bg2);
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.sb-day-allday-label {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sb-day-allday-overflow {
+  font-size: 10px;
+  color: var(--text3);
+  padding: 0 6px;
+}
+
+.sb-day-grid {
+  position: relative;
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  overflow: hidden;
+}
+
+.sb-day-buffer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--bg2),
+    var(--bg2) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+  pointer-events: none;
+}
+
+.sb-day-hourline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 0.5px solid var(--border);
+  pointer-events: none;
+}
+
+.sb-day-hourlabel {
+  position: absolute;
+  left: 2px;
+  top: 1px;
+  font-size: 9px;
+  color: var(--text3);
+  font-variant-numeric: tabular-nums;
+  background: var(--bg);
+  padding: 0 2px;
+}
+
+.sb-day-event {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
+  padding: 2px 4px;
+  border: 0;
+  border-left: 3px solid var(--text3);
+  border-radius: var(--rs);
+  background: var(--bg2);
+  color: var(--text);
+  font-size: 10px;
+  text-align: left;
+  cursor: grab;
+  overflow: hidden;
+  z-index: 2;
+}
+
+.sb-day-event[data-draggable]:active {
+  cursor: grabbing;
+}
+
+.sb-day-event-time {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text2);
+}
+
+.sb-day-event-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.15;
+}
+
+.sb-day-event-no-time {
+  font-style: italic;
+}
+
+.sb-day-event-open {
+  border-left-color: var(--teal);
+  background: var(--tealbg);
+  color: var(--tealtxt);
+}
+.sb-day-event-in_progress {
+  border-left-color: var(--blue, var(--p));
+  background: var(--bluebg, var(--bg2));
+  color: var(--bluetxt, var(--text));
+}
+.sb-day-event-blocked {
+  border-left-color: var(--red);
+  background: var(--redbg);
+  color: var(--redtxt);
+}
+.sb-day-event-done {
+  border-left-color: var(--text3);
+  background: var(--bg2);
+  color: var(--text3);
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+.sb-day-event-archived {
+  border-left-color: var(--text3);
+  background: var(--bg2);
+  color: var(--text3);
+  opacity: 0.5;
+}
+
+.working-hours-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.working-hours-table th,
+.working-hours-table td {
+  padding: 6px 8px;
+  border-bottom: 0.5px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.working-hours-table thead th {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text3);
+}
+
+.working-hours-table tbody th {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.working-hours-disabled td input:not([type="checkbox"]),
+.working-hours-disabled td button {
+  opacity: 0.5;
+}
+
+.working-hours-table input[type="time"],
+.working-hours-table input[type="number"] {
+  padding: 3px 6px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.working-hours-table input[type="number"] {
+  width: 56px;
+}
+
+.working-hours-unit {
+  margin-left: 4px;
+  font-size: 11px;
+}

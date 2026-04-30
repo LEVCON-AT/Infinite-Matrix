@@ -98,6 +98,12 @@ const Settings: ParentComponent = (props) => {
       icon: 'sparkles',
       hint: 'API-Key fuer Onboarding & Hilfe',
     },
+    {
+      to: `${wsBase()}/account/working-hours`,
+      label: 'Arbeitszeiten',
+      icon: 'clock',
+      hint: 'Pro Wochentag Start/Ende + Buffer',
+    },
   ];
 
   const workspaceItems = (): NavItem[] => [
