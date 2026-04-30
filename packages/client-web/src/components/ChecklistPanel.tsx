@@ -18,7 +18,7 @@ import { validateAlias } from '../lib/alias';
 import { executeChecklistAction, parseChecklistAction } from '../lib/checklist-action';
 import type { ParsedPasteItem } from '../lib/checklist-paste-parse';
 import { showConfirm } from '../lib/dialog';
-import { bindDropTarget } from '../lib/drag-context';
+import { bindDragSource, bindDropTarget } from '../lib/drag-context';
 import { useEditMode } from '../lib/edit-mode';
 import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
@@ -546,85 +546,108 @@ const ChecklistPanel: Component<Props> = (p) => {
         onDrop={crossViewDrop.onDrop}
       >
         <For each={p.items}>
-          {(it) => (
-            <li
-              class="cl-it"
-              classList={{ 'cl-it-done': it.done }}
-              style={{ '--cl-level': it.level }}
-              onMouseEnter={() => p.onItemHover?.(it.id)}
-              onMouseLeave={() => p.onItemHover?.(undefined)}
-            >
-              <PresenceMini users={presenceByItem().get(it.id) ?? []} />
-              <input
-                type="checkbox"
-                class="cl-checkbox-input"
-                checked={it.done}
-                aria-label="Erledigt"
-                onChange={(e) => onToggleItem(it, e.currentTarget.checked)}
-              />
-              {/* Edit-Mode: klassischer Input mit Alias-Autocomplete.
+          {(it) => {
+            // Phase 4 T.1.G.2.D-Followup: Items sind Tasks (T.1.B).
+            // bindDragSource macht sie zu vollwertigen Drag-Quellen
+            // fuer Mini-Calendar/Day-View. sourceManifId = die
+            // Checklist-Manifestation, damit Drop-Targets via lookup
+            // entscheiden koennen.
+            const itemDrag = bindDragSource({
+              build: () => {
+                const manif = (p.wsManifestations ?? []).find(
+                  (m) => m.kind === 'checklist' && m.task_id === it.id,
+                );
+                return {
+                  atom: 'task',
+                  atomId: it.id,
+                  label: it.text,
+                  sourceManifId: manif?.id,
+                };
+              },
+            });
+            return (
+              <li
+                class="cl-it"
+                classList={{ 'cl-it-done': it.done, 'cl-it-draggable': !editMode() }}
+                style={{ '--cl-level': it.level }}
+                draggable={!editMode()}
+                onDragStart={itemDrag.onDragStart}
+                onDragEnd={itemDrag.onDragEnd}
+                onMouseEnter={() => p.onItemHover?.(it.id)}
+                onMouseLeave={() => p.onItemHover?.(undefined)}
+              >
+                <PresenceMini users={presenceByItem().get(it.id) ?? []} />
+                <input
+                  type="checkbox"
+                  class="cl-checkbox-input"
+                  checked={it.done}
+                  aria-label="Erledigt"
+                  onChange={(e) => onToggleItem(it, e.currentTarget.checked)}
+                />
+                {/* Edit-Mode: klassischer Input mit Alias-Autocomplete.
                   View-Mode: Span mit AliasText → `^alias`-Chips sind
                   klickbar (dispatch) und kontext-menu-faehig. */}
-              <Show
-                when={editMode()}
-                fallback={
-                  <span class="cl-text-view">
-                    <Show
-                      when={it.text}
-                      fallback={<span class="cl-text-placeholder">(Punkt)</span>}
-                    >
-                      <AliasText text={it.text} workspaceId={p.workspaceId} />
-                    </Show>
-                  </span>
-                }
-              >
-                <input
-                  class="cl-text-input"
-                  type="text"
-                  value={it.text}
-                  placeholder="(Punkt)"
-                  tabIndex={0}
-                  ref={(el) => {
-                    const cleanup = bindAliasAutocomplete(el, p.workspaceId);
-                    onCleanup(cleanup);
-                  }}
-                  onPaste={(e) => {
-                    // Multi-line-Paste → Popup mit Parser-Vorschau.
-                    // Single-line bleibt normaler Paste (kein preventDefault).
-                    const txt = e.clipboardData?.getData('text/plain') ?? '';
-                    if (/\r?\n/.test(txt)) {
-                      e.preventDefault();
-                      setPasteText(txt);
-                    }
-                  }}
-                  onBlur={(e) => onRenameItem(it, e.currentTarget.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      (e.currentTarget as HTMLInputElement).blur();
-                    } else if (e.altKey && e.key === 'ArrowRight') {
-                      e.preventDefault();
-                      void onLevelItem(it, 1);
-                    } else if (e.altKey && e.key === 'ArrowLeft') {
-                      e.preventDefault();
-                      void onLevelItem(it, -1);
-                    }
-                  }}
-                />
-              </Show>
-              <button
-                type="button"
-                class="cl-it-del"
-                title="Punkt loeschen"
-                aria-label="Punkt loeschen"
-                tabIndex={editMode() ? 0 : -1}
-                onClick={() => onDelItem(it)}
-                disabled={busy() || !editMode()}
-              >
-                ✕
-              </button>
-            </li>
-          )}
+                <Show
+                  when={editMode()}
+                  fallback={
+                    <span class="cl-text-view">
+                      <Show
+                        when={it.text}
+                        fallback={<span class="cl-text-placeholder">(Punkt)</span>}
+                      >
+                        <AliasText text={it.text} workspaceId={p.workspaceId} />
+                      </Show>
+                    </span>
+                  }
+                >
+                  <input
+                    class="cl-text-input"
+                    type="text"
+                    value={it.text}
+                    placeholder="(Punkt)"
+                    tabIndex={0}
+                    ref={(el) => {
+                      const cleanup = bindAliasAutocomplete(el, p.workspaceId);
+                      onCleanup(cleanup);
+                    }}
+                    onPaste={(e) => {
+                      // Multi-line-Paste → Popup mit Parser-Vorschau.
+                      // Single-line bleibt normaler Paste (kein preventDefault).
+                      const txt = e.clipboardData?.getData('text/plain') ?? '';
+                      if (/\r?\n/.test(txt)) {
+                        e.preventDefault();
+                        setPasteText(txt);
+                      }
+                    }}
+                    onBlur={(e) => onRenameItem(it, e.currentTarget.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        (e.currentTarget as HTMLInputElement).blur();
+                      } else if (e.altKey && e.key === 'ArrowRight') {
+                        e.preventDefault();
+                        void onLevelItem(it, 1);
+                      } else if (e.altKey && e.key === 'ArrowLeft') {
+                        e.preventDefault();
+                        void onLevelItem(it, -1);
+                      }
+                    }}
+                  />
+                </Show>
+                <button
+                  type="button"
+                  class="cl-it-del"
+                  title="Punkt loeschen"
+                  aria-label="Punkt loeschen"
+                  tabIndex={editMode() ? 0 : -1}
+                  onClick={() => onDelItem(it)}
+                  disabled={busy() || !editMode()}
+                >
+                  ✕
+                </button>
+              </li>
+            );
+          }}
         </For>
       </ul>
 

@@ -4350,6 +4350,18 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   background: var(--bg2);
 }
 
+/* Phase 4 T.1.G.2.D-Followup: Items sind im View-Mode draggable.
+   grab-Cursor signalisiert das. Im Edit-Mode greift das nicht (Input). */
+.cl-it-draggable {
+  cursor: grab;
+}
+.cl-it-draggable:active {
+  cursor: grabbing;
+}
+body[data-dragging] .cl-it-draggable[draggable="true"]:active {
+  opacity: 0.5;
+}
+
 .cl-checkbox-input {
   width: 15px;
   height: 15px;
