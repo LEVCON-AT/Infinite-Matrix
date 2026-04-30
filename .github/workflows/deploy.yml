@@ -334,12 +334,17 @@ jobs:
 
       - name: Smoke test
         env:
-          HOST: ${{ secrets.DEPLOY_HOST }}
+          # SAAS_HOST ist der Public-Hostname mit /app/-Block (siehe
+          # staging.matrix.levcon.at.conf). NICHT identisch mit
+          # secrets.DEPLOY_HOST — letzteres ist der SSH-Target-Host und
+          # zeigt auf matrix.levcon.at (Bridge-Vhost ohne /app/).
+          # Konsistent zu VITE_SITE_URL im Build-Step hartkodiert.
+          SAAS_HOST: staging.matrix.levcon.at
           BRIDGE_HOST: ${{ secrets.BRIDGE_HOST }}
         run: |
           set -euo pipefail
           # AU-B1 K11b (B1-G-004): Smoke-Test trifft jetzt die korrekten
-          # Endpunkte. Der SaaS-Client lebt unter /app/ auf $HOST
+          # Endpunkte. Der SaaS-Client lebt unter /app/ auf $SAAS_HOST
           # (staging.matrix.levcon.at). Die Bridge mit /healthz lebt auf
           # $BRIDGE_HOST (matrix.levcon.at) — separater nginx-Vhost.
           # Falls BRIDGE_HOST nicht gesetzt ist, faellt Smoke nur auf
@@ -349,7 +354,7 @@ jobs:
           # zwischen `systemctl reload nginx` und dem ersten Smoke-Curl
           # ab — Worker-Swap ist near-instant aber nicht atomar.
           curl -fsS --retry 5 --retry-delay 2 --retry-all-errors \
-            -o /dev/null -w "%{http_code}\n" "https://$HOST/app/" | grep -q 200
+            -o /dev/null -w "%{http_code}\n" "https://$SAAS_HOST/app/" | grep -q 200
           if [[ -n "${BRIDGE_HOST:-}" ]]; then
             curl -fsS --retry 5 --retry-delay 2 --retry-all-errors \
               "https://$BRIDGE_HOST/healthz" | grep -q '"ok":true'
