@@ -404,6 +404,47 @@ export async function restoreTask(snap: TaskSnapshot): Promise<TaskRow> {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// POSITION-HELPER
+// ═══════════════════════════════════════════════════════════════
+
+// Liefert die naechste freie Position fuer eine task_manifestation in
+// einem bestimmten Container desselben Kinds. Bevorzugt einen Live-Read
+// (MAX(position) + 1) und faellt bei Network-Loss auf den IDB-Cache
+// zurueck. Q.1.c: ersetzt ad-hoc `Date.now()`-Defaults aus der
+// manifestation-cross-view-Welle — Date.now() produziert 13-stellige
+// Timestamps, die mit den 0/1/2/...-Positionen der bestehenden
+// Manifestations kollidieren und Replay-/Reorder-Pfade brechen.
+export async function nextManifestationPosition(
+  containerId: string,
+  kind: TaskManifestationKind,
+): Promise<number> {
+  if (!containerId) return 0;
+  try {
+    const { data, error } = await supabase
+      .from('task_manifestations')
+      .select('position')
+      .eq('container_id', containerId)
+      .eq('kind', kind)
+      .order('position', { ascending: false })
+      .limit(1);
+    if (error) throw error;
+    const top = data && data.length > 0 ? (data[0] as { position: number }).position : -1;
+    markLiveSuccess();
+    return top + 1;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    // Cache-Fallback: alle Manifestations laden und client-seitig
+    // filtern. Pattern uebernommen aus nextPositionFromCache in
+    // mutations.ts.
+    const all = await getByWorkspace<TaskManifestationRow>('task_manifestations', '');
+    const filtered = all.filter((m) => m.container_id === containerId && m.kind === kind);
+    markCacheFallback();
+    if (filtered.length === 0) return 0;
+    return filtered.reduce((m, r) => Math.max(m, r.position ?? -1), -1) + 1;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // SCHREIBE-PFADE — MANIFESTATIONS
 // ═══════════════════════════════════════════════════════════════
 
