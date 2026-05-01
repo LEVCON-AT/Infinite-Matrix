@@ -27,6 +27,8 @@ import { supabase } from '../supabase';
 import { logAiCall } from './audit';
 import { type ProviderCredential, getProviderCredential } from './credential';
 import { callAnthropicStream } from './providers/anthropic';
+import { callGeminiStream } from './providers/gemini';
+import { callOpenAiStream } from './providers/openai';
 import { buildSystemPrompt } from './system-prompt';
 import { TOOL_MAP, WIZARD_PROPOSE_TOOL_NAME, allowedToolsForMode } from './tools';
 import type { AssistEvent, AssistMessage, AssistToolUse, RunAssistOptions } from './types';
@@ -61,13 +63,22 @@ export async function runAssist(opts: RunAssistOptions): Promise<void> {
     return;
   }
 
-  if (cred.kind !== 'anthropic') {
-    // OpenAI/Gemini-Adapter kommen in Folge-Sprint. Klar an UI melden.
-    const msg = `Provider "${cred.kind}" ist noch nicht unterstuetzt. Aktuell nur Anthropic Claude. Bitte unter Settings → Konto → AI-Anbindung den Standard auf Anthropic stellen.`;
-    opts.onEvent({ type: 'error', message: msg });
-    opts.onEvent({ type: 'done', stopReason: 'error' });
-    return;
-  }
+  // Provider-Switch: jeder Adapter hat denselben Input/Output-Shape.
+  // Gemini ist V1 ein Stub (wirft "not implemented") — die Adapter-
+  // Funktion wird trotzdem registriert, damit der Switch hier keinen
+  // Sonderfall braucht.
+  type AdapterFn = typeof callAnthropicStream;
+  const adapter: AdapterFn = (() => {
+    if (cred.kind === 'anthropic') return callAnthropicStream;
+    if (cred.kind === 'openai') return callOpenAiStream as AdapterFn;
+    if (cred.kind === 'gemini') return callGeminiStream as AdapterFn;
+    return callAnthropicStream; // unreachable, aber TS-safe
+  })();
+  const defaultModel: Record<typeof cred.kind, string> = {
+    anthropic: 'claude-opus-4-7',
+    openai: 'gpt-4o',
+    gemini: 'gemini-2.5-pro',
+  };
 
   // 2) System-Prompt + Conversation aufbauen.
   const systemPrompt = buildSystemPrompt(opts.mode, allowedTools, opts.contextSnapshot);
@@ -94,10 +105,10 @@ export async function runAssist(opts: RunAssistOptions): Promise<void> {
   try {
     while (iter < cap) {
       iter += 1;
-      const result = await callAnthropicStream(
+      const result = await adapter(
         {
           apiKey: cred.apiKey,
-          model: cred.modelName || 'claude-opus-4-7',
+          model: cred.modelName || defaultModel[cred.kind],
           systemPrompt,
           messages,
           tools: allowedTools,
