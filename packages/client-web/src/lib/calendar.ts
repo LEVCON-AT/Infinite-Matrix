@@ -9,6 +9,7 @@
 //     entsprechend, nicht der JS-Default-Konvention (So=0).
 //   - Multi-Day-Events: start_date + end_date inklusiv.
 
+import { type RecurRule, recurFiresOn } from './recur';
 import type { TaskManifestationRow, TaskRow, TaskStatus } from './types';
 
 // ─── Datum-Helper ──────────────────────────────────────────
@@ -164,11 +165,62 @@ export function buildEvents(args: {
     display_meta: Record<string, unknown>;
     url?: string | null;
   }>;
+  // T.AC.D.2: viewRange (fromIso, toIso) aktiviert die Recur-Expansion.
+  // Ohne viewRange wird recur als Marker (isRecurring=true) emittiert
+  // aber nicht in Folgetermine zerlegt — backwards-compat fuer Aufrufer
+  // die keinen Range haben (Smoketests, Smart-Summary).
+  viewRange?: { fromIso: string; toIso: string };
 }): CalendarEvent[] {
-  const { tasks, manifestations, atomManifestations } = args;
+  const { tasks, manifestations, atomManifestations, viewRange } = args;
   const taskById = new Map(tasks.map((t) => [t.id, t]));
   const explicitTaskIds = new Set<string>();
   const out: CalendarEvent[] = [];
+
+  // T.AC.D.2: Recur-Expander. Nimmt einen "Anker"-Event + RecurRule und
+  // emittiert eine CalendarEvent-Instanz pro fire-date im Range.
+  // Cap auf 366 Iterationen pro Event (Sicherheits-Limit gegen
+  // pathologische Recur-Konfig). Manifestation-Recur gewinnt lokal —
+  // siehe Plan T.AC: "Manifestation gewinnt lokal".
+  function expandRecurOrSingle(base: CalendarEvent, recur: RecurRule | null): void {
+    if (!recur || !viewRange) {
+      out.push(base);
+      return;
+    }
+    // Recur-Expansion. base.startDate ist der Anker — zaehlt als 1.
+    // Vorkommen bei recurFiresOn-Match. End-Rule (count) zaehlen wir
+    // ueber die Schleife.
+    const fromIsoLocal = viewRange.fromIso;
+    const toIsoLocal = viewRange.toIso;
+    let cur = fromIsoLocal;
+    let safety = 0;
+    let count = 0;
+    const maxCount =
+      recur.endType === 'count' && typeof recur.endCount === 'number'
+        ? recur.endCount
+        : Number.POSITIVE_INFINITY;
+    // recurFiresOn akzeptiert RecurRule mit startDate-Anker. Wir setzen
+    // den Anker auf base.startDate damit ein recurType='daily' nicht
+    // den ganzen Range expandiert sondern erst ab Anker.
+    const recurWithAnchor: RecurRule = { ...recur, startDate: base.startDate };
+    while (cur <= toIsoLocal && safety < 366 && count < maxCount) {
+      safety += 1;
+      const d = fromIso(cur);
+      if (recurFiresOn(recurWithAnchor, d)) {
+        out.push({
+          ...base,
+          // Synth manifId pro Instanz, damit Click-Handler die Quelle
+          // identifizieren koennen aber nicht eine reale Manif-ID kollidiert.
+          manifId: base.manifId ? `${base.manifId}::${cur}` : null,
+          startDate: cur,
+          endDate: cur,
+          isRange: false,
+          isRecurring: true,
+        });
+        count += 1;
+      }
+      cur = addDays(cur, 1);
+    }
+  }
 
   for (const m of manifestations) {
     if (m.kind !== 'calendar') continue;
@@ -179,7 +231,10 @@ export function buildEvents(args: {
     const startDate = (dm.start_date as string | undefined) ?? t.deadline ?? null;
     if (!startDate) continue;
     const endDate = (dm.end_date as string | undefined) ?? startDate;
-    out.push({
+    // Manifestation-Recur (display_meta.recur) gewinnt lokal vor task.recur.
+    const manifRecur = (dm.recur as RecurRule | null | undefined) ?? null;
+    const effectiveRecur = manifRecur ?? (t.recur as RecurRule | null) ?? null;
+    const base: CalendarEvent = {
       atomType: 'task',
       atomId: t.id,
       taskId: t.id,
@@ -189,16 +244,18 @@ export function buildEvents(args: {
       startDate,
       endDate,
       isRange: endDate > startDate,
-      isRecurring: t.recur != null,
+      isRecurring: effectiveRecur != null,
       time: (dm.time as string | undefined) ?? null,
       durationMin: (dm.duration_min as number | undefined) ?? null,
-    });
+    };
+    expandRecurOrSingle(base, effectiveRecur);
   }
 
   for (const t of tasks) {
     if (!t.deadline) continue;
     if (explicitTaskIds.has(t.id)) continue;
-    out.push({
+    const taskRecur = (t.recur as RecurRule | null) ?? null;
+    const base: CalendarEvent = {
       atomType: 'task',
       atomId: t.id,
       taskId: t.id,
@@ -208,21 +265,22 @@ export function buildEvents(args: {
       startDate: t.deadline,
       endDate: t.deadline,
       isRange: false,
-      isRecurring: t.recur != null,
+      isRecurring: taskRecur != null,
       time: null,
       durationMin: null,
-    });
+    };
+    expandRecurOrSingle(base, taskRecur);
   }
 
   // T.AC.B: non-task Atoms (Link/Checklist/Doc) als Calendar-Events.
-  // Status-Konzept gilt fuer sie nicht → null. Recur, Range erstmal
-  // optional aus display_meta (start_date/end_date/time/duration_min).
+  // Status-Konzept gilt fuer sie nicht → null. Recur lebt in display_meta.
   for (const a of atomManifestations ?? []) {
     const dm = (a.display_meta ?? {}) as Record<string, unknown>;
     const startDate = dm.start_date as string | undefined;
     if (!startDate) continue;
     const endDate = (dm.end_date as string | undefined) ?? startDate;
-    out.push({
+    const recur = (dm.recur as RecurRule | null | undefined) ?? null;
+    const base: CalendarEvent = {
       atomType: a.atom_type,
       atomId: a.atom_id,
       taskId: a.atom_id,
@@ -232,11 +290,12 @@ export function buildEvents(args: {
       startDate,
       endDate,
       isRange: endDate > startDate,
-      isRecurring: false,
+      isRecurring: recur != null,
       time: (dm.time as string | undefined) ?? null,
       durationMin: (dm.duration_min as number | undefined) ?? null,
       url: a.url ?? null,
-    });
+    };
+    expandRecurOrSingle(base, recur);
   }
 
   return out;

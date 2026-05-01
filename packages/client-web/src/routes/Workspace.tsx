@@ -41,7 +41,15 @@ import {
   fetchAtomCalendarManifestations,
 } from '../lib/atom-manifestations';
 import { signOut, useUser } from '../lib/auth';
-import { buildEvents } from '../lib/calendar';
+import { buildEvents, isoDate } from '../lib/calendar';
+
+// addMonthsToDate: lokale Monatsverschiebung ohne UTC-Drift. Nicht in
+// lib/calendar.ts weil dort addMonths nur ISO-Strings nimmt.
+function addMonthsToDate(d: Date, months: number): Date {
+  const next = new Date(d);
+  next.setMonth(next.getMonth() + months);
+  return next;
+}
 import { clearDocsRequest, openDocsPopup, useDocsRequest } from '../lib/docs-ui';
 import { setEditModeValue, toggleEditMode, useEditMode } from '../lib/edit-mode';
 import { toggleIncognito, useIncognito } from '../lib/incognito';
@@ -434,8 +442,15 @@ const Workspace: Component = () => {
   // buildEvents aus lib/calendar.ts; Quelle sind die wsTasks +
   // wsManifestations-Resources (bereits geladen). T.AC.B: zusaetzlich
   // wsAtomManifestations (Link/Checklist).
-  const calendarEvents = createMemo(() =>
-    buildEvents({
+  const calendarEvents = createMemo(() => {
+    // T.AC.D.2: viewRange aktiviert Recur-Expansion. Sidebar deckt
+    // potentiell ±1 Jahr ab (User kann den Mini-Calendar bidirektional
+    // bis +12 Monate ausklappen). Wir nehmen einen grosszuegigen Range
+    // damit jede sichtbare Instance gerendert wird.
+    const today = new Date();
+    const fromIso = isoDate(addMonthsToDate(today, -6));
+    const toIso = isoDate(addMonthsToDate(today, 18));
+    return buildEvents({
       tasks: wsTasks() ?? [],
       manifestations: wsManifestations() ?? [],
       atomManifestations: (wsAtomManifestations() ?? []).map((a) => ({
@@ -446,8 +461,9 @@ const Workspace: Component = () => {
         display_meta: a.display_meta,
         url: a.url ?? null,
       })),
-    }),
-  );
+      viewRange: { fromIso, toIso },
+    });
+  });
 
   // Lookup-Maps fuer Drop-Handler (T.1.G.2.B): Mini-Calendar-Drop +
   // Tagesansicht-Hour-Slot brauchen das aktuelle display_meta /
@@ -1156,13 +1172,19 @@ const Workspace: Component = () => {
         {(req) => (
           <CreateManifestationModal
             workspaceId={req().workspaceId}
-            taskId={req().taskId}
-            taskLabel={req().taskLabel}
+            atomType={req().atomType}
+            atomId={req().atomId}
+            atomLabel={req().atomLabel}
+            atomUrl={req().atomUrl}
             defaultDate={req().defaultDate}
             onClose={closeManifestationModal}
             onCreated={() => {
-              void refetchWsTasks();
-              void refetchWsManifestations();
+              if (req().atomType === 'task') {
+                void refetchWsTasks();
+                void refetchWsManifestations();
+              } else {
+                void refetchAtomManifs();
+              }
             }}
           />
         )}

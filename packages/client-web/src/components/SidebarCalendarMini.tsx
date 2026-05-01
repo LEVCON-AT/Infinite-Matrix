@@ -220,22 +220,40 @@ const SidebarCalendarMini: Component<Props> = (p) => {
       }
       openManifestationModal({
         workspaceId: p.workspaceId,
-        taskId: src.atomId,
-        taskLabel: src.label ?? '',
+        atomType: 'task',
+        atomId: src.atomId,
+        atomLabel: src.label ?? '',
         defaultDate: iso,
       });
       return;
     }
     if (src.atom === 'link' || src.atom === 'checklist') {
-      void dropAtomOnDate({
+      // T.AC.D.1: wenn schon eine atom_manifestation existiert → Move
+      // (nur Datum aendern). Sonst Modal aufmachen — User kann Range +
+      // Recur + Uhrzeit setzen (oder ESC fuer Quick-Add ohne Extras).
+      const existingForAtom = (p.atomManifestations ?? []).find(
+        (m) => m.atom_type === src.atom && m.atom_id === src.atomId && m.kind === 'calendar',
+      );
+      if (existingForAtom) {
+        void dropAtomOnDate({
+          workspaceId: p.workspaceId,
+          atomType: src.atom,
+          atomId: src.atomId,
+          atomLabel: src.label,
+          atomUrl: src.url,
+          newDate: iso,
+          existing: p.atomManifestations ?? [],
+        }).then(() => p.onAtomManifestationsChanged?.());
+        return;
+      }
+      openManifestationModal({
         workspaceId: p.workspaceId,
         atomType: src.atom,
         atomId: src.atomId,
-        atomLabel: src.label,
+        atomLabel: src.label ?? '',
         atomUrl: src.url,
-        newDate: iso,
-        existing: p.atomManifestations ?? [],
-      }).then(() => p.onAtomManifestationsChanged?.());
+        defaultDate: iso,
+      });
       return;
     }
   }

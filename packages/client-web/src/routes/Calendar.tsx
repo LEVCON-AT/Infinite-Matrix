@@ -120,10 +120,14 @@ const Calendar: Component = () => {
   );
 
   // Build CalendarEvents aus den Agenda-Items (jeweils task + manifs).
+  // T.AC.D.2: viewRange aktiviert Recur-Expansion fuer den sichtbaren
+  // Monatsgrid (rangeFrom..rangeTo deckt nicht nur den Anker-Monat ab,
+  // sondern auch die angrenzenden Tage in der ersten/letzten Grid-Zeile).
   const events = createMemo<CalendarEvent[]>(() => {
     const items = agenda() ?? [];
     const tasks = items.map((i) => i.task);
     const manifs = items.flatMap((i) => i.manifestations);
+    const r = fetchRange();
     return buildEvents({
       tasks,
       manifestations: manifs,
@@ -135,6 +139,7 @@ const Calendar: Component = () => {
         display_meta: a.display_meta,
         url: a.url ?? null,
       })),
+      viewRange: { fromIso: r.rangeFrom, toIso: r.rangeTo },
     });
   });
 
