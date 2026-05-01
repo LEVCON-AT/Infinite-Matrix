@@ -4,6 +4,7 @@ import AiHelpDrawer, { AiHelpDrawerToggle } from './components/AiHelpDrawer';
 import AiProviderHint from './components/AiProviderHint';
 import DialogHost from './components/DialogHost';
 import ProgressOverlay from './components/ProgressOverlay';
+import StepUpDialog from './components/StepUpDialog';
 import Toasts from './components/Toasts';
 import { useIsPlatformAdmin } from './lib/admin';
 import { useDrawerHotkey } from './lib/ai-help-state';
@@ -121,6 +122,7 @@ const App: ParentComponent = (props): JSX.Element => {
       <Toasts />
       <DialogHost />
       <ProgressOverlay />
+      <StepUpDialog />
     </div>
   );
 };

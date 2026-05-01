@@ -10,6 +10,7 @@
 //   showToast(translateLifecycleError(err, fallback), 'error').
 // - translateLifecycleError ist endkundentauglich, kein Tech-Jargon.
 
+import { requireFreshAal2 } from './auth-step-up';
 import { supabase } from './supabase';
 
 // ─── Ownership-Transfer ──────────────────────────────────────────
@@ -23,6 +24,12 @@ export async function transferWorkspaceOwnership(
   workspaceId: string,
   newOwnerId: string,
 ): Promise<TransferOwnershipResult> {
+  // B.3 — Step-Up. Fresh AAL2 in den letzten 5min Pflicht.
+  const ok = await requireFreshAal2({
+    reason:
+      'Eigentum eines Workspaces zu uebertragen ist eine destruktive Aktion. Bitte bestaetige.',
+  });
+  if (!ok) throw new Error('step_up_cancelled');
   const { data, error } = await supabase.rpc('transfer_workspace_ownership', {
     p_workspace_id: workspaceId,
     p_new_owner_id: newOwnerId,
@@ -41,6 +48,11 @@ export async function deleteWorkspace(
   workspaceId: string,
   confirmName: string,
 ): Promise<DeleteWorkspaceResult> {
+  // B.3 — Step-Up. Fresh AAL2 in den letzten 5min Pflicht.
+  const ok = await requireFreshAal2({
+    reason: 'Workspace dauerhaft loeschen ist nicht widerrufbar. Bitte bestaetige.',
+  });
+  if (!ok) throw new Error('step_up_cancelled');
   const { data, error } = await supabase.rpc('delete_workspace', {
     p_workspace_id: workspaceId,
     p_confirm_name: confirmName,
@@ -73,6 +85,9 @@ export function translateLifecycleError(err: unknown, fallback: string): string 
     }
     if (msg.includes('unauthenticated')) {
       return 'Bitte erneut einloggen.';
+    }
+    if (msg.includes('step_up_cancelled')) {
+      return 'Aktion abgebrochen — Code nicht bestaetigt.';
     }
   }
   return fallback;

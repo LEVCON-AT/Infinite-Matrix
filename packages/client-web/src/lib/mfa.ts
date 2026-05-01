@@ -71,6 +71,19 @@ export async function listMfaFactors(): Promise<MfaFactor[]> {
 }
 
 export async function unenrollMfa(factorId: string): Promise<void> {
+  // B.3 — Step-Up. Faktor-Entfernen ist sensitiv (gleichbedeutend mit
+  // MFA-Aenderung). Fresh AAL2 in den letzten 5min Pflicht. Nur wenn
+  // der Faktor verifiziert ist; pending-Faktoren (Enrollment-Cleanup
+  // bei cancelEnrollment) brauchen keine Step-Up.
+  const factors = await listMfaFactors();
+  const target = factors.find((f) => f.id === factorId);
+  if (target?.status === 'verified') {
+    const { requireFreshAal2 } = await import('./auth-step-up');
+    const ok = await requireFreshAal2({
+      reason: 'MFA entfernen ist sicherheitsrelevant. Bitte bestaetige.',
+    });
+    if (!ok) throw new Error('step_up_cancelled');
+  }
   const { error } = await supabase.auth.mfa.unenroll({ factorId });
   if (error) throw error;
 }
