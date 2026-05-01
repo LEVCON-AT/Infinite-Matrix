@@ -3,12 +3,14 @@ import { type JSX, type ParentComponent, Show, createEffect } from 'solid-js';
 import AiHelpDrawer, { AiHelpDrawerToggle } from './components/AiHelpDrawer';
 import AiProviderHint from './components/AiProviderHint';
 import DialogHost from './components/DialogHost';
+import MfaGateDialog from './components/MfaGateDialog';
 import ProgressOverlay from './components/ProgressOverlay';
 import StepUpDialog from './components/StepUpDialog';
 import Toasts from './components/Toasts';
 import { useIsPlatformAdmin } from './lib/admin';
 import { useDrawerHotkey } from './lib/ai-help-state';
 import { bootstrapAuth, useAccountInvalid, useAuthReady, useSession } from './lib/auth';
+import { checkMfaGate } from './lib/auth-mfa-gate';
 import { useEditModeHotkey } from './lib/edit-mode';
 import { checkAndMaybeRedirectToOnboarding, resetOnboardingGate } from './lib/onboarding-gate';
 import { useUserPrefsSync } from './lib/settings';
@@ -59,6 +61,16 @@ const App: ParentComponent = (props): JSX.Element => {
         { ms: 10000 },
       );
     }
+  });
+
+  // MFA-Gate: nach erfolgreichem Login (AAL1) pruefen ob User TOTP-
+  // Faktor hat. Wenn ja → Dialog erzwingt Code-Eingabe → AAL2.
+  // Idempotent: bei wiederholtem Auth-Change wird der Check nur einmal
+  // gleichzeitig ausgefuehrt.
+  createEffect(() => {
+    const s = session();
+    if (!s) return;
+    void checkMfaGate();
   });
 
   // Route-Guard: ohne Session -> /login (ausser auf public-Routen),
@@ -123,6 +135,7 @@ const App: ParentComponent = (props): JSX.Element => {
       <DialogHost />
       <ProgressOverlay />
       <StepUpDialog />
+      <MfaGateDialog />
     </div>
   );
 };

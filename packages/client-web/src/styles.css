@@ -13908,6 +13908,24 @@ html.view-transition-drill-up::view-transition-new(ws-main) {
   margin-top: var(--space-2);
 }
 
+/* ── MFA-Gate-Dialog (Login-Flow) ─────────────────────────────── */
+.mfa-gate-card {
+  inline-size: min(24rem, 100%);
+}
+
+.mfa-gate-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+}
+
+.mfa-gate-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
 /* ── Webhooks-Settings (Welle C.2) ────────────────────────────── */
 
 .webhook-list {
