@@ -13071,3 +13071,80 @@ body[data-dragging] .sb-day-allday-item[draggable="true"]:active {
   margin-right: auto;
   color: var(--red);
 }
+
+/* B.0.D — Plattform-Admins-Sektion */
+.admin-grant-form {
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  padding: var(--space-md);
+  margin-bottom: var(--space-lg);
+  background: var(--bg2);
+}
+.admin-grant-form h4 {
+  margin: 0 0 var(--space-sm) 0;
+  font-size: 13px;
+  color: var(--text2);
+  font-weight: 500;
+}
+.admin-grant-row {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: stretch;
+  margin-bottom: var(--space-xs);
+}
+.admin-grant-row input[type="email"] {
+  flex: 0 0 280px;
+}
+.admin-grant-row input[type="text"] {
+  flex: 1;
+}
+.admin-grant-row input {
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.admin-admins-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.admin-admins-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--bg2);
+}
+.admin-admins-info {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+.admin-admins-note {
+  color: var(--text2);
+  font-size: 12px;
+}
+.admin-admins-meta {
+  color: var(--text3);
+  font-size: 11px;
+  margin-left: auto;
+}
+.admin-admins-self {
+  color: var(--p);
+  font-weight: 500;
+}
+.admin-admins-revoke {
+  color: var(--red);
+  border-color: var(--red);
+}

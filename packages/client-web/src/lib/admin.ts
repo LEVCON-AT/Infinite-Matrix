@@ -33,6 +33,13 @@ export async function isPlatformAdmin(): Promise<boolean> {
   return data === true;
 }
 
+// B.0.D: admin-only Lookup, gibt null zurueck wenn keine Email matched.
+export async function findUserIdByEmail(email: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc('find_user_id_by_email', { p_email: email });
+  if (error) throw error;
+  return (data as string | null) ?? null;
+}
+
 // ─── system_config ──────────────────────────────────────────────
 export async function listSystemConfig(): Promise<SystemConfigEntry[]> {
   const { data, error } = await supabase.rpc('list_system_config');

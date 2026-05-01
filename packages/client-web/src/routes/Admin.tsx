@@ -17,6 +17,7 @@
 import { useNavigate } from '@solidjs/router';
 import { type Component, Show, createResource, createSignal } from 'solid-js';
 import Icon from '../components/Icon';
+import PlatformAdminsSection from '../components/admin/PlatformAdminsSection';
 import SystemConfigSection from '../components/admin/SystemConfigSection';
 import { isPlatformAdmin } from '../lib/admin';
 import { useUser } from '../lib/auth';
@@ -115,10 +116,7 @@ const Admin: Component = () => {
               <SystemConfigSection />
             </Show>
             <Show when={section() === 'admins'}>
-              <SectionStub
-                title="Plattform-Admins"
-                hint="Liste aller Plattform-Admins, Grant/Revoke. Kommt mit B.0.D (Step-Up nach B.3)."
-              />
+              <PlatformAdminsSection />
             </Show>
             <Show when={section() === 'audit'}>
               <SectionStub
