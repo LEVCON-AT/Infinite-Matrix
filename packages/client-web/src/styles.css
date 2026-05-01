@@ -14038,6 +14038,56 @@ html.view-transition-drill-up::view-transition-new(ws-main) {
   justify-content: flex-end;
 }
 
+/* ── Welcome-Modal (A.5 V1) ───────────────────────────────────── */
+
+.welcome-card {
+  inline-size: min(28rem, 100%);
+}
+
+.welcome-body {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  line-height: var(--lh-normal);
+}
+
+.welcome-body p {
+  margin: 0;
+}
+
+.welcome-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5) var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+.welcome-dots {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.welcome-dot {
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  border-radius: var(--radius-full);
+  background: var(--bg-active);
+  transition: background var(--tr-fast) var(--ease-smooth);
+}
+
+.welcome-dot-active {
+  background: var(--accent);
+}
+
+.welcome-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
 /* ── Webhooks-Settings (Welle C.2) ────────────────────────────── */
 
 .webhook-list {

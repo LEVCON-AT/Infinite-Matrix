@@ -7,6 +7,7 @@ import MfaGateDialog from './components/MfaGateDialog';
 import ProgressOverlay from './components/ProgressOverlay';
 import StepUpDialog from './components/StepUpDialog';
 import Toasts from './components/Toasts';
+import WelcomeModal from './components/WelcomeModal';
 import { useIsPlatformAdmin } from './lib/admin';
 import { useDrawerHotkey } from './lib/ai-help-state';
 import { bootstrapAuth, useAccountInvalid, useAuthReady, useSession } from './lib/auth';
@@ -136,6 +137,9 @@ const App: ParentComponent = (props): JSX.Element => {
       <ProgressOverlay />
       <StepUpDialog />
       <MfaGateDialog />
+      <Show when={session()}>
+        <WelcomeModal />
+      </Show>
     </div>
   );
 };

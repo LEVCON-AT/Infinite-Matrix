@@ -8,6 +8,7 @@ import { clearAll as clearAllOfflineCache } from './offline-cache';
 import { resetOfflineState } from './offline-state';
 import { resetOnboardingGate } from './onboarding-gate';
 import { supabase } from './supabase';
+import { resetWelcomeTourCache } from './welcome-tour';
 
 // Magic-Link-Redirect-URI: aus VITE_SITE_URL (Build-time-Konstante).
 // Bewusst NICHT window.location.origin — sonst kann ein gefaelschter
@@ -122,6 +123,11 @@ async function clearLocalUserData(): Promise<void> {
     resetOnboardingGate();
   } catch (err) {
     console.warn('clearLocalUserData: resetOnboardingGate failed:', err);
+  }
+  try {
+    resetWelcomeTourCache();
+  } catch (err) {
+    console.warn('clearLocalUserData: resetWelcomeTourCache failed:', err);
   }
   try {
     resetOfflineState();
