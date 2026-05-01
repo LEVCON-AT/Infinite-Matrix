@@ -287,6 +287,22 @@ export function setTaskWho(taskId: string, who: string[]): Promise<TaskRow> {
 export function setTaskRecur(taskId: string, recur: TaskRecur | null): Promise<TaskRow> {
   return updateTask(taskId, { recur });
 }
+// T.AC.D.3: pro-Recur-Instanz toggeln. Caller uebergibt die aktuellen
+// done_occurrences (aus dem Render-State); wir berechnen das neue
+// Array via toggleOccurrence (lib/recur.ts) und persistieren via
+// setTaskDoneOccurrences. Aufrufer aus Calendar/DayView haben den
+// Task im wsTasks-Memo geladen — kein Round-Trip noetig.
+export async function toggleTaskInstanceDone(
+  taskId: string,
+  instanceDate: string,
+  done: boolean,
+  currentOccurrences: string[],
+): Promise<TaskRow> {
+  const { toggleOccurrence } = await import('./recur');
+  const next = toggleOccurrence(currentOccurrences, instanceDate, done);
+  return setTaskDoneOccurrences(taskId, next);
+}
+
 export function setTaskDoneOccurrences(
   taskId: string,
   done_occurrences: string[],

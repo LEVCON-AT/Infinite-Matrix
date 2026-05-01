@@ -9270,6 +9270,26 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   opacity: 0.45;
 }
 
+/* T.AC.D.3: Pro-Recur-Instanz erledigt — strikethrough + dimmed.
+   Checkbox vor dem Label rendert dezenter als die Status-Border. */
+.calendar-event-instance-done .calendar-event-label {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+.calendar-event-check,
+.sb-day-event-check {
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--teal);
+  cursor: pointer;
+}
+.sb-day-event-instance-done .sb-day-event-label {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
 /* T.AC.B Polish: Atom-Typ-Variante visualisieren. Tasks behalten die
    status-basierte Farbe; Link/Checklist kriegen einen neutralen Look,
    damit sie sich von Tasks abheben. */

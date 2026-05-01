@@ -149,6 +149,12 @@ export type CalendarEvent = {
   durationMin: number | null;
   // Fuer atomType='link': originale URL (Click oeffnet sie).
   url?: string | null;
+  // T.AC.D.3: nur fuer Recur-Instanzen gesetzt. instanceDate ist das
+  // konkrete Vorkommen-Datum (= startDate fuer Recur-Instanzen).
+  // instanceDone spiegelt task.done_occurrences.includes(instanceDate)
+  // — der User toggelt das per Checkbox auf einer einzelnen Instanz.
+  instanceDate?: string;
+  instanceDone?: boolean;
 };
 
 export function buildEvents(args: {
@@ -181,7 +187,15 @@ export function buildEvents(args: {
   // Cap auf 366 Iterationen pro Event (Sicherheits-Limit gegen
   // pathologische Recur-Konfig). Manifestation-Recur gewinnt lokal —
   // siehe Plan T.AC: "Manifestation gewinnt lokal".
-  function expandRecurOrSingle(base: CalendarEvent, recur: RecurRule | null): void {
+  //
+  // T.AC.D.3: doneOccurrences (nur fuer Tasks gesetzt) ermoeglicht
+  // pro-Instanz instanceDone-Markierung — User kann eine einzelne
+  // Recur-Vorkommen abhaken ohne den Recur-Anker zu beruehren.
+  function expandRecurOrSingle(
+    base: CalendarEvent,
+    recur: RecurRule | null,
+    doneOccurrences?: string[] | null,
+  ): void {
     if (!recur || !viewRange) {
       out.push(base);
       return;
@@ -191,6 +205,7 @@ export function buildEvents(args: {
     // ueber die Schleife.
     const fromIsoLocal = viewRange.fromIso;
     const toIsoLocal = viewRange.toIso;
+    const doneSet = new Set(doneOccurrences ?? []);
     let cur = fromIsoLocal;
     let safety = 0;
     let count = 0;
@@ -215,6 +230,8 @@ export function buildEvents(args: {
           endDate: cur,
           isRange: false,
           isRecurring: true,
+          instanceDate: cur,
+          instanceDone: doneSet.has(cur),
         });
         count += 1;
       }
@@ -248,7 +265,7 @@ export function buildEvents(args: {
       time: (dm.time as string | undefined) ?? null,
       durationMin: (dm.duration_min as number | undefined) ?? null,
     };
-    expandRecurOrSingle(base, effectiveRecur);
+    expandRecurOrSingle(base, effectiveRecur, t.done_occurrences);
   }
 
   for (const t of tasks) {
@@ -269,7 +286,7 @@ export function buildEvents(args: {
       time: null,
       durationMin: null,
     };
-    expandRecurOrSingle(base, taskRecur);
+    expandRecurOrSingle(base, taskRecur, t.done_occurrences);
   }
 
   // T.AC.B: non-task Atoms (Link/Checklist/Doc) als Calendar-Events.

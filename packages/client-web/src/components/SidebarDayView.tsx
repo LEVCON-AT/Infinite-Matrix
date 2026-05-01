@@ -23,6 +23,7 @@ import { columnGeometry, heightPx, layoutDay, topPx as topPxFn } from '../lib/da
 import { bindDragSource, bindDropTarget } from '../lib/drag-context';
 import { translateDbError } from '../lib/errors';
 import { moveByTime } from '../lib/manifestation-move';
+import { toggleTaskInstanceDone } from '../lib/tasks';
 import { showToast } from '../lib/toasts';
 import type { TaskManifestationRow, TaskRow } from '../lib/types';
 import { formatHHMM, visibleRangeForDay, workingHours } from '../lib/working-hours';
@@ -130,6 +131,21 @@ const SidebarDayView: Component<Props> = (p) => {
   function openEvent(e: CalendarEvent, ev: MouseEvent) {
     ev.stopPropagation();
     void navigateToAtomEvent(p.workspaceId, e, navigate);
+  }
+
+  // T.AC.D.3: pro-Recur-Instanz toggeln. Lookup ueber tasksById-Prop.
+  async function onToggleInstance(e: CalendarEvent, ev: MouseEvent) {
+    ev.stopPropagation();
+    if (e.atomType !== 'task' || !e.instanceDate) return;
+    const task = p.tasksById.get(e.atomId);
+    if (!task) return;
+    const wantDone = !e.instanceDone;
+    try {
+      await toggleTaskInstanceDone(e.atomId, e.instanceDate, wantDone, task.done_occurrences ?? []);
+    } catch (err) {
+      console.error('toggleTaskInstanceDone:', err);
+      showToast(translateDbError(err, 'Status nicht aenderbar.'), 'error');
+    }
   }
 
   async function onRemoveAtomEvent(e: CalendarEvent, ev: MouseEvent) {
@@ -340,6 +356,7 @@ const SidebarDayView: Component<Props> = (p) => {
                       [`sb-day-event-${it.event.status ?? 'open'}`]: true,
                       [`sb-day-event-atom-${it.event.atomType}`]: true,
                       'sb-day-event-no-time': !it.hasTime,
+                      'sb-day-event-instance-done': it.event.instanceDone === true,
                     }}
                     draggable={it.event.atomType === 'task'}
                     onDragStart={dragHandlers.onDragStart}
@@ -353,6 +370,22 @@ const SidebarDayView: Component<Props> = (p) => {
                     onClick={(ev) => openEvent(it.event, ev)}
                     title={it.event.label}
                   >
+                    <Show when={it.event.atomType === 'task' && it.event.instanceDate}>
+                      <input
+                        type="checkbox"
+                        class="sb-day-event-check"
+                        checked={it.event.instanceDone === true}
+                        onClick={(ev) => ev.stopPropagation()}
+                        onChange={(ev) => {
+                          ev.stopPropagation();
+                          void onToggleInstance(it.event, ev as unknown as MouseEvent);
+                        }}
+                        aria-label={
+                          it.event.instanceDone ? 'Wieder offen' : 'Als erledigt markieren'
+                        }
+                        title={it.event.instanceDone ? 'Wieder offen' : 'Als erledigt markieren'}
+                      />
+                    </Show>
                     <Show when={it.event.atomType === 'link'}>
                       <Icon name="link" size={10} />
                     </Show>

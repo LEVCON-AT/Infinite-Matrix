@@ -44,6 +44,7 @@ import { translateDbError } from '../lib/errors';
 import { installEscReturn, useGridNav } from '../lib/keyboard-nav';
 import { fetchAgendaTasks } from '../lib/queries';
 import { todayIso } from '../lib/task-aggregate';
+import { toggleTaskInstanceDone } from '../lib/tasks';
 import { showToast } from '../lib/toasts';
 import type { TaskStatus } from '../lib/types';
 
@@ -142,6 +143,29 @@ const Calendar: Component = () => {
       viewRange: { fromIso: r.rangeFrom, toIso: r.rangeTo },
     });
   });
+
+  // T.AC.D.3: pro-Recur-Instanz toggeln. Wir lookup den Task aus dem
+  // aktuellen agenda()-Memo (kein extra Round-Trip), nehmen die heutige
+  // done_occurrences-Liste, und persistieren via toggleTaskInstanceDone.
+  async function onToggleInstance(e: CalendarEvent, ev: MouseEvent) {
+    ev.stopPropagation();
+    if (e.atomType !== 'task' || !e.instanceDate) return;
+    const items = agenda() ?? [];
+    const item = items.find((i) => i.task.id === e.atomId);
+    if (!item) return;
+    const wantDone = !e.instanceDone;
+    try {
+      await toggleTaskInstanceDone(
+        e.atomId,
+        e.instanceDate,
+        wantDone,
+        item.task.done_occurrences ?? [],
+      );
+    } catch (err) {
+      console.error('toggleTaskInstanceDone:', err);
+      showToast(translateDbError(err, 'Status nicht aenderbar.'), 'error');
+    }
+  }
 
   // T.AC.C-Polish: ✕ entfernt eine atom_manifestation aus dem Calendar.
   // Nur fuer non-task Atoms — Tasks haben TaskDetail-Page mit Manif-Liste.
@@ -317,10 +341,25 @@ const Calendar: Component = () => {
                           [`calendar-event-${statusKey(e.status)}`]: true,
                           [`calendar-event-atom-${e.atomType}`]: true,
                           'calendar-event-range': e.isRange,
+                          'calendar-event-instance-done': e.instanceDone === true,
                         }}
                         onClick={(ev) => openEvent(e, ev)}
                         title={e.label}
                       >
+                        <Show when={e.atomType === 'task' && e.instanceDate}>
+                          <input
+                            type="checkbox"
+                            class="calendar-event-check"
+                            checked={e.instanceDone === true}
+                            onClick={(ev) => ev.stopPropagation()}
+                            onChange={(ev) => {
+                              ev.stopPropagation();
+                              void onToggleInstance(e, ev as unknown as MouseEvent);
+                            }}
+                            aria-label={e.instanceDone ? 'Wieder offen' : 'Als erledigt markieren'}
+                            title={e.instanceDone ? 'Wieder offen' : 'Als erledigt markieren'}
+                          />
+                        </Show>
                         <Show when={e.atomType === 'link'}>
                           <Icon name="link" size={10} />
                         </Show>
