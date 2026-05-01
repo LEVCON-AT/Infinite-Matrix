@@ -17,6 +17,7 @@
 import { useNavigate } from '@solidjs/router';
 import { type Component, Show, createResource, createSignal } from 'solid-js';
 import Icon from '../components/Icon';
+import SystemConfigSection from '../components/admin/SystemConfigSection';
 import { isPlatformAdmin } from '../lib/admin';
 import { useUser } from '../lib/auth';
 import { showToast } from '../lib/toasts';
@@ -111,10 +112,7 @@ const Admin: Component = () => {
 
           <main class="admin-main">
             <Show when={section() === 'config'}>
-              <SectionStub
-                title="System-Config"
-                hint="SSO-Provider (Google/GitHub/LinkedIn/Microsoft), SMTP, Magic-Link-Templates. Konfiguration kommt mit B.0.C."
-              />
+              <SystemConfigSection />
             </Show>
             <Show when={section() === 'admins'}>
               <SectionStub

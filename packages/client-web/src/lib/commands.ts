@@ -658,6 +658,8 @@ function describeResult(result: AliasResolveResult): {
       return { typeLabel: 'Zelle', displayLabel: '(Zelle)' };
     case 'link':
       return { typeLabel: 'Link', displayLabel: result.label || '(ohne Label)' };
+    case 'route':
+      return { typeLabel: 'Route', displayLabel: result.label };
   }
 }
 

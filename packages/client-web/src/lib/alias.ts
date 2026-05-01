@@ -20,7 +20,10 @@ export const ALIAS_RE = /^[a-z0-9]+$/;
 // case-insensitive Eingabe). Konsumenten setzen `lastIndex = 0` vor jedem
 // Iteration-Lauf — siehe AliasText/markdown-lite/alias-tokenizer.
 export const ALIAS_REF_RE = /\^([a-z0-9]+)/gi;
-export const RESERVED_ALIASES = ['n', 'fa', 'fi', 'fh', 'fc', 'home', 'w', 's'];
+// `admin` ist reserviert seit Welle B.0 — ^admin navigiert zur
+// Plattform-Admin-Konsole. User koennen ihn deshalb nicht auf eigene
+// Atome legen.
+export const RESERVED_ALIASES = ['n', 'fa', 'fi', 'fh', 'fc', 'home', 'w', 's', 'admin'];
 
 export type AliasOwnerType = 'node' | 'cell' | 'card' | 'checklist' | 'link' | 'doc';
 

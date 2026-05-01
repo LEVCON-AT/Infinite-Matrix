@@ -29,7 +29,18 @@ export type AliasResolveResult =
   | { kind: 'checklist-board'; checklistId: string; boardId: string; label: string }
   | { kind: 'checklist-cell'; checklistId: string; cellId: string; matrixId: string; label: string }
   | { kind: 'link'; url: string; label: string }
-  | { kind: 'doc'; docId: string; title: string };
+  | { kind: 'doc'; docId: string; title: string }
+  // Welle B B.0.B: reservierte Aliase werden vor der Format-Validation
+  // abgefangen (siehe RESERVED_ROUTES). path ist ein absoluter Workspace-
+  // unabhaengiger Pfad (z.B. '/admin'), label ist UI-Hinweis.
+  | { kind: 'route'; path: string; label: string };
+
+// Reservierte Route-Aliase. Werden in resolveAlias VOR validateAliasFormat
+// abgefangen — RESERVED_ALIASES in lib/alias.ts blockiert dasselbe wort
+// als User-Alias-Wert, damit kein Konflikt entsteht.
+const RESERVED_ROUTES: Record<string, { path: string; label: string }> = {
+  admin: { path: '/admin', label: 'Admin-Dashboard' },
+};
 
 export type AliasResolveOutcome =
   | { ok: true; result: AliasResolveResult; canonical: string }
@@ -42,6 +53,19 @@ export type AliasResolveOutcome =
 // checklists > links — erste Quelle die trifft).
 export async function resolveAlias(raw: string, workspaceId: string): Promise<AliasResolveOutcome> {
   const stripped = raw.trim().replace(/^\^+/, '');
+
+  // Welle B B.0.B: reservierte Routen-Aliase short-circuit. validateAliasFormat
+  // wuerde sie sonst als RESERVED_ALIASES ablehnen — wir prufen ZUERST.
+  const lowered = stripped.toLowerCase();
+  const reservedRoute = RESERVED_ROUTES[lowered];
+  if (reservedRoute) {
+    return {
+      ok: true,
+      result: { kind: 'route', path: reservedRoute.path, label: reservedRoute.label },
+      canonical: lowered,
+    };
+  }
+
   const fmt = validateAliasFormat(stripped);
   if (!fmt.ok) return { ok: false, msg: fmt.msg };
   if (!fmt.canonical) return { ok: false, msg: 'Alias ist leer.' };

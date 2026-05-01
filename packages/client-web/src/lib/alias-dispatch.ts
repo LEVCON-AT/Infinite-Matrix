@@ -73,5 +73,10 @@ export function dispatchAliasResult(result: AliasResolveResult, deps: DispatchDe
     case 'doc':
       openDocsPopup({ initialDocId: result.docId });
       return;
+    case 'route':
+      // Welle B B.0.B: reservierte Routen-Aliase wie ^admin. path
+      // ist absolut (z.B. '/admin'), nicht workspace-prefixed.
+      deps.navigate(result.path);
+      return;
   }
 }
