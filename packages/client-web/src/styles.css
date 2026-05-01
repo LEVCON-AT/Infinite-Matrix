@@ -430,31 +430,46 @@ p.ok {
    button[type='button'] ohne .btn-Klasse wird NICHT gestylt — sonst
    uebernimmt jeder custom-styled Button (tree-chevron, overlay-close,
    ico-btn, ws-sidebar-mode-btn, ...) unerwuenscht die Base. */
+/* Q.3.B+B.1.X: HyperUI-Spec (style.md §5.1). Border-radius-md, Manifest-
+   Spacing/Typo-Tokens, hover-shadow-Lift, active-press-scale. */
 .btn,
 button[type="submit"] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 6px 12px;
-  font-size: var(--fs-small);
-  font-weight: 500;
+  gap: var(--space-2);
+  padding-inline: var(--space-4);
+  padding-block: var(--space-2_5);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
   font-family: inherit;
-  line-height: 1.4;
-  border-radius: var(--rs);
+  line-height: var(--lh-snug);
+  border-radius: var(--radius-md);
   border: 1px solid var(--border2);
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
   white-space: nowrap;
-  transition: background var(--tr-std), border-color var(--tr-std), color var(--tr-std), opacity
-    var(--tr-std);
+  transition:
+    background-color var(--tr-fast) var(--ease-smooth),
+    border-color var(--tr-fast) var(--ease-smooth),
+    box-shadow var(--tr-fast) var(--ease-smooth),
+    transform var(--tr-instant) var(--ease-out),
+    color var(--tr-fast) var(--ease-smooth),
+    opacity var(--tr-fast) var(--ease-smooth);
 }
 
 .btn:hover:not(:disabled),
 button[type="submit"]:hover:not(:disabled) {
   background: var(--surface-hover);
   border-color: var(--text3);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn:active:not(:disabled),
+button[type="submit"]:active:not(:disabled) {
+  transform: scale(var(--scale-press));
+  box-shadow: var(--shadow-xs);
 }
 
 .btn:focus-visible,
@@ -535,25 +550,34 @@ button[type="submit"]:hover:not(:disabled) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 6px 12px;
-  font-size: var(--fs-small);
-  font-weight: 500;
+  gap: var(--space-2);
+  padding-inline: var(--space-4);
+  padding-block: var(--space-2_5);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
   font-family: inherit;
-  line-height: 1.4;
+  line-height: var(--lh-snug);
   background: transparent;
   color: var(--text2);
   border: 1px solid transparent;
-  border-radius: var(--rs);
+  border-radius: var(--radius-md);
   cursor: pointer;
   white-space: nowrap;
-  transition: background var(--tr-std), color var(--tr-std), border-color var(--tr-std), opacity
-    var(--tr-std);
+  transition:
+    background-color var(--tr-fast) var(--ease-smooth),
+    color var(--tr-fast) var(--ease-smooth),
+    border-color var(--tr-fast) var(--ease-smooth),
+    transform var(--tr-instant) var(--ease-out),
+    opacity var(--tr-fast) var(--ease-smooth);
 }
 
 .btn-subtle:hover:not(:disabled) {
   background: var(--surface-hover);
   color: var(--text);
+}
+
+.btn-subtle:active:not(:disabled) {
+  transform: scale(var(--scale-press));
 }
 
 .btn-subtle:focus-visible {
@@ -13613,6 +13637,54 @@ body[data-dragging] .sb-day-allday-item[draggable="true"]:active {
   transform: translateY(0) scale(var(--scale-press));
   box-shadow: var(--shadow-sm);
   transition: transform var(--tr-instant) var(--ease-out);
+}
+
+/* HyperUI-Spec (style.md §5.2) — globale .input-Klasse. Existing
+   Inline-Inputs nutzen sie; die Klasse selbst hat HyperUI-praezise
+   Border + Focus-Ring + Padding. */
+.input {
+  inline-size: 100%;
+  padding-inline: var(--space-3);
+  padding-block: var(--space-2);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--tr-fast) var(--ease-smooth), box-shadow var(--tr-fast)
+    var(--ease-smooth);
+}
+
+.input:focus-visible,
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--shadow-focus);
+}
+
+.input::placeholder {
+  color: var(--text3);
+}
+
+.input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: var(--bg2);
+}
+
+textarea.input {
+  resize: vertical;
+  min-block-size: 4rem;
+  line-height: var(--lh-normal);
+}
+
+select.input {
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path fill='none' stroke='%239ca3af' stroke-width='1.5' d='M3 4.5L6 7.5 9 4.5'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right var(--space-2) center;
+  padding-right: var(--space-7);
 }
 
 /* Q.3.A.6 — View-Transitions API Scope auf .ws-main (siehe oben).

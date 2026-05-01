@@ -188,7 +188,6 @@ const Signup: Component = () => {
           </p>
         </Show>
         <Show when={error()}>
-          {/* biome-ignore lint/a11y/useSemanticElements: role="alert" Block-Container. */}
           <p class="login-error" role="alert">
             {error()}
           </p>

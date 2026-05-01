@@ -86,7 +86,6 @@ const ResetPassword: Component = () => {
         </Show>
 
         <Show when={recoveryReady() === 'invalid'}>
-          {/* biome-ignore lint/a11y/useSemanticElements: <p role="alert"> bewusst. */}
           <p class="login-error" role="alert">
             Reset-Link ist ungueltig oder abgelaufen. Bitte fordere einen neuen Link an.
           </p>
@@ -128,7 +127,6 @@ const ResetPassword: Component = () => {
               Passwort speichern
             </button>
             <Show when={error()}>
-              {/* biome-ignore lint/a11y/useSemanticElements: <p role="alert"> bewusst. */}
               <p class="login-error" role="alert">
                 {error()}
               </p>
