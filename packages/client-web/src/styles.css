@@ -13809,3 +13809,83 @@ html.view-transition-drill-up::view-transition-new(ws-main) {
   color: var(--redtxt);
   border: 1px solid var(--danger);
 }
+
+/* ── MFA-Section in Settings/AccountSecurity (Welle B.2) ──────── */
+
+.mfa-factor-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mfa-factor-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.mfa-factor-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0_5);
+}
+
+.mfa-enroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  padding: var(--space-4);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.mfa-qr {
+  align-self: center;
+  padding: var(--space-3);
+  background: white;
+  border-radius: var(--radius);
+  inline-size: 12rem;
+  block-size: 12rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mfa-qr svg {
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+.mfa-secret summary {
+  cursor: pointer;
+  color: var(--text2);
+  font-size: var(--text-sm);
+}
+
+.mfa-secret code {
+  display: block;
+  margin-top: var(--space-2);
+  padding: var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking-wide);
+  word-break: break-all;
+}
+
+.mfa-enroll-actions {
+  display: flex;
+  gap: var(--space-2);
+}
