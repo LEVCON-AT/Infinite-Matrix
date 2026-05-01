@@ -22,13 +22,17 @@ const MfaGateDialog: Component = () => {
 
   async function onSubmit(e: Event) {
     e.preventDefault();
-    if (!/^\d{6}$/.test(code())) {
-      showToast('Bitte 6-stelligen Code eingeben.', 'error');
+    const c = code().trim();
+    // Beide Formate: 6-stellig TOTP oder 14-Zeichen Backup-Code (12 + 2 -)
+    const isTotp = /^\d{6}$/.test(c);
+    const isBackup = /^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$/.test(c);
+    if (!isTotp && !isBackup) {
+      showToast('6-stelligen Code aus der App ODER 12-stelligen Backup-Code eingeben.', 'error');
       return;
     }
     setBusy(true);
     try {
-      await submitMfaGateCode(code());
+      await submitMfaGateCode(c);
       showToast('Anmeldung bestaetigt.', 'success');
     } catch (err) {
       showToast(translateDbError(err, 'Code ungueltig.'), 'error');
@@ -73,17 +77,16 @@ const MfaGateDialog: Component = () => {
             }}
           >
             <label class="login-field">
-              <span>Code</span>
+              <span>Code (6-stellig aus App ODER Backup-Code)</span>
               <input
                 class="input"
                 type="text"
-                inputmode="numeric"
+                inputmode="text"
                 autocomplete="one-time-code"
-                pattern="\d{6}"
-                maxLength={6}
+                maxLength={14}
                 autofocus
                 value={code()}
-                onInput={(e) => setCode(e.currentTarget.value.replace(/\D/g, ''))}
+                onInput={(e) => setCode(e.currentTarget.value)}
                 disabled={busy()}
               />
             </label>
@@ -91,7 +94,7 @@ const MfaGateDialog: Component = () => {
               <button
                 type="submit"
                 class="btn btn-primary lift"
-                disabled={busy() || code().length !== 6}
+                disabled={busy() || code().length < 6}
               >
                 Bestaetigen
               </button>

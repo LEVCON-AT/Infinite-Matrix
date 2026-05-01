@@ -8,6 +8,11 @@
 import { useNavigate } from '@solidjs/router';
 import { type Component, For, Show, createResource, createSignal } from 'solid-js';
 import { signOut } from '../../lib/auth';
+import {
+  type BackupCodesStatus,
+  generateBackupCodes,
+  getBackupCodesStatus,
+} from '../../lib/backup-codes';
 import { formatDateDE } from '../../lib/dates';
 import { showConfirm } from '../../lib/dialog';
 import { translateDbError } from '../../lib/errors';
@@ -215,6 +220,8 @@ const AccountSecurity: Component = () => {
         </Show>
       </section>
 
+      <BackupCodesPane />
+
       <section class="settings-form-section">
         <h3>Session</h3>
         <button
@@ -228,6 +235,101 @@ const AccountSecurity: Component = () => {
         </button>
       </section>
     </article>
+  );
+};
+
+// Backup-Codes-Sektion. Eigene Komponente weil mehrere Resources +
+// Generate-Modal-State.
+const BackupCodesPane: Component = () => {
+  const [status, { refetch }] = createResource(async () => {
+    try {
+      return await getBackupCodesStatus();
+    } catch (err) {
+      console.error('getBackupCodesStatus:', err);
+      return { total: 0, remaining: 0, used: 0 } as BackupCodesStatus;
+    }
+  });
+
+  const [busy, setBusy] = createSignal(false);
+  const [freshCodes, setFreshCodes] = createSignal<string[] | null>(null);
+
+  async function generate() {
+    const ok = await showConfirm({
+      title: 'Backup-Codes neu generieren?',
+      message:
+        'Existing Codes werden ungueltig. Die neuen Codes siehst du nur einmal — bitte sofort sicher kopieren.',
+      confirmLabel: 'Generieren',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const codes = await generateBackupCodes();
+      setFreshCodes(codes);
+      void refetch();
+    } catch (err) {
+      showToast(translateDbError(err, 'Generieren fehlgeschlagen.'), 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function copyAll() {
+    const codes = freshCodes();
+    if (!codes) return;
+    void navigator.clipboard.writeText(codes.join('\n'));
+    showToast('Codes in die Zwischenablage kopiert.', 'success');
+  }
+
+  return (
+    <section class="settings-form-section">
+      <h3>Backup-Codes</h3>
+      <p class="hint">
+        Single-use Codes als Fallback fuer den Authenticator. 10 Stueck pro Generierung; jeder Code
+        ist nach Verwendung verbraucht.
+      </p>
+
+      <Show when={!freshCodes()}>
+        <p class="hint">
+          <Show when={!status.loading} fallback="Lade…">
+            {status()?.remaining ?? 0} von {status()?.total ?? 0} Codes unbenutzt.
+          </Show>
+        </p>
+        <button
+          type="button"
+          class="btn btn-subtle"
+          onClick={() => void generate()}
+          disabled={busy()}
+        >
+          {(status()?.total ?? 0) === 0 ? 'Codes erstellen' : 'Codes neu generieren'}
+        </button>
+      </Show>
+
+      <Show when={freshCodes()}>
+        {(codes) => (
+          <div class="backup-codes-banner">
+            <strong>Bitte sofort kopieren — die Codes erscheinen nur einmal.</strong>
+            <ol class="backup-codes-list">
+              <For each={codes()}>
+                {(c) => (
+                  <li>
+                    <code>{c}</code>
+                  </li>
+                )}
+              </For>
+            </ol>
+            <div class="backup-codes-actions">
+              <button type="button" class="btn-subtle" onClick={copyAll}>
+                Alle kopieren
+              </button>
+              <button type="button" class="btn-subtle" onClick={() => setFreshCodes(null)}>
+                Ich habe sie gespeichert
+              </button>
+            </div>
+          </div>
+        )}
+      </Show>
+    </section>
   );
 };
 

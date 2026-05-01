@@ -18,6 +18,7 @@
 //   - Login-Gate wird DIREKT NACH Login getriggert, Cancel = signOut
 //     (User wollte gar nicht rein).
 
+import { consumeBackupCode, looksLikeBackupCode } from './backup-codes';
 import { challengeFactor, getAuthAal, listMfaFactors, verifyChallenge } from './mfa';
 
 type GateRequest = {
@@ -71,6 +72,16 @@ export async function checkMfaGate(): Promise<void> {
 export async function submitMfaGateCode(code: string): Promise<void> {
   const req = pendingGate;
   if (!req) throw new Error('no_pending_gate');
+  // Backup-Code-Pfad: User hat seine App verloren. Akzeptiert ohne
+  // AAL2-Upgrade — Session bleibt aal1, sensitive Aktionen brauchen
+  // dann erneuten Setup eines TOTP-Faktors. UX-Hinweis dazu im Dialog.
+  if (looksLikeBackupCode(code)) {
+    await consumeBackupCode(code);
+    pendingGate = null;
+    notifyGate();
+    return;
+  }
+  // TOTP-Pfad: 6-stelliger Code, AAL1 → AAL2.
   const challengeId = await challengeFactor(req.factorId);
   await verifyChallenge(req.factorId, challengeId, code);
   pendingGate = null;
