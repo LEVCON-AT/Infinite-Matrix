@@ -386,12 +386,7 @@ const TreeItem: Component<{
         data-tree-parent={p.parentId ?? ''}
         data-tree-depth={p.depth}
         data-dot-type={dotTypeFor(p.entry)}
-        style={{
-          /* 16px pro Depth-Level. Base-Offset 4px damit das Chevron
-             nicht ganz am Rand klebt. */
-          'padding-left': `${p.depth * 16 + 4}px`,
-          '--tree-depth': p.depth,
-        }}
+        style={{ '--tree-depth': p.depth }}
         onContextMenu={(e) => {
           e.preventDefault();
           if (rowRef) p.openMenu(p.entry, rowRef, e.clientX, e.clientY);

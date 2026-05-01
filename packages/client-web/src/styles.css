@@ -49,12 +49,37 @@
   --redtxt: #7a1f1e;
   --prio-medium: #e8a317;
 
-  /* Spacing */
-  --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 12px;
-  --space-lg: 16px;
-  --space-xl: 24px;
+  /* Spacing — Legacy (Q.3.B): aktuell breit verwendet (~hunderte Stellen).
+     Bleiben als Aliase auf die rem-Skala unten (style.md §1.2). Neue
+     Aenderungen verwenden `--space-1..32` direkt. */
+  --space-xs: var(--space-1);
+  --space-sm: var(--space-2);
+  --space-md: var(--space-3);
+  --space-lg: var(--space-4);
+  --space-xl: var(--space-6);
+
+  /* Style-Manifest §1.2 — Spacing-Skala (rem). */
+  --space-0: 0;
+  --space-px: 0.0625rem;
+  --space-0_5: 0.125rem;
+  --space-1: 0.25rem;
+  --space-1_5: 0.375rem;
+  --space-2: 0.5rem;
+  --space-2_5: 0.625rem;
+  --space-3: 0.75rem;
+  --space-3_5: 0.875rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 1.75rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-14: 3.5rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+  --space-24: 6rem;
+  --space-32: 8rem;
 
   /* Avatar-Groessen — fuer Tree-Mini-Avatare (NT.1) und User-Chip. */
   --avatar-sm: 14px;
@@ -112,20 +137,35 @@
   --focus-width: 2px;
   --focus-offset: 2px;
 
-  /* Shadows — HyperUI/Tailwind-Parity. Subtil gehalten, damit die
-     Oberflaeche clean wirkt; tiefere Shadows nur fuer Modal-Overlays. */
-  --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
-  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.1), 0 4px 6px -4px rgba(15, 23, 42, 0.05);
+  /* Shadows — Style-Manifest §1.5. Vollstaendige HyperUI/Tailwind-Skala. */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.06);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.06);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.18);
+  --shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+  --shadow-focus: 0 0 0 3px var(--accent-soft, rgb(55 138 221 / 0.25));
 
   /* Overlays */
   --overlay-soft: rgba(0, 0, 0, 0.28);
   --overlay-strong: rgba(0, 0, 0, 0.4);
 
-  /* Radien */
-  --rs: 4px;
-  --r: 8px;
-  --rl: 12px;
+  /* Radien — Legacy (Q.3.B). Aliase auf die Manifest-Skala unten. */
+  --rs: var(--radius);
+  --r: var(--radius-md);
+  --rl: var(--radius-xl);
+
+  /* Style-Manifest §1.4 — Border-Radius-Skala. --radius-sm wird im
+     AU-B1-Block weiter unten definiert (Manifest-Spec 0.125rem). */
+  --radius-none: 0;
+  --radius: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
+  --radius-full: 9999px;
 
   /* AU-B1 K4 (B1-E-003 / B1-E-004): Token-Aliase fuer Object-Layer-
      Sections (Bulk-Add, Obj-Detail, Group-Matrix, NewCellWizard,
@@ -135,11 +175,21 @@
      Farben + Focus-Outlines unsichtbar. */
   --p: var(--blue);
   --accent: var(--blue);
+  --accent-hover: #2c6fb8;
+  --accent-soft: #d6e7f7;
   --bg-hover: var(--surface-hover);
-  --radius-sm: var(--rs);
+  --bg-active: #e5e7eb;
+  --border-strong: rgba(15, 23, 42, 0.18);
+  --text-inverse: #ffffff;
+  --success: var(--teal);
+  --success-soft: var(--tealbg);
+  --warning: var(--amber);
+  --warning-soft: var(--amberbg);
+  --radius-sm: 0.125rem;
   --focus-ring: var(--focus-width) solid var(--focus-color);
   --danger: var(--red);
   --dangerbg: var(--redbg);
+  --danger-soft: var(--redbg);
 
   /* Font-Sizes */
   --fs-title: clamp(14px, 0.9vw + 10px, 17px);
@@ -151,13 +201,53 @@
   --fs-base: 14px;
   --fs-small: 13px;
 
+  /* Style-Manifest §1.3 — Typo-Skala (rem). */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
+
+  /* Line-Heights. */
+  --lh-none: 1;
+  --lh-tight: 1.25;
+  --lh-snug: 1.375;
+  --lh-normal: 1.5;
+  --lh-relaxed: 1.625;
+  --lh-loose: 2;
+
+  /* Font-Weights. */
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* Letter-Spacings (em, niemals px). */
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.02em;
+  --tracking-wider: 0.04em;
+
   /* Layout */
   --sidebar-w: 280px;
 
-  /* AU-B1 K11e (B1-D-014): z-index-Skala fuer Popups + Modale.
-     `--z-popup` deckt Floating-Listen (Autocomplete, ObjectSuggestion).
-     Modale liegen darueber via `.overlay-scrim` (CSS-Wert direkt). */
-  --z-popup: 10000;
+  /* Style-Manifest §1.6 — Z-Index-Skala. */
+  --z-base: 0;
+  --z-dropdown: 10;
+  --z-sticky: 20;
+  --z-fixed: 30;
+  --z-modal-backdrop: 40;
+  --z-modal: 50;
+  --z-popover: 60;
+  --z-toast: 70;
+  --z-cmd: 80;
+
+  /* Legacy (Q.3.B): einzelnes z-popup-Token, jetzt Alias. */
+  --z-popup: var(--z-popover);
 
   /* Basis-Font */
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, sans-serif;
@@ -2662,6 +2752,16 @@ button[type="submit"]:hover:not(:disabled) {
   display: flex;
   align-items: center;
   gap: 2px;
+  /* Q.3.B — Indent via --tree-depth (gesetzt in JSX als Custom-Property).
+     16px pro Level + 4px Base-Offset, in rem: 1rem * depth + 0.25rem. */
+  padding-left: calc(var(--tree-depth, 0) * 1rem + 0.25rem);
+}
+
+/* Q.3.B — Icon-Helper (style.md §5.8). Ersetzt das Inline-style auf
+   <svg> in components/Icon.tsx (flex:0 0 auto + display:block). */
+.icon {
+  flex: 0 0 auto;
+  display: block;
 }
 
 .tree-row .tree-link {
@@ -8321,7 +8421,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   flex: 1 1 auto;
   padding: 6px 10px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   background: var(--bg);
   color: var(--text);
   font-size: var(--fs-small);
@@ -8348,7 +8448,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   background: transparent;
   border: none;
   color: var(--text3);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: background var(--tr-std), color var(--tr-std);
 }
@@ -8369,7 +8469,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   border: 1px dashed var(--border2);
   color: var(--text2);
   padding: 4px 10px;
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   font-size: 12px;
   cursor: pointer;
   transition: border-color var(--tr-std), color var(--tr-std);
@@ -8413,7 +8513,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   flex: 1 1 200px;
   padding: 6px 10px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   background: var(--bg);
   color: var(--text);
   font-size: var(--fs-small);
@@ -8472,7 +8572,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   padding: 6px 12px;
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   color: var(--text2);
   font-size: var(--fs-small);
   cursor: pointer;
@@ -8506,7 +8606,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
 .obj-detail-input {
   padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   background: var(--bg);
   color: var(--text);
   font-size: var(--fs-base, 14px);
@@ -8671,7 +8771,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   border: 1px dashed var(--border2);
   color: var(--text2);
   padding: 4px 12px;
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   font-size: 12px;
   cursor: pointer;
   margin-top: 6px;
@@ -9512,7 +9612,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   gap: 6px;
   padding: 6px 10px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   background: var(--bg);
   flex: 1 1 220px;
   transition: border-color var(--tr-std);
@@ -9552,7 +9652,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
 .objects-list-type-filter {
   padding: 6px 10px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   background: var(--bg);
   color: var(--text);
   font-size: var(--fs-small);
@@ -9582,7 +9682,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   padding: 4px 10px;
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   color: var(--text2);
   font-size: 12px;
   cursor: pointer;
@@ -9662,7 +9762,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   padding: 6px 12px;
   background: var(--amberbg, var(--surface-hover));
   border: 1px solid var(--amber, var(--border));
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   color: var(--text);
   font-size: var(--fs-small);
   cursor: pointer;
@@ -9679,7 +9779,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
 .objects-list-view-toggle {
   display: inline-flex;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 
@@ -9784,7 +9884,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
 .group-matrix-empty {
   padding: var(--space-md);
   background: var(--surface-hover);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   text-align: center;
 }
 
@@ -9801,7 +9901,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   padding: var(--space-sm);
   background: var(--bg-subtle, transparent);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
 }
 
 .group-matrix-source-label {
@@ -9815,7 +9915,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
 .group-matrix-select {
   padding: 6px 10px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   background: var(--bg);
   color: var(--text);
   font-size: var(--fs-small);
@@ -9872,7 +9972,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   align-items: center;
   gap: 6px;
   padding: 4px 6px;
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   transition: background var(--tr-std);
 }
 
@@ -9911,7 +10011,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   border: 0;
   background: transparent;
   color: var(--text3);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   cursor: pointer;
   opacity: 0;
   transition: opacity var(--tr-std), background var(--tr-std), color var(--tr-std);
@@ -9943,7 +10043,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   gap: 4px;
   padding: 4px 10px;
   border: 1px dashed var(--border2);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--text3);
   font-size: 12px;
@@ -9967,7 +10067,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   flex: 1 1 auto;
   padding: 5px 8px;
   border: 1px solid var(--p);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   background: var(--bg);
   color: var(--text);
   font-size: 12px;
@@ -9994,7 +10094,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   flex: 1 1 auto;
   padding: 6px 10px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   background: var(--bg);
   color: var(--text);
   font-size: var(--fs-small);
@@ -10044,7 +10144,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   padding: 10px 14px;
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   color: var(--text);
   font-size: var(--fs-small);
   cursor: pointer;
@@ -10104,7 +10204,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   padding: 6px 12px;
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   color: var(--text2);
   font-size: var(--fs-small);
   cursor: pointer;
@@ -10244,7 +10344,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   padding: 6px 10px;
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   color: var(--text);
   font-size: var(--fs-small);
   cursor: pointer;
@@ -11814,7 +11914,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   flex: 1 1 auto;
   padding: 6px 10px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   background: var(--bg);
   color: var(--text);
   font-size: var(--fs-small);
@@ -11844,7 +11944,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   gap: 8px;
   padding: 8px 10px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   background: var(--bg);
   color: var(--text);
   font-size: var(--fs-small);
@@ -11956,7 +12056,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   width: 100%;
   padding: 8px 12px;
   border: 1px solid var(--p);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   background: var(--bg);
   color: var(--text);
   font-size: var(--fs-body, 14px);
@@ -12086,7 +12186,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   flex: 1 1 auto;
   padding: 6px 10px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md);
   background: var(--bg);
   color: var(--text);
   font-size: var(--fs-small);

@@ -418,9 +418,8 @@ const Icon: Component<Props> = (p) => {
       stroke-width="1.75"
       stroke-linecap="round"
       stroke-linejoin="round"
-      class={p.class}
+      class={`icon ${p.class ?? ''}`.trim()}
       aria-hidden="true"
-      style={{ flex: '0 0 auto', display: 'block' }}
     >
       {ICONS[p.name]()}
     </svg>
