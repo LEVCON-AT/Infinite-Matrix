@@ -9325,10 +9325,11 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   display: contents;
 }
 .calendar-event-remove,
-.sb-day-event-remove {
+.sb-day-event-remove,
+.calendar-event-edit,
+.sb-day-event-edit {
   position: absolute;
   top: 1px;
-  right: 1px;
   width: 16px;
   height: 16px;
   border-radius: 50%;
@@ -9343,11 +9344,30 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   transition: opacity var(--tr-std), background var(--tr-std);
   z-index: 2;
 }
+.calendar-event-remove,
+.sb-day-event-remove {
+  right: 1px;
+}
+/* Edit-Button rutscht links neben das ✕ wenn beide sichtbar (non-task
+   Atoms haben beide), sonst auch ganz rechts. */
+.calendar-event-edit,
+.sb-day-event-edit {
+  right: 1px;
+}
+.calendar-event-wrap:has(.calendar-event-remove) .calendar-event-edit,
+.sb-day-allday-wrap:has(.sb-day-event-remove) .sb-day-event-edit {
+  right: 19px;
+}
 .calendar-event-wrap:hover .calendar-event-remove,
+.calendar-event-wrap:hover .calendar-event-edit,
 .sb-day-allday-wrap:hover .sb-day-event-remove,
+.sb-day-allday-wrap:hover .sb-day-event-edit,
 .sb-day-event:hover + .sb-day-event-remove,
+.sb-day-event:hover + .sb-day-event-edit,
 .calendar-event-remove:focus-visible,
-.sb-day-event-remove:focus-visible {
+.sb-day-event-remove:focus-visible,
+.calendar-event-edit:focus-visible,
+.sb-day-event-edit:focus-visible {
   opacity: 1;
 }
 .calendar-event-remove:hover,
@@ -9355,6 +9375,12 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   background: var(--redbg);
   color: var(--redtxt);
   border-color: var(--red);
+}
+.calendar-event-edit:hover,
+.sb-day-event-edit:hover {
+  background: var(--bluebg);
+  color: var(--bluetxt);
+  border-color: var(--p);
 }
 .calendar-event-wrap {
   position: relative;

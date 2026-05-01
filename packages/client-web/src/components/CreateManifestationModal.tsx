@@ -23,11 +23,18 @@
 //                       → atom_manifestations)
 
 import { type Component, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
-import { addAtomManifestation, removeAtomManifestation } from '../lib/atom-manifestations';
+import {
+  addAtomManifestation,
+  removeAtomManifestation,
+  updateAtomManifestation,
+} from '../lib/atom-manifestations';
 import { installFocusRestore, installFocusTrap } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
-import type { ManifestationAtomType } from '../lib/manifestation-modal-state';
-import { addManifestation, removeManifestation } from '../lib/tasks';
+import type {
+  ManifestationAtomType,
+  ManifestationModalMode,
+} from '../lib/manifestation-modal-state';
+import { addManifestation, removeManifestation, updateManifestation } from '../lib/tasks';
 import { showToast, showUndoToast } from '../lib/toasts';
 import Icon from './Icon';
 
@@ -41,19 +48,48 @@ type Props = {
   atomLabel: string;
   atomUrl?: string;
   defaultDate: string;
+  // T.AC.D.4: edit-Mode pre-fillt aus existingDisplayMeta + persistiert
+  // via updateManifestation/updateAtomManifestation. Default 'create'.
+  mode?: ManifestationModalMode;
+  manifId?: string;
+  existingDisplayMeta?: Record<string, unknown>;
   onClose: () => void;
   onCreated?: () => void;
 };
 
 const CreateManifestationModal: Component<Props> = (p) => {
-  const [startDate, setStartDate] = createSignal(p.defaultDate);
-  const [endDate, setEndDate] = createSignal('');
-  const [time, setTime] = createSignal('');
-  const [duration, setDuration] = createSignal('');
-  const [recurType, setRecurType] = createSignal<RecurType>('none');
-  const [endType, setEndType] = createSignal<EndType>('never');
-  const [endDateRecur, setEndDateRecur] = createSignal('');
-  const [endCount, setEndCount] = createSignal('');
+  // T.AC.D.4: edit-Mode pre-fillt aus existingDisplayMeta. Wir lesen
+  // einmal beim Component-Mount — die User-Edits bleiben unabhaengig
+  // vom prop-Update bei sich aendernder Modal-Request.
+  const initialDm = p.mode === 'edit' ? (p.existingDisplayMeta ?? {}) : {};
+  const initialRecur = (initialDm as Record<string, unknown>).recur as
+    | Record<string, unknown>
+    | undefined;
+  const initialEndType: EndType = (() => {
+    const et = initialRecur?.endType as string | undefined;
+    if (et === 'date') return 'on_date';
+    if (et === 'count') return 'after_count';
+    return 'never';
+  })();
+
+  const [startDate, setStartDate] = createSignal(
+    (initialDm.start_date as string | undefined) ?? p.defaultDate,
+  );
+  const [endDate, setEndDate] = createSignal((initialDm.end_date as string | undefined) ?? '');
+  const [time, setTime] = createSignal((initialDm.time as string | undefined) ?? '');
+  const [duration, setDuration] = createSignal(
+    initialDm.duration_min != null ? String(initialDm.duration_min) : '',
+  );
+  const [recurType, setRecurType] = createSignal<RecurType>(
+    ((initialRecur?.type as RecurType | undefined) ?? 'none') as RecurType,
+  );
+  const [endType, setEndType] = createSignal<EndType>(initialEndType);
+  const [endDateRecur, setEndDateRecur] = createSignal(
+    (initialRecur?.endDate as string | undefined) ?? '',
+  );
+  const [endCount, setEndCount] = createSignal(
+    initialRecur?.endCount != null ? String(initialRecur.endCount) : '',
+  );
   const [busy, setBusy] = createSignal(false);
   let cardRef: HTMLDivElement | undefined;
 
@@ -62,6 +98,8 @@ const CreateManifestationModal: Component<Props> = (p) => {
     if (p.atomType === 'link') return 'Link';
     return 'Liste';
   });
+
+  const isEdit = () => p.mode === 'edit';
 
   // Block: Range UND Recur gleichzeitig.
   const isInvalidCombo = createMemo(() => endDate().trim() !== '' && recurType() !== 'none');
@@ -144,7 +182,32 @@ const CreateManifestationModal: Component<Props> = (p) => {
         if (p.atomUrl) display_meta.url = p.atomUrl;
       }
 
-      if (p.atomType === 'task') {
+      if (isEdit() && p.manifId) {
+        // T.AC.D.4: edit-Mode. updateManifestation/updateAtomManifestation
+        // mit dem ANKER-Manif-id (originalManifId) — alle Recur-Instanzen
+        // ziehen automatisch nach.
+        if (p.atomType === 'task') {
+          const oldMeta = p.existingDisplayMeta ?? {};
+          await updateManifestation(p.manifId, { display_meta });
+          showUndoToast('Termin geaendert', async () => {
+            try {
+              await updateManifestation(p.manifId as string, { display_meta: oldMeta });
+            } catch (undoErr) {
+              console.error('updateManifestation (undo):', undoErr);
+            }
+          });
+        } else {
+          const oldMeta = p.existingDisplayMeta ?? {};
+          await updateAtomManifestation(p.manifId, { display_meta });
+          showUndoToast('Termin geaendert', async () => {
+            try {
+              await updateAtomManifestation(p.manifId as string, { display_meta: oldMeta });
+            } catch (undoErr) {
+              console.error('updateAtomManifestation (undo):', undoErr);
+            }
+          });
+        }
+      } else if (p.atomType === 'task') {
         const created = await addManifestation(p.workspaceId, {
           task_id: p.atomId,
           kind: 'calendar',
@@ -177,7 +240,15 @@ const CreateManifestationModal: Component<Props> = (p) => {
       p.onClose();
     } catch (err) {
       console.error('addManifestation:', err);
-      showToast(translateDbError(err, 'Termin konnte nicht angelegt werden.'), 'error');
+      showToast(
+        translateDbError(
+          err,
+          isEdit()
+            ? 'Termin konnte nicht geaendert werden.'
+            : 'Termin konnte nicht angelegt werden.',
+        ),
+        'error',
+      );
     } finally {
       setBusy(false);
     }
@@ -200,7 +271,7 @@ const CreateManifestationModal: Component<Props> = (p) => {
         aria-labelledby="create-manif-title"
       >
         <header class="overlay-head">
-          <h3 id="create-manif-title">Termin anlegen</h3>
+          <h3 id="create-manif-title">{isEdit() ? 'Termin bearbeiten' : 'Termin anlegen'}</h3>
           <button
             type="button"
             class="overlay-close"
@@ -338,7 +409,7 @@ const CreateManifestationModal: Component<Props> = (p) => {
                 Abbrechen
               </button>
               <button type="submit" class="btn-primary" disabled={busy() || isInvalidCombo()}>
-                {busy() ? 'Speichere…' : 'Anlegen'}
+                {busy() ? 'Speichere…' : isEdit() ? 'Speichern' : 'Anlegen'}
               </button>
             </div>
           </footer>

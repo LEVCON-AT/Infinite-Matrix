@@ -22,6 +22,7 @@ import { type CalendarEvent, fromIso, groupEventsByDay } from '../lib/calendar';
 import { columnGeometry, heightPx, layoutDay, topPx as topPxFn } from '../lib/day-view-layout';
 import { bindDragSource, bindDropTarget } from '../lib/drag-context';
 import { translateDbError } from '../lib/errors';
+import { openManifestationModal } from '../lib/manifestation-modal-state';
 import { moveByTime } from '../lib/manifestation-move';
 import { toggleTaskInstanceDone } from '../lib/tasks';
 import { showToast } from '../lib/toasts';
@@ -148,6 +149,25 @@ const SidebarDayView: Component<Props> = (p) => {
     }
   }
 
+  function onEditEvent(e: CalendarEvent, ev: MouseEvent) {
+    ev.stopPropagation();
+    if (!e.originalManifId) {
+      showToast('Termin ohne Manifestation — neu droppen statt edit.', 'info');
+      return;
+    }
+    openManifestationModal({
+      workspaceId: p.workspaceId,
+      atomType: e.atomType === 'doc' ? 'task' : e.atomType,
+      atomId: e.atomId,
+      atomLabel: e.label,
+      atomUrl: e.url ?? undefined,
+      defaultDate: e.startDate,
+      mode: 'edit',
+      manifId: e.originalManifId,
+      existingDisplayMeta: e.displayMeta,
+    });
+  }
+
   async function onRemoveAtomEvent(e: CalendarEvent, ev: MouseEvent) {
     ev.stopPropagation();
     if (!e.manifId || e.atomType === 'task') return;
@@ -270,6 +290,17 @@ const SidebarDayView: Component<Props> = (p) => {
                         </Show>
                         <span class="sb-day-allday-label">{e.label || '(ohne Label)'}</span>
                       </button>
+                      <Show when={e.originalManifId}>
+                        <button
+                          type="button"
+                          class="sb-day-event-edit"
+                          onClick={(ev) => onEditEvent(e, ev)}
+                          title="Termin bearbeiten"
+                          aria-label="Termin bearbeiten"
+                        >
+                          <Icon name="pencil" size={10} />
+                        </button>
+                      </Show>
                       <Show when={e.atomType !== 'task' && e.manifId}>
                         <button
                           type="button"

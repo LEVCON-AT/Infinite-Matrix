@@ -155,6 +155,12 @@ export type CalendarEvent = {
   // — der User toggelt das per Checkbox auf einer einzelnen Instanz.
   instanceDate?: string;
   instanceDone?: boolean;
+  // T.AC.D.4: vollstaendige display_meta + originalManifId (= manifId
+  // ohne Recur-Instanz-Suffix). Fuer Edit-Modal-Pre-Fill: Recur-Edit
+  // muss den ANKER-Manif treffen, nicht eine Instanz, damit alle
+  // Folgetermine konsistent angepasst werden.
+  displayMeta?: Record<string, unknown>;
+  originalManifId?: string;
 };
 
 export function buildEvents(args: {
@@ -256,6 +262,7 @@ export function buildEvents(args: {
       atomId: t.id,
       taskId: t.id,
       manifId: m.id,
+      originalManifId: m.id,
       label: t.label,
       status: t.status,
       startDate,
@@ -264,6 +271,7 @@ export function buildEvents(args: {
       isRecurring: effectiveRecur != null,
       time: (dm.time as string | undefined) ?? null,
       durationMin: (dm.duration_min as number | undefined) ?? null,
+      displayMeta: dm,
     };
     expandRecurOrSingle(base, effectiveRecur, t.done_occurrences);
   }
@@ -277,6 +285,7 @@ export function buildEvents(args: {
       atomId: t.id,
       taskId: t.id,
       manifId: null,
+      originalManifId: undefined, // virtual: kein Manif-Edit-Pfad
       label: t.label,
       status: t.status,
       startDate: t.deadline,
@@ -285,6 +294,7 @@ export function buildEvents(args: {
       isRecurring: taskRecur != null,
       time: null,
       durationMin: null,
+      displayMeta: undefined,
     };
     expandRecurOrSingle(base, taskRecur, t.done_occurrences);
   }
@@ -302,6 +312,7 @@ export function buildEvents(args: {
       atomId: a.atom_id,
       taskId: a.atom_id,
       manifId: a.id,
+      originalManifId: a.id,
       label: a.label,
       status: null,
       startDate,
@@ -311,6 +322,7 @@ export function buildEvents(args: {
       time: (dm.time as string | undefined) ?? null,
       durationMin: (dm.duration_min as number | undefined) ?? null,
       url: a.url ?? null,
+      displayMeta: dm,
     };
     expandRecurOrSingle(base, recur);
   }

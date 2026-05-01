@@ -1177,6 +1177,9 @@ const Workspace: Component = () => {
             atomLabel={req().atomLabel}
             atomUrl={req().atomUrl}
             defaultDate={req().defaultDate}
+            mode={req().mode}
+            manifId={req().manifId}
+            existingDisplayMeta={req().existingDisplayMeta}
             onClose={closeManifestationModal}
             onCreated={() => {
               if (req().atomType === 'task') {

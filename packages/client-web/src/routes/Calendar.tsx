@@ -42,6 +42,7 @@ import {
 } from '../lib/calendar';
 import { translateDbError } from '../lib/errors';
 import { installEscReturn, useGridNav } from '../lib/keyboard-nav';
+import { openManifestationModal } from '../lib/manifestation-modal-state';
 import { fetchAgendaTasks } from '../lib/queries';
 import { todayIso } from '../lib/task-aggregate';
 import { toggleTaskInstanceDone } from '../lib/tasks';
@@ -165,6 +166,29 @@ const Calendar: Component = () => {
       console.error('toggleTaskInstanceDone:', err);
       showToast(translateDbError(err, 'Status nicht aenderbar.'), 'error');
     }
+  }
+
+  // T.AC.D.4: ✏️ oeffnet das Modal im edit-Mode mit pre-gefilltem
+  // display_meta. Edit zielt auf den ANKER-Manif (originalManifId),
+  // damit Recur-Edits alle Folgetermine konsistent aendern.
+  function onEditEvent(e: CalendarEvent, ev: MouseEvent) {
+    ev.stopPropagation();
+    if (!e.originalManifId) {
+      // Virtual via task.deadline → kein Manif zum editieren. Toast.
+      showToast('Termin ohne Manifestation — neu droppen statt edit.', 'info');
+      return;
+    }
+    openManifestationModal({
+      workspaceId: params.workspaceId,
+      atomType: e.atomType === 'doc' ? 'task' : e.atomType,
+      atomId: e.atomId,
+      atomLabel: e.label,
+      atomUrl: e.url ?? undefined,
+      defaultDate: e.startDate,
+      mode: 'edit',
+      manifId: e.originalManifId,
+      existingDisplayMeta: e.displayMeta,
+    });
   }
 
   // T.AC.C-Polish: ✕ entfernt eine atom_manifestation aus dem Calendar.
@@ -377,6 +401,17 @@ const Calendar: Component = () => {
                           <Icon name="arrows-pointing-out" size={10} />
                         </Show>
                       </button>
+                      <Show when={e.originalManifId}>
+                        <button
+                          type="button"
+                          class="calendar-event-edit"
+                          onClick={(ev) => onEditEvent(e, ev)}
+                          title="Termin bearbeiten"
+                          aria-label="Termin bearbeiten"
+                        >
+                          <Icon name="pencil" size={10} />
+                        </button>
+                      </Show>
                       <Show when={e.atomType !== 'task' && e.manifId}>
                         <button
                           type="button"
