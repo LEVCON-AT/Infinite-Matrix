@@ -64,6 +64,7 @@ import BulkAddModal from './BulkAddModal';
 import CardOverlay from './CardOverlay';
 import ChecklistPanel from './ChecklistPanel';
 import Icon from './Icon';
+import { ModalTransition } from './ModalTransition';
 import PresenceMini from './PresenceMini';
 
 type Props = {
@@ -1422,16 +1423,18 @@ const BoardView: Component<Props> = (p) => {
             </section>
           </Show>
 
-          <Show when={selectedCard()}>
-            {(card) => (
-              <CardOverlay
-                card={card()}
-                content={content()}
-                onClose={() => setSelectedCardId(null)}
-                onChanged={() => p.onChanged?.()}
-              />
-            )}
-          </Show>
+          <ModalTransition when={Boolean(selectedCard())}>
+            <Show when={selectedCard()}>
+              {(card) => (
+                <CardOverlay
+                  card={card()}
+                  content={content()}
+                  onClose={() => setSelectedCardId(null)}
+                  onChanged={() => p.onChanged?.()}
+                />
+              )}
+            </Show>
+          </ModalTransition>
 
           <Show when={bulkAddOpen()}>
             <BulkAddModal

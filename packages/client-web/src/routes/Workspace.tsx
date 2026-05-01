@@ -1137,12 +1137,12 @@ const Workspace: Component = () => {
           im DOM, egal wie viele Chips gerade gerendert sind. */}
       <ContextMenu state={aliasChipMenuState()} onClose={closeAliasChipMenu} />
 
-      <Show when={showSearch() && params.workspaceId}>
+      <ModalTransition when={Boolean(showSearch() && params.workspaceId)}>
         <GlobalSearch
           workspaceId={params.workspaceId as string}
           onClose={() => setShowSearch(false)}
         />
-      </Show>
+      </ModalTransition>
 
       <ModalTransition when={Boolean(showCommand() && params.workspaceId)}>
         <CommandPalette
@@ -1155,7 +1155,7 @@ const Workspace: Component = () => {
         />
       </ModalTransition>
 
-      <Show when={showDocs() && params.workspaceId}>
+      <ModalTransition when={Boolean(showDocs() && params.workspaceId)}>
         <DocsPopup
           workspaceId={params.workspaceId as string}
           request={docsRequest()}
@@ -1165,36 +1165,38 @@ const Workspace: Component = () => {
             clearDocsRequest();
           }}
         />
-      </Show>
+      </ModalTransition>
 
-      <Show when={showHelp()}>
+      <ModalTransition when={showHelp()}>
         <KeyboardHelp onClose={() => setShowHelp(false)} />
-      </Show>
+      </ModalTransition>
 
-      <Show when={manifestationModalRequest()}>
-        {(req) => (
-          <CreateManifestationModal
-            workspaceId={req().workspaceId}
-            atomType={req().atomType}
-            atomId={req().atomId}
-            atomLabel={req().atomLabel}
-            atomUrl={req().atomUrl}
-            defaultDate={req().defaultDate}
-            mode={req().mode}
-            manifId={req().manifId}
-            existingDisplayMeta={req().existingDisplayMeta}
-            onClose={closeManifestationModal}
-            onCreated={() => {
-              if (req().atomType === 'task') {
-                void refetchWsTasks();
-                void refetchWsManifestations();
-              } else {
-                void refetchAtomManifs();
-              }
-            }}
-          />
-        )}
-      </Show>
+      <ModalTransition when={Boolean(manifestationModalRequest())}>
+        <Show when={manifestationModalRequest()}>
+          {(req) => (
+            <CreateManifestationModal
+              workspaceId={req().workspaceId}
+              atomType={req().atomType}
+              atomId={req().atomId}
+              atomLabel={req().atomLabel}
+              atomUrl={req().atomUrl}
+              defaultDate={req().defaultDate}
+              mode={req().mode}
+              manifId={req().manifId}
+              existingDisplayMeta={req().existingDisplayMeta}
+              onClose={closeManifestationModal}
+              onCreated={() => {
+                if (req().atomType === 'task') {
+                  void refetchWsTasks();
+                  void refetchWsManifestations();
+                } else {
+                  void refetchAtomManifs();
+                }
+              }}
+            />
+          )}
+        </Show>
+      </ModalTransition>
 
       <main class="ws-main">
         <Show when={currentWs()} fallback={<p class="hint">Workspace waehlen.</p>}>

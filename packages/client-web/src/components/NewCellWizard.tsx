@@ -41,6 +41,7 @@
 
 import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
 import { validateAlias } from '../lib/alias';
+import { openCellSuggest } from '../lib/cell-suggest';
 import { installFocusRestore, installFocusTrap, showConfirm } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
 import { CELL_FEATURES, type FeatureDef, findFeatureByHotkey } from '../lib/features';
@@ -799,6 +800,26 @@ const NewCellWizard: Component<Props> = (p) => {
             <span class="new-cell-wizard-tip">
               <kbd>↩</kbd> weiter · <kbd>Strg</kbd>+<kbd>↩</kbd> ohne Naming · <kbd>Esc</kbd>
             </span>
+            <Show when={!isEditMode}>
+              <button
+                type="button"
+                class="btn-subtle new-cell-wizard-ai-btn"
+                onClick={() => {
+                  const cellId = p.cell?.id ?? null;
+                  const parentLabel = p.cell ? `Cell ${cellId?.slice(0, 8)}` : 'Workspace-Root';
+                  openCellSuggest({
+                    workspaceId: p.workspaceId,
+                    parentCellId: cellId,
+                    parentLabel,
+                  });
+                  p.onClose();
+                }}
+                disabled={busy()}
+                title="AI generiert Vorschlag fuer diese Zelle"
+              >
+                ✨ AI vorschlagen
+              </button>
+            </Show>
             <Show when={isEditMode}>
               <button
                 type="button"

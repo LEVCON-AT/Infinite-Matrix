@@ -11,8 +11,11 @@ import { useNavigate, useParams } from '@solidjs/router';
 import { Show, createResource, createSignal } from 'solid-js';
 import DeleteWorkspaceModal from '../../components/DeleteWorkspaceModal';
 import Icon from '../../components/Icon';
+import { ModalTransition } from '../../components/ModalTransition';
 import TransferOwnershipModal from '../../components/TransferOwnershipModal';
 import { useSession } from '../../lib/auth';
+import { downloadIcs, exportWorkspaceCalendarIcs } from '../../lib/calendar-export';
+import { translateDbError } from '../../lib/errors';
 import { fetchMembers } from '../../lib/members';
 import { fetchMyWorkspaces } from '../../lib/queries';
 import { showToast } from '../../lib/toasts';
@@ -104,6 +107,8 @@ const WorkspaceGeneral = () => {
               </dd>
             </dl>
 
+            <CalendarExportSection workspaceId={params.workspaceId} workspaceName={ws().name} />
+
             <Show when={ws().role === 'owner'}>
               <section class="settings-form-section settings-danger-zone">
                 <h3 id="danger-zone-head">Gefahren-Zone</h3>
@@ -132,7 +137,7 @@ const WorkspaceGeneral = () => {
                 </div>
               </section>
 
-              <Show when={transferOpen()}>
+              <ModalTransition when={transferOpen()}>
                 <TransferOwnershipModal
                   workspaceId={params.workspaceId}
                   workspaceName={ws().name}
@@ -140,19 +145,14 @@ const WorkspaceGeneral = () => {
                   onClose={() => setTransferOpen(false)}
                   onTransferred={() => {
                     setTransferOpen(false);
-                    // Resources neu laden — Rolle aenderte sich (owner -> admin),
-                    // Members-Liste hat neue Rollenverteilung.
                     void refetchWorkspaces();
                     void refetchMembers();
-                    // Auf Members-Tab wechseln: Gefahren-Zone verschwindet (du
-                    // bist nicht mehr Owner), Members-Tab zeigt direkt den
-                    // neuen Owner.
                     navigate(`/w/${params.workspaceId}/settings/workspace/members`);
                   }}
                 />
-              </Show>
+              </ModalTransition>
 
-              <Show when={deleteOpen()}>
+              <ModalTransition when={deleteOpen()}>
                 <DeleteWorkspaceModal
                   workspaceId={params.workspaceId}
                   workspaceName={ws().name}
@@ -160,12 +160,10 @@ const WorkspaceGeneral = () => {
                   onDeleted={() => {
                     setDeleteOpen(false);
                     showToast(`Workspace „${ws().name}" geloescht.`, 'success');
-                    // App-Bootstrap routet auf naechsten verfuegbaren
-                    // Workspace oder Empty-State.
                     navigate('/');
                   }}
                 />
-              </Show>
+              </ModalTransition>
             </Show>
           </>
         )}
@@ -173,5 +171,50 @@ const WorkspaceGeneral = () => {
     </article>
   );
 };
+
+// Calendar-Export V1: ICS-Download fuer Outlook/Google/Apple Calendar.
+// V2 (Subscription-Feed) folgt mit eigenem Node-Service.
+function CalendarExportSection(props: { workspaceId: string; workspaceName: string }) {
+  const [busy, setBusy] = createSignal(false);
+
+  async function onDownload() {
+    setBusy(true);
+    try {
+      const { filename, content } = await exportWorkspaceCalendarIcs({
+        workspaceId: props.workspaceId,
+        workspaceName: props.workspaceName,
+      });
+      downloadIcs(filename, content);
+      showToast('Calendar exportiert.', 'success');
+    } catch (err) {
+      showToast(translateDbError(err, 'Export fehlgeschlagen.'), 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section class="settings-form-section">
+      <h3>Kalender-Export</h3>
+      <p class="hint">
+        Exportiere alle Tasks + atom-Calendar-Events als .ics-Datei (RFC 5545). Outlook / Google
+        Calendar / Apple Calendar koennen die Datei direkt importieren. Wiederholungen (taeglich /
+        woechentlich / monatlich / jaehrlich) sind als RRULE enthalten.
+      </p>
+      <p class="hint">
+        Live-Subscription-Feed (Calendar abonniert URL und aktualisiert automatisch) folgt in einem
+        eigenen Sprint mit dediziertem ICS-Service.
+      </p>
+      <button
+        type="button"
+        class="btn btn-primary lift"
+        onClick={() => void onDownload()}
+        disabled={busy()}
+      >
+        {busy() ? 'Exportiere…' : '.ics herunterladen'}
+      </button>
+    </section>
+  );
+}
 
 export default WorkspaceGeneral;
