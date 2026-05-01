@@ -472,17 +472,27 @@ Wenn **eine** Antwort Nein: Commit blockt.
 
 ---
 
-## 13. Bekannte Drift (Audit-Baseline fuer Q.3.C)
+## 13. Bekannte Drift
 
-Stand 2026-05-01, zu fixen in Q.3.C Code-Hygiene-Sweep:
+Stand 2026-05-01 nach Q.3.C-Audit:
 
-- **`as any`-Casts** durch Codebase verteilt — vor allem in Realtime-Listenern (Supabase-Limitation, dokumentiert) und bei JSONB-Zugriffen (sollten Type-Predicate sein).
-- **Doublet-Verdacht:** mehrere `formatDate*`-Funktionen in unterschiedlichen Files? Audit.
-- **Inline-Styles:** schaetzungsweise vorhanden, vor allem in alten Komponenten (CardOverlay, BoardView).
-- **TODO ohne Trigger:** Audit per `grep -rn "TODO" packages/client-web/src/`.
-- **console.log:** Audit per `grep -rn "console.log" packages/client-web/src/`.
-- **Auskommentierter Code:** Audit per `grep -rn "^\s*//\s*\(const\|function\|export\|import\|return\)" packages/client-web/src/`.
-- **Component-internal Helper-Doubletten:** vermutlich in vielen Komponenten — Audit.
+**Behoben in Q.3.C:**
+
+- ~~Doublet-Verdacht `formatDate*`~~ → `lib/dates.ts` mit `formatDateDE` / `formatDateTimeDE` / `formatDateTimeWithSecsDE`. 6 Komponenten konsolidiert (AuditLogSection, ChecklistPanel, CardOverlay, PlatformAdminsSection, StatsSection, recur.ts). Number-Format-`toLocaleString` (z.B. Stats-Counts) bleibt inline — kein Date-Doublet.
+- ~~`as any`-Casts~~ → 4 Stellen verifiziert, alle in `lib/realtime.ts` mit dokumentierter biome-ignore + Supabase-Workaround-Erklaerung. Manifest-konform.
+- ~~TODO ohne Trigger~~ → 1 Stelle in `routes/Calendar.tsx` Header-Doc, ist Out-of-Scope-Hinweis (Drag-Drop / Atom-Generalisierung), kein Code-Todo.
+- **Inline-Styles** → groesstenteils Custom-Property-Set (Manifest-konform). Echte Verstoesse in NodeTree (padding-left in px) und Icon (flex/display hardcoded) per Q.3.B behoben.
+
+**Nicht-Defekte (verifiziert):**
+
+- `as unknown as`-Casts (85 Stellen) sind optimistic-update-Pattern in `lib/mutations.ts` und Tagged-Union-Casts. Kein Type-Refactor noetig.
+
+**Offen / Folge-Sub-Sprints:**
+
+- **console.log-Audit:** noch offen.
+- **Auskommentierter Code-Audit:** noch offen.
+- **Component-internal Helper-Doubletten:** noch offen, ggf. ad-hoc bei Sprint-Pass-throughs.
+- **Inline-Styles in Dynamic-Position-Popups** (AliasAutocomplete, ContextMenu, ObjectSuggestion) und Hour-Grid (SidebarDayView) — Custom-Property-Migration in eigenem Sub-Sprint.
 
 ---
 

@@ -1,5 +1,6 @@
 import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
 import { validateAlias } from '../lib/alias';
+import { formatDateDE } from '../lib/dates';
 import { installFocusRestore, showConfirm } from '../lib/dialog';
 import { openDocsPopup } from '../lib/docs-ui';
 import { translateDbError } from '../lib/errors';
@@ -1084,10 +1085,7 @@ const CardOverlay: Component<Props> = (p) => {
                     Termine
                   </span>
                   <span class="card-recur-occ-last hint">
-                    zuletzt{' '}
-                    {new Date(
-                      [...(p.card.done_occurrences ?? [])].sort().at(-1) as string,
-                    ).toLocaleDateString('de-DE')}
+                    zuletzt {formatDateDE([...(p.card.done_occurrences ?? [])].sort().at(-1))}
                   </span>
                   <button
                     type="button"

@@ -10,6 +10,7 @@
 
 import { type Component, For, Show, createMemo, createResource, createSignal } from 'solid-js';
 import { type AuditLogEntry, listSystemAuditLog } from '../../lib/admin';
+import { formatDateTimeWithSecsDE } from '../../lib/dates';
 import { translateDbError } from '../../lib/errors';
 import { showToast } from '../../lib/toasts';
 
@@ -38,20 +39,7 @@ const AuditLogSection: Component = () => {
 
   const hasNext = createMemo(() => (entries() ?? []).length === PAGE_SIZE);
 
-  function fmtTime(iso: string): string {
-    try {
-      return new Date(iso).toLocaleString('de-DE', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      });
-    } catch {
-      return iso;
-    }
-  }
+  const fmtTime = formatDateTimeWithSecsDE;
 
   function fmtUuid(id: string | null): string {
     if (!id) return '—';

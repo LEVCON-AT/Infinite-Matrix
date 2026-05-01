@@ -17,6 +17,7 @@ import {
 import { validateAlias } from '../lib/alias';
 import { executeChecklistAction, parseChecklistAction } from '../lib/checklist-action';
 import type { ParsedPasteItem } from '../lib/checklist-paste-parse';
+import { formatDateTimeDE } from '../lib/dates';
 import { showConfirm } from '../lib/dialog';
 import { bindDragSource, bindDropTarget } from '../lib/drag-context';
 import { useEditMode } from '../lib/edit-mode';
@@ -433,20 +434,7 @@ const ChecklistPanel: Component<Props> = (p) => {
   const done = () => p.items.filter((i) => i.done).length;
   const historyList = () => p.checklist.history ?? [];
 
-  function formatClosedAt(iso: string): string {
-    try {
-      const d = new Date(iso);
-      return d.toLocaleString('de-DE', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return iso;
-    }
-  }
+  const formatClosedAt = formatDateTimeDE;
 
   return (
     <li class="cl-item" attr:data-edit={editMode() ? 'true' : 'false'}>

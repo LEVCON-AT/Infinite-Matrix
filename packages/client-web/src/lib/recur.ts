@@ -11,6 +11,7 @@
 // eine neue Instanz gespawnt wird — der Nutzer sieht immer die eine
 // Karte und deren Historie an Abhak-Daten.
 
+import { formatDateDE } from './dates';
 import type { KbCardRow } from './types';
 
 export function todayIso(): string {
@@ -319,8 +320,7 @@ export function recurHumanLabel(r: RecurRule | null | undefined): string {
 export function recurEndLabel(r: RecurRule | null | undefined): string {
   if (!r || !r.type || r.type === 'none') return '';
   if (r.endType === 'date' && r.endDate) {
-    const d = new Date(r.endDate);
-    return `bis ${d.toLocaleDateString('de-DE')}`;
+    return `bis ${formatDateDE(r.endDate)}`;
   }
   if (r.endType === 'count' && r.endCount && r.endCount > 0) {
     return `${r.endCount} Termine`;

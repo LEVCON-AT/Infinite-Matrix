@@ -20,6 +20,7 @@ import {
   revokePlatformAdmin,
 } from '../../lib/admin';
 import { useUser } from '../../lib/auth';
+import { formatDateDE } from '../../lib/dates';
 import { showConfirm } from '../../lib/dialog';
 import { translateDbError } from '../../lib/errors';
 import { showToast } from '../../lib/toasts';
@@ -146,7 +147,7 @@ const PlatformAdminsSection: Component = () => {
                       <span class="admin-admins-note">— {a.note}</span>
                     </Show>
                     <span class="admin-admins-meta">
-                      seit {new Date(a.granted_at).toLocaleDateString('de-DE')}
+                      seit {formatDateDE(a.granted_at)}
                       <Show when={a.user_id === me()?.id}>
                         <span class="admin-admins-self"> · du</span>
                       </Show>

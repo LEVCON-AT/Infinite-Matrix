@@ -5,6 +5,7 @@
 
 import { type Component, For, Show, createResource } from 'solid-js';
 import { type AdminStats, getAdminStats } from '../../lib/admin';
+import { formatDateTimeDE } from '../../lib/dates';
 import { translateDbError } from '../../lib/errors';
 import { showToast } from '../../lib/toasts';
 
@@ -67,17 +68,7 @@ const StatsSection: Component = () => {
             )}
           </For>
         </div>
-        <p class="admin-stats-asof">
-          Stand: {(() => {
-            const s = stats();
-            if (!s) return '';
-            try {
-              return new Date(s.as_of).toLocaleString('de-DE');
-            } catch {
-              return s.as_of;
-            }
-          })()}
-        </p>
+        <p class="admin-stats-asof">Stand: {formatDateTimeDE(stats()?.as_of)}</p>
       </Show>
     </section>
   );
