@@ -2,6 +2,7 @@ import { useLocation, useNavigate } from '@solidjs/router';
 import { type JSX, type ParentComponent, Show, createEffect } from 'solid-js';
 import AiHelpDrawer, { AiHelpDrawerToggle } from './components/AiHelpDrawer';
 import AiProviderHint from './components/AiProviderHint';
+import CellSuggestModal from './components/CellSuggestModal';
 import DialogHost from './components/DialogHost';
 import MfaGateDialog from './components/MfaGateDialog';
 import ProgressOverlay from './components/ProgressOverlay';
@@ -139,6 +140,7 @@ const App: ParentComponent = (props): JSX.Element => {
       <MfaGateDialog />
       <Show when={session()}>
         <WelcomeModal />
+        <CellSuggestModal />
       </Show>
     </div>
   );

@@ -14088,6 +14088,64 @@ html.view-transition-drill-up::view-transition-new(ws-main) {
   gap: var(--space-2);
 }
 
+/* ── Cell-Suggest Modal (A.6 Skeleton) ────────────────────────── */
+
+.cell-suggest-card {
+  inline-size: min(36rem, 100%);
+}
+
+.cell-suggest-body {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.cell-suggest-prompt {
+  resize: vertical;
+  min-block-size: 5rem;
+  font-family: inherit;
+}
+
+.cell-suggest-actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+.cell-suggest-output {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-block-size: 18rem;
+  overflow: auto;
+  padding: var(--space-3);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.cell-suggest-output pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  line-height: var(--lh-normal);
+}
+
+.cell-suggest-tools {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-xs);
+  color: var(--text2);
+}
+
 /* ── Webhooks-Settings (Welle C.2) ────────────────────────────── */
 
 .webhook-list {
