@@ -22,6 +22,7 @@ export type SearchTab =
   | 'account/ai'
   | 'workspace/general'
   | 'workspace/members'
+  | 'workspace/webhooks'
   | 'workspace/audit';
 
 export type SearchEntry = {
@@ -114,6 +115,12 @@ export const SETTINGS_SEARCH_INDEX: ReadonlyArray<SearchEntry> = [
     anchorId: 'members-list-head',
   },
   {
+    tab: 'workspace/webhooks',
+    label: 'Webhooks',
+    hint: 'Outbound Events n8n Slack Teams Custom Endpoint Integration HMAC Signature Dispatch',
+    anchorId: null,
+  },
+  {
     tab: 'workspace/audit',
     label: 'Audit-Log',
     hint: 'Historie Aktionen Einladungen Mitglieder Workspace',
@@ -147,6 +154,7 @@ const TAB_LABELS: Record<SearchTab, string> = {
   'account/ai': 'Konto · AI-Anbindung',
   'workspace/general': 'Workspace · Allgemein',
   'workspace/members': 'Workspace · Mitglieder',
+  'workspace/webhooks': 'Workspace · Webhooks',
   'workspace/audit': 'Workspace · Audit-Log',
 };
 
@@ -165,6 +173,7 @@ const TAB_ICONS: Record<SearchTab, IconName> = {
   'account/ai': 'sparkles',
   'workspace/general': 'cog',
   'workspace/members': 'users',
+  'workspace/webhooks': 'arrow-top-right-on-square',
   'workspace/audit': 'list-bullet',
 };
 

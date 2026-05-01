@@ -120,6 +120,12 @@ const Settings: ParentComponent = (props) => {
       hint: 'Einladen, Rollen, Audit',
     },
     {
+      to: `${wsBase()}/workspace/webhooks`,
+      label: 'Webhooks',
+      icon: 'arrow-top-right-on-square',
+      hint: 'Outbound-Events an n8n / Slack',
+    },
+    {
       to: `${wsBase()}/workspace/audit`,
       label: 'Audit-Log',
       icon: 'list-bullet',

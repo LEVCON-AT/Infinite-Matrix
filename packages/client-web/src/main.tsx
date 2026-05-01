@@ -20,6 +20,7 @@ import AccountWorkingHours from './routes/settings/AccountWorkingHours';
 import WorkspaceAuditLog from './routes/settings/WorkspaceAuditLog';
 import WorkspaceGeneral from './routes/settings/WorkspaceGeneral';
 import WorkspaceMembers from './routes/settings/WorkspaceMembers';
+import WorkspaceWebhooks from './routes/settings/WorkspaceWebhooks';
 import './styles.css';
 import { registerServiceWorker } from './lib/pwa';
 
@@ -70,6 +71,7 @@ render(
         <Route path="/account/working-hours" component={AccountWorkingHours} />
         <Route path="/workspace/general" component={WorkspaceGeneral} />
         <Route path="/workspace/members" component={WorkspaceMembers} />
+        <Route path="/workspace/webhooks" component={WorkspaceWebhooks} />
         <Route path="/workspace/audit" component={WorkspaceAuditLog} />
       </Route>
     </Router>

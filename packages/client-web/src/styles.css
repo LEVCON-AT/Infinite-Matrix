@@ -13907,3 +13907,125 @@ html.view-transition-drill-up::view-transition-new(ws-main) {
   gap: var(--space-2);
   margin-top: var(--space-2);
 }
+
+/* ── Webhooks-Settings (Welle C.2) ────────────────────────────── */
+
+.webhook-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.webhook-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.webhook-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0_5);
+  min-inline-size: 0;
+}
+
+.webhook-meta strong {
+  font-size: var(--text-sm);
+}
+
+.webhook-meta .hint {
+  font-size: var(--text-xs);
+  word-break: break-all;
+}
+
+.webhook-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.webhook-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.webhook-form h3 {
+  margin: 0 0 var(--space-1) 0;
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+}
+
+.webhook-events {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  margin: 0;
+}
+
+.webhook-events legend {
+  padding-inline: var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.webhook-events-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.webhook-event-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.webhook-enabled {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.webhook-secret-banner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--warning-soft);
+  border: 1px solid var(--warning);
+  border-radius: var(--radius);
+}
+
+.webhook-secret-banner code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-xs);
+  word-break: break-all;
+  background: var(--surface);
+  padding: var(--space-2);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.webhook-form-actions {
+  display: flex;
+  gap: var(--space-2);
+}
