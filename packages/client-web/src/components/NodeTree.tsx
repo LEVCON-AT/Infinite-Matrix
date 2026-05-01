@@ -517,7 +517,7 @@ const TreeItem: Component<{
         <TreeAvatarStack users={presenceForRow()} />
       </div>
       <Show when={hasChildren() && expanded()}>
-        <ul>
+        <ul class="tree-children">
           <For each={p.entry.children}>
             {(child) => (
               <TreeItem

@@ -36,6 +36,7 @@ import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
 import { useAggregateView } from '../lib/aggregate-view';
 import { aliasChipMenuState, closeAliasChipMenu } from '../lib/alias-chip-menu';
 import { clearAliasIndex, fetchAliasIndex, scheduleAliasRefresh } from '../lib/alias-index';
+import { drillNavigate } from '../lib/animations';
 import {
   type AtomManifestationRow,
   fetchAtomCalendarManifestations,
@@ -1240,7 +1241,11 @@ const Workspace: Component = () => {
                           href={`/w/${params.workspaceId}/n/${crumb.id}`}
                           onClick={(e) => {
                             e.preventDefault();
-                            navigate(`/w/${params.workspaceId}/n/${crumb.id}`);
+                            // Q.3.A.6 — Breadcrumb-Click ist Drill-Up:
+                            // wir navigieren zu einem Vorfahren der
+                            // aktuellen Route. View-Transitions API
+                            // animiert Pattern §2.7-inverse.
+                            drillNavigate(navigate, `/w/${params.workspaceId}/n/${crumb.id}`, 'up');
                           }}
                         >
                           {crumb.label}

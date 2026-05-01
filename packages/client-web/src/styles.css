@@ -61,9 +61,51 @@
   --avatar-md: 18px;
   --avatar-lg: 28px;
 
-  /* Transitions */
+  /* Transitions — Legacy (vor Q.3.A; ~90 Stellen). Bleiben fuer
+     Bestand erhalten; neue Aenderungen nutzen die Manifest-Suite
+     darunter (animations.md §1.1). */
   --tr-std: 220ms cubic-bezier(0.4, 0, 0.2, 1);
-  --tr-enter: 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  --tr-enter: 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Animations-Manifest §1.1 — Durations (nur Zeitwert, Easing
+     separat via --ease-*). Nicht inline animieren, immer ueber
+     diese Tokens. */
+  --tr-instant: 75ms;
+  --tr-fast: 150ms;
+  --tr-base: 200ms;
+  --tr-exit: 160ms;
+  --tr-slow: 300ms;
+  --tr-slower: 500ms;
+
+  /* §1.2 — Easings. */
+  --ease-linear: linear;
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* §1.3 — Transform-Origins. */
+  --origin-tl: top left;
+  --origin-tr: top right;
+  --origin-tc: top center;
+  --origin-bc: bottom center;
+  --origin-cl: center left;
+  --origin-cr: center right;
+  --origin-cc: center center;
+
+  /* §1.4 — Translate-Distanzen (rem-Skala, kein px). */
+  --lift-xs: -0.125rem;
+  --lift-sm: -0.25rem;
+  --lift-md: -0.5rem;
+  --lift-lg: -1rem;
+  --press: 0.0625rem;
+
+  /* §1.5 — Scale-Faktoren. */
+  --scale-press: 0.98;
+  --scale-pulse-up: 1.03;
+  --scale-pop-in: 0.94;
+  --scale-pop-out: 1.04;
 
   /* Focus */
   --focus-color: var(--blue);
@@ -755,6 +797,10 @@ button[type="submit"]:hover:not(:disabled) {
   padding: 0 var(--space-xl) var(--space-xl);
   overflow: auto;
   background: var(--bg);
+  /* Q.3.A.6 — View-Transitions API Scope. Nur dieser Bereich wird
+     beim Drill-Down/Up animiert; Sidebar/Header bleiben stabil.
+     Browser ohne View-Transitions ignorieren die Property. */
+  view-transition-name: ws-main;
 }
 
 .ws-main-header {
@@ -2663,6 +2709,25 @@ button[type="submit"]:hover:not(:disabled) {
 
 .tree-chevron-open {
   transform: rotate(90deg);
+}
+
+/* Q.3.A — NodeTree-Expand: Children-UL mountet beim expanded()=true.
+   Pattern §2.8/§2.13-Hybrid: subtile Slide-Down + Fade. Close bleibt
+   in V1 instant (Solid <Show>-Unmount), siehe animations.md §6. */
+.tree-children {
+  animation: treeChildrenIn var(--tr-fast) var(--ease-smooth);
+  transform-origin: var(--origin-tl);
+}
+
+@keyframes treeChildrenIn {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--lift-xs)));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .tree-chevron-empty {
@@ -4922,6 +4987,10 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
 }
 
 /* ── Overlays / Modals (HTML-smodal-Vorbild) ──────────────────── */
+/* Q.3.A: Animation-Manifest §2.9 (Modal-Bloom). Backdrop fade,
+   Dialog skaliert von --scale-pop-in mit ease-spring (--tr-enter
+   bringt das Spring-Easing implizit mit). transform-origin: center
+   (--origin-cc) — aus dem Mittelpunkt wachsen, nicht aus oben-links. */
 .overlay-scrim {
   position: fixed;
   inset: 0;
@@ -4931,7 +5000,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   justify-content: center;
   z-index: 300;
   padding: var(--space-md);
-  animation: overlayIn var(--tr-enter);
+  animation: overlayIn var(--tr-enter) var(--ease-smooth);
 }
 
 @keyframes overlayIn {
@@ -4953,17 +5022,18 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-lg);
+  transform-origin: var(--origin-cc);
   animation: modalIn var(--tr-enter);
 }
 
 @keyframes modalIn {
   from {
     opacity: 0;
-    transform: translateY(12px) scale(0.98);
+    transform: scale(var(--scale-pop-in));
   }
   to {
     opacity: 1;
-    transform: none;
+    transform: scale(1);
   }
 }
 
@@ -5808,7 +5878,7 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   display: flex;
   align-items: flex-start;
   gap: var(--space-sm);
-  animation: toastIn var(--tr-enter);
+  animation: toastIn var(--tr-enter) var(--ease-smooth);
   max-width: 100%;
   word-wrap: break-word;
 }
@@ -5884,7 +5954,9 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
 @keyframes toastIn {
   from {
     opacity: 0;
-    transform: translateX(16px) scale(0.96);
+    /* lift-lg = -1rem; calc invertiert zu +1rem (Slide von rechts).
+       Token-konform laut Manifest §1.4 / §2.11. */
+    transform: translateX(calc(-1 * var(--lift-lg))) scale(var(--scale-pop-in));
   }
   to {
     opacity: 1;
@@ -12473,12 +12545,30 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
 .sb-cal-mini-expand-row {
   display: flex;
   justify-content: center;
+  /* Q.3.A — Card-Insert beim Mount (analog zu .sb-cal-mini-month). */
+  animation: sbCalMonthEnter var(--tr-enter) var(--ease-smooth) forwards;
 }
 
 .sb-cal-mini-month {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* Q.3.A — Pattern §2.13 Card-Insert. Beim Mount slidet jeder Monat
+     subtil von oben + faded ein. Bei Expand-Click landen neu
+     gerenderte Monate damit weich im Layout. forwards = End-State
+     bleibt; unter prefers-reduced-motion deaktiviert globaler Override. */
+  animation: sbCalMonthEnter var(--tr-enter) var(--ease-smooth) forwards;
+}
+
+@keyframes sbCalMonthEnter {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--lift-md)));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .sb-cal-mini-month-label {
@@ -13265,4 +13355,151 @@ body[data-dragging] .sb-day-allday-item[draggable="true"]:active {
   margin-top: var(--space-md);
   font-size: 11px;
   color: var(--text3);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Animations-Manifest §2 — Pflicht-Pattern-Klassen.
+   Alle UI-Komponenten konsumieren diese Klassen, niemals inline.
+   docs/claude/animations.md
+   ════════════════════════════════════════════════════════════════ */
+
+/* §2.7 — Drill-Down (Matrix-Zoom-In). Old-Layer skaliert auf
+   --scale-pop-out + faded auf 0; New-Layer kommt von --scale-pop-in
+   + faded auf 1. Async via animationend. */
+.drill-down-out {
+  animation: drillDownOut var(--tr-slow) var(--ease-smooth) forwards;
+  transform-origin: var(--origin-cc);
+}
+.drill-down-in {
+  animation: drillDownIn var(--tr-slow) var(--ease-smooth) forwards;
+  transform-origin: var(--origin-cc);
+}
+.drill-up-out {
+  animation: drillUpOut var(--tr-slow) var(--ease-smooth) forwards;
+  transform-origin: var(--origin-cc);
+}
+.drill-up-in {
+  animation: drillUpIn var(--tr-slow) var(--ease-smooth) forwards;
+  transform-origin: var(--origin-cc);
+}
+@keyframes drillDownOut {
+  to {
+    opacity: 0;
+    transform: scale(var(--scale-pop-out));
+  }
+}
+@keyframes drillDownIn {
+  from {
+    opacity: 0;
+    transform: scale(var(--scale-pop-in));
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes drillUpOut {
+  to {
+    opacity: 0;
+    transform: scale(var(--scale-pop-in));
+  }
+}
+@keyframes drillUpIn {
+  from {
+    opacity: 0;
+    transform: scale(var(--scale-pop-out));
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* §2.8 — Chevron + Collapsible. Chevron rotiert 0deg → 90deg.
+   Inhalt expandiert via max-height: 0 → --collapsible-natural
+   (von JS auf scrollHeight gesetzt vor dem Toggle, nach
+   transitionend auf 'none' freigegeben). */
+.chevron-rotate {
+  transition: transform var(--tr-fast) var(--ease-smooth);
+  transform-origin: var(--origin-cc);
+}
+.chevron-rotate[aria-expanded="true"],
+.chevron-rotate[data-open="true"] {
+  transform: rotate(90deg);
+}
+
+.collapsible {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition: max-height var(--tr-slow) var(--ease-smooth), opacity var(--tr-fast)
+    var(--ease-smooth);
+}
+.collapsible[data-open="true"] {
+  max-height: var(--collapsible-natural, 100vh);
+  opacity: 1;
+}
+
+/* §2.9 — Modal-Open (Bloom). Backdrop faded 0 → 1; Dialog
+   skaliert --scale-pop-in → 1 mit ease-spring. Close: --tr-exit
+   mit --ease-in. Pflicht-Pattern fuer alle role="dialog". */
+.modal-bloom-backdrop {
+  opacity: 0;
+  transition: opacity var(--tr-enter) var(--ease-smooth);
+}
+.modal-bloom-backdrop[data-open="true"] {
+  opacity: 1;
+}
+.modal-bloom-backdrop[data-state="leaving"] {
+  opacity: 0;
+  transition: opacity var(--tr-exit) var(--ease-in);
+}
+
+.modal-bloom-dialog {
+  opacity: 0;
+  transform: scale(var(--scale-pop-in));
+  transform-origin: var(--origin-cc);
+  transition: opacity var(--tr-enter) var(--ease-spring), transform var(--tr-enter)
+    var(--ease-spring);
+}
+.modal-bloom-dialog[data-open="true"] {
+  opacity: 1;
+  transform: scale(1);
+}
+.modal-bloom-dialog[data-state="leaving"] {
+  opacity: 0;
+  transform: scale(var(--scale-pop-in));
+  transition: opacity var(--tr-exit) var(--ease-in), transform var(--tr-exit) var(--ease-in);
+}
+
+/* §2.1 — Hover-Lift (HyperUI-Signature) als Helper-Klasse. */
+.lift {
+  transition: transform var(--tr-fast) var(--ease-smooth), box-shadow var(--tr-fast)
+    var(--ease-smooth);
+}
+.lift:hover {
+  transform: translateY(var(--lift-sm));
+  box-shadow: var(--shadow-lg);
+}
+.lift:active {
+  transform: translateY(0) scale(var(--scale-press));
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--tr-instant) var(--ease-out);
+}
+
+/* Q.3.A.6 — View-Transitions API Scope auf .ws-main (siehe oben).
+   Klassen .view-transition-drill-down / -up werden von drillNavigate()
+   in lib/animations.ts auf <html> gesetzt. Browser ohne API ignorieren
+   die ::view-transition-* Selektoren komplett. */
+html.view-transition-drill-down::view-transition-old(ws-main) {
+  animation: drillDownOut var(--tr-slow) var(--ease-smooth) forwards;
+}
+html.view-transition-drill-down::view-transition-new(ws-main) {
+  animation: drillDownIn var(--tr-slow) var(--ease-smooth) forwards;
+}
+html.view-transition-drill-up::view-transition-old(ws-main) {
+  animation: drillUpOut var(--tr-slow) var(--ease-smooth) forwards;
+}
+html.view-transition-drill-up::view-transition-new(ws-main) {
+  animation: drillUpIn var(--tr-slow) var(--ease-smooth) forwards;
 }

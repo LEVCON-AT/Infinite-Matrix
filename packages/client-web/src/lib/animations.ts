@@ -220,3 +220,237 @@ export function clickPulse(el: HTMLElement | null): void {
   };
   setTimeout(onUp, 110);
 }
+
+// ─── Animations-Manifest §2.7-2.9 Helpers (Q.3.A) ─────────────────
+// Class-Toggle-Pattern. Klassen + Tokens leben in styles.css.
+// Async-Helper resolven bei animationend/transitionend; bei
+// prefers-reduced-motion: reduce → sofortige Resolve.
+
+// Internal: warten auf einmaligen animation/transition-Event.
+function waitOnce(
+  el: HTMLElement,
+  evt: 'animationend' | 'transitionend',
+  timeoutMs: number,
+): Promise<void> {
+  return new Promise((resolve) => {
+    const onEnd = (e: Event) => {
+      if (e.target !== el) return;
+      el.removeEventListener(evt, onEnd);
+      resolve();
+    };
+    el.addEventListener(evt, onEnd);
+    // Safety: wenn Element hidden ist (display:none-Vorfahre, fehlende
+    // Animation-Definition, etc.), feuert das Event nie. timeoutMs * 2
+    // als Cap, damit der Caller nie haengt.
+    setTimeout(() => {
+      el.removeEventListener(evt, onEnd);
+      resolve();
+    }, timeoutMs);
+  });
+}
+
+// §2.7 — Drill-Down: Old-Layer skaliert raus, New-Layer skaliert rein.
+// Aufruf nach DOM-Insert beider Layer (oldEl noch sichtbar, newEl
+// frisch gemountet). Layer werden parallel animiert.
+export function drillDown(oldEl: HTMLElement | null, newEl: HTMLElement | null): Promise<void> {
+  if (!oldEl || !newEl) return Promise.resolve();
+  if (reducedMotion()) return Promise.resolve();
+  oldEl.classList.add('drill-down-out');
+  newEl.classList.add('drill-down-in');
+  // 600ms = --tr-slow * 2 (Safety-Cap).
+  return Promise.all([
+    waitOnce(oldEl, 'animationend', 600),
+    waitOnce(newEl, 'animationend', 600),
+  ]).then(() => {
+    oldEl.classList.remove('drill-down-out');
+    newEl.classList.remove('drill-down-in');
+  });
+}
+
+// §2.7 — Drill-Up: umgekehrte Skalen.
+export function drillUp(oldEl: HTMLElement | null, newEl: HTMLElement | null): Promise<void> {
+  if (!oldEl || !newEl) return Promise.resolve();
+  if (reducedMotion()) return Promise.resolve();
+  oldEl.classList.add('drill-up-out');
+  newEl.classList.add('drill-up-in');
+  return Promise.all([
+    waitOnce(oldEl, 'animationend', 600),
+    waitOnce(newEl, 'animationend', 600),
+  ]).then(() => {
+    oldEl.classList.remove('drill-up-out');
+    newEl.classList.remove('drill-up-in');
+  });
+}
+
+// §2.8 — Collapsible binden. Setzt --collapsible-natural via
+// scrollHeight, toggelt data-open. Trigger-Element bekommt
+// aria-expanded synchron, damit .chevron-rotate-Klasse mitzieht.
+//
+// Verwendung:
+//   const cleanup = bindCollapsible(buttonEl, contentEl);
+//   onCleanup(cleanup);
+// contentEl muss .collapsible-Klasse tragen, triggerEl die
+// .chevron-rotate-Klasse (oder eigenes [aria-expanded]-Element).
+export function bindCollapsible(
+  triggerEl: HTMLElement | null,
+  contentEl: HTMLElement | null,
+  initialOpen = false,
+): () => void {
+  if (!triggerEl || !contentEl) return () => {};
+
+  function setNatural() {
+    // scrollHeight in px ist hier zwingend (Runtime-derived). Token-
+    // Free-Pass laut Manifest §2.8.
+    contentEl?.style.setProperty('--collapsible-natural', `${contentEl.scrollHeight}px`);
+  }
+
+  function applyState(open: boolean) {
+    if (!contentEl || !triggerEl) return;
+    if (open) {
+      setNatural();
+      contentEl.dataset.open = 'true';
+      triggerEl.setAttribute('aria-expanded', 'true');
+      // Nach Open-Transition: max-height auf 'none' freigeben, damit
+      // nachfolgendes Resize sauber durchschlaegt.
+      const onEnd = (e: TransitionEvent) => {
+        if (e.target !== contentEl || e.propertyName !== 'max-height') return;
+        contentEl.style.removeProperty('--collapsible-natural');
+        contentEl.style.maxHeight = 'none';
+        contentEl.removeEventListener('transitionend', onEnd);
+      };
+      contentEl.addEventListener('transitionend', onEnd);
+    } else {
+      // Close: aktuelle max-height von 'none' auf scrollHeight setzen,
+      // dann auf 0. Sonst springt die Transition.
+      if (contentEl.style.maxHeight === 'none') {
+        setNatural();
+        contentEl.style.maxHeight = `${contentEl.scrollHeight}px`;
+        // Reflow erzwingen, dann data-open entfernen → Transition.
+        void contentEl.offsetHeight;
+      }
+      contentEl.dataset.open = 'false';
+      contentEl.style.maxHeight = '';
+      triggerEl.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  // Initial-State setzen ohne Animation (kurz Transition deaktivieren).
+  const initialTransition = contentEl.style.transition;
+  contentEl.style.transition = 'none';
+  applyState(initialOpen);
+  // Reflow vor Transition wieder freischalten.
+  void contentEl.offsetHeight;
+  contentEl.style.transition = initialTransition;
+
+  function onClick() {
+    const isOpen = contentEl?.dataset.open === 'true';
+    applyState(!isOpen);
+  }
+  triggerEl.addEventListener('click', onClick);
+
+  return () => {
+    triggerEl?.removeEventListener('click', onClick);
+  };
+}
+
+// §2.9 — Modal-Open (Bloom). Backdrop + Dialog parallel animieren.
+// Aufruf nach DOM-Insert. Beide Elemente brauchen die Klassen
+// .modal-bloom-backdrop / .modal-bloom-dialog.
+export function openModal(backdrop: HTMLElement | null, dialog: HTMLElement | null): Promise<void> {
+  if (!backdrop || !dialog) return Promise.resolve();
+  if (reducedMotion()) {
+    backdrop.dataset.open = 'true';
+    dialog.dataset.open = 'true';
+    return Promise.resolve();
+  }
+  // Doppel-rAF: garantiert Browser commit-ed Initial-State (opacity:0 +
+  // scale-pop-in) bevor data-open=true die Transition triggert.
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        backdrop.dataset.open = 'true';
+        dialog.dataset.open = 'true';
+        // Resolve bei Dialog-transitionend (Dialog hat laengere Animation).
+        const onEnd = (e: TransitionEvent) => {
+          if (e.target !== dialog || e.propertyName !== 'transform') return;
+          dialog.removeEventListener('transitionend', onEnd);
+          resolve();
+        };
+        dialog.addEventListener('transitionend', onEnd);
+        // Safety-Cap: --tr-enter ~220ms; 480ms = 2x.
+        setTimeout(() => {
+          dialog.removeEventListener('transitionend', onEnd);
+          resolve();
+        }, 480);
+      });
+    });
+  });
+}
+
+// §2.9 — Modal-Close. Setzt data-state="leaving" → exit-Animation
+// (--tr-exit / --ease-in). DOM-Remove nach resolve.
+export function closeModal(
+  backdrop: HTMLElement | null,
+  dialog: HTMLElement | null,
+): Promise<void> {
+  if (!backdrop || !dialog) return Promise.resolve();
+  if (reducedMotion()) {
+    delete backdrop.dataset.open;
+    delete dialog.dataset.open;
+    return Promise.resolve();
+  }
+  backdrop.dataset.state = 'leaving';
+  dialog.dataset.state = 'leaving';
+  delete backdrop.dataset.open;
+  delete dialog.dataset.open;
+  return waitOnce(dialog, 'transitionend', 360);
+}
+
+// §2.7 — Drill-Navigate via View-Transitions API (Q.3.A.6).
+//
+// Wickelt einen Solid-Router navigate() in document.startViewTransition()
+// und setzt eine Direction-Klasse auf <html>, damit das CSS
+// (::view-transition-old/new(ws-main)) das passende Drill-Down/Up-
+// Pattern animiert.
+//
+// Browser-Support: Chrome ≥111, Edge ≥111, Safari ≥18. In Browsern
+// ohne API faellt der Aufruf auf instant-navigate zurueck — kein
+// visueller Defekt, nur fehlende Animation.
+//
+// prefers-reduced-motion: skip Animation, navigate sofort. Das matched
+// die Manifest-§3-Konvention.
+//
+// Verwendung:
+//   drillNavigate(navigate, `/w/${ws}/c/${cellId}`, 'down');
+//   drillNavigate(navigate, `/w/${ws}/n/${parentNodeId}`, 'up');
+export function drillNavigate(
+  navigate: (href: string) => void,
+  href: string,
+  direction: 'down' | 'up',
+): void {
+  if (typeof document === 'undefined') {
+    navigate(href);
+    return;
+  }
+  type DocWithVT = Document & {
+    startViewTransition?: (cb: () => void) => { finished: Promise<void> };
+  };
+  const doc = document as DocWithVT;
+  if (reducedMotion() || typeof doc.startViewTransition !== 'function') {
+    navigate(href);
+    return;
+  }
+  const root = document.documentElement;
+  const cls = direction === 'up' ? 'view-transition-drill-up' : 'view-transition-drill-down';
+  root.classList.add(cls);
+  const tx = doc.startViewTransition(() => {
+    navigate(href);
+  });
+  tx.finished
+    .catch(() => {
+      // Abbruch durch nachfolgenden Trigger ist harmlos.
+    })
+    .finally(() => {
+      root.classList.remove(cls);
+    });
+}

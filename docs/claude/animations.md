@@ -537,18 +537,26 @@ Wenn **eine** Antwort Nein: Commit blockt.
 
 ---
 
-## 6. Bekannte Defekte (Audit-Baseline fuer Q.3.A)
+## 6. Bekannte Defekte
 
-Stand 2026-05-01. Diese Liste wandert in den Q.3.A-Audit-Sub-Sprint:
+Stand 2026-05-01 nach Q.3.A-Sweep:
 
-- **Sidebar-Mini-Calendar Aufklapp-Chevrons:** rotieren ohne Token-Easing, Inhalt schaltet hart. → Pattern 2.8.
-- **Matrix-Drill-Down/Up:** kein Zoom-Fade. → Pattern 2.7.
-- **NodeTree-Expand:** harte Sichtbarkeits-Toggles. → Pattern 2.8.
-- **CardOverlay-Open:** kein Modal-Open-Pattern. → Pattern 2.9.
-- **CommandPalette-Open:** existing Modal, aber Inline-Tokens. → Token-Migration.
-- **Toast-Enter:** existing Animation, aber Inline-Styles. → Token-Migration.
-- **Provider-Slot-Cards (kommend):** Pflicht-Pattern 2.1 Hover-Lift einplanen.
+**Behoben in Q.3.A** (alle 6 Audit-Defekte):
+
+- ~~Sidebar-Mini-Calendar Aufklapp-Chevrons~~ → `.sb-cal-mini-month` / `.sb-cal-mini-expand-row` mit `sbCalMonthEnter` Card-Insert beim Mount.
+- ~~Matrix-Drill-Down/Up~~ → View-Transitions API via `drillNavigate(nav, href, 'down'|'up')` aus `lib/animations.ts`. CSS scope `.ws-main` via `view-transition-name`. Integriert in `MatrixView.enterCellNonEdit` (down) + Breadcrumb-Click (up). Silent-Fallback auf instant-navigate in Browsern ohne API.
+- ~~NodeTree-Expand~~ → `.tree-children` UL mit `treeChildrenIn`-Animation beim Mount. V1-Tradeoff: Close-Path bleibt instant (Solid-`<Show>`-Constraint).
+- ~~CardOverlay-Open~~ + ~~CommandPalette-Open~~ → `.overlay-card` global auf Pattern §2.9 migriert: `scale(--scale-pop-in)` Pure-Bloom, transform-origin: center, --ease-spring via --tr-enter. Trifft auch alle anderen `.overlay-card`-Modale.
+- ~~Toast-Enter~~ → `@keyframes toastIn` jetzt `translateX(calc(-1 * --lift-lg)) scale(--scale-pop-in)` mit explizitem --ease-smooth.
+
+**Foundation-Komplettierung in Q.3.A:** Token-Suite §1.1-1.5 in `:root` ergaenzt (legacy `--tr-std`/`--tr-enter` bleiben fuer ~90 nicht angefasste Stellen). Helper-Library um `drillDown`/`drillUp`/`bindCollapsible`/`openModal`/`closeModal`/`drillNavigate` erweitert. Pattern-Klassen `.drill-down-*`/`.drill-up-*`/`.chevron-rotate`/`.collapsible`/`.modal-bloom-*`/`.lift` global verfuegbar.
+
+**Offen / kommend:**
+
+- **Provider-Slot-Cards (kommend):** Pflicht-Pattern 2.1 Hover-Lift einplanen — `.lift`-Helper-Klasse steht ab Q.3.A bereit.
 - **Login-Page (kommend B.1.B):** Pflicht-Pattern 2.4 Page-Enter + 2.1 Hover-Lift fuer SSO-Buttons.
+- **Modal-Close-Pattern:** Helper `closeModal()` existiert; existing `.overlay-card`-Konsumenten nutzen ihn noch nicht (Close = Solid-Show=false → instant). Migration als eigener Sub-Sprint, weil State-Refactor pro Modal noetig.
+- **NodeTree-Collapse-Animation:** open-path animiert, close-path instant. Volle Symmetrie braucht solid-transition-group oder grid-template-rows-Trick mit always-mounted Children (Performance-Tradeoff bei tiefen Baeumen).
 
 ---
 

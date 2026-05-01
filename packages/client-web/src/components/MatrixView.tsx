@@ -9,6 +9,7 @@ import {
   onCleanup,
   onMount,
 } from 'solid-js';
+import { drillNavigate } from '../lib/animations';
 import { showChoice, showConfirm } from '../lib/dialog';
 import { openDocsPopup } from '../lib/docs-ui';
 import { useEditMode } from '../lib/edit-mode';
@@ -523,11 +524,11 @@ const MatrixView: Component<Props> = (p) => {
     // Matrix-Vorrang: wenn vorhanden, sofort rein.
     const matrix = targets.find((t) => t.key === 'matrix');
     if (matrix) {
-      navigate(matrix.href);
+      drillNavigate(navigate, matrix.href, 'down');
       return;
     }
     if (targets.length === 1) {
-      navigate(targets[0].href);
+      drillNavigate(navigate, targets[0].href, 'down');
       return;
     }
     // Picker fuer 2+ — showChoice mit Buttons. Erstes Target ist Default
@@ -543,7 +544,7 @@ const MatrixView: Component<Props> = (p) => {
     });
     if (!choice) return;
     const tgt = targets.find((t) => t.key === choice);
-    if (tgt) navigate(tgt.href);
+    if (tgt) drillNavigate(navigate, tgt.href, 'down');
   }
 
   // ─── Keyboard auf fokussierter Zelle ─────────────────────────
