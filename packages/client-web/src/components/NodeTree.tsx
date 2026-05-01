@@ -511,34 +511,36 @@ const TreeItem: Component<{
         </Show>
         <TreeAvatarStack users={presenceForRow()} />
       </div>
-      <Show when={hasChildren() && expanded()}>
-        <ul class="tree-children">
-          <For each={p.entry.children}>
-            {(child) => (
-              <TreeItem
-                workspaceId={p.workspaceId}
-                entry={child}
-                currentNodeId={p.currentNodeId}
-                currentFeature={p.currentFeature}
-                depth={p.depth + 1}
-                parentId={p.entry.id}
-                expand={p.expand}
-                query={p.query}
-                activePath={p.activePath}
-                openMenu={p.openMenu}
-                onPasteChecklist={p.onPasteChecklist}
-                dragOverBoardId={p.dragOverBoardId}
-                onCardDragOver={p.onCardDragOver}
-                onCardDragLeave={p.onCardDragLeave}
-                onCardDrop={p.onCardDrop}
-                presence={p.presence}
-                selfUserId={p.selfUserId}
-                members={p.members}
-                resolverMaps={p.resolverMaps}
-              />
-            )}
-          </For>
-        </ul>
+      <Show when={hasChildren()}>
+        <div class="tree-children-wrap" data-open={expanded() ? 'true' : 'false'}>
+          <ul class="tree-children">
+            <For each={p.entry.children}>
+              {(child) => (
+                <TreeItem
+                  workspaceId={p.workspaceId}
+                  entry={child}
+                  currentNodeId={p.currentNodeId}
+                  currentFeature={p.currentFeature}
+                  depth={p.depth + 1}
+                  parentId={p.entry.id}
+                  expand={p.expand}
+                  query={p.query}
+                  activePath={p.activePath}
+                  openMenu={p.openMenu}
+                  onPasteChecklist={p.onPasteChecklist}
+                  dragOverBoardId={p.dragOverBoardId}
+                  onCardDragOver={p.onCardDragOver}
+                  onCardDragLeave={p.onCardDragLeave}
+                  onCardDrop={p.onCardDrop}
+                  presence={p.presence}
+                  selfUserId={p.selfUserId}
+                  members={p.members}
+                  resolverMaps={p.resolverMaps}
+                />
+              )}
+            </For>
+          </ul>
+        </div>
       </Show>
     </li>
   );

@@ -2811,23 +2811,27 @@ button[type="submit"]:hover:not(:disabled) {
   transform: rotate(90deg);
 }
 
-/* Q.3.A — NodeTree-Expand: Children-UL mountet beim expanded()=true.
-   Pattern §2.8/§2.13-Hybrid: subtile Slide-Down + Fade. Close bleibt
-   in V1 instant (Solid <Show>-Unmount), siehe animations.md §6. */
-.tree-children {
-  animation: treeChildrenIn var(--tr-fast) var(--ease-smooth);
-  transform-origin: var(--origin-tl);
+/* Q.3.A.10 — NodeTree-Collapse-Symmetrie via grid-template-rows-Trick.
+   Wrapper bleibt immer gemountet (sobald hasChildren), UL+Children
+   auch — Animation laeuft via grid-template-rows: 0fr → 1fr.
+   Close-Pfad ist genauso smooth wie Open. Pattern §2.8 vollstaendig
+   (Pflicht-Pattern erfuellt, animations.md §6 letzter Folge-Defekt). */
+.tree-children-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--tr-slow) var(--ease-smooth);
 }
 
-@keyframes treeChildrenIn {
-  from {
-    opacity: 0;
-    transform: translateY(calc(-1 * var(--lift-xs)));
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.tree-children-wrap[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+
+.tree-children-wrap > .tree-children {
+  /* min-block-size: 0 ist Pflicht damit der Inhalt vom Grid-Track
+     nicht das Maximum von intrinsic-min-content nimmt. Sonst stuemmelt
+     der Wrapper nicht auf 0 zusammen. */
+  min-block-size: 0;
+  overflow: hidden;
 }
 
 .tree-chevron-empty {
@@ -5124,6 +5128,30 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   box-shadow: var(--shadow-lg);
   transform-origin: var(--origin-cc);
   animation: modalIn var(--tr-enter);
+}
+
+/* Q.3.A.9 — Modal-Close-Symmetrie. ModalTransition-Wrapper setzt
+   data-state="leaving" auf .overlay-scrim + .overlay-card; Exit-
+   Animation laeuft, dann Unmount. */
+.overlay-scrim[data-state="leaving"] {
+  animation: overlayOut var(--tr-exit) var(--ease-in) forwards;
+}
+
+.overlay-card[data-state="leaving"] {
+  animation: modalOut var(--tr-exit) var(--ease-in) forwards;
+}
+
+@keyframes overlayOut {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes modalOut {
+  to {
+    opacity: 0;
+    transform: scale(var(--scale-pop-in));
+  }
 }
 
 @keyframes modalIn {

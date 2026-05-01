@@ -551,12 +551,12 @@ Stand 2026-05-01 nach Q.3.A-Sweep:
 
 **Foundation-Komplettierung in Q.3.A:** Token-Suite §1.1-1.5 in `:root` ergaenzt (legacy `--tr-std`/`--tr-enter` bleiben fuer ~90 nicht angefasste Stellen). Helper-Library um `drillDown`/`drillUp`/`bindCollapsible`/`openModal`/`closeModal`/`drillNavigate` erweitert. Pattern-Klassen `.drill-down-*`/`.drill-up-*`/`.chevron-rotate`/`.collapsible`/`.modal-bloom-*`/`.lift` global verfuegbar.
 
-**Offen / kommend:**
+**Behoben in Folge-Sprints (post-Q.3.A):**
 
-- **Provider-Slot-Cards (kommend):** Pflicht-Pattern 2.1 Hover-Lift einplanen — `.lift`-Helper-Klasse steht ab Q.3.A bereit.
-- **Login-Page (kommend B.1.B):** Pflicht-Pattern 2.4 Page-Enter + 2.1 Hover-Lift fuer SSO-Buttons.
-- **Modal-Close-Pattern:** Helper `closeModal()` existiert; existing `.overlay-card`-Konsumenten nutzen ihn noch nicht (Close = Solid-Show=false → instant). Migration als eigener Sub-Sprint, weil State-Refactor pro Modal noetig.
-- **NodeTree-Collapse-Animation:** open-path animiert, close-path instant. Volle Symmetrie braucht solid-transition-group oder grid-template-rows-Trick mit always-mounted Children (Performance-Tradeoff bei tiefen Baeumen).
+- ~~Provider-Slot-Cards~~ → `.lift`-Helper-Klasse auf `ProviderSlotCard` (Admin/Config Welle B Folge).
+- ~~Login-Page~~ → Pattern 2.4 `loginPageEnter` + 2.1 `.lift` auf SSO-Buttons (B.1.A/B Sprint).
+- ~~Modal-Close-Pattern~~ → `ModalTransition`-Wrapper + `[data-state="leaving"]` Exit-Animation auf `.overlay-scrim` / `.overlay-card`. CommandPalette migriert; weitere Modale (CardOverlay, ImportDialog, Wizards) sind drop-in-migrierbar via `<ModalTransition when={open()}>`-Wrap.
+- ~~NodeTree-Collapse-Animation~~ → `.tree-children-wrap` mit `grid-template-rows: 0fr → 1fr`-Trick. Children IMMER gerendert sobald `hasChildren()` (Performance-Tradeoff: O(n) bei vollem Tree). Open + Close beide smooth.
 
 ---
 

@@ -25,6 +25,7 @@ import HeaderSearchBar from '../components/HeaderSearchBar';
 import Icon from '../components/Icon';
 import KeyboardHelp from '../components/KeyboardHelp';
 import MatrixView from '../components/MatrixView';
+import { ModalTransition } from '../components/ModalTransition';
 import NodeDescription from '../components/NodeDescription';
 import NodeTree from '../components/NodeTree';
 import ObjectSuggestion from '../components/ObjectSuggestion';
@@ -1143,7 +1144,7 @@ const Workspace: Component = () => {
         />
       </Show>
 
-      <Show when={showCommand() && params.workspaceId}>
+      <ModalTransition when={Boolean(showCommand() && params.workspaceId)}>
         <CommandPalette
           workspaceId={params.workspaceId as string}
           currentNode={currentNode()}
@@ -1152,7 +1153,7 @@ const Workspace: Component = () => {
           onClose={() => setShowCommand(false)}
           onShowHelp={() => setShowHelp(true)}
         />
-      </Show>
+      </ModalTransition>
 
       <Show when={showDocs() && params.workspaceId}>
         <DocsPopup
