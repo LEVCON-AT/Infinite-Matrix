@@ -117,3 +117,32 @@ Diese Datei (CLAUDE.md) ist der **Single Entry Point**: Projektidentität, Arbei
 | Memory-Files (Session-Wissen) | `~/.claude/projects/…/memory/` | Automatisch beim Session-Start gelesen |
 
 **Regel für Claude:** Lies nicht präventiv alle Sub-Dokumente. Nur das, was die aktuelle Aufgabe betrifft. Bei Zweifel — Aufgaben-Scope prüfen, dann gezielt öffnen.
+
+## Infrastruktur-Zugriff
+
+Der Dev-PC hat SSH-Zugriff auf den Staging-/Prod-VPS. Claude darf im Auftrag des Users Infrastruktur-Aktionen via SSH ausführen — DB-Bootstrap, Container-Status-Checks, Deploy-Mirror-Updates, Log-Inspektion, einmalige psql-Patches. Spart dem User SQL-Editor-Klickerei und manuelles Console-Hopping.
+
+**Staging-/Prod-VPS:** `ssh root@87.106.25.91` (Schlüssel auf dem Dev-PC eingerichtet). Hier läuft die Supabase-Stack als Docker-Compose.
+
+**Wichtige Container:**
+- `matrix-supabase-db` — Postgres-DB mit allen Migrationen.
+- Alle weiteren via `ssh root@87.106.25.91 "docker ps --format '{{.Names}}'"`.
+
+**Postgres-Zugriff:** Im Container als `postgres` ohne Passwort (Trust-Auth via Unix-Socket):
+```bash
+ssh root@87.106.25.91 "docker exec matrix-supabase-db psql -U postgres -d postgres -c '<SQL>'"
+```
+
+`supabase_admin` braucht ein Passwort und sollte für Routine-Tasks vermieden werden — `postgres` über Unix-Socket bypasst RLS sowieso (entspricht service-role).
+
+**Wann Claude SSH-en darf:**
+- Auf explizite User-Bitte ("trag das auf dem VPS ein", "schau ob X läuft", "lass mal die Migration laufen").
+- Bei Bootstrap-Tasks die nur per service-role gehen (z.B. ersten platform_admin anlegen).
+- Bei Smoke-Verifikation nach Deploy (count(*)-Checks etc.).
+
+**Wann Claude NICHT SSH-en darf:**
+- Spekulativ "weil ich gerade dran denke" — immer Auftrag abwarten.
+- Für destruktive Aktionen ohne explizite Bestätigung (DROP, DELETE ohne WHERE, Container-rm). Der "Executing actions with care"-Workflow oben gilt zusätzlich auch hier.
+- Bind-Mount-Volumes auf `/opt/matrix-repo/infra/supabase/volumes/db/data/` NIEMALS pauschal cleanen — siehe Memory `feedback_no_pauschal_git_clean.md`.
+
+**Wichtig:** Service-Role-/Admin-Keys + DB-Inhalte NIE in der Konversation loggen. Wenn ein Smoke einen Wert zurückbringt, Output gefiltert zeigen (`SELECT count(*)`, nicht `SELECT *`).
