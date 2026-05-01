@@ -1,6 +1,7 @@
 import { Route, Router } from '@solidjs/router';
 import { render } from 'solid-js/web';
 import App from './App';
+import Admin from './routes/Admin';
 import Agenda from './routes/Agenda';
 import Calendar from './routes/Calendar';
 import Invite from './routes/Invite';
@@ -48,6 +49,7 @@ render(
       <Route path="/login" component={Login} />
       <Route path="/invite/:token" component={Invite} />
       <Route path="/onboarding" component={Onboarding} />
+      <Route path="/admin" component={Admin} />
       <Route path="/w/:workspaceId" component={Workspace} />
       <Route path="/w/:workspaceId/n/:nodeId" component={Workspace} />
       <Route path="/w/:workspaceId/c/:cellId/checklists" component={Workspace} />

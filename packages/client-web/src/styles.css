@@ -12890,3 +12890,92 @@ body[data-dragging] .sb-day-allday-item[draggable="true"]:active {
   display: flex;
   gap: var(--space-sm);
 }
+
+/* ── Welle B B.0.B — Admin-Dashboard ─────────────────────────── */
+
+.admin-shell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.admin-loading {
+  padding: var(--space-lg);
+  color: var(--text2);
+}
+
+.admin-sidebar {
+  background: var(--bg2);
+  border-right: 0.5px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-md);
+  gap: var(--space-md);
+}
+
+.admin-sidebar-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-bottom: 0.5px solid var(--border);
+  padding-bottom: var(--space-md);
+}
+.admin-sidebar-head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.admin-email {
+  font-size: 11px;
+  color: var(--text3);
+}
+
+.admin-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.admin-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--rs);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--tr-std);
+}
+.admin-nav-btn:hover {
+  background: var(--bg-hover);
+}
+.admin-nav-btn-active {
+  background: var(--bluebg);
+  color: var(--bluetxt);
+  font-weight: 500;
+}
+
+.admin-sidebar-foot {
+  margin-top: auto;
+}
+
+.admin-main {
+  padding: var(--space-lg);
+  overflow: auto;
+}
+
+.admin-section {
+  max-width: 800px;
+}
+.admin-section-head h3 {
+  margin: 0 0 var(--space-md) 0;
+}
+.admin-section-stub .hint {
+  padding: var(--space-md);
+  background: var(--bg2);
+  border-radius: var(--rs);
+  border: 0.5px dashed var(--border);
+}

@@ -91,6 +91,7 @@ const App: ParentComponent = (props): JSX.Element => {
     if (
       session() &&
       !path.startsWith('/onboarding') &&
+      !path.startsWith('/admin') &&
       !isPublicRoute(path) &&
       !path.startsWith('/invite/')
     ) {
