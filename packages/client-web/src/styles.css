@@ -9296,6 +9296,56 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   color: var(--text) !important;
 }
 
+/* T.AC.C: Remove-Button auf Calendar-Events fuer non-task Atoms.
+   Wrap-Element trumpft die Stack-Order; Button ueberlagert oben rechts,
+   sichtbar nur on hover des wrap. */
+.calendar-event-wrap,
+.sb-day-allday-wrap {
+  position: relative;
+  display: contents;
+}
+.calendar-event-remove,
+.sb-day-event-remove {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 0.5px solid var(--border);
+  background: var(--bg);
+  color: var(--text2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--tr-std), background var(--tr-std);
+  z-index: 2;
+}
+.calendar-event-wrap:hover .calendar-event-remove,
+.sb-day-allday-wrap:hover .sb-day-event-remove,
+.sb-day-event:hover + .sb-day-event-remove,
+.calendar-event-remove:focus-visible,
+.sb-day-event-remove:focus-visible {
+  opacity: 1;
+}
+.calendar-event-remove:hover,
+.sb-day-event-remove:hover {
+  background: var(--redbg);
+  color: var(--redtxt);
+  border-color: var(--red);
+}
+.calendar-event-wrap {
+  position: relative;
+  display: block;
+}
+.sb-day-allday-wrap {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
 .calendar-event-range {
   font-style: italic;
 }

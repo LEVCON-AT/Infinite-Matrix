@@ -16,11 +16,14 @@
 import { useNavigate } from '@solidjs/router';
 import { type Component, For, Show, createEffect, createMemo, createSignal } from 'solid-js';
 import { fadeIn, fadeOut } from '../lib/animations';
+import { removeAtomManifestation } from '../lib/atom-manifestations';
 import { navigateToAtomEvent } from '../lib/atom-routing';
 import { type CalendarEvent, fromIso, groupEventsByDay } from '../lib/calendar';
 import { columnGeometry, heightPx, layoutDay, topPx as topPxFn } from '../lib/day-view-layout';
 import { bindDragSource, bindDropTarget } from '../lib/drag-context';
+import { translateDbError } from '../lib/errors';
 import { moveByTime } from '../lib/manifestation-move';
+import { showToast } from '../lib/toasts';
 import type { TaskManifestationRow, TaskRow } from '../lib/types';
 import { formatHHMM, visibleRangeForDay, workingHours } from '../lib/working-hours';
 import Icon from './Icon';
@@ -31,6 +34,9 @@ type Props = {
   events: CalendarEvent[];
   tasksById: Map<string, TaskRow>;
   manifestationsById: Map<string, TaskManifestationRow>;
+  // T.AC.C: Callback nach Remove eines atom_manifestation aus der
+  // Tagesansicht — Workspace refetcht wsAtomManifestations.
+  onAtomManifestationsChanged?: () => void;
 };
 
 // Snap auf 15-Min-Raster fuer Hour-Slot-Drops.
@@ -126,6 +132,19 @@ const SidebarDayView: Component<Props> = (p) => {
     void navigateToAtomEvent(p.workspaceId, e, navigate);
   }
 
+  async function onRemoveAtomEvent(e: CalendarEvent, ev: MouseEvent) {
+    ev.stopPropagation();
+    if (!e.manifId || e.atomType === 'task') return;
+    try {
+      await removeAtomManifestation(e.manifId);
+      p.onAtomManifestationsChanged?.();
+      showToast('Aus Kalender entfernt.', 'success');
+    } catch (err) {
+      console.error('removeAtomManifestation:', err);
+      showToast(translateDbError(err, 'Entfernen fehlgeschlagen.'), 'error');
+    }
+  }
+
   function openInCalendarRoute() {
     navigate(`/w/${p.workspaceId}/calendar?date=${renderedDay()}`);
   }
@@ -209,31 +228,44 @@ const SidebarDayView: Component<Props> = (p) => {
                         : null,
                   });
                   return (
-                    <button
-                      type="button"
-                      class="sb-day-allday-item"
-                      classList={{
-                        [`sb-day-event-${e.status ?? 'open'}`]: true,
-                        [`sb-day-event-atom-${e.atomType}`]: true,
-                      }}
-                      onClick={(ev) => openEvent(e, ev)}
-                      style={{ height: `${ALL_DAY_BAR_HEIGHT}px` }}
-                      draggable={e.atomType === 'task'}
-                      onDragStart={dragHandlers.onDragStart}
-                      onDragEnd={dragHandlers.onDragEnd}
-                      title={e.label}
-                    >
-                      <Show when={e.atomType === 'link'}>
-                        <Icon name="link" size={10} />
+                    <div class="sb-day-allday-wrap">
+                      <button
+                        type="button"
+                        class="sb-day-allday-item"
+                        classList={{
+                          [`sb-day-event-${e.status ?? 'open'}`]: true,
+                          [`sb-day-event-atom-${e.atomType}`]: true,
+                        }}
+                        onClick={(ev) => openEvent(e, ev)}
+                        style={{ height: `${ALL_DAY_BAR_HEIGHT}px` }}
+                        draggable={e.atomType === 'task'}
+                        onDragStart={dragHandlers.onDragStart}
+                        onDragEnd={dragHandlers.onDragEnd}
+                        title={e.label}
+                      >
+                        <Show when={e.atomType === 'link'}>
+                          <Icon name="link" size={10} />
+                        </Show>
+                        <Show when={e.atomType === 'checklist'}>
+                          <Icon name="list-bullet" size={10} />
+                        </Show>
+                        <Show when={e.atomType === 'task'}>
+                          <Icon name="arrows-pointing-out" size={10} />
+                        </Show>
+                        <span class="sb-day-allday-label">{e.label || '(ohne Label)'}</span>
+                      </button>
+                      <Show when={e.atomType !== 'task' && e.manifId}>
+                        <button
+                          type="button"
+                          class="sb-day-event-remove"
+                          onClick={(ev) => void onRemoveAtomEvent(e, ev)}
+                          title="Aus Kalender entfernen"
+                          aria-label="Aus Kalender entfernen"
+                        >
+                          <Icon name="x" size={10} />
+                        </button>
                       </Show>
-                      <Show when={e.atomType === 'checklist'}>
-                        <Icon name="list-bullet" size={10} />
-                      </Show>
-                      <Show when={e.atomType === 'task'}>
-                        <Icon name="arrows-pointing-out" size={10} />
-                      </Show>
-                      <span class="sb-day-allday-label">{e.label || '(ohne Label)'}</span>
-                    </button>
+                    </div>
                   );
                 }}
               </For>

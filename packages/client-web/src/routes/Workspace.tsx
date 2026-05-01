@@ -1023,6 +1023,7 @@ const Workspace: Component = () => {
                   events={calendarEvents()}
                   tasksById={tasksById()}
                   manifestationsById={manifestationsById()}
+                  onAtomManifestationsChanged={() => void refetchAtomManifs()}
                 />
               </div>
             </Show>

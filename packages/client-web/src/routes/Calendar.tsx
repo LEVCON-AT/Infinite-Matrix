@@ -24,6 +24,10 @@ import { useNavigate, useParams, useSearchParams } from '@solidjs/router';
 import { type Component, For, Show, createMemo, createResource, onMount } from 'solid-js';
 import Icon from '../components/Icon';
 import { pageEnter, slideIn, slideOut } from '../lib/animations';
+import {
+  fetchAtomCalendarManifestations,
+  removeAtomManifestation,
+} from '../lib/atom-manifestations';
 import { navigateToAtomEvent } from '../lib/atom-routing';
 import {
   type CalendarEvent,
@@ -108,13 +112,47 @@ const Calendar: Component = () => {
     },
   );
 
+  // T.AC.B: Non-task Atoms (Link/Checklist/Doc) im Calendar zusaetzlich
+  // anzeigen. Eigene Resource, weil nicht via fetchAgendaTasks gefiltert.
+  const [atomManifs, { refetch: refetchAtomManifs }] = createResource(
+    () => params.workspaceId,
+    async (wid) => (wid ? fetchAtomCalendarManifestations(wid) : []),
+  );
+
   // Build CalendarEvents aus den Agenda-Items (jeweils task + manifs).
   const events = createMemo<CalendarEvent[]>(() => {
     const items = agenda() ?? [];
     const tasks = items.map((i) => i.task);
     const manifs = items.flatMap((i) => i.manifestations);
-    return buildEvents({ tasks, manifestations: manifs });
+    return buildEvents({
+      tasks,
+      manifestations: manifs,
+      atomManifestations: (atomManifs() ?? []).map((a) => ({
+        id: a.id,
+        atom_type: a.atom_type as 'link' | 'checklist' | 'doc',
+        atom_id: a.atom_id,
+        label: a.label,
+        display_meta: a.display_meta,
+        url: a.url ?? null,
+      })),
+    });
   });
+
+  // T.AC.C-Polish: ✕ entfernt eine atom_manifestation aus dem Calendar.
+  // Nur fuer non-task Atoms — Tasks haben TaskDetail-Page mit Manif-Liste.
+  async function onRemoveAtomEvent(e: CalendarEvent, ev: MouseEvent) {
+    ev.stopPropagation();
+    if (!e.manifId) return;
+    if (e.atomType === 'task') return;
+    try {
+      await removeAtomManifestation(e.manifId);
+      void refetchAtomManifs();
+      showToast('Aus Kalender entfernt.', 'success');
+    } catch (err) {
+      console.error('removeAtomManifestation:', err);
+      showToast(translateDbError(err, 'Entfernen fehlgeschlagen.'), 'error');
+    }
+  }
 
   const eventsByDay = createMemo(() => groupEventsByDay(events()));
 
@@ -266,34 +304,47 @@ const Calendar: Component = () => {
                 </span>
                 <For each={visibleEvents()}>
                   {(e) => (
-                    <button
-                      type="button"
-                      class="calendar-event"
-                      classList={{
-                        [`calendar-event-${statusKey(e.status)}`]: true,
-                        [`calendar-event-atom-${e.atomType}`]: true,
-                        'calendar-event-range': e.isRange,
-                      }}
-                      onClick={(ev) => openEvent(e, ev)}
-                      title={e.label}
-                    >
-                      <Show when={e.atomType === 'link'}>
-                        <Icon name="link" size={10} />
+                    <div class="calendar-event-wrap">
+                      <button
+                        type="button"
+                        class="calendar-event"
+                        classList={{
+                          [`calendar-event-${statusKey(e.status)}`]: true,
+                          [`calendar-event-atom-${e.atomType}`]: true,
+                          'calendar-event-range': e.isRange,
+                        }}
+                        onClick={(ev) => openEvent(e, ev)}
+                        title={e.label}
+                      >
+                        <Show when={e.atomType === 'link'}>
+                          <Icon name="link" size={10} />
+                        </Show>
+                        <Show when={e.atomType === 'checklist'}>
+                          <Icon name="list-bullet" size={10} />
+                        </Show>
+                        <Show when={e.time}>
+                          <span class="calendar-event-time">{e.time}</span>
+                        </Show>
+                        <span class="calendar-event-label">{e.label || '(ohne Label)'}</span>
+                        <Show when={e.isRecurring}>
+                          <Icon name="arrow-path" size={10} />
+                        </Show>
+                        <Show when={e.isRange}>
+                          <Icon name="arrows-pointing-out" size={10} />
+                        </Show>
+                      </button>
+                      <Show when={e.atomType !== 'task' && e.manifId}>
+                        <button
+                          type="button"
+                          class="calendar-event-remove"
+                          onClick={(ev) => void onRemoveAtomEvent(e, ev)}
+                          title="Aus Kalender entfernen"
+                          aria-label="Aus Kalender entfernen"
+                        >
+                          <Icon name="x" size={10} />
+                        </button>
                       </Show>
-                      <Show when={e.atomType === 'checklist'}>
-                        <Icon name="list-bullet" size={10} />
-                      </Show>
-                      <Show when={e.time}>
-                        <span class="calendar-event-time">{e.time}</span>
-                      </Show>
-                      <span class="calendar-event-label">{e.label || '(ohne Label)'}</span>
-                      <Show when={e.isRecurring}>
-                        <Icon name="arrow-path" size={10} />
-                      </Show>
-                      <Show when={e.isRange}>
-                        <Icon name="arrows-pointing-out" size={10} />
-                      </Show>
-                    </button>
+                    </div>
                   )}
                 </For>
                 <Show when={overflowCount() > 0}>
