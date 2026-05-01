@@ -24,6 +24,7 @@ import { useNavigate, useParams, useSearchParams } from '@solidjs/router';
 import { type Component, For, Show, createMemo, createResource, onMount } from 'solid-js';
 import Icon from '../components/Icon';
 import { pageEnter, slideIn, slideOut } from '../lib/animations';
+import { navigateToAtomEvent } from '../lib/atom-routing';
 import {
   type CalendarEvent,
   addMonths,
@@ -167,7 +168,7 @@ const Calendar: Component = () => {
 
   function openEvent(e: CalendarEvent, ev: MouseEvent) {
     ev.stopPropagation();
-    navigate(`/w/${params.workspaceId}/task/${e.taskId}`);
+    void navigateToAtomEvent(params.workspaceId, e, navigate);
   }
 
   function onDayClick(iso: string) {
@@ -270,11 +271,18 @@ const Calendar: Component = () => {
                       class="calendar-event"
                       classList={{
                         [`calendar-event-${statusKey(e.status)}`]: true,
+                        [`calendar-event-atom-${e.atomType}`]: true,
                         'calendar-event-range': e.isRange,
                       }}
                       onClick={(ev) => openEvent(e, ev)}
                       title={e.label}
                     >
+                      <Show when={e.atomType === 'link'}>
+                        <Icon name="link" size={10} />
+                      </Show>
+                      <Show when={e.atomType === 'checklist'}>
+                        <Icon name="list-bullet" size={10} />
+                      </Show>
                       <Show when={e.time}>
                         <span class="calendar-event-time">{e.time}</span>
                       </Show>

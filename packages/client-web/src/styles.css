@@ -9270,6 +9270,32 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   opacity: 0.45;
 }
 
+/* T.AC.B Polish: Atom-Typ-Variante visualisieren. Tasks behalten die
+   status-basierte Farbe; Link/Checklist kriegen einen neutralen Look,
+   damit sie sich von Tasks abheben. */
+.calendar-event-atom-link {
+  border-left-color: var(--p);
+  background: color-mix(in srgb, var(--p) 12%, var(--bg2));
+  color: var(--text);
+}
+.calendar-event-atom-checklist {
+  border-left-color: var(--violet, #7c4dff);
+  background: color-mix(in srgb, var(--violet, #7c4dff) 12%, var(--bg2));
+  color: var(--text);
+}
+.sb-day-event-atom-link,
+.sb-day-allday-item.sb-day-event-atom-link {
+  border-left-color: var(--p) !important;
+  background: color-mix(in srgb, var(--p) 14%, var(--bg2)) !important;
+  color: var(--text) !important;
+}
+.sb-day-event-atom-checklist,
+.sb-day-allday-item.sb-day-event-atom-checklist {
+  border-left-color: var(--violet, #7c4dff) !important;
+  background: color-mix(in srgb, var(--violet, #7c4dff) 14%, var(--bg2)) !important;
+  color: var(--text) !important;
+}
+
 .calendar-event-range {
   font-style: italic;
 }

@@ -16,6 +16,7 @@
 import { useNavigate } from '@solidjs/router';
 import { type Component, For, Show, createEffect, createMemo, createSignal } from 'solid-js';
 import { fadeIn, fadeOut } from '../lib/animations';
+import { navigateToAtomEvent } from '../lib/atom-routing';
 import { type CalendarEvent, fromIso, groupEventsByDay } from '../lib/calendar';
 import { columnGeometry, heightPx, layoutDay, topPx as topPxFn } from '../lib/day-view-layout';
 import { bindDragSource, bindDropTarget } from '../lib/drag-context';
@@ -122,7 +123,7 @@ const SidebarDayView: Component<Props> = (p) => {
 
   function openEvent(e: CalendarEvent, ev: MouseEvent) {
     ev.stopPropagation();
-    navigate(`/w/${p.workspaceId}/task/${e.taskId}`);
+    void navigateToAtomEvent(p.workspaceId, e, navigate);
   }
 
   function openInCalendarRoute() {
@@ -202,21 +203,35 @@ const SidebarDayView: Component<Props> = (p) => {
               <For each={layout().multiDay.slice(0, 3)}>
                 {(e) => {
                   const dragHandlers = bindDragSource({
-                    build: () => ({ atom: 'task', atomId: e.taskId, label: e.label }),
+                    build: () =>
+                      e.atomType === 'task'
+                        ? { atom: 'task', atomId: e.atomId, label: e.label }
+                        : null,
                   });
                   return (
                     <button
                       type="button"
                       class="sb-day-allday-item"
-                      classList={{ [`sb-day-event-${e.status}`]: true }}
+                      classList={{
+                        [`sb-day-event-${e.status ?? 'open'}`]: true,
+                        [`sb-day-event-atom-${e.atomType}`]: true,
+                      }}
                       onClick={(ev) => openEvent(e, ev)}
                       style={{ height: `${ALL_DAY_BAR_HEIGHT}px` }}
-                      draggable={true}
+                      draggable={e.atomType === 'task'}
                       onDragStart={dragHandlers.onDragStart}
                       onDragEnd={dragHandlers.onDragEnd}
                       title={e.label}
                     >
-                      <Icon name="arrows-pointing-out" size={10} />
+                      <Show when={e.atomType === 'link'}>
+                        <Icon name="link" size={10} />
+                      </Show>
+                      <Show when={e.atomType === 'checklist'}>
+                        <Icon name="list-bullet" size={10} />
+                      </Show>
+                      <Show when={e.atomType === 'task'}>
+                        <Icon name="arrows-pointing-out" size={10} />
+                      </Show>
                       <span class="sb-day-allday-label">{e.label || '(ohne Label)'}</span>
                     </button>
                   );
@@ -275,22 +290,26 @@ const SidebarDayView: Component<Props> = (p) => {
               {(it) => {
                 const geom = columnGeometry(it.column, it.totalCols);
                 const dragHandlers = bindDragSource({
-                  build: () => ({
-                    atom: 'task',
-                    atomId: it.event.taskId,
-                    label: it.event.label,
-                    sourceManifId: it.event.manifId ?? undefined,
-                  }),
+                  build: () =>
+                    it.event.atomType === 'task'
+                      ? {
+                          atom: 'task',
+                          atomId: it.event.atomId,
+                          label: it.event.label,
+                          sourceManifId: it.event.manifId ?? undefined,
+                        }
+                      : null,
                 });
                 return (
                   <button
                     type="button"
                     class="sb-day-event"
                     classList={{
-                      [`sb-day-event-${it.event.status}`]: true,
+                      [`sb-day-event-${it.event.status ?? 'open'}`]: true,
+                      [`sb-day-event-atom-${it.event.atomType}`]: true,
                       'sb-day-event-no-time': !it.hasTime,
                     }}
-                    draggable={true}
+                    draggable={it.event.atomType === 'task'}
                     onDragStart={dragHandlers.onDragStart}
                     onDragEnd={dragHandlers.onDragEnd}
                     style={{
@@ -302,6 +321,12 @@ const SidebarDayView: Component<Props> = (p) => {
                     onClick={(ev) => openEvent(it.event, ev)}
                     title={it.event.label}
                   >
+                    <Show when={it.event.atomType === 'link'}>
+                      <Icon name="link" size={10} />
+                    </Show>
+                    <Show when={it.event.atomType === 'checklist'}>
+                      <Icon name="list-bullet" size={10} />
+                    </Show>
                     <Show when={it.event.time}>
                       <span class="sb-day-event-time">{it.event.time}</span>
                     </Show>
