@@ -208,6 +208,65 @@ export async function signInWithMagicLink(email: string, redirectPath?: string):
   if (error) throw error;
 }
 
+// B.1.A — SSO via Supabase OAuth-Provider. Externes Setup (Google
+// Cloud Console / Microsoft Entra Client-IDs) liegt beim Plattform-
+// Admin und wird auf VPS in Supabase Auth-Config gepflegt — siehe
+// docs/claude/architektur.md SSO-Sektion. Der Frontend-Aufruf ist
+// stabil unabhaengig davon.
+//
+// redirectPath analog zum Magic-Link-Flow: wird an SITE_URL angehaengt
+// und an Supabase als redirectTo uebergeben.
+export async function signInWithGoogle(redirectPath?: string): Promise<void> {
+  const redirectTo = redirectPath ? SITE_URL + redirectPath.replace(/^\/+/, '') : SITE_URL;
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo },
+  });
+  if (error) throw error;
+}
+
+export async function signInWithMicrosoft(redirectPath?: string): Promise<void> {
+  const redirectTo = redirectPath ? SITE_URL + redirectPath.replace(/^\/+/, '') : SITE_URL;
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'azure',
+    options: { redirectTo, scopes: 'email openid profile' },
+  });
+  if (error) throw error;
+}
+
+// B.1.B — Email + Password. Sign-In + Sign-Up + Password-Reset.
+// Magic-Link bleibt als parallele Option verfuegbar.
+export async function signInWithPassword(email: string, password: string): Promise<void> {
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+}
+
+export async function signUpWithPassword(
+  email: string,
+  password: string,
+  redirectPath?: string,
+): Promise<void> {
+  const emailRedirectTo = redirectPath ? SITE_URL + redirectPath.replace(/^\/+/, '') : SITE_URL;
+  const { error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo },
+  });
+  if (error) throw error;
+}
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${SITE_URL}reset-password`,
+  });
+  if (error) throw error;
+}
+
+export async function updatePassword(newPassword: string): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw error;
+}
+
 export async function signOut(): Promise<void> {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;

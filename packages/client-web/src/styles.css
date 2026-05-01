@@ -13603,3 +13603,209 @@ html.view-transition-drill-up::view-transition-old(ws-main) {
 html.view-transition-drill-up::view-transition-new(ws-main) {
   animation: drillUpIn var(--tr-slow) var(--ease-smooth) forwards;
 }
+
+/* ════════════════════════════════════════════════════════════════
+   Login-Page (Welle B.1.A SSO + B.1.B Email+Password + Magic-Link).
+   Pattern §2.4 Page-Enter + §2.1 Hover-Lift fuer SSO-Buttons.
+   ════════════════════════════════════════════════════════════════ */
+
+.login-page {
+  min-block-size: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  background: var(--canvas);
+}
+
+.login-page-enter {
+  animation: loginPageEnter var(--tr-enter) var(--ease-smooth);
+}
+
+@keyframes loginPageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--lift-md)));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.login-card {
+  inline-size: min(28rem, 100%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-8) var(--space-6) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.login-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  text-align: center;
+}
+
+.login-head h1 {
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+
+.login-sub {
+  margin: 0;
+  color: var(--text2);
+  font-size: var(--text-sm);
+}
+
+.login-sso {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.login-sso-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding-inline: var(--space-4);
+  padding-block: var(--space-2_5);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.login-sso-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.login-sso-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-sso-icon svg {
+  display: block;
+}
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text3);
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: "";
+  flex: 1;
+  block-size: 1px;
+  background: var(--border);
+}
+
+.login-tabs {
+  display: flex;
+  gap: var(--space-1);
+  background: var(--bg2);
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+}
+
+.login-tab {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--text2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  padding-block: var(--space-2);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background var(--tr-fast) var(--ease-smooth), color var(--tr-fast) var(--ease-smooth);
+}
+
+.login-tab:hover {
+  color: var(--text);
+}
+
+.login-tab-active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-xs);
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text2);
+}
+
+.login-field span {
+  font-weight: var(--weight-medium);
+}
+
+.login-pw-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: var(--text-xs);
+  margin-top: var(--space-1);
+}
+
+.btn-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.btn-link:hover {
+  color: var(--accent-hover);
+}
+
+.login-info,
+.login-error {
+  margin: 0;
+  padding: var(--space-2_5) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+
+.login-info {
+  background: var(--success-soft);
+  color: var(--tealtxt);
+  border: 1px solid var(--success);
+}
+
+.login-error {
+  background: var(--danger-soft);
+  color: var(--redtxt);
+  border: 1px solid var(--danger);
+}
