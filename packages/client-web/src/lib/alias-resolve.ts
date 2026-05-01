@@ -10,6 +10,7 @@
 // tatsaechlich noetig sind (Node-ID, Matrix-ID fuer Cell, Board-ID
 // fuer Card, URL fuer Link).
 
+import { isPlatformAdminCached } from './admin';
 import { validateAliasFormat } from './alias';
 import { supabase } from './supabase';
 
@@ -56,9 +57,16 @@ export async function resolveAlias(raw: string, workspaceId: string): Promise<Al
 
   // Welle B B.0.B: reservierte Routen-Aliase short-circuit. validateAliasFormat
   // wuerde sie sonst als RESERVED_ALIASES ablehnen — wir prufen ZUERST.
+  //
+  // Welle B B.0.G: ^admin existiert nur fuer tatsaechliche Plattform-
+  // Admins. Fuer Non-Admins sofort "Nicht gefunden" — kein RESERVED_-
+  // ALIASES-Branch (wuerde "ist reserviert" sagen + die Existenz leaken).
   const lowered = stripped.toLowerCase();
   const reservedRoute = RESERVED_ROUTES[lowered];
   if (reservedRoute) {
+    if (lowered === 'admin' && !isPlatformAdminCached()) {
+      return { ok: false, msg: `Alias "^${stripped}" nicht gefunden.` };
+    }
     return {
       ok: true,
       result: { kind: 'route', path: reservedRoute.path, label: reservedRoute.label },

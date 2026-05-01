@@ -5,6 +5,8 @@
 // Wrapper) — Admin-Aktionen sind selten + sicherheitskritisch (analog
 // Memory-Regel `feedback_saas_security_no_offline.md`).
 
+import { type Accessor, createSignal } from 'solid-js';
+import { onAuthChange } from './auth';
 import { supabase } from './supabase';
 
 export type SystemConfigEntry = {
@@ -31,6 +33,48 @@ export async function isPlatformAdmin(): Promise<boolean> {
     return false;
   }
   return data === true;
+}
+
+// ─── Cached Admin-Status (B.0.G) ────────────────────────────────
+// Reaktives Solid-Signal damit Konsumenten (alias-resolve, command-
+// palette, conditional-Rendering) synchron pruefen koennen ob der
+// aktuelle User Plattform-Admin ist. Refresh-Trigger:
+//   - Lazy-Bootstrap beim ersten useIsPlatformAdmin()-Aufruf.
+//   - Auth-Change (signIn/signOut) → onAuthChange-Listener.
+// Default false (Fail-closed: ohne bestaetigten Admin-Status ist
+// User non-Admin).
+const [adminCache, setAdminCache] = createSignal<boolean>(false);
+let adminBootstrapped = false;
+let adminRefreshing = false;
+
+async function refreshAdminStatus(): Promise<void> {
+  if (adminRefreshing) return;
+  adminRefreshing = true;
+  try {
+    const result = await isPlatformAdmin();
+    setAdminCache(result);
+  } finally {
+    adminRefreshing = false;
+  }
+}
+
+export function useIsPlatformAdmin(): Accessor<boolean> {
+  if (!adminBootstrapped) {
+    adminBootstrapped = true;
+    void refreshAdminStatus();
+    onAuthChange(() => {
+      void refreshAdminStatus();
+    });
+  }
+  return adminCache;
+}
+
+// Synchroner Cache-Read fuer Stellen wo kein Solid-Reactive-Context
+// existiert (z.B. lib/alias-resolve.ts in einem async-Helper).
+// Returns false wenn noch nicht bootstrapped — Erst-Bootstrap geschieht
+// in App.tsx beim Boot, sodass der Cache vor erstem ^-Tippen warm ist.
+export function isPlatformAdminCached(): boolean {
+  return adminCache();
 }
 
 // B.0.D: admin-only Lookup, gibt null zurueck wenn keine Email matched.

@@ -5,6 +5,7 @@ import AiProviderHint from './components/AiProviderHint';
 import DialogHost from './components/DialogHost';
 import ProgressOverlay from './components/ProgressOverlay';
 import Toasts from './components/Toasts';
+import { useIsPlatformAdmin } from './lib/admin';
 import { useDrawerHotkey } from './lib/ai-help-state';
 import { bootstrapAuth, useAccountInvalid, useAuthReady, useSession } from './lib/auth';
 import { useEditModeHotkey } from './lib/edit-mode';
@@ -36,6 +37,11 @@ const App: ParentComponent = (props): JSX.Element => {
   useUserPrefsSync();
   useWorkingHoursSync();
   useDrawerHotkey();
+  // Welle B B.0.G: Plattform-Admin-Status warm halten. Erst-Bootstrap
+  // beim ersten Aufruf, danach refresh auf Auth-Change. Sync getter
+  // (isPlatformAdminCached) wird von alias-resolve genutzt — der Cache
+  // muss VOR erstem ^-Tippen warm sein.
+  useIsPlatformAdmin();
 
   // Account-Health-Toast: wenn die JWT-Session lokal noch existiert, der
   // serverseitige User aber weg ist (geloeschter Account), hat lib/auth
