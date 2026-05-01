@@ -168,6 +168,18 @@ const Calendar: Component = () => {
     }
   }
 
+  // T.AC.D.4-Polish: Doppelclick auf einen Termin oeffnet das Edit-Modal
+  // direkt — schneller als hover-✏️. Bei Virtual-Events (kein Manif)
+  // faellt der Handler auf openEvent zurueck (= navigiert wie ueblich).
+  function onDoubleClickEvent(e: CalendarEvent, ev: MouseEvent) {
+    ev.stopPropagation();
+    if (!e.originalManifId) {
+      void navigateToAtomEvent(params.workspaceId, e, navigate);
+      return;
+    }
+    onEditEvent(e, ev);
+  }
+
   // T.AC.D.4: ✏️ oeffnet das Modal im edit-Mode mit pre-gefilltem
   // display_meta. Edit zielt auf den ANKER-Manif (originalManifId),
   // damit Recur-Edits alle Folgetermine konsistent aendern.
@@ -368,6 +380,7 @@ const Calendar: Component = () => {
                           'calendar-event-instance-done': e.instanceDone === true,
                         }}
                         onClick={(ev) => openEvent(e, ev)}
+                        onDblClick={(ev) => onDoubleClickEvent(e, ev)}
                         title={e.label}
                       >
                         <Show when={e.atomType === 'task' && e.instanceDate}>

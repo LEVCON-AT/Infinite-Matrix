@@ -134,6 +134,18 @@ const SidebarDayView: Component<Props> = (p) => {
     void navigateToAtomEvent(p.workspaceId, e, navigate);
   }
 
+  // T.AC.D.4-Polish: Doppelclick auf einen Termin oeffnet das Edit-Modal
+  // direkt — schneller als hover-✏️. Bei Virtual-Events (kein Manif)
+  // faellt der Handler auf openEvent zurueck (= navigiert wie ueblich).
+  function onDoubleClickEvent(e: CalendarEvent, ev: MouseEvent) {
+    ev.stopPropagation();
+    if (!e.originalManifId) {
+      void navigateToAtomEvent(p.workspaceId, e, navigate);
+      return;
+    }
+    onEditEvent(e, ev);
+  }
+
   // T.AC.D.3: pro-Recur-Instanz toggeln. Lookup ueber tasksById-Prop.
   async function onToggleInstance(e: CalendarEvent, ev: MouseEvent) {
     ev.stopPropagation();
@@ -273,6 +285,7 @@ const SidebarDayView: Component<Props> = (p) => {
                           [`sb-day-event-atom-${e.atomType}`]: true,
                         }}
                         onClick={(ev) => openEvent(e, ev)}
+                        onDblClick={(ev) => onDoubleClickEvent(e, ev)}
                         style={{ height: `${ALL_DAY_BAR_HEIGHT}px` }}
                         draggable={e.atomType === 'task'}
                         onDragStart={dragHandlers.onDragStart}
@@ -399,6 +412,7 @@ const SidebarDayView: Component<Props> = (p) => {
                       width: `calc(${geom.widthPct}% - 4px)`,
                     }}
                     onClick={(ev) => openEvent(it.event, ev)}
+                    onDblClick={(ev) => onDoubleClickEvent(it.event, ev)}
                     title={it.event.label}
                   >
                     <Show when={it.event.atomType === 'task' && it.event.instanceDate}>
