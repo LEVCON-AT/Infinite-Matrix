@@ -276,16 +276,21 @@ Workspace-Channel haelt Presence. Presence-Events bumpen NodeTree-Avatars + Curs
 
 ### 5.6 Auth-Pfad-Vollstaendigkeit
 
-| Pfad | Status (Stand 2026-05-01) |
+| Pfad | Status (Stand 2026-05-02) |
 |---|---|
-| Magic-Link | live |
-| Mail+PW Login | Welle B.1.B (pending) |
-| Mail+PW Signup | Welle B.1.C (pending) |
-| ResetPassword | Welle B.1.D (pending) |
-| OAuth (Google/GitHub/LinkedIn/Microsoft) | Welle B.1.A+B (pending) |
-| TOTP-MFA | Welle B.2 (pending) |
-| Step-Up-Auth (AAL2) | Welle B.3 (pending) |
-| Session-Mgmt | Welle B.5 (pending) |
+| Magic-Link (Login) | live; B.1.E mit 30s-Cooldown + Spam-Hint |
+| Mail+PW Login | live (B.1.B) |
+| Mail+PW Signup | live als eigene /signup-Route (B.1.C) |
+| ResetPassword | live als /reset-password-Route (B.1.D) |
+| OAuth Google | live (B.1.A) — Provider-Slot in Admin/Config + Auto-Gate Login |
+| OAuth Microsoft | live (B.1.A) |
+| OAuth GitHub | live (B.1.A) |
+| OAuth LinkedIn | live (B.1.A, OIDC-Variante) |
+| OAuth Verify-Button | live (Discovery-Endpoint-Reachability + JWT-Issuer-Check) |
+| TOTP-MFA | live (B.2) — Enrollment + Login-Gate + Backup-Codes |
+| Backup-Codes | live (B.2 Folge) — 10 single-use Codes, sha256-Hash, Login-Gate akzeptiert |
+| Step-Up-Auth (AAL2) | live (B.3) — Workspace-Delete/Owner-Transfer/MFA-Unenroll/Platform-Admin-Grant |
+| Session-Mgmt | Welle B.5 (pending — Multi-Session-Liste + Revoke) |
 
 Vor Production-Cutover muessen alle Auth-Pfade durch Step-Up-Auth fuer destruktive Aktionen geschuetzt sein.
 

@@ -27,7 +27,12 @@ bootstrapAuth();
 // /invite/:token bleibt aufrufbar — die Page selbst handhabt den
 // Login-Redirect mit Token-Memorierung in sessionStorage.
 function isPublicRoute(pathname: string): boolean {
-  return pathname === '/login' || pathname.startsWith('/invite/');
+  return (
+    pathname === '/login' ||
+    pathname === '/signup' ||
+    pathname === '/reset-password' ||
+    pathname.startsWith('/invite/')
+  );
 }
 
 const App: ParentComponent = (props): JSX.Element => {

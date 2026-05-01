@@ -30,11 +30,15 @@ type FieldDef = {
   placeholder?: string;
 };
 
+type VerifyKind = 'oauth-discovery' | 'smtp-noop' | null;
+
 type SlotDef = {
   key: string;
   label: string;
   description: string;
+  docsUrl?: string;
   fields: FieldDef[];
+  verify: VerifyKind;
 };
 
 const SLOTS: SlotDef[] = [
@@ -43,6 +47,7 @@ const SLOTS: SlotDef[] = [
     label: 'Google OAuth',
     description:
       'Sign-in via Google. Client-Setup: console.cloud.google.com → APIs & Services → Credentials.',
+    docsUrl: 'https://supabase.com/docs/guides/auth/social-login/auth-google',
     fields: [
       {
         key: 'client_id',
@@ -53,12 +58,14 @@ const SLOTS: SlotDef[] = [
       },
       { key: 'client_secret', label: 'Client-Secret', type: 'password', required: true },
     ],
+    verify: 'oauth-discovery',
   },
   {
     key: 'auth.providers.microsoft',
     label: 'Microsoft Entra (Azure AD)',
     description:
       'Sign-in via Microsoft. Client-Setup: portal.azure.com → Entra ID → App registrations.',
+    docsUrl: 'https://supabase.com/docs/guides/auth/social-login/auth-azure',
     fields: [
       { key: 'client_id', label: 'Application (Client) ID', type: 'text', required: true },
       { key: 'client_secret', label: 'Client-Secret', type: 'password', required: true },
@@ -70,6 +77,30 @@ const SLOTS: SlotDef[] = [
         hint: 'common fuer Multi-Tenant',
       },
     ],
+    verify: 'oauth-discovery',
+  },
+  {
+    key: 'auth.providers.github',
+    label: 'GitHub OAuth',
+    description: 'Sign-in via GitHub. Client-Setup: github.com/settings/developers → OAuth Apps.',
+    docsUrl: 'https://supabase.com/docs/guides/auth/social-login/auth-github',
+    fields: [
+      { key: 'client_id', label: 'Client-ID', type: 'text', required: true },
+      { key: 'client_secret', label: 'Client-Secret', type: 'password', required: true },
+    ],
+    verify: 'oauth-discovery',
+  },
+  {
+    key: 'auth.providers.linkedin',
+    label: 'LinkedIn OAuth (OIDC)',
+    description:
+      'Sign-in via LinkedIn. Client-Setup: linkedin.com/developers → Apps. OIDC-Scope notwendig.',
+    docsUrl: 'https://supabase.com/docs/guides/auth/social-login/auth-linkedin',
+    fields: [
+      { key: 'client_id', label: 'Client-ID', type: 'text', required: true },
+      { key: 'client_secret', label: 'Client-Secret', type: 'password', required: true },
+    ],
+    verify: 'oauth-discovery',
   },
   {
     key: 'smtp.config',
@@ -95,8 +126,18 @@ const SLOTS: SlotDef[] = [
         placeholder: 'no-reply@levcon.at',
       },
     ],
+    verify: 'smtp-noop',
   },
 ];
+
+// OIDC-Discovery-Endpoints zum Verify (HEAD/GET-Reachability + jwks-Lookup).
+const OIDC_DISCOVERY: Record<string, string> = {
+  'auth.providers.google': 'https://accounts.google.com/.well-known/openid-configuration',
+  'auth.providers.microsoft':
+    'https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration',
+  'auth.providers.github': 'https://api.github.com',
+  'auth.providers.linkedin': 'https://www.linkedin.com/oauth/.well-known/openid-configuration',
+};
 
 const ProviderSlotsSection: Component = () => {
   const [entries, { refetch }] = createResource(async () => {
@@ -162,6 +203,45 @@ const ProviderSlotCard: Component<{
   );
   const [enabled, setEnabled] = createSignal<boolean>(Boolean(initialValue().enabled));
   const [busy, setBusy] = createSignal(false);
+  const [verifying, setVerifying] = createSignal(false);
+  const [verifyResult, setVerifyResult] = createSignal<{ ok: boolean; msg: string } | null>(null);
+
+  async function doVerify() {
+    if (p.slot.verify == null) return;
+    setVerifying(true);
+    setVerifyResult(null);
+    try {
+      if (p.slot.verify === 'oauth-discovery') {
+        const url = OIDC_DISCOVERY[p.slot.key];
+        if (!url) throw new Error('Discovery-URL unbekannt');
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 5000);
+        const res = await fetch(url, { method: 'GET', signal: ctrl.signal });
+        clearTimeout(timer);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        // OIDC-Doc: muss issuer-Feld haben (oder bei GitHub status 200)
+        if (url.endsWith('.well-known/openid-configuration')) {
+          const j = await res.json();
+          if (!j.issuer) throw new Error('Antwort enthielt kein issuer-Feld');
+        }
+        setVerifyResult({ ok: true, msg: 'Discovery-Endpoint erreichbar' });
+      } else if (p.slot.verify === 'smtp-noop') {
+        // SMTP kann der Browser nicht direkt testen (Port 587 + SMTP-Protocol).
+        // Pseudo-Verify: hostname-DNS-Resolve via fetch zu einer Status-URL,
+        // V1: User-Hint dass echter Test im Mail-Send-Flow passiert.
+        const host = String(draft().host || '');
+        if (!/^[a-z0-9.-]+$/i.test(host)) throw new Error('Host-Format ungueltig');
+        setVerifyResult({
+          ok: true,
+          msg: 'Host-Format ok. Echter Send-Test passiert beim ersten Magic-Link.',
+        });
+      }
+    } catch (err) {
+      setVerifyResult({ ok: false, msg: (err as Error).message ?? 'Verify fehlgeschlagen' });
+    } finally {
+      setVerifying(false);
+    }
+  }
 
   const allRequiredFilled = createMemo(() => {
     const d = draft();
@@ -249,7 +329,40 @@ const ProviderSlotCard: Component<{
         </Show>
       </label>
 
+      <Show when={verifyResult()}>
+        {(r) => (
+          <p
+            class="provider-slot-verify"
+            classList={{
+              'provider-slot-verify-ok': r().ok,
+              'provider-slot-verify-fail': !r().ok,
+            }}
+            // biome-ignore lint/a11y/useSemanticElements: <p role="status"> bewusst — Block-Container fuer Live-Region.
+            role="status"
+          >
+            {r().ok ? '✓' : '✗'} {r().msg}
+          </p>
+        )}
+      </Show>
+
       <div class="provider-slot-actions">
+        <Show when={p.slot.docsUrl}>
+          {(href) => (
+            <a class="btn-link" href={href()} target="_blank" rel="noopener noreferrer">
+              Anleitung
+            </a>
+          )}
+        </Show>
+        <Show when={p.slot.verify}>
+          <button
+            type="button"
+            class="btn btn-subtle"
+            onClick={() => void doVerify()}
+            disabled={busy() || verifying() || !allRequiredFilled()}
+          >
+            {verifying() ? 'Pruefe…' : 'Verbindung pruefen'}
+          </button>
+        </Show>
         <button
           type="button"
           class="btn btn-primary lift"

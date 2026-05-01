@@ -240,6 +240,24 @@ export async function signInWithMicrosoft(redirectPath?: string): Promise<void> 
   if (error) throw error;
 }
 
+export async function signInWithGitHub(redirectPath?: string): Promise<void> {
+  const redirectTo = redirectPath ? SITE_URL + redirectPath.replace(/^\/+/, '') : SITE_URL;
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'github',
+    options: { redirectTo },
+  });
+  if (error) throw error;
+}
+
+export async function signInWithLinkedIn(redirectPath?: string): Promise<void> {
+  const redirectTo = redirectPath ? SITE_URL + redirectPath.replace(/^\/+/, '') : SITE_URL;
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'linkedin_oidc',
+    options: { redirectTo },
+  });
+  if (error) throw error;
+}
+
 // B.1.B — Email + Password. Sign-In + Sign-Up + Password-Reset.
 // Magic-Link bleibt als parallele Option verfuegbar.
 export async function signInWithPassword(email: string, password: string): Promise<void> {

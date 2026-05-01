@@ -9,7 +9,9 @@ import Login from './routes/Login';
 import ObjectDetail from './routes/ObjectDetail';
 import ObjectsList from './routes/ObjectsList';
 import Onboarding from './routes/Onboarding';
+import ResetPassword from './routes/ResetPassword';
 import Settings from './routes/Settings';
+import Signup from './routes/Signup';
 import TaskDetail from './routes/TaskDetail';
 import Workspace from './routes/Workspace';
 import AccountAi from './routes/settings/AccountAi';
@@ -48,6 +50,8 @@ render(
     <Router root={App} base={ROUTER_BASE}>
       <Route path="/" component={Workspace} />
       <Route path="/login" component={Login} />
+      <Route path="/signup" component={Signup} />
+      <Route path="/reset-password" component={ResetPassword} />
       <Route path="/invite/:token" component={Invite} />
       <Route path="/onboarding" component={Onboarding} />
       <Route path="/admin" component={Admin} />
