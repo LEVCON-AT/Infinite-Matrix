@@ -937,6 +937,13 @@ const Workspace: Component = () => {
         void refetchCellsWithDocs();
         scheduleAliasRefresh(wid);
       },
+      // T.AC.A.5: atom_manifestations-Events kommen NUR fuer non-task
+      // Atoms an (Tasks gehen ueber den task_manifestations-Sync-Trigger
+      // den anderen Weg). Refetch triggert den Mini-Calendar/DayView/
+      // Calendar-Render mit den neuen Link/Checklist-Eintraegen.
+      atom_manifestations: () => {
+        void refetchAtomManifs();
+      },
       // Phase 3 O.8: Object-Rename → Templates re-resolven. Refetch
       // triggert die Solid-Resource, deren Memo-Konsumenten in
       // NodeTree/MatrixView/BoardView automatisch neu rendern.

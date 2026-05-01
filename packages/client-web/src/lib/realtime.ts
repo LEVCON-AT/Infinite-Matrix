@@ -42,7 +42,11 @@ export type RealtimeTable =
   | 'checklist_items'
   | 'links'
   | 'docs'
-  | 'objects';
+  | 'objects'
+  // T.AC.A.5: Calendar-Slot fuer non-task Atoms (Link/Checklist via
+  // atom_manifestations). Bumps refetchen wsAtomManifestations in
+  // Workspace.tsx.
+  | 'atom_manifestations';
 
 export type RealtimeBumps = Partial<Record<RealtimeTable, () => void>>;
 
@@ -120,6 +124,25 @@ export function subscribeWorkspace(workspaceId: string, bumps: RealtimeBumps): v
       const kind = payload.new?.kind ?? payload.old?.kind;
       if (kind === 'kanban') bumps.kb_cards?.();
       else if (kind === 'checklist') bumps.checklist_items?.();
+    },
+  );
+
+  // T.AC.A.5: atom_manifestations subscript. Drop von Link/Checklist
+  // in einem zweiten Tab oder durch einen anderen User soll hier
+  // sofort sichtbar werden — der Sync-Trigger aus Migration 044 spiegelt
+  // task→atom, aber NICHT atom→task, also kommt der Event NUR ueber
+  // diese Subscription rein wenn die Quelle ein Link/Checklist war.
+  channel.on(
+    // biome-ignore lint/suspicious/noExplicitAny: siehe oben.
+    'postgres_changes' as any,
+    {
+      event: '*',
+      schema: 'public',
+      table: 'atom_manifestations',
+      filter: `workspace_id=eq.${workspaceId}`,
+    },
+    () => {
+      bumps.atom_manifestations?.();
     },
   );
 
