@@ -40,6 +40,24 @@ export async function findUserIdByEmail(email: string): Promise<string | null> {
   return (data as string | null) ?? null;
 }
 
+// ─── Admin-Stats (B.0.F) ────────────────────────────────────────
+export type AdminStats = {
+  users_total: number;
+  users_active_30d: number;
+  workspaces_total: number;
+  tasks_total: number;
+  task_manifestations_total: number;
+  atom_manifestations_total: number;
+  audit_events_24h: number;
+  as_of: string;
+};
+
+export async function getAdminStats(): Promise<AdminStats> {
+  const { data, error } = await supabase.rpc('get_admin_stats');
+  if (error) throw error;
+  return data as AdminStats;
+}
+
 // ─── system_audit_log (B.0.E) ───────────────────────────────────
 export type AuditLogEntry = {
   id: string;

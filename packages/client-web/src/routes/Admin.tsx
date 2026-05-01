@@ -19,6 +19,7 @@ import { type Component, Show, createResource, createSignal } from 'solid-js';
 import Icon from '../components/Icon';
 import AuditLogSection from '../components/admin/AuditLogSection';
 import PlatformAdminsSection from '../components/admin/PlatformAdminsSection';
+import StatsSection from '../components/admin/StatsSection';
 import SystemConfigSection from '../components/admin/SystemConfigSection';
 import { isPlatformAdmin } from '../lib/admin';
 import { useUser } from '../lib/auth';
@@ -123,10 +124,7 @@ const Admin: Component = () => {
               <AuditLogSection />
             </Show>
             <Show when={section() === 'stats'}>
-              <SectionStub
-                title="Statistik"
-                hint="User-Counts, Workspace-Counts, Aktivitaet. V1 reine Counts. Kommt mit B.0.F."
-              />
+              <StatsSection />
             </Show>
           </main>
         </Show>
@@ -153,17 +151,6 @@ const SectionButton: Component<{
       <Icon name={p.icon as never} size={16} />
       <span>{p.label}</span>
     </button>
-  );
-};
-
-const SectionStub: Component<{ title: string; hint: string }> = (p) => {
-  return (
-    <section class="admin-section admin-section-stub">
-      <header class="admin-section-head">
-        <h3>{p.title}</h3>
-      </header>
-      <p class="hint">{p.hint}</p>
-    </section>
   );
 };
 
