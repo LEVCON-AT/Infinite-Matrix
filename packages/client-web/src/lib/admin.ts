@@ -40,6 +40,42 @@ export async function findUserIdByEmail(email: string): Promise<string | null> {
   return (data as string | null) ?? null;
 }
 
+// ─── system_audit_log (B.0.E) ───────────────────────────────────
+export type AuditLogEntry = {
+  id: string;
+  action: string;
+  actor_id: string | null;
+  workspace_id: string | null;
+  workspace_name: string | null;
+  payload: Record<string, unknown>;
+  created_at: string;
+};
+
+export type AuditLogFilter = {
+  actionPrefix?: string; // ilike-Match auf action
+  limit?: number;
+  offset?: number;
+};
+
+// Direct-Query — RLS aus Migration 046 erlaubt platform_admins SELECT.
+// Sortiert nach created_at DESC; die action+created_at-Indexes greifen.
+export async function listSystemAuditLog(filter: AuditLogFilter = {}): Promise<AuditLogEntry[]> {
+  const limit = Math.max(1, Math.min(filter.limit ?? 100, 500));
+  const offset = Math.max(0, filter.offset ?? 0);
+  let q = supabase
+    .from('system_audit_log')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (filter.actionPrefix && filter.actionPrefix.trim().length > 0) {
+    const pat = `${filter.actionPrefix.trim().replace(/[%_]/g, (m) => `\\${m}`)}%`;
+    q = q.ilike('action', pat);
+  }
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []) as AuditLogEntry[];
+}
+
 // ─── system_config ──────────────────────────────────────────────
 export async function listSystemConfig(): Promise<SystemConfigEntry[]> {
   const { data, error } = await supabase.rpc('list_system_config');

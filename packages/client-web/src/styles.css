@@ -13148,3 +13148,84 @@ body[data-dragging] .sb-day-allday-item[draggable="true"]:active {
   color: var(--red);
   border-color: var(--red);
 }
+
+/* B.0.E — Audit-Log */
+.admin-audit-filter {
+  font-size: 12px;
+  padding: 6px 8px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--bg);
+  color: var(--text);
+  width: 240px;
+}
+
+.admin-audit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.admin-audit-table th,
+.admin-audit-table td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 0.5px solid var(--border);
+  vertical-align: top;
+}
+.admin-audit-table th {
+  font-weight: 500;
+  color: var(--text2);
+  background: var(--bg2);
+  position: sticky;
+  top: 0;
+}
+.admin-audit-time {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--text2);
+}
+.admin-audit-action code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--bg2);
+}
+.admin-audit-actor,
+.admin-audit-ws {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--text3);
+}
+.admin-audit-payload details {
+  font-size: 11px;
+}
+.admin-audit-payload summary {
+  cursor: pointer;
+  color: var(--p);
+}
+.admin-audit-payload pre {
+  margin: 4px 0 0 0;
+  padding: 6px 8px;
+  background: var(--bg2);
+  border-radius: var(--rs);
+  font-size: 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.admin-audit-paginate {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+  padding-top: var(--space-sm);
+  border-top: 0.5px solid var(--border);
+}
+.admin-audit-page {
+  font-size: 12px;
+  color: var(--text2);
+  margin-right: auto;
+}

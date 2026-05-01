@@ -17,6 +17,7 @@
 import { useNavigate } from '@solidjs/router';
 import { type Component, Show, createResource, createSignal } from 'solid-js';
 import Icon from '../components/Icon';
+import AuditLogSection from '../components/admin/AuditLogSection';
 import PlatformAdminsSection from '../components/admin/PlatformAdminsSection';
 import SystemConfigSection from '../components/admin/SystemConfigSection';
 import { isPlatformAdmin } from '../lib/admin';
@@ -119,10 +120,7 @@ const Admin: Component = () => {
               <PlatformAdminsSection />
             </Show>
             <Show when={section() === 'audit'}>
-              <SectionStub
-                title="Audit-Log"
-                hint="Read-only View des system_audit_log. Read-Pfad wurde in B.0.A aktiviert. Viewer kommt mit B.0.E."
-              />
+              <AuditLogSection />
             </Show>
             <Show when={section() === 'stats'}>
               <SectionStub
