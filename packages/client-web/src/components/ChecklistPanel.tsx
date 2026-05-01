@@ -149,7 +149,7 @@ const ChecklistPanel: Component<Props> = (p) => {
     onDrop: (src) => {
       setCrossViewDragOver(false);
       const tail = p.items.reduce((max, it) => (it.position > max ? it.position : max), -1) + 1;
-      const taskExisting = (p.wsManifestations ?? []).filter((m) => m.task_id === src.atomId);
+      const taskExisting = (p.wsManifestations ?? []).filter((m) => m.atom_id === src.atomId);
       void dropOnChecklist({
         workspaceId: p.workspaceId,
         taskId: src.atomId,
@@ -578,7 +578,7 @@ const ChecklistPanel: Component<Props> = (p) => {
             const itemDrag = bindDragSource({
               build: () => {
                 const manif = (p.wsManifestations ?? []).find(
-                  (m) => m.kind === 'checklist' && m.task_id === it.id,
+                  (m) => m.kind === 'checklist' && m.atom_id === it.id,
                 );
                 return {
                   atom: 'task',

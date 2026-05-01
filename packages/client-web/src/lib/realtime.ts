@@ -10,14 +10,14 @@
 // Die workspace_id-Filter laufen serverseitig — der Client sieht nur
 // Events, die zu seinem Workspace gehoeren (RLS + Filter zusammen).
 //
-// Phase 4 T.1.D: kb_cards + checklist_items sind weg, Daten leben
-// nur noch in tasks + task_manifestations. Damit die UI-Subscriber
-// (BoardView ueber kb_cards-Bumps, ChecklistPanel ueber checklist_-
-// items-Bumps) ohne Aenderung weiterlaufen, routen wir Events von
-// task_manifestations anhand von payload.new.kind / payload.old.kind
-// auf die Legacy-Bump-Slots. tasks-Events bumpen beide Slots
-// (Kanban-Sicht und Checklist-Sicht koennen beide auf Task-Felder
-// reagieren). Refetches sind idempotent — kein Schaden bei Doppel-Bump.
+// Q.2: task_manifestations ist aufgeloest, atom_manifestations ist die
+// Single-Source. Wir routen Events anhand `payload.new.atom_type` +
+// `payload.new.kind`:
+//   - atom_type='task' + kind='kanban'    → kb_cards-Slot
+//   - atom_type='task' + kind='checklist' → checklist_items-Slot
+//   - atom_type=anderes (link/checklist/doc) → atom_manifestations-Slot
+//     (Calendar-Reload via Workspace.tsx)
+// Refetches sind idempotent — kein Schaden bei Doppel-Bump.
 //
 // Keine Event-Deduplizierung gegen eigene Mutationen. Wenn Tab A
 // toggleFeature() aufruft, kommt das Event auch bei Tab A wieder an
@@ -29,8 +29,8 @@ import { supabase } from './supabase';
 
 // Slot-Namen behalten ihren historischen kb_cards / checklist_items
 // Bezug, weil bestehende UI-Konsumenten unter genau diesen Schluesseln
-// ihre Refetches registrieren. Die DB-Tabellen dahinter sind seit
-// T.1.D tasks + task_manifestations.
+// ihre Refetches registrieren. Die DB-Tabelle dahinter ist seit Q.2
+// atom_manifestations (kind='kanban'/'checklist', atom_type='task').
 export type RealtimeTable =
   | 'nodes'
   | 'cells'
@@ -43,7 +43,7 @@ export type RealtimeTable =
   | 'links'
   | 'docs'
   | 'objects'
-  // T.AC.A.5: Calendar-Slot fuer non-task Atoms (Link/Checklist via
+  // T.AC.A.5 + Q.2: Calendar-Slot fuer non-task Atoms (Link/Checklist via
   // atom_manifestations). Bumps refetchen wsAtomManifestations in
   // Workspace.tsx.
   | 'atom_manifestations';
@@ -63,9 +63,9 @@ const DIRECT_TABLES: Array<Exclude<RealtimeTable, 'kb_cards' | 'checklist_items'
   'objects',
 ];
 
-type TaskManifKindPayload = {
-  new?: { kind?: string } | null;
-  old?: { kind?: string } | null;
+type AtomManifPayload = {
+  new?: { atom_type?: string; kind?: string } | null;
+  old?: { atom_type?: string; kind?: string } | null;
 };
 
 // Subscribe in einem reaktiven Scope (onMount / createEffect). Der
@@ -108,30 +108,14 @@ export function subscribeWorkspace(workspaceId: string, bumps: RealtimeBumps): v
     },
   );
 
-  // task_manifestations: kind-spezifisch routen. kanban → kb_cards-Slot,
-  // checklist → checklist_items-Slot. calendar/standalone laufen ins
-  // Leere (T.1.G fuegt einen calendar-Slot dazu).
-  channel.on(
-    // biome-ignore lint/suspicious/noExplicitAny: siehe oben.
-    'postgres_changes' as any,
-    {
-      event: '*',
-      schema: 'public',
-      table: 'task_manifestations',
-      filter: `workspace_id=eq.${workspaceId}`,
-    },
-    (payload: TaskManifKindPayload) => {
-      const kind = payload.new?.kind ?? payload.old?.kind;
-      if (kind === 'kanban') bumps.kb_cards?.();
-      else if (kind === 'checklist') bumps.checklist_items?.();
-    },
-  );
-
-  // T.AC.A.5: atom_manifestations subscript. Drop von Link/Checklist
-  // in einem zweiten Tab oder durch einen anderen User soll hier
-  // sofort sichtbar werden — der Sync-Trigger aus Migration 044 spiegelt
-  // task→atom, aber NICHT atom→task, also kommt der Event NUR ueber
-  // diese Subscription rein wenn die Quelle ein Link/Checklist war.
+  // atom_manifestations: Q.2 Single-Source. Wir routen anhand atom_type
+  // + kind:
+  //   - atom_type='task' + kind='kanban'    → kb_cards-Slot
+  //   - atom_type='task' + kind='checklist' → checklist_items-Slot
+  //   - atom_type='task' + kind='calendar'  → kein Legacy-Slot (Workspace.tsx
+  //     refetcht Tasks ueber den tasks-Subscribe oben).
+  //   - atom_type<>task                     → atom_manifestations-Slot
+  //     (Link/Checklist im Calendar via Workspace.tsx → wsAtomManifestations)
   channel.on(
     // biome-ignore lint/suspicious/noExplicitAny: siehe oben.
     'postgres_changes' as any,
@@ -141,8 +125,18 @@ export function subscribeWorkspace(workspaceId: string, bumps: RealtimeBumps): v
       table: 'atom_manifestations',
       filter: `workspace_id=eq.${workspaceId}`,
     },
-    () => {
-      bumps.atom_manifestations?.();
+    (payload: AtomManifPayload) => {
+      const atomType = payload.new?.atom_type ?? payload.old?.atom_type;
+      const kind = payload.new?.kind ?? payload.old?.kind;
+      if (atomType === 'task') {
+        if (kind === 'kanban') bumps.kb_cards?.();
+        else if (kind === 'checklist') bumps.checklist_items?.();
+        // calendar-Manifestations werden ueber den tasks-Subscribe
+        // covered (Task-Aenderungen feuern wsTasks-Refetch, der
+        // calendarEvents neu rechnet).
+      } else {
+        bumps.atom_manifestations?.();
+      }
     },
   );
 

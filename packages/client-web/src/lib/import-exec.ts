@@ -144,7 +144,7 @@ export async function executeImport(
     onProgress,
   );
 
-  // 4b) Phase 4 T.1.D: checklist_items → tasks + task_manifestations.
+  // 4b) Phase 4 T.1.D + Q.2: checklist_items → tasks + atom_manifestations.
   await insertBatch(
     'tasks',
     plan.checklistItems.map((it) => ({
@@ -158,16 +158,17 @@ export async function executeImport(
     onProgress,
   );
   await insertBatch(
-    'task_manifestations',
+    'atom_manifestations',
     plan.checklistItems.map((it) => ({
-      task_id: it.id,
+      atom_type: 'task',
+      atom_id: it.id,
       workspace_id: ws,
       kind: 'checklist',
       container_id: it.checklist_id,
       level: it.level,
       position: it.position,
     })),
-    'task_manifestations',
+    'atom_manifestations',
     onProgress,
   );
 
@@ -190,7 +191,7 @@ export async function executeImport(
     onProgress,
   );
 
-  // 6) Phase 4 T.1.D: kb_cards → tasks + task_manifestations.
+  // 6) Phase 4 T.1.D + Q.2: kb_cards → tasks + atom_manifestations.
   //    Karten-Feldern auf tasks/attrs/manifestation aufgeteilt
   //    (siehe lib/task-projections.ts fuer das Mapping).
   await insertBatch(
@@ -222,16 +223,17 @@ export async function executeImport(
     onProgress,
   );
   await insertBatch(
-    'task_manifestations',
+    'atom_manifestations',
     plan.kbCards.map((c) => ({
-      task_id: c.id,
+      atom_type: 'task',
+      atom_id: c.id,
       workspace_id: ws,
       kind: 'kanban',
       container_id: c.col_id,
       position: c.position,
       display_meta: { board_id: c.board_id },
     })),
-    'task_manifestations',
+    'atom_manifestations',
     onProgress,
   );
 

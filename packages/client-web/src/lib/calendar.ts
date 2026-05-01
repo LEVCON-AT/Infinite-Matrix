@@ -247,7 +247,7 @@ export function buildEvents(args: {
 
   for (const m of manifestations) {
     if (m.kind !== 'calendar') continue;
-    const t = taskById.get(m.task_id);
+    const t = taskById.get(m.atom_id);
     if (!t) continue;
     explicitTaskIds.add(t.id);
     const dm = (m.display_meta ?? {}) as Record<string, unknown>;

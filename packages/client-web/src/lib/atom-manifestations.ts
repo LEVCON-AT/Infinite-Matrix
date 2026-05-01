@@ -1,11 +1,11 @@
 // Atom-Manifestations-Helper (Phase 4 T.AC.B + Q.1.b refactor).
 //
 // Polymorpher Layer ueber Migration 044's atom_manifestations-Tabelle.
-// Heute: Drag-Drop von Link / Checklist (als Ganzes) in den Calendar
-// erzeugt eine atom_manifestation mit atom_type='link' bzw. 'checklist'
-// und kind='calendar'. Tasks gehen weiterhin den lib/tasks.ts-Pfad
-// ueber task_manifestations — der Sync-Trigger aus 044 spiegelt sie
-// in atom_manifestations. Q.2-Konsolidierung dreht das Verhaeltnis um.
+// Single-Source seit Q.2 (Migration 049): atom_manifestations haelt
+// alle Manifestations aller Atom-Typen (task/link/checklist/doc).
+// Tasks-spezifische Reads/Writes laufen ueber lib/tasks.ts — diese
+// Datei kuemmert sich um die nicht-task Atoms (Link/Checklist im
+// Calendar) plus den polymorphen Drop-Handler.
 //
 // Read-Pfad: fetchAtomCalendarManifestations laedt nur die NICHT-
 // task-Atoms und joint mit links/checklists, damit der Calendar eine

@@ -19,7 +19,6 @@ const CARDS: StatCard[] = [
   { key: 'users_active_30d', label: 'Aktiv in 30 Tagen', hint: 'last_sign_in_at' },
   { key: 'workspaces_total', label: 'Workspaces' },
   { key: 'tasks_total', label: 'Tasks (Layer 0)' },
-  { key: 'task_manifestations_total', label: 'task_manifestations' },
   { key: 'atom_manifestations_total', label: 'atom_manifestations' },
   { key: 'audit_events_24h', label: 'Audit-Events (24h)' },
 ];

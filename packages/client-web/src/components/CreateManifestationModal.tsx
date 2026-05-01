@@ -18,7 +18,7 @@
 // 1.-3."?) — kommt mit T.AC.D.4 wenn ueberhaupt.
 //
 // Persistenz dispatcht nach atomType:
-//   - task     → addManifestation (lib/tasks.ts → task_manifestations)
+//   - task     → addManifestation (lib/tasks.ts → atom_manifestations, atom_type='task')
 //   - link/checklist → addAtomManifestation (lib/atom-manifestations.ts
 //                       → atom_manifestations)
 
@@ -209,7 +209,7 @@ const CreateManifestationModal: Component<Props> = (p) => {
         }
       } else if (p.atomType === 'task') {
         const created = await addManifestation(p.workspaceId, {
-          task_id: p.atomId,
+          atom_id: p.atomId,
           kind: 'calendar',
           display_meta,
         });

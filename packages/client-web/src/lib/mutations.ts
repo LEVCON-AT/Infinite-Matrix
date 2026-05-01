@@ -40,7 +40,7 @@ import { supabase } from './supabase';
 // zieht (z.B. board_id + col_id matchen). Liefert 0 wenn der Scope
 // noch leer ist.
 async function nextPositionFromCache(
-  table: 'rows' | 'cols' | 'kb_cols' | 'checklists' | 'links' | 'task_manifestations',
+  table: 'rows' | 'cols' | 'kb_cols' | 'checklists' | 'links' | 'atom_manifestations',
   workspaceId: string,
   filter: (r: Record<string, unknown> & { position?: number }) => boolean,
 ): Promise<number> {
@@ -905,9 +905,10 @@ export async function delKbCol(colId: string): Promise<void> {
 async function nextManifPosition(containerId: string, workspaceId: string): Promise<number> {
   try {
     const { data, error } = await supabase
-      .from('task_manifestations')
+      .from('atom_manifestations')
       .select('position')
       .eq('container_id', containerId)
+      .eq('atom_type', 'task')
       .eq('kind', 'kanban')
       .eq('workspace_id', workspaceId)
       .order('position', { ascending: false })
@@ -917,9 +918,9 @@ async function nextManifPosition(containerId: string, workspaceId: string): Prom
   } catch (err) {
     if (!isNetworkError(err)) throw err;
     return nextPositionFromCache(
-      'task_manifestations',
+      'atom_manifestations',
       workspaceId,
-      (r) => r.kind === 'kanban' && r.container_id === containerId,
+      (r) => r.atom_type === 'task' && r.kind === 'kanban' && r.container_id === containerId,
     );
   }
 }
@@ -930,9 +931,10 @@ async function nextManifPosition(containerId: string, workspaceId: string): Prom
 async function findKanbanManif(taskId: string): Promise<TaskManifestationRow | null> {
   try {
     const { data, error } = await supabase
-      .from('task_manifestations')
+      .from('atom_manifestations')
       .select('*')
-      .eq('task_id', taskId)
+      .eq('atom_type', 'task')
+      .eq('atom_id', taskId)
       .eq('kind', 'kanban')
       .maybeSingle();
     if (error) throw error;
@@ -943,10 +945,13 @@ async function findKanbanManif(taskId: string): Promise<TaskManifestationRow | n
     const task = await getById<TaskRow>('tasks', taskId);
     if (!task) return null;
     const cached = await getByWorkspace<TaskManifestationRow>(
-      'task_manifestations',
+      'atom_manifestations',
       task.workspace_id,
     );
-    return cached.find((m) => m.task_id === taskId && m.kind === 'kanban') ?? null;
+    return (
+      cached.find((m) => m.atom_type === 'task' && m.atom_id === taskId && m.kind === 'kanban') ??
+      null
+    );
   }
 }
 
@@ -970,7 +975,7 @@ export async function addCard(args: {
   const pos = await nextManifPosition(args.colId, args.workspaceId);
   const task = await createTask(args.workspaceId, { label: args.name ?? '' });
   const manif = await addManifestation(args.workspaceId, {
-    task_id: task.id,
+    atom_id: task.id,
     kind: 'kanban',
     container_id: args.colId,
     position: pos,
@@ -1003,7 +1008,7 @@ export async function createCardFromChecklist(args: {
     attrs: { checklist_ref: args.checklistId },
   });
   const manif = await addManifestation(args.workspaceId, {
-    task_id: task.id,
+    atom_id: task.id,
     kind: 'kanban',
     container_id: args.targetColId,
     position: pos,
@@ -1355,9 +1360,10 @@ export async function delChecklist(clId: string): Promise<void> {
 async function nextItemPosition(checklistId: string, workspaceId: string): Promise<number> {
   try {
     const { data, error } = await supabase
-      .from('task_manifestations')
+      .from('atom_manifestations')
       .select('position')
       .eq('container_id', checklistId)
+      .eq('atom_type', 'task')
       .eq('kind', 'checklist')
       .eq('workspace_id', workspaceId)
       .order('position', { ascending: false })
@@ -1367,9 +1373,9 @@ async function nextItemPosition(checklistId: string, workspaceId: string): Promi
   } catch (err) {
     if (!isNetworkError(err)) throw err;
     return nextPositionFromCache(
-      'task_manifestations',
+      'atom_manifestations',
       workspaceId,
-      (r) => r.kind === 'checklist' && r.container_id === checklistId,
+      (r) => r.atom_type === 'task' && r.kind === 'checklist' && r.container_id === checklistId,
     );
   }
 }
@@ -1377,9 +1383,10 @@ async function nextItemPosition(checklistId: string, workspaceId: string): Promi
 async function findChecklistManif(taskId: string): Promise<TaskManifestationRow | null> {
   try {
     const { data, error } = await supabase
-      .from('task_manifestations')
+      .from('atom_manifestations')
       .select('*')
-      .eq('task_id', taskId)
+      .eq('atom_type', 'task')
+      .eq('atom_id', taskId)
       .eq('kind', 'checklist')
       .maybeSingle();
     if (error) throw error;
@@ -1389,10 +1396,14 @@ async function findChecklistManif(taskId: string): Promise<TaskManifestationRow 
     const task = await getById<TaskRow>('tasks', taskId);
     if (!task) return null;
     const cached = await getByWorkspace<TaskManifestationRow>(
-      'task_manifestations',
+      'atom_manifestations',
       task.workspace_id,
     );
-    return cached.find((m) => m.task_id === taskId && m.kind === 'checklist') ?? null;
+    return (
+      cached.find(
+        (m) => m.atom_type === 'task' && m.atom_id === taskId && m.kind === 'checklist',
+      ) ?? null
+    );
   }
 }
 
@@ -1405,7 +1416,7 @@ export async function addChecklistItem(args: {
   const pos = await nextItemPosition(args.checklistId, args.workspaceId);
   const task = await createTask(args.workspaceId, { label: args.text ?? '' });
   const manif = await addManifestation(args.workspaceId, {
-    task_id: task.id,
+    atom_id: task.id,
     kind: 'checklist',
     container_id: args.checklistId,
     position: pos,
@@ -1524,13 +1535,14 @@ export async function applyChecklistClose(args: {
   try {
     // Erst die Tasks ermitteln, deren Manifestation in dieser Liste lebt.
     const { data: manifData, error: manifErr } = await supabase
-      .from('task_manifestations')
-      .select('task_id')
+      .from('atom_manifestations')
+      .select('atom_id')
       .eq('container_id', args.checklistId)
+      .eq('atom_type', 'task')
       .eq('kind', 'checklist')
       .eq('workspace_id', args.workspaceId);
     if (manifErr) throw manifErr;
-    const taskIds = (manifData ?? []).map((m: { task_id: string }) => m.task_id);
+    const taskIds = (manifData ?? []).map((m: { atom_id: string }) => m.atom_id);
     if (taskIds.length === 0) return;
 
     if (args.recurring) {
@@ -1554,17 +1566,20 @@ export async function applyChecklistClose(args: {
     // Offline-Fallback: aus dem Cache die Manifestations dieser Liste
     // ziehen und einzeln durch den Wrapper schicken.
     const manifs = await getByWorkspace<TaskManifestationRow>(
-      'task_manifestations',
+      'atom_manifestations',
       args.workspaceId,
     );
-    const own = manifs.filter((m) => m.kind === 'checklist' && m.container_id === args.checklistId);
+    const own = manifs.filter(
+      (m) =>
+        m.atom_type === 'task' && m.kind === 'checklist' && m.container_id === args.checklistId,
+    );
     if (args.recurring) {
       for (const m of own) {
-        await updateTask(m.task_id, { status: 'open' });
+        await updateTask(m.atom_id, { status: 'open' });
       }
     } else {
       for (const m of own) {
-        await deleteTask(m.task_id);
+        await deleteTask(m.atom_id);
       }
     }
   }
@@ -1635,7 +1650,8 @@ export async function bulkAddChecklistItems(args: {
     }
     // 2. Bulk-Insert manifestations (eine pro task, gleiche Reihenfolge).
     const manifPayload = tasks.map((t, i) => ({
-      task_id: t.id,
+      atom_type: 'task' as const,
+      atom_id: t.id,
       workspace_id: args.workspaceId,
       kind: 'checklist',
       container_id: args.checklistId,
@@ -1643,7 +1659,7 @@ export async function bulkAddChecklistItems(args: {
       position: startPos + i,
     }));
     const { data: manifData, error: manifErr } = await supabase
-      .from('task_manifestations')
+      .from('atom_manifestations')
       .insert(manifPayload)
       .select();
     if (manifErr) throw manifErr;
@@ -2168,13 +2184,13 @@ export async function restoreCard(snapshot: KbCardRow): Promise<void> {
     buildOffline: () => task,
   });
   await runOptimisticInsert<TaskManifestationRow>({
-    table: 'task_manifestations',
+    table: 'atom_manifestations',
     workspaceId: manif.workspace_id,
     label: 'Wiederherstellen',
     run: async () => {
       const { created_at: _ca, id: _id, ...clean } = manif;
       const { data, error } = await supabase
-        .from('task_manifestations')
+        .from('atom_manifestations')
         .insert(clean)
         .select()
         .single();
@@ -2255,13 +2271,13 @@ export async function restoreChecklistItem(snap: ChecklistItemRow): Promise<void
     buildOffline: () => task,
   });
   await runOptimisticInsert<TaskManifestationRow>({
-    table: 'task_manifestations',
+    table: 'atom_manifestations',
     workspaceId: manif.workspace_id,
     label: 'Wiederherstellen',
     run: async () => {
       const { created_at: _ca, id: _id, ...clean } = manif;
       const { data, error } = await supabase
-        .from('task_manifestations')
+        .from('atom_manifestations')
         .insert(clean)
         .select()
         .single();

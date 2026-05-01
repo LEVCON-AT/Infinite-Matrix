@@ -63,7 +63,7 @@ export async function dropOnKanbanCol(args: DropOnKanbanArgs): Promise<void> {
   try {
     const pos = targetPosition ?? (await nextManifestationPosition(targetColId, 'kanban'));
     const created = await addManifestation(workspaceId, {
-      task_id: taskId,
+      atom_id: taskId,
       kind: 'kanban',
       container_id: targetColId,
       position: pos,
@@ -120,7 +120,7 @@ export async function dropOnChecklist(args: DropOnChecklistArgs): Promise<void> 
   try {
     const pos = targetPosition ?? (await nextManifestationPosition(targetChecklistId, 'checklist'));
     const created = await addManifestation(workspaceId, {
-      task_id: taskId,
+      atom_id: taskId,
       kind: 'checklist',
       container_id: targetChecklistId,
       position: pos,

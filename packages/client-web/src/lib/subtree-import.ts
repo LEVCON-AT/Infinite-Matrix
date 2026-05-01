@@ -311,7 +311,7 @@ async function insertBatch(table: string, rows: Record<string, unknown>[]): Prom
 // Import-Payloads tragen weiterhin die kb_cards / checklist_items
 // Form aus historischen Exporten. Diese Helper transformieren sie in
 // die native (TaskRow, TaskManifestationRow{kanban|checklist}) Form,
-// bevor wir per insertBatch in tasks + task_manifestations schreiben.
+// bevor wir per insertBatch in tasks + atom_manifestations schreiben.
 type AnyRecord = Record<string, unknown>;
 
 function kbCardPayloadToTaskAndManif(
@@ -364,7 +364,8 @@ function kbCardPayloadToTaskAndManif(
       attrs,
     },
     manif: {
-      task_id: r.id,
+      atom_type: 'task',
+      atom_id: r.id,
       workspace_id: workspaceId,
       kind: 'kanban',
       container_id: r.col_id,
@@ -395,7 +396,8 @@ function itemPayloadToTaskAndManif(
       attrs: { legacy_kind: 'checklist_item' },
     },
     manif: {
-      task_id: r.id,
+      atom_type: 'task',
+      atom_id: r.id,
       workspace_id: workspaceId,
       kind: 'checklist',
       container_id: r.checklist_id,
@@ -527,7 +529,7 @@ export async function clearCellInfoData(cellId: string): Promise<void> {
 // Loescht alle Cell-scoped Checklisten + Items + nimmt 'checklists'
 // aus features.
 //
-// Phase 4 T.1.D: Items leben in task_manifestations(kind='checklist').
+// Phase 4 T.1.D + Q.2: Items leben in atom_manifestations(atom_type='task', kind='checklist').
 // Wir loeschen erst die Tasks dieser Manifestations (CASCADE killt
 // die Manifestations), dann die Checklisten.
 export async function clearCellChecklistsData(cellId: string): Promise<void> {
@@ -540,12 +542,13 @@ export async function clearCellChecklistsData(cellId: string): Promise<void> {
   if (ids.length > 0) {
     // 1. Tasks der checklist-Manifestations dieser Listen ermitteln.
     const { data: itManifs, error: imErr } = await supabase
-      .from('task_manifestations')
-      .select('task_id')
+      .from('atom_manifestations')
+      .select('atom_id')
+      .eq('atom_type', 'task')
       .eq('kind', 'checklist')
       .in('container_id', ids);
     if (imErr) throw imErr;
-    const taskIds = ((itManifs ?? []) as Array<{ task_id: string }>).map((m) => m.task_id);
+    const taskIds = ((itManifs ?? []) as Array<{ atom_id: string }>).map((m) => m.atom_id);
     if (taskIds.length > 0) {
       const { error: tasksErr } = await supabase.from('tasks').delete().in('id', taskIds);
       if (tasksErr) throw tasksErr;
@@ -614,25 +617,27 @@ async function collectDescendantNodeIds(rootMatrixId: string): Promise<string[]>
   return descendants;
 }
 
-// Pre-Cleanup-Helper fuer Phase 4 T.1.D: das Schema 040 hat keinen FK
-// von task_manifestations.container_id auf kb_cols/checklists (poly-
+// Pre-Cleanup-Helper fuer Phase 4 T.1.D + Q.2: das Schema hat keinen FK
+// von atom_manifestations.container_id auf kb_cols/checklists (poly-
 // morpher Container). Damit cascadet ein DELETE auf nodes/kb_cols/
 // checklists NICHT auf manifestations + tasks. Wir muessen die Tasks
-// vorher loeschen — der CASCADE laeuft dann ueber tasks.id.
+// vorher loeschen — der Pseudo-CASCADE-Trigger purgt die Manifestations
+// ueber tasks.id.
 async function cleanupTasksForNodeIds(nodeIds: string[]): Promise<void> {
   if (nodeIds.length === 0) return;
   // 1. kanban-Manifestations mit display_meta.board_id ∈ nodeIds.
   //    Wir holen alle (workspace-scoped via RLS) und filtern client-side
   //    — JSONB-Index fehlt.
   const { data: kbManifs, error: kbErr } = await supabase
-    .from('task_manifestations')
-    .select('task_id, display_meta')
+    .from('atom_manifestations')
+    .select('atom_id, display_meta')
+    .eq('atom_type', 'task')
     .eq('kind', 'kanban');
   if (kbErr) throw kbErr;
   const idSet = new Set(nodeIds);
   const cardTaskIds = (
     (kbManifs ?? []) as Array<{
-      task_id: string;
+      atom_id: string;
       display_meta: Record<string, unknown> | null;
     }>
   )
@@ -640,7 +645,7 @@ async function cleanupTasksForNodeIds(nodeIds: string[]): Promise<void> {
       const bId = (m.display_meta as Record<string, unknown> | null)?.board_id;
       return typeof bId === 'string' && idSet.has(bId);
     })
-    .map((m) => m.task_id);
+    .map((m) => m.atom_id);
 
   // 2. Checklisten in diesen Boards.
   const { data: cls, error: clQErr } = await supabase
@@ -654,15 +659,16 @@ async function cleanupTasksForNodeIds(nodeIds: string[]): Promise<void> {
   let itemTaskIds: string[] = [];
   if (clIds.length > 0) {
     const { data: itManifs, error: imErr } = await supabase
-      .from('task_manifestations')
-      .select('task_id')
+      .from('atom_manifestations')
+      .select('atom_id')
+      .eq('atom_type', 'task')
       .eq('kind', 'checklist')
       .in('container_id', clIds);
     if (imErr) throw imErr;
-    itemTaskIds = ((itManifs ?? []) as Array<{ task_id: string }>).map((m) => m.task_id);
+    itemTaskIds = ((itManifs ?? []) as Array<{ atom_id: string }>).map((m) => m.atom_id);
   }
 
-  // 4. Tasks bulk-delete (CASCADE killt manifestations).
+  // 4. Tasks bulk-delete (Pseudo-CASCADE-Trigger purgt manifestations).
   const allTaskIds = [...cardTaskIds, ...itemTaskIds];
   if (allTaskIds.length > 0) {
     const { error: tasksErr } = await supabase.from('tasks').delete().in('id', allTaskIds);
@@ -680,12 +686,13 @@ async function cleanupTasksForCellIds(cellIds: string[]): Promise<void> {
   const clIds = ((cls ?? []) as Array<{ id: string }>).map((c) => c.id);
   if (clIds.length === 0) return;
   const { data: itManifs, error: imErr } = await supabase
-    .from('task_manifestations')
-    .select('task_id')
+    .from('atom_manifestations')
+    .select('atom_id')
+    .eq('atom_type', 'task')
     .eq('kind', 'checklist')
     .in('container_id', clIds);
   if (imErr) throw imErr;
-  const taskIds = ((itManifs ?? []) as Array<{ task_id: string }>).map((m) => m.task_id);
+  const taskIds = ((itManifs ?? []) as Array<{ atom_id: string }>).map((m) => m.atom_id);
   if (taskIds.length > 0) {
     const { error: tasksErr } = await supabase.from('tasks').delete().in('id', taskIds);
     if (tasksErr) throw tasksErr;
@@ -1102,7 +1109,7 @@ export async function executeSubtreeImportIntoCell(args: {
     {
       const { tasks, manifs } = splitKbCards(kbCardsOut, workspaceId);
       await insertBatch('tasks', tasks);
-      await insertBatch('task_manifestations', manifs);
+      await insertBatch('atom_manifestations', manifs);
     }
     step('Checklisten einfuegen…');
     await insertBatch('checklists', checklistsOut);
@@ -1110,7 +1117,7 @@ export async function executeSubtreeImportIntoCell(args: {
     {
       const { tasks, manifs } = splitChecklistItems(checklistItemsOut, workspaceId);
       await insertBatch('tasks', tasks);
-      await insertBatch('task_manifestations', manifs);
+      await insertBatch('atom_manifestations', manifs);
     }
     step('Links einfuegen…');
     await insertBatch('links', linksOut);
@@ -1362,7 +1369,7 @@ async function executeCellContainerMerge(args: {
     {
       const { tasks, manifs } = splitChecklistItems(itemsOut, workspaceId);
       await insertBatch('tasks', tasks);
-      await insertBatch('task_manifestations', manifs);
+      await insertBatch('atom_manifestations', manifs);
     }
   }
 
@@ -1575,7 +1582,7 @@ export async function executeFeatureChecklistsImport(args: {
   {
     const { tasks, manifs } = splitChecklistItems(itemsOut, workspaceId);
     await insertBatch('tasks', tasks);
-    await insertBatch('task_manifestations', manifs);
+    await insertBatch('atom_manifestations', manifs);
   }
 
   // Cell-Feature-Flag sicherstellen.
@@ -1924,7 +1931,7 @@ export async function executeSubtreeImportIntoMatrix(args: {
     {
       const { tasks, manifs } = splitKbCards(kbCardsOut, workspaceId);
       await insertBatch('tasks', tasks);
-      await insertBatch('task_manifestations', manifs);
+      await insertBatch('atom_manifestations', manifs);
     }
     step('Checklisten einfuegen…');
     await insertBatch('checklists', checklistsOut);
@@ -1932,7 +1939,7 @@ export async function executeSubtreeImportIntoMatrix(args: {
     {
       const { tasks, manifs } = splitChecklistItems(checklistItemsOut, workspaceId);
       await insertBatch('tasks', tasks);
-      await insertBatch('task_manifestations', manifs);
+      await insertBatch('atom_manifestations', manifs);
     }
     step('Links einfuegen…');
     await insertBatch('links', linksOut);
@@ -2185,7 +2192,7 @@ export async function executeSubtreeImportIntoBoard(args: {
   {
     const { tasks, manifs } = splitKbCards(kbCardsOut, workspaceId);
     await insertBatch('tasks', tasks);
-    await insertBatch('task_manifestations', manifs);
+    await insertBatch('atom_manifestations', manifs);
   }
   step('Checklisten einfuegen…');
   await insertBatch('checklists', checklistsOut);
@@ -2193,7 +2200,7 @@ export async function executeSubtreeImportIntoBoard(args: {
   {
     const { tasks, manifs } = splitChecklistItems(checklistItemsOut, workspaceId);
     await insertBatch('tasks', tasks);
-    await insertBatch('task_manifestations', manifs);
+    await insertBatch('atom_manifestations', manifs);
   }
   step('Links einfuegen…');
   await insertBatch('links', linksOut);

@@ -90,7 +90,8 @@ export type AdminStats = {
   users_active_30d: number;
   workspaces_total: number;
   tasks_total: number;
-  task_manifestations_total: number;
+  // Q.2: task_manifestations_total entfernt — die Tabelle existiert
+  // nicht mehr. atom_manifestations_total ist der konsolidierte Count.
   atom_manifestations_total: number;
   audit_events_24h: number;
   as_of: string;

@@ -235,7 +235,7 @@ const BoardView: Component<Props> = (p) => {
     // Shape). Die zugehoerige Kanban-Manifestation suchen wir via
     // wsManifestations, damit Drop-Targets Move-vs-Add erkennen koennen.
     const kanbanManif = (p.wsManifestations ?? []).find(
-      (m) => m.kind === 'kanban' && m.task_id === card.id,
+      (m) => m.kind === 'kanban' && m.atom_id === card.id,
     );
     startDrag({
       atom: 'task',
@@ -393,7 +393,7 @@ const BoardView: Component<Props> = (p) => {
       clearDragState();
       const list = cardsByCol().get(colId) ?? [];
       const tail = list.reduce((max, c) => (c.position > max ? c.position : max), -1) + 1;
-      const taskExisting = (p.wsManifestations ?? []).filter((m) => m.task_id === ext.atomId);
+      const taskExisting = (p.wsManifestations ?? []).filter((m) => m.atom_id === ext.atomId);
       void dropOnKanbanCol({
         workspaceId: p.workspaceId,
         taskId: ext.atomId,

@@ -465,10 +465,12 @@ export type SoftGroupMemberRow = {
   workspace_id: string;
 };
 
-// ─── Task-Layer Types (Phase 4 T.1) ───────────────────────────────
-// ECS-Architektur: tasks (Layer 0 = Aggregate Root) + task_manifestations
-// (Layer 1 = "wo erscheint die Task"). Layer 2/3/4 (Dependencies, Rules,
-// Comments/Files/Docs) folgen in T.3/T.4/T.2.
+// ─── Task-Layer Types (Phase 4 T.1 + Q.2 consolidation) ────────────
+// ECS-Architektur: tasks (Layer 0 = Aggregate Root) + atom_manifestations
+// (Layer 1 = "wo erscheint die Task / das Atom"). Q.2 hat die alte
+// task_manifestations-Tabelle aufgeloest — Manifestations leben jetzt
+// polymorph in atom_manifestations mit `atom_type` als Diskriminator.
+// Task-spezifische Reads filtern auf `atom_type='task'`.
 
 export type TaskStatus = 'open' | 'in_progress' | 'blocked' | 'done' | 'archived';
 
@@ -504,9 +506,15 @@ export type TaskInput = {
   attrs?: Record<string, unknown>;
 };
 
+// Q.2: TaskManifestationRow ist jetzt eine getypte Sicht auf
+// atom_manifestations mit atom_type='task'. Die ID-Spalte heisst in der
+// DB `atom_id` — Caller die einen Task-Bezug brauchen, nutzen die
+// Spalte mit demselben Namen. Field-Renames entlang der 30 Zugriffs-
+// stellen wurden mit dem Q.2-Sweep angepasst.
 export type TaskManifestationRow = {
   id: string;
-  task_id: string;
+  atom_type: 'task';
+  atom_id: string; // ehemals task_id; verweist nach wie vor auf tasks.id
   workspace_id: string;
   kind: TaskManifestationKind;
   container_id: string | null; // kb_cols.id / checklists.id / null bei calendar/standalone
@@ -517,7 +525,7 @@ export type TaskManifestationRow = {
 };
 
 export type TaskManifestationInput = {
-  task_id: string;
+  atom_id: string; // tasks.id
   kind: TaskManifestationKind;
   container_id?: string | null;
   position?: number;

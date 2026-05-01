@@ -1,14 +1,15 @@
-// Task-Layer Projections (Phase 4 T.1.D — Native Datenfluss)
+// Task-Layer Projections (Phase 4 T.1.D + Q.2 consolidation)
 //
 // Verantwortung:
-//   Daten leben ausschliesslich in `tasks` + `task_manifestations`.
+//   Daten leben ausschliesslich in `tasks` + `atom_manifestations`
+//   (Q.2 hat task_manifestations aufgeloest).
 //   Diese Datei mappt zwischen der DB-nahen ECS-Form (TaskRow +
-//   TaskManifestationRow) und der Legacy-UI-Form (KbCardRow /
-//   ChecklistItemRow), die BoardView/ChecklistPanel/CardOverlay/etc.
-//   noch konsumieren. Sobald T.1.D5-T.1.D7 die UI auf die compound
-//   form (KanbanCard / ChecklistEntry) umstellen, schmelzen die
-//   `to*Row()`-Projektionen auf 1:1-Zuweisungen ein und diese Datei
-//   verschwindet (T.1.D8).
+//   TaskManifestationRow ueber atom_type='task') und der Legacy-UI-Form
+//   (KbCardRow / ChecklistItemRow), die BoardView/ChecklistPanel/
+//   CardOverlay/etc. noch konsumieren. Sobald T.1.D5-T.1.D7 die UI auf
+//   die compound form (KanbanCard / ChecklistEntry) umstellen,
+//   schmelzen die `to*Row()`-Projektionen auf 1:1-Zuweisungen ein und
+//   diese Datei verschwindet (T.1.D8).
 //
 // Mapping-Tabelle (kb_cards):
 //   task.id                    → KbCardRow.id           (1:1 durch Migration 041)
@@ -137,7 +138,8 @@ export function cardSnapshotToTaskAndManif(snap: KbCardRow): {
   // Manifestations. Synth-Id reicht.
   const manif: TaskManifestationRow = {
     id: `${snap.id}-kanban`, // Synth — DB vergibt beim Replay eine echte UUID
-    task_id: snap.id,
+    atom_type: 'task',
+    atom_id: snap.id,
     workspace_id: snap.workspace_id,
     kind: 'kanban',
     container_id: snap.col_id,
@@ -172,7 +174,8 @@ export function itemSnapshotToTaskAndManif(snap: ChecklistItemRow): {
 
   const manif: TaskManifestationRow = {
     id: `${snap.id}-checklist`,
-    task_id: snap.id,
+    atom_type: 'task',
+    atom_id: snap.id,
     workspace_id: snap.workspace_id,
     kind: 'checklist',
     container_id: snap.checklist_id,

@@ -142,7 +142,7 @@ export async function moveByTime(args: MoveByTimeArgs): Promise<void> {
   // unveraendert (User koennte das spaeter selbst aendern).
   try {
     const created = await addManifestation(workspaceId, {
-      task_id: taskId,
+      atom_id: taskId,
       kind: 'calendar',
       display_meta: { start_date: dayIso, time: newTime },
     });

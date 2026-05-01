@@ -184,41 +184,50 @@ export async function fetchColsForWorkspace(workspaceId: string): Promise<ColRow
 // von der Aggregat-Sektion (Intervallmatrix / Aufgabenuebersicht),
 // um alle Karten im Subtree einer Matrix zu holen.
 //
-// Phase 4 T.1.D: Native gegen tasks + task_manifestations. Manifestations
-// (kind='kanban') tragen den board_id-Bezug in display_meta.board_id —
-// der Filter laeuft client-side, weil ein JSONB-Index dafuer (noch)
-// fehlt und die Fall-Datenmenge pro Workspace klein ist.
+// Phase 4 T.1.D + Q.2: Native gegen tasks + atom_manifestations
+// (atom_type='task'). Manifestations (kind='kanban') tragen den
+// board_id-Bezug in display_meta.board_id — der Filter laeuft
+// client-side, weil ein JSONB-Index dafuer (noch) fehlt und die
+// Fall-Datenmenge pro Workspace klein ist.
+//
+// Q.2: atom_manifestations.atom_id traegt KEINEN FK auf tasks.id (poly-
+// morpher Ref), daher kein PostgREST-Embed. Stattdessen zwei parallele
+// Queries + client-seitiger Join via Map<task.id, task>.
 export async function fetchCardsForBoards(
   boardIds: string[],
   workspaceId: string,
 ): Promise<KbCardRow[]> {
   if (boardIds.length === 0) return [];
   try {
-    const { data, error } = await supabase
-      .from('task_manifestations')
-      .select('*, task:tasks(*)')
-      .eq('workspace_id', workspaceId)
-      .eq('kind', 'kanban');
-    if (error) throw error;
+    const [manifsRes, tasksRes] = await Promise.all([
+      supabase
+        .from('atom_manifestations')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .eq('atom_type', 'task')
+        .eq('kind', 'kanban'),
+      supabase.from('tasks').select('*').eq('workspace_id', workspaceId),
+    ]);
+    if (manifsRes.error) throw manifsRes.error;
+    if (tasksRes.error) throw tasksRes.error;
     const idSet = new Set(boardIds);
-    type Joined = TaskManifestationRow & { task: TaskRow | null };
-    const joined = (data ?? []) as Joined[];
+    const manifsAll = (manifsRes.data ?? []) as TaskManifestationRow[];
+    const tasksAll = (tasksRes.data ?? []) as TaskRow[];
+    const taskById = new Map(tasksAll.map((t) => [t.id, t]));
     const cards: KbCardRow[] = [];
-    const tasks: TaskRow[] = [];
     const manifs: TaskManifestationRow[] = [];
-    for (const m of joined) {
-      const t = m.task;
-      if (!t) continue;
+    for (const m of manifsAll) {
       const boardId = (m.display_meta as Record<string, unknown> | null)?.board_id as
         | string
         | undefined;
       if (!boardId || !idSet.has(boardId)) continue;
+      const t = taskById.get(m.atom_id);
+      if (!t) continue;
       cards.push(taskAndManifToCard(t, m));
-      tasks.push(t);
-      manifs.push({ ...m, task: undefined } as unknown as TaskManifestationRow);
+      manifs.push(m);
     }
-    void mergeRows('tasks', tasks).catch(() => {});
-    void mergeRows('task_manifestations', manifs).catch(() => {});
+    void mergeRows('tasks', tasksAll).catch(() => {});
+    void mergeRows('atom_manifestations', manifs).catch(() => {});
     markLiveSuccess();
     return cards;
   } catch (err) {
@@ -226,17 +235,17 @@ export async function fetchCardsForBoards(
     const idSet = new Set(boardIds);
     const [allTasks, allManifs] = await Promise.all([
       getByWorkspace<TaskRow>('tasks', workspaceId),
-      getByWorkspace<TaskManifestationRow>('task_manifestations', workspaceId),
+      getByWorkspace<TaskManifestationRow>('atom_manifestations', workspaceId),
     ]);
     const taskById = new Map(allTasks.map((t) => [t.id, t]));
     const cards: KbCardRow[] = [];
     for (const m of allManifs) {
-      if (m.kind !== 'kanban') continue;
+      if (m.atom_type !== 'task' || m.kind !== 'kanban') continue;
       const boardId = (m.display_meta as Record<string, unknown> | null)?.board_id as
         | string
         | undefined;
       if (!boardId || !idSet.has(boardId)) continue;
-      const t = taskById.get(m.task_id);
+      const t = taskById.get(m.atom_id);
       if (!t) continue;
       cards.push(taskAndManifToCard(t, m));
     }
@@ -312,16 +321,16 @@ export async function fetchMatrixContent(
 // Board-Checklisten eingeschraenkt — nicht via RLS-only, weil es sonst
 // alle items ueber den Workspace laedt.
 //
-// Phase 4 T.1.D: Karten + Items kommen ueber tasks + task_manifestations.
-// Karten = manifestations(kind='kanban') WHERE display_meta.board_id =
-// boardId. Items = manifestations(kind='checklist') WHERE container_id
-// IN (board.checklists).
+// Phase 4 T.1.D + Q.2: Karten + Items kommen ueber tasks +
+// atom_manifestations(atom_type='task'). Karten = kind='kanban'
+// WHERE display_meta.board_id = boardId. Items = kind='checklist'
+// WHERE container_id IN (board.checklists).
 export async function fetchBoardContent(
   boardId: string,
   workspaceId: string,
 ): Promise<BoardContent> {
   try {
-    const [colsRes, manifsRes, checklistsRes, linksRes] = await Promise.all([
+    const [colsRes, manifsRes, tasksRes, checklistsRes, linksRes] = await Promise.all([
       supabase
         .from('kb_cols')
         .select('*')
@@ -329,10 +338,12 @@ export async function fetchBoardContent(
         .eq('workspace_id', workspaceId)
         .order('position', { ascending: true }),
       supabase
-        .from('task_manifestations')
-        .select('*, task:tasks(*)')
+        .from('atom_manifestations')
+        .select('*')
         .eq('workspace_id', workspaceId)
+        .eq('atom_type', 'task')
         .eq('kind', 'kanban'),
+      supabase.from('tasks').select('*').eq('workspace_id', workspaceId),
       supabase
         .from('checklists')
         .select('*')
@@ -349,51 +360,50 @@ export async function fetchBoardContent(
 
     if (colsRes.error) throw colsRes.error;
     if (manifsRes.error) throw manifsRes.error;
+    if (tasksRes.error) throw tasksRes.error;
     if (checklistsRes.error) throw checklistsRes.error;
     if (linksRes.error) throw linksRes.error;
 
     const kbCols = (colsRes.data ?? []) as KbColRow[];
     const checklists = (checklistsRes.data ?? []) as ChecklistRow[];
     const links = (linksRes.data ?? []) as LinkRow[];
+    const tasksAll = (tasksRes.data ?? []) as TaskRow[];
+    const taskById = new Map(tasksAll.map((t) => [t.id, t]));
 
-    type Joined = TaskManifestationRow & { task: TaskRow | null };
-    const cardManifs = (manifsRes.data ?? []) as Joined[];
-    const cachedTasks: TaskRow[] = [];
+    const cardManifs = (manifsRes.data ?? []) as TaskManifestationRow[];
     const cachedCardManifs: TaskManifestationRow[] = [];
     const kbCards: KbCardRow[] = [];
     for (const m of cardManifs) {
-      const t = m.task;
-      if (!t) continue;
       const bId = (m.display_meta as Record<string, unknown> | null)?.board_id as
         | string
         | undefined;
       if (bId !== boardId) continue;
+      const t = taskById.get(m.atom_id);
+      if (!t) continue;
       kbCards.push(taskAndManifToCard(t, m));
-      cachedTasks.push(t);
-      cachedCardManifs.push({ ...m, task: undefined } as unknown as TaskManifestationRow);
+      cachedCardManifs.push(m);
     }
     kbCards.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 
     // Items: manifestations(kind='checklist') wo container_id in checklists.
     const checklistItems: ChecklistItemRow[] = [];
-    const cachedItemTasks: TaskRow[] = [];
     const cachedItemManifs: TaskManifestationRow[] = [];
     if (checklists.length > 0) {
       const ids = checklists.map((c) => c.id);
       const itemsRes = await supabase
-        .from('task_manifestations')
-        .select('*, task:tasks(*)')
+        .from('atom_manifestations')
+        .select('*')
         .eq('workspace_id', workspaceId)
+        .eq('atom_type', 'task')
         .eq('kind', 'checklist')
         .in('container_id', ids);
       if (itemsRes.error) throw itemsRes.error;
-      const itemJoined = (itemsRes.data ?? []) as Joined[];
-      for (const m of itemJoined) {
-        const t = m.task;
+      const itemManifs = (itemsRes.data ?? []) as TaskManifestationRow[];
+      for (const m of itemManifs) {
+        const t = taskById.get(m.atom_id);
         if (!t) continue;
         checklistItems.push(taskAndManifToItem(t, m));
-        cachedItemTasks.push(t);
-        cachedItemManifs.push({ ...m, task: undefined } as unknown as TaskManifestationRow);
+        cachedItemManifs.push(m);
       }
       checklistItems.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
     }
@@ -401,8 +411,8 @@ export async function fetchBoardContent(
     void mergeRows('kb_cols', kbCols).catch(() => {});
     void mergeRows('checklists', checklists).catch(() => {});
     void mergeRows('links', links).catch(() => {});
-    void mergeRows('tasks', [...cachedTasks, ...cachedItemTasks]).catch(() => {});
-    void mergeRows('task_manifestations', [...cachedCardManifs, ...cachedItemManifs]).catch(
+    void mergeRows('tasks', tasksAll).catch(() => {});
+    void mergeRows('atom_manifestations', [...cachedCardManifs, ...cachedItemManifs]).catch(
       () => {},
     );
     markLiveSuccess();
@@ -414,7 +424,7 @@ export async function fetchBoardContent(
     const [allCols, allTasks, allManifs, allCl, allLinks] = await Promise.all([
       getByWorkspace<KbColRow>('kb_cols', workspaceId),
       getByWorkspace<TaskRow>('tasks', workspaceId),
-      getByWorkspace<TaskManifestationRow>('task_manifestations', workspaceId),
+      getByWorkspace<TaskManifestationRow>('atom_manifestations', workspaceId),
       getByWorkspace<ChecklistRow>('checklists', workspaceId),
       getByWorkspace<LinkRow>('links', workspaceId),
     ]);
@@ -426,7 +436,8 @@ export async function fetchBoardContent(
     const kbCards: KbCardRow[] = [];
     const checklistItems: ChecklistItemRow[] = [];
     for (const m of allManifs) {
-      const t = taskById.get(m.task_id);
+      if (m.atom_type !== 'task') continue;
+      const t = taskById.get(m.atom_id);
       if (!t) continue;
       if (m.kind === 'kanban') {
         const bId = (m.display_meta as Record<string, unknown> | null)?.board_id as
@@ -461,9 +472,8 @@ export async function fetchBoardContent(
 // in deren Card-Liste. Wird vom NodeTree-Drop-Handler benoetigt
 // um Karten ans Top der ersten Spalte zu schieben.
 //
-// Phase 4 T.1.D: Position kommt aus task_manifestations(kind='kanban',
-// container_id = firstCol.id) — die Cards leben dort, nicht mehr in
-// einer kb_cards-Tabelle.
+// Phase 4 T.1.D + Q.2: Position kommt aus atom_manifestations(atom_type=
+// 'task', kind='kanban', container_id=firstCol.id).
 export async function fetchBoardCardDropTarget(
   boardId: string,
   workspaceId: string,
@@ -481,9 +491,10 @@ export async function fetchBoardCardDropTarget(
     if (!firstCol) return null;
 
     const posRes = await supabase
-      .from('task_manifestations')
+      .from('atom_manifestations')
       .select('position')
       .eq('container_id', firstCol.id)
+      .eq('atom_type', 'task')
       .eq('kind', 'kanban')
       .eq('workspace_id', workspaceId)
       .order('position', { ascending: false })
@@ -499,7 +510,7 @@ export async function fetchBoardCardDropTarget(
     if (!isNetworkError(err)) throw err;
     const [allCols, allManifs] = await Promise.all([
       getByWorkspace<KbColRow>('kb_cols', workspaceId),
-      getByWorkspace<TaskManifestationRow>('task_manifestations', workspaceId),
+      getByWorkspace<TaskManifestationRow>('atom_manifestations', workspaceId),
     ]);
     const cols = allCols
       .filter((c) => c.board_id === boardId)
@@ -510,7 +521,9 @@ export async function fetchBoardCardDropTarget(
       return null;
     }
     const colManifs = allManifs
-      .filter((m) => m.kind === 'kanban' && m.container_id === firstCol.id)
+      .filter(
+        (m) => m.atom_type === 'task' && m.kind === 'kanban' && m.container_id === firstCol.id,
+      )
       .sort((a, b) => (b.position ?? 0) - (a.position ?? 0));
     const topPos = colManifs.length > 0 ? (colManifs[0].position ?? 0) : -1;
     markCacheFallback();
@@ -522,7 +535,8 @@ export async function fetchBoardCardDropTarget(
 // Wie der Board-Pfad, aber gefiltert auf eine Zelle. RLS + workspace_id
 // als Guard.
 //
-// Phase 4 T.1.D: Items kommen aus task_manifestations(kind='checklist').
+// Phase 4 T.1.D + Q.2: Items kommen aus atom_manifestations(
+// atom_type='task', kind='checklist').
 export async function fetchCellChecklists(
   cellId: string,
   workspaceId: string,
@@ -542,27 +556,34 @@ export async function fetchCellChecklists(
     const cachedManifs: TaskManifestationRow[] = [];
     if (checklists.length > 0) {
       const ids = checklists.map((c) => c.id);
-      const { data: itData, error: itErr } = await supabase
-        .from('task_manifestations')
-        .select('*, task:tasks(*)')
-        .eq('workspace_id', workspaceId)
-        .eq('kind', 'checklist')
-        .in('container_id', ids);
-      if (itErr) throw itErr;
-      type Joined = TaskManifestationRow & { task: TaskRow | null };
-      for (const m of (itData ?? []) as Joined[]) {
-        const t = m.task;
+      const [manifsRes, tasksRes] = await Promise.all([
+        supabase
+          .from('atom_manifestations')
+          .select('*')
+          .eq('workspace_id', workspaceId)
+          .eq('atom_type', 'task')
+          .eq('kind', 'checklist')
+          .in('container_id', ids),
+        supabase.from('tasks').select('*').eq('workspace_id', workspaceId),
+      ]);
+      if (manifsRes.error) throw manifsRes.error;
+      if (tasksRes.error) throw tasksRes.error;
+      const manifs = (manifsRes.data ?? []) as TaskManifestationRow[];
+      const tasksAll = (tasksRes.data ?? []) as TaskRow[];
+      const taskById = new Map(tasksAll.map((t) => [t.id, t]));
+      for (const m of manifs) {
+        const t = taskById.get(m.atom_id);
         if (!t) continue;
         checklistItems.push(taskAndManifToItem(t, m));
         cachedTasks.push(t);
-        cachedManifs.push({ ...m, task: undefined } as unknown as TaskManifestationRow);
+        cachedManifs.push(m);
       }
       checklistItems.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
     }
 
     void mergeRows('checklists', checklists).catch(() => {});
     void mergeRows('tasks', cachedTasks).catch(() => {});
-    void mergeRows('task_manifestations', cachedManifs).catch(() => {});
+    void mergeRows('atom_manifestations', cachedManifs).catch(() => {});
     markLiveSuccess();
     return { checklists, checklistItems };
   } catch (err) {
@@ -570,7 +591,7 @@ export async function fetchCellChecklists(
     const [allCl, allTasks, allManifs] = await Promise.all([
       getByWorkspace<ChecklistRow>('checklists', workspaceId),
       getByWorkspace<TaskRow>('tasks', workspaceId),
-      getByWorkspace<TaskManifestationRow>('task_manifestations', workspaceId),
+      getByWorkspace<TaskManifestationRow>('atom_manifestations', workspaceId),
     ]);
     const checklists = allCl
       .filter((c) => c.cell_id === cellId)
@@ -579,8 +600,9 @@ export async function fetchCellChecklists(
     const taskById = new Map(allTasks.map((t) => [t.id, t]));
     const checklistItems: ChecklistItemRow[] = [];
     for (const m of allManifs) {
-      if (m.kind !== 'checklist' || !m.container_id || !clIds.has(m.container_id)) continue;
-      const t = taskById.get(m.task_id);
+      if (m.atom_type !== 'task' || m.kind !== 'checklist') continue;
+      if (!m.container_id || !clIds.has(m.container_id)) continue;
+      const t = taskById.get(m.atom_id);
       if (!t) continue;
       checklistItems.push(taskAndManifToItem(t, m));
     }
@@ -714,12 +736,17 @@ export async function isNodeEmpty(nodeId: string, nodeType: 'matrix' | 'board'):
     ]);
     return (r.count ?? 0) === 0 && (c.count ?? 0) === 0;
   }
-  // Karten = task_manifestations(kind='kanban', display_meta.board_id=nodeId).
-  // Wir fragen dafuer alle kanban-Manifestations des Workspaces ab und
-  // zaehlen client-seitig — JSONB-Index fehlt (s. fetchBoardContent).
-  // Bei "leerem" Board geht das durch wenn die Tabelle ohnehin klein ist.
+  // Karten = atom_manifestations(atom_type='task', kind='kanban',
+  // display_meta.board_id=nodeId). Wir fragen dafuer alle kanban-
+  // Manifestations des Workspaces ab und zaehlen client-seitig —
+  // JSONB-Index fehlt (s. fetchBoardContent). Bei "leerem" Board geht
+  // das durch wenn die Tabelle ohnehin klein ist.
   const [cardManifs, cols, cls, links] = await Promise.all([
-    supabase.from('task_manifestations').select('display_meta').eq('kind', 'kanban'),
+    supabase
+      .from('atom_manifestations')
+      .select('display_meta')
+      .eq('atom_type', 'task')
+      .eq('kind', 'kanban'),
     supabase.from('kb_cols').select('id', { head: true, count: 'exact' }).eq('board_id', nodeId),
     supabase.from('checklists').select('id', { head: true, count: 'exact' }).eq('board_id', nodeId),
     supabase.from('links').select('id', { head: true, count: 'exact' }).eq('board_id', nodeId),
@@ -1123,9 +1150,12 @@ export async function fetchAgendaTasks(filter: AgendaFilter): Promise<AgendaTask
   const { workspaceId } = filter;
   if (!workspaceId) return [];
   try {
+    // Q.2: Tasks ohne Embed laden (atom_manifestations.atom_id hat
+    // keinen FK auf tasks.id — polymorpher Ref). Manifestations werden
+    // parallel ueber atom_type='task' geladen und client-seitig gemapt.
     let q = supabase
       .from('tasks')
-      .select('*, manifestations:task_manifestations(*)')
+      .select('*')
       .eq('workspace_id', workspaceId)
       .order('deadline', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: false })
@@ -1148,21 +1178,30 @@ export async function fetchAgendaTasks(filter: AgendaFilter): Promise<AgendaTask
       const pat = `%${filter.search.trim().replace(/[%_]/g, (m) => `\\${m}`)}%`;
       q = q.ilike('label', pat);
     }
-    const { data, error } = await q;
-    if (error) throw error;
-    type Joined = TaskRow & { manifestations: TaskManifestationRow[] | null };
-    const rows = (data ?? []) as Joined[];
-    const tasks: TaskRow[] = [];
-    const manifs: TaskManifestationRow[] = [];
-    const out: AgendaTask[] = rows.map((r) => {
-      const { manifestations: m, ...task } = r;
-      tasks.push(task as TaskRow);
-      const mlist = (m ?? []) as TaskManifestationRow[];
-      manifs.push(...mlist);
-      return { task: task as TaskRow, manifestations: mlist };
-    });
+    const [tasksRes, manifsRes] = await Promise.all([
+      q,
+      supabase
+        .from('atom_manifestations')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .eq('atom_type', 'task'),
+    ]);
+    if (tasksRes.error) throw tasksRes.error;
+    if (manifsRes.error) throw manifsRes.error;
+    const tasks = (tasksRes.data ?? []) as TaskRow[];
+    const manifs = (manifsRes.data ?? []) as TaskManifestationRow[];
+    const manifsByTask = new Map<string, TaskManifestationRow[]>();
+    for (const m of manifs) {
+      const list = manifsByTask.get(m.atom_id) ?? [];
+      list.push(m);
+      manifsByTask.set(m.atom_id, list);
+    }
+    const out: AgendaTask[] = tasks.map((task) => ({
+      task,
+      manifestations: manifsByTask.get(task.id) ?? [],
+    }));
     void mergeRows('tasks', tasks).catch(() => {});
-    void mergeRows('task_manifestations', manifs).catch(() => {});
+    void mergeRows('atom_manifestations', manifs).catch(() => {});
     markLiveSuccess();
     return out;
   } catch (err) {
@@ -1170,13 +1209,14 @@ export async function fetchAgendaTasks(filter: AgendaFilter): Promise<AgendaTask
     // Offline-Fallback: aus IDB-Cache, dieselben Filter client-side.
     const [allTasks, allManifs] = await Promise.all([
       getByWorkspace<TaskRow>('tasks', workspaceId),
-      getByWorkspace<TaskManifestationRow>('task_manifestations', workspaceId),
+      getByWorkspace<TaskManifestationRow>('atom_manifestations', workspaceId),
     ]);
     const manifsByTask = new Map<string, TaskManifestationRow[]>();
     for (const m of allManifs) {
-      const arr = manifsByTask.get(m.task_id) ?? [];
+      if (m.atom_type !== 'task') continue;
+      const arr = manifsByTask.get(m.atom_id) ?? [];
       arr.push(m);
-      manifsByTask.set(m.task_id, arr);
+      manifsByTask.set(m.atom_id, arr);
     }
     const statusSet = filter.statusIn ? new Set(filter.statusIn) : null;
     const search = (filter.search ?? '').trim().toLowerCase();

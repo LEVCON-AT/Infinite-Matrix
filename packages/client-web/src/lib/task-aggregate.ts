@@ -121,7 +121,8 @@ export function buildCellTaskSummaries(args: {
   const tasksByBoard = new Map<string, TaskRow[]>();
   const tasksByChecklist = new Map<string, TaskRow[]>();
   for (const m of manifestations) {
-    const t = taskById.get(m.task_id);
+    if (m.atom_type !== 'task') continue;
+    const t = taskById.get(m.atom_id);
     if (!t) continue;
     if (m.kind === 'kanban') {
       const bId = (m.display_meta as Record<string, unknown> | null)?.board_id as

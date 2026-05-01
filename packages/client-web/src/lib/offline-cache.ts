@@ -38,10 +38,12 @@ type CacheRow = { id: string; workspace_id: string } & Record<string, unknown>;
 // leben nur noch in tasks + task_manifestations. Der upgrade()-Callback
 // loescht die alten Stores aus IDB-Installations < V6.
 //
-// Q.1.a (DB_VERSION=7): atom_manifestations ergaenzt. Damit Drag-Drops
-// von Link/Checklist auf Calendar (T.AC.B/C) auch offline durch den
-// safe-mutation-Wrapper laufen koennen — ohne Cache-Eintrag wuerfe
-// runOptimisticInsert sonst trotz Network-Loss eine Exception.
+// Q.1.a (DB_VERSION=7): atom_manifestations ergaenzt — Single-Source
+// fuer alle polymorphen Manifestations.
+//
+// Q.2 (DB_VERSION=8): task_manifestations entfernt — Daten leben jetzt
+// in atom_manifestations mit atom_type='task'. Der upgrade()-Callback
+// loescht den obsoleten Store.
 const TABLES = [
   'nodes',
   'cells',
@@ -59,15 +61,11 @@ const TABLES = [
   'object_tags',
   'groups',
   'group_members',
-  // T.1.C — Task-Layer Cache. tasks (Layer 0) + task_manifestations
-  // (Layer 1). Smart-Summary, Agenda, Calendar lesen aus diesen Stores
-  // wenn der Server weg ist.
+  // T.1.C — Task-Layer Cache. tasks (Layer 0) leben hier weiter; ihre
+  // Manifestations ziehen via atom_manifestations (Q.2).
   'tasks',
-  'task_manifestations',
-  // T.AC.A — polymorphe Manifestations (Layer 1+). Quelle der Wahrheit
-  // fuer Link/Checklist-im-Calendar; task-Atoms werden uebergangsweise
-  // per Sync-Trigger gespiegelt (Konsolidierung Q.2 droppt task_-
-  // manifestations zugunsten dieser Tabelle).
+  // T.AC.A + Q.2 — polymorphe Manifestations (Layer 1). Single-Source
+  // fuer alle Atom-Typen (task/link/checklist/doc).
   'atom_manifestations',
 ] as const;
 
@@ -94,7 +92,6 @@ interface MatrixCacheSchema extends DBSchema {
   groups: StoreDef;
   group_members: StoreDef;
   tasks: StoreDef;
-  task_manifestations: StoreDef;
   atom_manifestations: StoreDef;
 }
 
@@ -104,11 +101,12 @@ const DB_NAME = 'matrix-cache';
 // (tasks, task_manifestations). V6 (T.1.J): kb_cards + checklist_items
 // Stores entfernt — Daten leben nur noch in tasks + task_manifestations.
 // V7 (Q.1.a): atom_manifestations als Polymorph-Store ergaenzt.
-// Der `contains(t)`-Guard im Loop laesst alte Installs die fehlenden
-// Stores idempotent nachzufuegt bekommen; der zweite Block loescht
-// die obsoleten Stores aus V<6 Installs.
-const DB_VERSION = 7;
-const OBSOLETE_STORES = ['kb_cards', 'checklist_items'] as const;
+// V8 (Q.2): task_manifestations entfernt — atom_manifestations ist
+// Single-Source. Der `contains(t)`-Guard im Loop laesst alte Installs
+// die fehlenden Stores idempotent nachzufuegt bekommen; der zweite
+// Block loescht die obsoleten Stores.
+const DB_VERSION = 8;
+const OBSOLETE_STORES = ['kb_cards', 'checklist_items', 'task_manifestations'] as const;
 
 let dbPromise: Promise<IDBPDatabase<MatrixCacheSchema>> | null = null;
 

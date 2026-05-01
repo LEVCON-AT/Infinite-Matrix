@@ -1,9 +1,12 @@
-// Task-Layer (Phase 4 T.1.C) — Mutations + Helpers.
+// Task-Layer (Phase 4 T.1.C + Q.2 consolidation) — Mutations + Helpers.
 //
-// ECS-Architektur: tasks (Layer 0 = Aggregate Root) + task_manifestations
-// (Layer 1 = "wo erscheint die Task"). Pattern aus lib/objects.ts +
-// lib/mutations.ts uebernommen — runOptimistic*-Wrapper, IDB-Cache-
-// Fallback bei Network-Errors, Snapshot-basiertes Restore fuer Undo.
+// ECS-Architektur: tasks (Layer 0 = Aggregate Root) + atom_manifestations
+// (Layer 1 = "wo erscheint die Task / das Atom"). Q.2 hat die alte
+// task_manifestations-Tabelle aufgeloest — diese Datei schreibt und
+// liest jetzt direkt gegen atom_manifestations mit atom_type='task'.
+// Pattern aus lib/objects.ts + lib/mutations.ts: runOptimistic*-Wrapper,
+// IDB-Cache-Fallback bei Network-Errors, Snapshot-basiertes Restore
+// fuer Undo.
 //
 // Lese-Pfade:
 //   fetchTasks(workspaceId) — alle Tasks im Workspace + IDB-Fallback
@@ -49,6 +52,12 @@ export type {
   TaskRow,
   TaskStatus,
 } from './types';
+
+// Q.2: Manifestations-IDB-Cache-Store + Tabellenname zentral. Alle
+// Funktionen unten lesen/schreiben gegen atom_manifestations mit
+// atom_type='task'-Filter. TaskManifestationRow ist die getypte Sicht
+// auf das Subset.
+const MANIF_TABLE: CacheTable = 'atom_manifestations';
 
 // ─── Snapshot fuer Undo (deleteTask → restoreTask) ────────────
 // Analog Object-Layer: Snapshot enthaelt Task + alle Manifestations,
@@ -105,23 +114,24 @@ export async function fetchManifestationsByTask(taskId: string): Promise<TaskMan
   if (!taskId) return [];
   try {
     const { data, error } = await supabase
-      .from('task_manifestations')
+      .from('atom_manifestations')
       .select('*')
-      .eq('task_id', taskId)
+      .eq('atom_type', 'task')
+      .eq('atom_id', taskId)
       .order('created_at', { ascending: true });
     if (error) throw error;
     const rows = (data ?? []) as TaskManifestationRow[];
-    void mergeRows('task_manifestations', rows).catch(() => {});
+    void mergeRows(MANIF_TABLE, rows).catch(() => {});
     markLiveSuccess();
     return rows;
   } catch (err) {
     if (!isNetworkError(err)) throw err;
-    // IDB hat keinen by_task-Index — wir holen alle Manifestations und
+    // IDB hat keinen by_atom-Index — wir holen alle Manifestations und
     // filtern client-seitig. Bei Workspace-Scope reicht das, der Cache
     // ist ohnehin pro Workspace klein gehalten.
-    const all = await getByWorkspace<TaskManifestationRow>('task_manifestations', '');
+    const all = await getByWorkspace<TaskManifestationRow>(MANIF_TABLE, '');
     markCacheFallback();
-    return all.filter((m) => m.task_id === taskId);
+    return all.filter((m) => m.atom_type === 'task' && m.atom_id === taskId);
   }
 }
 
@@ -132,22 +142,23 @@ export async function fetchManifestationsByContainer(
   if (!containerId) return [];
   try {
     const { data, error } = await supabase
-      .from('task_manifestations')
+      .from('atom_manifestations')
       .select('*')
+      .eq('atom_type', 'task')
       .eq('container_id', containerId)
       .eq('kind', kind)
       .order('position', { ascending: true });
     if (error) throw error;
     const rows = (data ?? []) as TaskManifestationRow[];
-    void mergeRows('task_manifestations', rows).catch(() => {});
+    void mergeRows(MANIF_TABLE, rows).catch(() => {});
     markLiveSuccess();
     return rows;
   } catch (err) {
     if (!isNetworkError(err)) throw err;
-    const all = await getByWorkspace<TaskManifestationRow>('task_manifestations', '');
+    const all = await getByWorkspace<TaskManifestationRow>(MANIF_TABLE, '');
     markCacheFallback();
     return all
-      .filter((m) => m.container_id === containerId && m.kind === kind)
+      .filter((m) => m.atom_type === 'task' && m.container_id === containerId && m.kind === kind)
       .sort((a, b) => a.position - b.position);
   }
 }
@@ -158,19 +169,20 @@ export async function fetchManifestationsByWorkspace(
   if (!workspaceId) return [];
   try {
     const { data, error } = await supabase
-      .from('task_manifestations')
+      .from('atom_manifestations')
       .select('*')
+      .eq('atom_type', 'task')
       .eq('workspace_id', workspaceId);
     if (error) throw error;
     const rows = (data ?? []) as TaskManifestationRow[];
-    void mergeRows('task_manifestations', rows).catch(() => {});
+    void mergeRows(MANIF_TABLE, rows).catch(() => {});
     markLiveSuccess();
     return rows;
   } catch (err) {
     if (!isNetworkError(err)) throw err;
-    const cached = await getByWorkspace<TaskManifestationRow>('task_manifestations', workspaceId);
+    const cached = await getByWorkspace<TaskManifestationRow>(MANIF_TABLE, workspaceId);
     markCacheFallback();
-    return cached;
+    return cached.filter((m) => m.atom_type === 'task');
   }
 }
 
@@ -316,8 +328,10 @@ export function toggleTaskDone(taskId: string, done: boolean): Promise<TaskRow> 
   return updateTask(taskId, { status: done ? 'done' : 'open' });
 }
 
-// Snapshot bauen, dann Cascade auf manifestations (DB ON DELETE CASCADE)
-// und am Ende task. Bei Network-Loss landet der Delete-Spec in der Queue.
+// Snapshot bauen, dann atom_manifestations explizit purgen (Pseudo-
+// CASCADE-Trigger aus Migration 044 erledigt das auch DB-seitig — wir
+// rufen den Delete trotzdem damit der lokale Cache sauber bleibt).
+// Bei Network-Loss landet der Delete-Spec in der Queue.
 export async function deleteTask(taskId: string): Promise<TaskSnapshot | null> {
   const task = await fetchTask(taskId);
   if (!task) return null;
@@ -333,19 +347,17 @@ export async function deleteTask(taskId: string): Promise<TaskSnapshot | null> {
     },
   });
 
-  // Manifestations sind durch FK CASCADE eh weg — lokalen Cache aber
-  // explizit putzen, sonst zeigen Reads stale Daten bis zum naechsten
-  // Live-Refresh.
+  // Pseudo-CASCADE-Trigger _atom_manif_purge_for_task aus Migration 044
+  // hat die Manifestations DB-seitig schon entfernt — wir putzen den
+  // IDB-Cache idempotent, damit kein stale Stand bleibt.
   for (const m of manifestations) {
     await runOptimisticDelete({
-      table: 'task_manifestations',
+      table: MANIF_TABLE,
       id: m.id,
       workspaceId: m.workspace_id,
       run: async () => {
-        // FK-Cascade hat das schon erledigt — wir versuchen den DELETE
-        // trotzdem (idempotent: loescht nichts wenn schon weg). Bei
-        // Network-Loss landet er in der Queue — auch ok.
-        await supabase.from('task_manifestations').delete().eq('id', m.id);
+        // Idempotent: loescht nichts wenn der Trigger schon gepurgt hat.
+        await supabase.from('atom_manifestations').delete().eq('id', m.id);
       },
     });
   }
@@ -379,10 +391,11 @@ export async function restoreTask(snap: TaskSnapshot): Promise<TaskRow> {
 
   for (const m of snap.manifestations) {
     const { data: mData, error: mErr } = await supabase
-      .from('task_manifestations')
+      .from('atom_manifestations')
       .insert({
         id: m.id,
-        task_id: m.task_id,
+        atom_type: 'task',
+        atom_id: m.atom_id,
         workspace_id: m.workspace_id,
         kind: m.kind,
         container_id: m.container_id,
@@ -396,9 +409,7 @@ export async function restoreTask(snap: TaskSnapshot): Promise<TaskRow> {
       console.error('[tasks] restoreTask manifestation insert failed', mErr);
       continue;
     }
-    void putOne('task_manifestations' satisfies CacheTable, mData as TaskManifestationRow).catch(
-      () => {},
-    );
+    void putOne(MANIF_TABLE, mData as TaskManifestationRow).catch(() => {});
   }
   return restored;
 }
@@ -407,8 +418,8 @@ export async function restoreTask(snap: TaskSnapshot): Promise<TaskRow> {
 // POSITION-HELPER
 // ═══════════════════════════════════════════════════════════════
 
-// Liefert die naechste freie Position fuer eine task_manifestation in
-// einem bestimmten Container desselben Kinds. Bevorzugt einen Live-Read
+// Liefert die naechste freie Position fuer eine Manifestation in einem
+// bestimmten Container desselben Kinds. Bevorzugt einen Live-Read
 // (MAX(position) + 1) und faellt bei Network-Loss auf den IDB-Cache
 // zurueck. Q.1.c: ersetzt ad-hoc `Date.now()`-Defaults aus der
 // manifestation-cross-view-Welle — Date.now() produziert 13-stellige
@@ -421,8 +432,9 @@ export async function nextManifestationPosition(
   if (!containerId) return 0;
   try {
     const { data, error } = await supabase
-      .from('task_manifestations')
+      .from('atom_manifestations')
       .select('position')
+      .eq('atom_type', 'task')
       .eq('container_id', containerId)
       .eq('kind', kind)
       .order('position', { ascending: false })
@@ -436,8 +448,10 @@ export async function nextManifestationPosition(
     // Cache-Fallback: alle Manifestations laden und client-seitig
     // filtern. Pattern uebernommen aus nextPositionFromCache in
     // mutations.ts.
-    const all = await getByWorkspace<TaskManifestationRow>('task_manifestations', '');
-    const filtered = all.filter((m) => m.container_id === containerId && m.kind === kind);
+    const all = await getByWorkspace<TaskManifestationRow>(MANIF_TABLE, '');
+    const filtered = all.filter(
+      (m) => m.atom_type === 'task' && m.container_id === containerId && m.kind === kind,
+    );
     markCacheFallback();
     if (filtered.length === 0) return 0;
     return filtered.reduce((m, r) => Math.max(m, r.position ?? -1), -1) + 1;
@@ -454,19 +468,19 @@ export async function nextManifestationPosition(
 function validateManifestationInput(input: TaskManifestationInput): void {
   if (input.kind === 'kanban' || input.kind === 'checklist') {
     if (!input.container_id) {
-      throw new Error(`task_manifestation kind='${input.kind}' braucht container_id`);
+      throw new Error(`atom_manifestation kind='${input.kind}' braucht container_id`);
     }
   } else if (input.kind === 'calendar' || input.kind === 'standalone') {
     if (input.container_id) {
-      throw new Error(`task_manifestation kind='${input.kind}' darf keinen container_id haben`);
+      throw new Error(`atom_manifestation kind='${input.kind}' darf keinen container_id haben`);
     }
   }
   if (input.kind === 'checklist') {
     if (input.level == null || input.level < 0 || input.level > 2) {
-      throw new Error("task_manifestation kind='checklist' braucht level 0..2");
+      throw new Error("atom_manifestation kind='checklist' braucht level 0..2");
     }
   } else if (input.level != null) {
-    throw new Error(`task_manifestation kind='${input.kind}' darf kein level haben`);
+    throw new Error(`atom_manifestation kind='${input.kind}' darf kein level haben`);
   }
 }
 
@@ -476,14 +490,15 @@ export async function addManifestation(
 ): Promise<TaskManifestationRow> {
   validateManifestationInput(input);
   return runOptimisticInsert<TaskManifestationRow>({
-    table: 'task_manifestations',
+    table: MANIF_TABLE,
     workspaceId,
     label: 'Sicht hinzufuegen',
     run: async () => {
       const { data, error } = await supabase
-        .from('task_manifestations')
+        .from('atom_manifestations')
         .insert({
-          task_id: input.task_id,
+          atom_type: 'task',
+          atom_id: input.atom_id,
           workspace_id: workspaceId,
           kind: input.kind,
           container_id: input.container_id ?? null,
@@ -498,7 +513,8 @@ export async function addManifestation(
     },
     buildOffline: (id) => ({
       id,
-      task_id: input.task_id,
+      atom_type: 'task',
+      atom_id: input.atom_id,
       workspace_id: workspaceId,
       kind: input.kind,
       container_id: input.container_id ?? null,
@@ -522,13 +538,13 @@ export async function updateManifestation(
   patch: ManifestationPatch,
 ): Promise<TaskManifestationRow> {
   return runOptimisticUpdate<TaskManifestationRow>({
-    table: 'task_manifestations',
+    table: MANIF_TABLE,
     id: manifId,
     patch: patch as Record<string, unknown>,
     label: 'Sicht aendern',
     run: async () => {
       const { data, error } = await supabase
-        .from('task_manifestations')
+        .from('atom_manifestations')
         .update(patch)
         .eq('id', manifId)
         .select()
@@ -555,11 +571,11 @@ export async function moveManifestation(
 
 export async function removeManifestation(manifId: string): Promise<void> {
   await runOptimisticDelete({
-    table: 'task_manifestations',
+    table: MANIF_TABLE,
     id: manifId,
     label: 'Sicht entfernen',
     run: async () => {
-      const { error } = await supabase.from('task_manifestations').delete().eq('id', manifId);
+      const { error } = await supabase.from('atom_manifestations').delete().eq('id', manifId);
       if (error) throw error;
     },
   });

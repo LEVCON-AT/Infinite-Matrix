@@ -52,24 +52,26 @@ export type ResetScope =
 // Board-Inhalt leeren: alle Karten + kb_cols + Checklisten + Links
 // mit board_id=target. Board-Node + Label + Alias bleiben.
 //
-// Phase 4 T.1.D: Karten = task_manifestations(kind='kanban',
-// display_meta.board_id=board). Items = task_manifestations(kind=
-// 'checklist', container_id IN board.checklists). Wir loeschen die
-// Tasks der jeweiligen Manifestations (CASCADE killt die Manifestations
-// selbst), dann kb_cols / checklists / links via FK.
+// Phase 4 T.1.D + Q.2: Karten = atom_manifestations(atom_type='task',
+// kind='kanban', display_meta.board_id=board). Items =
+// atom_manifestations(atom_type='task', kind='checklist',
+// container_id IN board.checklists). Wir loeschen die Tasks der
+// jeweiligen Manifestations (Pseudo-CASCADE-Trigger aus Migration 044
+// purgt die Manifestations), dann kb_cols / checklists / links via FK.
 async function clearBoardContents(boardNodeId: string): Promise<void> {
   // 1. Tasks mit kanban-Manif auf diesem Board.
   const { data: kbManifs, error: kbErr } = await supabase
-    .from('task_manifestations')
-    .select('task_id, display_meta')
+    .from('atom_manifestations')
+    .select('atom_id, display_meta')
+    .eq('atom_type', 'task')
     .eq('kind', 'kanban');
   if (kbErr) throw kbErr;
   const cardTaskIds = (kbManifs ?? [])
     .filter(
-      (m: { task_id: string; display_meta: Record<string, unknown> | null }) =>
+      (m: { atom_id: string; display_meta: Record<string, unknown> | null }) =>
         (m.display_meta as Record<string, unknown> | null)?.board_id === boardNodeId,
     )
-    .map((m: { task_id: string }) => m.task_id);
+    .map((m: { atom_id: string }) => m.atom_id);
 
   // 2. Tasks mit checklist-Manif in einer Checkliste dieses Boards.
   const { data: cls, error: clQErr } = await supabase
@@ -81,15 +83,16 @@ async function clearBoardContents(boardNodeId: string): Promise<void> {
   let itemTaskIds: string[] = [];
   if (clIds.length > 0) {
     const { data: itManifs, error: imErr } = await supabase
-      .from('task_manifestations')
-      .select('task_id')
+      .from('atom_manifestations')
+      .select('atom_id')
+      .eq('atom_type', 'task')
       .eq('kind', 'checklist')
       .in('container_id', clIds);
     if (imErr) throw imErr;
-    itemTaskIds = (itManifs ?? []).map((m: { task_id: string }) => m.task_id);
+    itemTaskIds = (itManifs ?? []).map((m: { atom_id: string }) => m.atom_id);
   }
 
-  // 3. Tasks-Bulk-Delete (CASCADE entfernt manifestations).
+  // 3. Tasks-Bulk-Delete (Pseudo-CASCADE-Trigger entfernt manifestations).
   const allTaskIds = [...cardTaskIds, ...itemTaskIds];
   if (allTaskIds.length > 0) {
     const { error: tasksErr } = await supabase.from('tasks').delete().in('id', allTaskIds);

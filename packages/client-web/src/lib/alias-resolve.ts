@@ -133,9 +133,10 @@ export async function resolveAlias(raw: string, workspaceId: string): Promise<Al
   if (cardTasks.data && cardTasks.data.length > 0) {
     const t = cardTasks.data[0] as { id: string; label: string; attrs: Record<string, unknown> };
     const manif = await supabase
-      .from('task_manifestations')
+      .from('atom_manifestations')
       .select('display_meta')
-      .eq('task_id', t.id)
+      .eq('atom_type', 'task')
+      .eq('atom_id', t.id)
       .eq('kind', 'kanban')
       .maybeSingle();
     const boardId = (

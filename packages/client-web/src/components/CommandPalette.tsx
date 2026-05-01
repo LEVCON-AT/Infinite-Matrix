@@ -247,9 +247,10 @@ const CommandPalette: Component<Props> = (p) => {
     setBusy(true);
     try {
       const posRes = await supabase
-        .from('task_manifestations')
+        .from('atom_manifestations')
         .select('position')
         .eq('container_id', col.id)
+        .eq('atom_type', 'task')
         .eq('kind', 'kanban')
         .eq('workspace_id', p.workspaceId)
         .order('position', { ascending: false })

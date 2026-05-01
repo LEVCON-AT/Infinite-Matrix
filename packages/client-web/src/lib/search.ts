@@ -220,25 +220,27 @@ export async function searchWorkspace(
       attrs: Record<string, unknown> | null;
     };
     const tasks = cardsRes.data as TaskHit[];
-    // Phase 4 T.1.D: board_id kommt aus task_manifestations(kind='kanban').display_meta.board_id.
-    // Batch-Lookup, damit wir nicht pro Treffer einen Roundtrip brauchen.
+    // Phase 4 T.1.D + Q.2: board_id kommt aus atom_manifestations
+    // (atom_type='task', kind='kanban').display_meta.board_id. Batch-
+    // Lookup, damit wir nicht pro Treffer einen Roundtrip brauchen.
     const taskIds = tasks.map((t) => t.id);
     const boardByTaskId = new Map<string, string>();
     if (taskIds.length > 0) {
       const manifsRes = await supabase
-        .from('task_manifestations')
-        .select('task_id, display_meta')
+        .from('atom_manifestations')
+        .select('atom_id, display_meta')
+        .eq('atom_type', 'task')
         .eq('kind', 'kanban')
-        .in('task_id', taskIds);
+        .in('atom_id', taskIds);
       if (manifsRes.data) {
         for (const m of manifsRes.data as Array<{
-          task_id: string;
+          atom_id: string;
           display_meta: Record<string, unknown> | null;
         }>) {
           const bId = (m.display_meta as Record<string, unknown> | null)?.board_id as
             | string
             | undefined;
-          if (bId) boardByTaskId.set(m.task_id, bId);
+          if (bId) boardByTaskId.set(m.atom_id, bId);
         }
       }
     }

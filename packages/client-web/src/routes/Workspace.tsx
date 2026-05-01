@@ -953,10 +953,11 @@ const Workspace: Component = () => {
         void refetchCellsWithDocs();
         scheduleAliasRefresh(wid);
       },
-      // T.AC.A.5: atom_manifestations-Events kommen NUR fuer non-task
-      // Atoms an (Tasks gehen ueber den task_manifestations-Sync-Trigger
-      // den anderen Weg). Refetch triggert den Mini-Calendar/DayView/
-      // Calendar-Render mit den neuen Link/Checklist-Eintraegen.
+      // T.AC.A.5 + Q.2: atom_manifestations ist Single-Source. Der
+      // realtime-Subscriber (lib/realtime.ts) routet task-Atoms in
+      // den kb_cards/checklist_items-Slot — dieser Slot hier feuert
+      // nur fuer non-task Atoms (Link/Checklist im Calendar) und
+      // refetcht den Mini-Calendar/DayView/Calendar-Render.
       atom_manifestations: () => {
         void refetchAtomManifs();
       },
