@@ -13961,6 +13961,83 @@ html.view-transition-drill-up::view-transition-new(ws-main) {
   gap: var(--space-2);
 }
 
+/* ── Provider-Slot-Cards (Admin/Config) ───────────────────────── */
+
+.provider-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+}
+
+.provider-slot-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.provider-slot-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.provider-slot-head h4 {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+}
+
+.provider-slot-status {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  padding: var(--space-0_5) var(--space-2);
+  border-radius: var(--radius-full);
+}
+
+.provider-slot-status-active {
+  background: var(--success-soft);
+  color: var(--tealtxt);
+}
+
+.provider-slot-status-incomplete {
+  background: var(--warning-soft);
+  color: var(--ambertxt);
+}
+
+.provider-slot-status-inactive {
+  background: var(--bg2);
+  color: var(--text3);
+}
+
+.provider-slot-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.provider-slot-enable {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.provider-slot-enable .hint {
+  margin-left: auto;
+}
+
+.provider-slot-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 /* ── Webhooks-Settings (Welle C.2) ────────────────────────────── */
 
 .webhook-list {

@@ -11,7 +11,7 @@
 // Buttons (.lift Helper-Klasse aus Q.3.A).
 
 import { useNavigate, useSearchParams } from '@solidjs/router';
-import { type Component, Show, createSignal } from 'solid-js';
+import { type Component, Show, createResource, createSignal } from 'solid-js';
 import {
   requestPasswordReset,
   signInWithGoogle,
@@ -22,6 +22,7 @@ import {
   useSession,
 } from '../lib/auth';
 import { translateDbError } from '../lib/errors';
+import { supabase } from '../lib/supabase';
 
 type Mode = 'magic-link' | 'password';
 type PasswordSubMode = 'sign-in' | 'sign-up' | 'reset';
@@ -30,6 +31,22 @@ const Login: Component = () => {
   const navigate = useNavigate();
   const session = useSession();
   const [searchParams] = useSearchParams<{ next?: string }>();
+
+  // Auto-Gate: SSO-Buttons nur sichtbar wenn der Plattform-Admin sie
+  // in System-Config aktiviert hat. RPC ist anon-callable und liefert
+  // nur enabled-Booleans, keine Secrets.
+  const [providers] = createResource(async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_enabled_auth_providers');
+      if (error) throw error;
+      return (data as { google?: boolean; microsoft?: boolean } | null) ?? {};
+    } catch {
+      return {} as { google?: boolean; microsoft?: boolean };
+    }
+  });
+  const googleEnabled = () => providers()?.google === true;
+  const microsoftEnabled = () => providers()?.microsoft === true;
+  const anySsoEnabled = () => googleEnabled() || microsoftEnabled();
 
   const [mode, setMode] = createSignal<Mode>('password');
   const [pwSub, setPwSub] = createSignal<PasswordSubMode>('sign-in');
@@ -103,61 +120,79 @@ const Login: Component = () => {
           <p class="login-sub">Waehle eine Methode</p>
         </header>
 
-        <div class="login-sso">
-          <button
-            type="button"
-            class="login-sso-btn lift"
-            onClick={onGoogle}
-            disabled={busy()}
-            aria-label="Mit Google anmelden"
-          >
-            <span class="login-sso-icon" aria-hidden="true">
-              {/* Google G — Multi-Color, daher inline hier (Manifest-Ausnahme: brand-mark). */}
-              <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
-                <title>Google</title>
-                <path
-                  fill="#4285F4"
-                  d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.79 2.72v2.26h2.9c1.7-1.56 2.69-3.86 2.69-6.62z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.34 0-4.32-1.58-5.03-3.71H.97v2.32A8.99 8.99 0 0 0 9 18z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M3.97 10.71A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.71V4.97H.97A8.99 8.99 0 0 0 0 9c0 1.45.35 2.83.97 4.03l3-2.32z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A8.95 8.95 0 0 0 9 0 8.99 8.99 0 0 0 .97 4.97l3 2.32C4.68 5.16 6.66 3.58 9 3.58z"
-                />
-              </svg>
-            </span>
-            Mit Google anmelden
-          </button>
-          <button
-            type="button"
-            class="login-sso-btn lift"
-            onClick={onMicrosoft}
-            disabled={busy()}
-            aria-label="Mit Microsoft anmelden"
-          >
-            <span class="login-sso-icon" aria-hidden="true">
-              <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
-                <title>Microsoft</title>
-                <path fill="#F25022" d="M0 0h8.5v8.5H0z" />
-                <path fill="#7FBA00" d="M9.5 0H18v8.5H9.5z" />
-                <path fill="#00A4EF" d="M0 9.5h8.5V18H0z" />
-                <path fill="#FFB900" d="M9.5 9.5H18V18H9.5z" />
-              </svg>
-            </span>
-            Mit Microsoft anmelden
-          </button>
-        </div>
+        <Show when={anySsoEnabled()}>
+          <div class="login-sso">
+            <Show when={googleEnabled()}>
+              <button
+                type="button"
+                class="login-sso-btn lift"
+                onClick={onGoogle}
+                disabled={busy()}
+                aria-label="Mit Google anmelden"
+              >
+                <span class="login-sso-icon" aria-hidden="true">
+                  {/* Google G — Multi-Color, daher inline hier (Manifest-Ausnahme: brand-mark). */}
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 18 18"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <title>Google</title>
+                    <path
+                      fill="#4285F4"
+                      d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.79 2.72v2.26h2.9c1.7-1.56 2.69-3.86 2.69-6.62z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.34 0-4.32-1.58-5.03-3.71H.97v2.32A8.99 8.99 0 0 0 9 18z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M3.97 10.71A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.71V4.97H.97A8.99 8.99 0 0 0 0 9c0 1.45.35 2.83.97 4.03l3-2.32z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A8.95 8.95 0 0 0 9 0 8.99 8.99 0 0 0 .97 4.97l3 2.32C4.68 5.16 6.66 3.58 9 3.58z"
+                    />
+                  </svg>
+                </span>
+                Mit Google anmelden
+              </button>
+            </Show>
+            <Show when={microsoftEnabled()}>
+              <button
+                type="button"
+                class="login-sso-btn lift"
+                onClick={onMicrosoft}
+                disabled={busy()}
+                aria-label="Mit Microsoft anmelden"
+              >
+                <span class="login-sso-icon" aria-hidden="true">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 18 18"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <title>Microsoft</title>
+                    <path fill="#F25022" d="M0 0h8.5v8.5H0z" />
+                    <path fill="#7FBA00" d="M9.5 0H18v8.5H9.5z" />
+                    <path fill="#00A4EF" d="M0 9.5h8.5V18H0z" />
+                    <path fill="#FFB900" d="M9.5 9.5H18V18H9.5z" />
+                  </svg>
+                </span>
+                Mit Microsoft anmelden
+              </button>
+            </Show>
+          </div>
+        </Show>
 
-        <div class="login-divider" aria-hidden="true">
-          <span>oder per Email</span>
-        </div>
+        <Show when={anySsoEnabled()}>
+          <div class="login-divider" aria-hidden="true">
+            <span>oder per Email</span>
+          </div>
+        </Show>
 
         <div class="login-tabs" role="tablist" aria-label="Email-Methode">
           <button

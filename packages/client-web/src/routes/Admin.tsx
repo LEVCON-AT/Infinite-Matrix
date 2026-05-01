@@ -19,6 +19,7 @@ import { type Component, Show, createResource, createSignal } from 'solid-js';
 import Icon from '../components/Icon';
 import AuditLogSection from '../components/admin/AuditLogSection';
 import PlatformAdminsSection from '../components/admin/PlatformAdminsSection';
+import ProviderSlotsSection from '../components/admin/ProviderSlotsSection';
 import StatsSection from '../components/admin/StatsSection';
 import SystemConfigSection from '../components/admin/SystemConfigSection';
 import { isPlatformAdmin } from '../lib/admin';
@@ -115,6 +116,7 @@ const Admin: Component = () => {
 
           <main class="admin-main">
             <Show when={section() === 'config'}>
+              <ProviderSlotsSection />
               <SystemConfigSection />
             </Show>
             <Show when={section() === 'admins'}>

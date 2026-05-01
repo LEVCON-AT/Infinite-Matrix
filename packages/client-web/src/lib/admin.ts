@@ -7,6 +7,7 @@
 
 import { type Accessor, createSignal } from 'solid-js';
 import { onAuthChange } from './auth';
+import { requireFreshAal2 } from './auth-step-up';
 import { supabase } from './supabase';
 
 export type SystemConfigEntry = {
@@ -179,6 +180,13 @@ export async function listPlatformAdmins(): Promise<PlatformAdminEntry[]> {
 }
 
 export async function grantPlatformAdmin(userId: string, note?: string | null): Promise<void> {
+  // B.3 — Step-Up. Plattform-Admin-Grant ist die hoechste sensitive
+  // Aktion (User bekommt globale Rechte). Fresh AAL2 in den letzten
+  // 5min Pflicht.
+  const ok = await requireFreshAal2({
+    reason: 'Plattform-Admin-Grant ist eine plattform-weite Berechtigung. Bitte bestaetige.',
+  });
+  if (!ok) throw new Error('step_up_cancelled');
   const { error } = await supabase.rpc('grant_platform_admin', {
     p_user_id: userId,
     p_note: note ?? null,
@@ -187,6 +195,11 @@ export async function grantPlatformAdmin(userId: string, note?: string | null): 
 }
 
 export async function revokePlatformAdmin(userId: string): Promise<void> {
+  // B.3 — Step-Up.
+  const ok = await requireFreshAal2({
+    reason: 'Plattform-Admin-Revoke ist sicherheitsrelevant. Bitte bestaetige.',
+  });
+  if (!ok) throw new Error('step_up_cancelled');
   const { error } = await supabase.rpc('revoke_platform_admin', { p_user_id: userId });
   if (error) throw error;
 }
