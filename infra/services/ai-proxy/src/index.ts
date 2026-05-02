@@ -76,26 +76,35 @@ async function streamUpstream(
     'content-type': upstream.headers.get('content-type') ?? 'application/json',
     'cache-control': 'no-cache',
   });
-  // Bei Non-2xx Upstream-Response Body in Log spiegeln (max 2KB) damit
-  // wir bei 4xx/5xx den eigentlichen Fehlercode/Message sehen.
+  // Body-Snippet immer loggen (temporary fuer Debug). Begrenzt auf
+  // 2KB. Spiegelt sowohl Errors als auch erste Chunks von Streams,
+  // damit wir Empty-Responses und Stream-Format-Issues sehen.
   const isError = upstream.status < 200 || upstream.status >= 300;
+  const debugLog = process.env.AI_PROXY_DEBUG === '1' || isError;
   if (!upstream.body) {
-    if (isError) console.warn(`[ai-proxy] upstream ${upstream.status} (no body)`);
+    console.log(`[ai-proxy] upstream ${upstream.status} (no body)`);
     res.end();
     return;
   }
   const reader = upstream.body.getReader();
-  let firstChunk: Uint8Array | null = null;
+  let bytesTotal = 0;
+  let firstSnippet = '';
+  let chunkCount = 0;
+  const decoder = new TextDecoder();
   while (true) {
     const { value, done } = await reader.read();
     if (done) break;
-    if (isError && !firstChunk) firstChunk = value;
+    bytesTotal += value.byteLength;
+    chunkCount += 1;
+    if (debugLog && firstSnippet.length < 2048) {
+      firstSnippet += decoder.decode(value, { stream: true }).slice(0, 2048 - firstSnippet.length);
+    }
     res.write(Buffer.from(value));
   }
   res.end();
-  if (isError && firstChunk) {
-    const snippet = new TextDecoder().decode(firstChunk).slice(0, 2048);
-    console.warn(`[ai-proxy] upstream ${upstream.status} body: ${snippet}`);
+  console.log(`[ai-proxy] upstream ${upstream.status} bytes=${bytesTotal} chunks=${chunkCount}`);
+  if (debugLog && firstSnippet) {
+    console.log(`[ai-proxy] body-snippet: ${firstSnippet.replace(/\n/g, '\\n')}`);
   }
 }
 
