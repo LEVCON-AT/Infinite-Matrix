@@ -164,6 +164,18 @@ const TaskDetail: Component = () => {
       >
         {(t) => (
           <div class="task-detail-body">
+            <Show when={t().derived_from_external_event_id}>
+              <aside class="task-derived-banner" classList={{ live: t().derive_sync_mode === 'live' }}>
+                <Icon name="arrow-top-right-on-square" size={14} />
+                <span>
+                  <strong>Aus externem Termin abgeleitet</strong>
+                  {t().derive_sync_mode === 'live'
+                    ? ' (live verbunden — Sync folgt)'
+                    : ' (Snapshot — unabhaengig vom Original)'}
+                  <Show when={t().derive_scope === 'series'}> · komplette Serie</Show>
+                </span>
+              </aside>
+            </Show>
             <section class="task-detail-section">
               <h3>Status</h3>
               <div class="task-status-toggle">

@@ -20,6 +20,8 @@ export type SearchTab =
   | 'account/security'
   | 'account/visibility'
   | 'account/ai'
+  | 'account/calendars'
+  | 'account/working-hours'
   | 'workspace/general'
   | 'workspace/members'
   | 'workspace/webhooks'
@@ -81,6 +83,18 @@ export const SETTINGS_SEARCH_INDEX: ReadonlyArray<SearchEntry> = [
     label: 'AI-Anbindung',
     hint: 'API-Key Anthropic Claude OpenAI GPT Gemini Provider KI Onboarding Hilfe Wizard',
     anchorId: null,
+  },
+  {
+    tab: 'account/calendars',
+    label: 'Externe Kalender',
+    hint: 'Outlook Google Apple iCal CalDAV ICS abonnieren importieren Subscribe Pull Sync Termine',
+    anchorId: null,
+  },
+  {
+    tab: 'account/calendars',
+    label: 'Calendar verbinden',
+    hint: 'Hinzufuegen ICS-URL OAuth Datei hochladen Upload',
+    anchorId: 'add-calendar-head',
   },
 
   // ── Workspace ────────────────────────────────────────────────
@@ -152,6 +166,8 @@ const TAB_LABELS: Record<SearchTab, string> = {
   'account/security': 'Konto · Sicherheit',
   'account/visibility': 'Konto · Sichtbarkeit',
   'account/ai': 'Konto · AI-Anbindung',
+  'account/calendars': 'Konto · Externe Kalender',
+  'account/working-hours': 'Konto · Arbeitszeiten',
   'workspace/general': 'Workspace · Allgemein',
   'workspace/members': 'Workspace · Mitglieder',
   'workspace/webhooks': 'Workspace · Webhooks',
@@ -171,6 +187,8 @@ const TAB_ICONS: Record<SearchTab, IconName> = {
   'account/security': 'lock-closed',
   'account/visibility': 'eye',
   'account/ai': 'sparkles',
+  'account/calendars': 'arrow-top-right-on-square',
+  'account/working-hours': 'clock',
   'workspace/general': 'cog',
   'workspace/members': 'users',
   'workspace/webhooks': 'arrow-top-right-on-square',

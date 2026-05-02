@@ -15,6 +15,7 @@ import Signup from './routes/Signup';
 import TaskDetail from './routes/TaskDetail';
 import Workspace from './routes/Workspace';
 import AccountAi from './routes/settings/AccountAi';
+import AccountCalendars from './routes/settings/AccountCalendars';
 import AccountProfile from './routes/settings/AccountProfile';
 import AccountSecurity from './routes/settings/AccountSecurity';
 import AccountVisibility from './routes/settings/AccountVisibility';
@@ -72,6 +73,7 @@ render(
         <Route path="/account/security" component={AccountSecurity} />
         <Route path="/account/visibility" component={AccountVisibility} />
         <Route path="/account/ai" component={AccountAi} />
+        <Route path="/account/calendars" component={AccountCalendars} />
         <Route path="/account/working-hours" component={AccountWorkingHours} />
         <Route path="/workspace/general" component={WorkspaceGeneral} />
         <Route path="/workspace/members" component={WorkspaceMembers} />

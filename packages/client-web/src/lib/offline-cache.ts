@@ -44,6 +44,10 @@ type CacheRow = { id: string; workspace_id: string } & Record<string, unknown>;
 // Q.2 (DB_VERSION=8): task_manifestations entfernt — Daten leben jetzt
 // in atom_manifestations mit atom_type='task'. Der upgrade()-Callback
 // loescht den obsoleten Store.
+//
+// Welle I (DB_VERSION=9): external_calendars + external_events fuer
+// Calendar-Inbound. external_events ist die Source-Tabelle fuer
+// atom_type='imported_event' (Migration 059).
 const TABLES = [
   'nodes',
   'cells',
@@ -65,8 +69,13 @@ const TABLES = [
   // Manifestations ziehen via atom_manifestations (Q.2).
   'tasks',
   // T.AC.A + Q.2 — polymorphe Manifestations (Layer 1). Single-Source
-  // fuer alle Atom-Typen (task/link/checklist/doc).
+  // fuer alle Atom-Typen (task/link/checklist/doc/imported_event).
   'atom_manifestations',
+  // Welle I — Calendar-Inbound. external_calendars sind user-scoped
+  // (workspace_id ist denormalisiert), external_events sind die
+  // Source-Tabelle fuer atom_type='imported_event'.
+  'external_calendars',
+  'external_events',
 ] as const;
 
 export type CacheTable = (typeof TABLES)[number];
@@ -93,6 +102,8 @@ interface MatrixCacheSchema extends DBSchema {
   group_members: StoreDef;
   tasks: StoreDef;
   atom_manifestations: StoreDef;
+  external_calendars: StoreDef;
+  external_events: StoreDef;
 }
 
 const DB_NAME = 'matrix-cache';
@@ -105,7 +116,10 @@ const DB_NAME = 'matrix-cache';
 // Single-Source. Der `contains(t)`-Guard im Loop laesst alte Installs
 // die fehlenden Stores idempotent nachzufuegt bekommen; der zweite
 // Block loescht die obsoleten Stores.
-const DB_VERSION = 8;
+// V9 (Welle I): external_calendars + external_events Stores fuer
+// Calendar-Inbound (Migration 059). Polymorphe Atom-Quelle
+// 'imported_event' wird ebenfalls in atom_manifestations gemirrored.
+const DB_VERSION = 9;
 const OBSOLETE_STORES = ['kb_cards', 'checklist_items', 'task_manifestations'] as const;
 
 let dbPromise: Promise<IDBPDatabase<MatrixCacheSchema>> | null = null;

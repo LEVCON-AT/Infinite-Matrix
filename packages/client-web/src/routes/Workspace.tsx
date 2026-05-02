@@ -19,6 +19,7 @@ import CellSummaryPage from '../components/CellSummaryPage';
 import CommandPalette from '../components/CommandPalette';
 import ContextMenu from '../components/ContextMenu';
 import CreateManifestationModal from '../components/CreateManifestationModal';
+import ImportedEventDetailModal from '../components/ImportedEventDetailModal';
 import DocsPopup from '../components/DocsPopup';
 import GlobalSearch from '../components/GlobalSearch';
 import HeaderSearchBar from '../components/HeaderSearchBar';
@@ -56,6 +57,7 @@ import { clearDocsRequest, openDocsPopup, useDocsRequest } from '../lib/docs-ui'
 import { setEditModeValue, toggleEditMode, useEditMode } from '../lib/edit-mode';
 import { toggleIncognito, useIncognito } from '../lib/incognito';
 import { resolveNodeLabel } from '../lib/label-template';
+import { importedEventModalRequest } from '../lib/imported-event-modal-state';
 import {
   closeManifestationModal,
   manifestationModalRequest,
@@ -1193,6 +1195,18 @@ const Workspace: Component = () => {
                   void refetchAtomManifs();
                 }
               }}
+            />
+          )}
+        </Show>
+      </ModalTransition>
+
+      <ModalTransition when={Boolean(importedEventModalRequest())}>
+        <Show when={importedEventModalRequest()}>
+          {(req) => (
+            <ImportedEventDetailModal
+              workspaceId={req().workspaceId}
+              eventId={req().eventId}
+              snapshot={req().snapshot}
             />
           )}
         </Show>

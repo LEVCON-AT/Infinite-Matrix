@@ -135,7 +135,8 @@ export type CalendarEvent = {
   // Source-Entity-ID (links.id bzw. checklists.id), taskId duplizieren
   // wir fuer Backward-Compat in Render-Komponenten, die schon taskId
   // lesen — dort fungiert der Wert als generischer Atom-Key.
-  atomType: 'task' | 'link' | 'checklist' | 'doc';
+  // Welle I: 'imported_event' als 5. Type — Source-Tabelle external_events.
+  atomType: 'task' | 'link' | 'checklist' | 'doc' | 'imported_event';
   atomId: string;
   taskId: string; // = atomId; bleibt drin damit bestehender Render-Code unveraendert bleibt
   manifId: string | null; // null = virtual aus tasks.deadline
@@ -161,21 +162,28 @@ export type CalendarEvent = {
   // Folgetermine konsistent angepasst werden.
   displayMeta?: Record<string, unknown>;
   originalManifId?: string;
+  // Welle I: nur fuer atomType='imported_event'. Provider-Discriminator
+  // + User-waehlbare Calendar-Farbe. Wird vom Calendar-Chip als
+  // border-left + Icon-Badge gerendert.
+  sourceProvider?: string | null;
+  sourceColor?: string | null;
 };
 
 export function buildEvents(args: {
   tasks: TaskRow[];
   manifestations: TaskManifestationRow[];
   // Phase 4 T.AC.B: enriched non-task atom_manifestations (kind='calendar'
-  // mit atom_type IN ('link','checklist','doc')). Optional — alte
-  // Aufrufer geben das Feld nicht mit, dann nur task-Events.
+  // mit atom_type IN ('link','checklist','doc','imported_event')).
+  // Optional — alte Aufrufer geben das Feld nicht mit, dann nur task-Events.
   atomManifestations?: Array<{
     id: string;
-    atom_type: 'link' | 'checklist' | 'doc';
+    atom_type: 'link' | 'checklist' | 'doc' | 'imported_event';
     atom_id: string;
     label: string;
     display_meta: Record<string, unknown>;
     url?: string | null;
+    source_provider?: string | null;
+    source_color?: string | null;
   }>;
   // T.AC.D.2: viewRange (fromIso, toIso) aktiviert die Recur-Expansion.
   // Ohne viewRange wird recur als Marker (isRecurring=true) emittiert
@@ -322,6 +330,8 @@ export function buildEvents(args: {
       time: (dm.time as string | undefined) ?? null,
       durationMin: (dm.duration_min as number | undefined) ?? null,
       url: a.url ?? null,
+      sourceProvider: a.source_provider ?? null,
+      sourceColor: a.source_color ?? null,
       displayMeta: dm,
     };
     expandRecurOrSingle(base, recur);

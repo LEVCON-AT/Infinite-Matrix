@@ -13,6 +13,7 @@
 // Trip beim Click ist akzeptabel.
 
 import type { CalendarEvent } from './calendar';
+import { openImportedEventModal } from './imported-event-modal-state';
 import { supabase } from './supabase';
 import { showToast } from './toasts';
 import { sanitizeUrl } from './url';
@@ -73,6 +74,26 @@ export async function navigateToAtomEvent(
     }
     case 'doc': {
       navigate(`/w/${workspaceId}?doc=${event.atomId}`);
+      return;
+    }
+    case 'imported_event': {
+      // Welle I.8 — ImportedEventDetailModal mit Read-only-Snapshot +
+      // Aktions-Section (Task ableiten, Manifestation hinzufuegen, ...).
+      openImportedEventModal({
+        workspaceId,
+        eventId: event.atomId,
+        snapshot: {
+          summary: event.label,
+          startDate: event.startDate,
+          endDate: event.endDate,
+          time: event.time,
+          isRange: event.isRange,
+          isRecurring: event.isRecurring,
+          url: event.url ?? null,
+          sourceProvider: event.sourceProvider ?? null,
+          sourceColor: event.sourceColor ?? null,
+        },
+      });
       return;
     }
   }

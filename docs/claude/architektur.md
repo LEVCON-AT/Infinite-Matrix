@@ -26,7 +26,7 @@
                  │   Layer 1 — Manifestations       │  ← wo erscheint das Atom?
                  │   (1:N atom_manifestations)      │     Kanban / Checklist / Calendar /
                  │   atom_type ∈ {task,link,        │     Standalone / (spaeter Flowchart)
-                 │     checklist,doc}               │     (T.1 + T.AC)
+                 │     checklist,doc,imported_event}│     (T.1 + T.AC + Welle I)
                  │   kind ∈ {kanban,checklist,      │
                  │     calendar,standalone}         │
                  ├══════════════════════════════════┤
@@ -46,6 +46,9 @@ Jedes inhaltliche Objekt hat **eine** Aggregate-Tabelle:
 
 **Regel:** ein Atom-Typ = eine Tabelle. Keine parallelen Tables fuer dieselbe Domain. Keine Mirror-Spalten. Keine "alternative" Repraesentation.
 
+**Welle I (Migration 059)** ergaenzt einen 5. atom_type:
+- `imported_event` — Source-Tabelle `external_events` (Read-Only fuer User; befuellt vom `calendar-inbound-sync`-Service aus ICS-URLs / Google / Microsoft)
+
 ### 1.2 Layer 1 — Manifestations (polymorph)
 
 Eine **einzige** polymorphe Tabelle `atom_manifestations` haelt alle Sichten:
@@ -53,17 +56,19 @@ Eine **einzige** polymorphe Tabelle `atom_manifestations` haelt alle Sichten:
 ```sql
 atom_manifestations (
   id           uuid PK
-  atom_type    enum('task','link','doc','checklist')   -- Diskriminator
+  atom_type    enum('task','link','doc','checklist','imported_event')   -- Diskriminator
   atom_id      uuid                                     -- Soft-Ref auf Layer-0-Tabelle
   workspace_id uuid FK workspaces
   kind         enum('kanban','checklist','calendar','standalone')
   container_id uuid                                     -- kb_col / checklist / null
   position     numeric
   level        smallint                                 -- nur bei kind='checklist' (0-2)
-  display_meta jsonb                                    -- kanban-color, calendar time/range/recur, ...
+  display_meta jsonb                                    -- kanban-color, calendar time/range/recur, source_provider/color (imported_event), ...
   created_at   timestamptz
 )
 ```
+
+**Welle I (Migration 059) erweitert** das `atom_type`-Enum um `imported_event` — Source-Tabelle ist `external_events` (gespeist vom `calendar-inbound-sync`-Service aus ICS-URLs / Google / Microsoft). Mirror-Trigger `_imported_event_mirror_to_atom_manif` synct INSERT/UPDATE auf `external_events` in `atom_manifestations(kind='calendar')` mit Provider-Snapshot in `display_meta` (`source_provider`, `source_color`, `source_calendar_id` zusaetzlich zu Standard-Calendar-Feldern).
 
 **Regel:** kein Mirror, keine Sync-Trigger zwischen parallelen Tables. Polymorph mit `atom_type`-Diskriminator. Layer-0-Tabellen haben **keinen** FK zu atom_manifestations (wuerde Polymorphie brechen). Stattdessen: BEFORE-DELETE-Trigger pro Layer-0-Tabelle, der atom_manifestations purged (Pseudo-CASCADE).
 

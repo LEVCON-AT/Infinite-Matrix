@@ -167,6 +167,13 @@ const SidebarDayView: Component<Props> = (p) => {
       showToast('Termin ohne Manifestation — neu droppen statt edit.', 'info');
       return;
     }
+    if (e.atomType === 'imported_event') {
+      showToast(
+        'Importierte Termine sind read-only. Bearbeite den Termin in der externen Quelle.',
+        'info',
+      );
+      return;
+    }
     openManifestationModal({
       workspaceId: p.workspaceId,
       atomType: e.atomType === 'doc' ? 'task' : e.atomType,

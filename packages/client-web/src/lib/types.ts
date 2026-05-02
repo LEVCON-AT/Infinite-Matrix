@@ -494,6 +494,14 @@ export type TaskRow = {
   created_at: string;
   created_by: string | null;
   updated_at: string;
+  // Welle I: Task wurde aus einem importierten External-Event abgeleitet.
+  // Bei derive_sync_mode='live' propagiert der Sync-Worker Updates des
+  // Events (label/deadline/recur/note) auf die Task — ausser die Spalte
+  // ist in local_overrides als true markiert (User-Edit gewinnt).
+  derived_from_external_event_id?: string | null;
+  derive_sync_mode?: 'snapshot' | 'live' | null;
+  derive_scope?: 'instance' | 'series' | null;
+  local_overrides?: Record<string, boolean>;
 };
 
 export type TaskInput = {
@@ -532,3 +540,64 @@ export type TaskManifestationInput = {
   level?: number | null;
   display_meta?: Record<string, unknown>;
 };
+
+// ─── Welle I — Calendar Inbound ────────────────────────────────
+// Externe Kalender (Gmail/Outlook/Apple/Nextcloud/CalDAV-Subscribe +
+// optional OAuth) werden in das Matrix-System gespiegelt. Storage-
+// Pattern wie ai-providers (pgcrypto fuer Tokens), Atom-Zwiebel-Treue
+// via atom_type='imported_event' + Mirror-Trigger (Migration 059).
+
+export type ExternalCalendarKind = 'ics_subscribe' | 'google' | 'microsoft' | 'upload';
+export type ExternalCalendarSyncStatus = 'idle' | 'syncing' | 'error';
+
+export type ExternalCalendar = {
+  id: string;
+  user_id: string;
+  workspace_id: string;
+  kind: ExternalCalendarKind;
+  label: string;
+  source_url: string | null;
+  // Ohne oauth_token-Felder — die existieren nur bytea-encrypted in der
+  // DB, das Frontend bekommt sie nie. Service-Helper holt bei Bedarf
+  // ueber get_external_calendar_credentials.
+  oauth_expires_at: string | null;
+  webhook_channel_id: string | null;
+  webhook_resource_id: string | null;
+  webhook_expires_at: string | null;
+  sync_status: ExternalCalendarSyncStatus;
+  sync_interval_minutes: number;
+  last_sync_at: string | null;
+  last_error_msg: string | null;
+  color: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ExternalEventSyncState = 'active' | 'cancelled' | 'orphaned';
+
+export type ExternalEvent = {
+  id: string;
+  external_calendar_id: string;
+  workspace_id: string;
+  external_id: string;
+  summary: string;
+  description: string | null;
+  location: string | null;
+  url: string | null;
+  start_at: string;          // ISO timestamp
+  end_at: string | null;
+  all_day: boolean;
+  rrule: string | null;
+  recurrence_id: string | null;
+  source_provider: ExternalCalendarKind;
+  source_modified_at: string | null;
+  sync_state: ExternalEventSyncState;
+  last_synced_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+// Bei Task-Ableitung aus External-Event: User-waehlbare Modi.
+export type DeriveSyncMode = 'snapshot' | 'live';
+export type DeriveScope = 'instance' | 'series';

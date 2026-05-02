@@ -21,14 +21,25 @@
 //     ihrem Original-deadline gerendert. TODO-Hinweis im Header.
 
 import { useNavigate, useParams, useSearchParams } from '@solidjs/router';
-import { type Component, For, Show, createMemo, createResource, onMount } from 'solid-js';
+import {
+  type Component,
+  For,
+  Show,
+  createMemo,
+  createResource,
+  createSignal,
+  onMount,
+} from 'solid-js';
 import Icon from '../components/Icon';
+import ImportedEventDetailModal from '../components/ImportedEventDetailModal';
+import { ModalTransition } from '../components/ModalTransition';
 import { pageEnter, slideIn, slideOut } from '../lib/animations';
 import {
   fetchAtomCalendarManifestations,
   removeAtomManifestation,
 } from '../lib/atom-manifestations';
 import { navigateToAtomEvent } from '../lib/atom-routing';
+import { importedEventModalRequest } from '../lib/imported-event-modal-state';
 import {
   type CalendarEvent,
   addMonths,
@@ -135,11 +146,13 @@ const Calendar: Component = () => {
       manifestations: manifs,
       atomManifestations: (atomManifs() ?? []).map((a) => ({
         id: a.id,
-        atom_type: a.atom_type as 'link' | 'checklist' | 'doc',
+        atom_type: a.atom_type as 'link' | 'checklist' | 'doc' | 'imported_event',
         atom_id: a.atom_id,
         label: a.label,
         display_meta: a.display_meta,
         url: a.url ?? null,
+        source_provider: a.source_provider ?? null,
+        source_color: a.source_color ?? null,
       })),
       viewRange: { fromIso: r.rangeFrom, toIso: r.rangeTo },
     });
@@ -190,9 +203,33 @@ const Calendar: Component = () => {
       showToast('Termin ohne Manifestation — neu droppen statt edit.', 'info');
       return;
     }
+    // Welle I: imported_event ist read-only — Edit ueber das External
+    // Calendar-System, nicht ueber Matrix. Detail-Modal hat „Original"-Link.
+    if (e.atomType === 'imported_event') {
+      showToast(
+        'Importierte Termine sind read-only. Bearbeite den Termin in der externen Quelle.',
+        'info',
+      );
+      return;
+    }
+    if (e.atomType === 'doc') {
+      // doc/calendar-edit ist V2 — fallback auf task-Pfad bisher.
+      openManifestationModal({
+        workspaceId: params.workspaceId,
+        atomType: 'task',
+        atomId: e.atomId,
+        atomLabel: e.label,
+        atomUrl: e.url ?? undefined,
+        defaultDate: e.startDate,
+        mode: 'edit',
+        manifId: e.originalManifId,
+        existingDisplayMeta: e.displayMeta,
+      });
+      return;
+    }
     openManifestationModal({
       workspaceId: params.workspaceId,
-      atomType: e.atomType === 'doc' ? 'task' : e.atomType,
+      atomType: e.atomType,
       atomId: e.atomId,
       atomLabel: e.label,
       atomUrl: e.url ?? undefined,
@@ -219,7 +256,35 @@ const Calendar: Component = () => {
     }
   }
 
-  const eventsByDay = createMemo(() => groupEventsByDay(events()));
+  // Welle I.7 — Filter-Toggle "Inkl. importierte" (Default: an).
+  // Persistiert in localStorage, damit der User die Wahl nicht jedes
+  // Mal neu treffen muss.
+  const FILTER_KEY = 'matrix.calendar.show_imported';
+  const initialShowImported = (() => {
+    try {
+      const v = localStorage.getItem(FILTER_KEY);
+      return v === null ? true : v === '1';
+    } catch {
+      return true;
+    }
+  })();
+  const [showImported, setShowImported] = createSignal(initialShowImported);
+
+  function toggleShowImported(): void {
+    const next = !showImported();
+    setShowImported(next);
+    try {
+      localStorage.setItem(FILTER_KEY, next ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const filteredEvents = createMemo(() =>
+    showImported() ? events() : events().filter((e) => e.atomType !== 'imported_event'),
+  );
+
+  const eventsByDay = createMemo(() => groupEventsByDay(filteredEvents()));
 
   const grid = createMemo(() => buildMonthGrid(anchorIso(), today));
 
@@ -329,6 +394,14 @@ const Calendar: Component = () => {
         <span class="hint calendar-recur-hint">
           Wiederkehrende Termine erscheinen V1 nur am Original-Datum.
         </span>
+        <label class="calendar-filter-toggle">
+          <input
+            type="checkbox"
+            checked={showImported()}
+            onChange={toggleShowImported}
+          />
+          <span>Importierte Termine</span>
+        </label>
       </div>
 
       <div
@@ -378,7 +451,14 @@ const Calendar: Component = () => {
                           [`calendar-event-atom-${e.atomType}`]: true,
                           'calendar-event-range': e.isRange,
                           'calendar-event-instance-done': e.instanceDone === true,
+                          'calendar-event-imported':
+                            e.atomType === 'imported_event' && !!e.sourceColor,
                         }}
+                        style={
+                          e.atomType === 'imported_event' && e.sourceColor
+                            ? { '--cal-event-source-color': e.sourceColor }
+                            : undefined
+                        }
                         onClick={(ev) => openEvent(e, ev)}
                         onDblClick={(ev) => onDoubleClickEvent(e, ev)}
                         title={e.label}
@@ -402,6 +482,9 @@ const Calendar: Component = () => {
                         </Show>
                         <Show when={e.atomType === 'checklist'}>
                           <Icon name="list-bullet" size={10} />
+                        </Show>
+                        <Show when={e.atomType === 'imported_event'}>
+                          <Icon name="arrow-top-right-on-square" size={10} />
                         </Show>
                         <Show when={e.time}>
                           <span class="calendar-event-time">{e.time}</span>
@@ -447,6 +530,18 @@ const Calendar: Component = () => {
           }}
         </For>
       </div>
+
+      <ModalTransition when={Boolean(importedEventModalRequest())}>
+        <Show when={importedEventModalRequest()}>
+          {(req) => (
+            <ImportedEventDetailModal
+              workspaceId={req().workspaceId}
+              eventId={req().eventId}
+              snapshot={req().snapshot}
+            />
+          )}
+        </Show>
+      </ModalTransition>
 
       <footer class="kb-hint-bar">
         <span>

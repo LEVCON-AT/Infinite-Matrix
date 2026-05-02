@@ -14550,3 +14550,400 @@ html.view-transition-drill-up::view-transition-new(ws-main) {
   display: flex;
   gap: var(--space-2);
 }
+
+/* ─── Welle I — Calendar Inbound (Settings + Modal) ──────────── */
+
+.add-cal-modal {
+  width: min(640px, 96vw);
+}
+
+.add-cal-tabs {
+  display: flex;
+  gap: var(--space-1);
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-2);
+}
+
+.add-cal-tab {
+  background: transparent;
+  border: 0;
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--text2);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  transition: color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+
+.add-cal-tab:hover {
+  color: var(--text);
+}
+
+.add-cal-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.add-cal-tab-hint {
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--text3);
+}
+
+.add-cal-color {
+  width: 4rem;
+  height: 2.25rem;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  background: transparent;
+}
+
+.add-cal-preview {
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.add-cal-preview h3 {
+  font-size: var(--text-sm);
+  margin: 0 0 var(--space-2) 0;
+  color: var(--text2);
+}
+
+.add-cal-preview-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.add-cal-preview-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.add-cal-preview-summary {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.add-cal-preview-date {
+  color: var(--text3);
+  font-size: var(--text-xs);
+  flex-shrink: 0;
+}
+
+.add-cal-deferred {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  text-align: center;
+  color: var(--text2);
+}
+
+.add-cal-deferred .hint {
+  font-size: var(--text-xs);
+  max-width: 28rem;
+}
+
+.ext-cal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ext-cal-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+
+.ext-cal-row.disabled {
+  opacity: 0.5;
+}
+
+.ext-cal-row.busy {
+  pointer-events: none;
+}
+
+.ext-cal-color-cell {
+  display: flex;
+  align-items: center;
+}
+
+.ext-cal-color {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  background: transparent;
+}
+
+.ext-cal-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ext-cal-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ext-cal-kind-badge {
+  font-size: var(--text-xs);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text2);
+  border: 1px solid var(--border);
+}
+
+.ext-cal-status-chip {
+  font-size: var(--text-xs);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius);
+  font-weight: 600;
+}
+
+.ext-cal-status-chip.off {
+  background: var(--surface);
+  color: var(--text3);
+}
+
+.ext-cal-status-chip.syncing {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.ext-cal-status-chip.error {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.ext-cal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text3);
+}
+
+.ext-cal-source-url {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 24rem;
+}
+
+.ext-cal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ext-cal-interval {
+  width: 5.5rem;
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-2);
+}
+
+.hint-danger {
+  color: var(--danger);
+}
+
+/* Welle I.7 — Calendar-Visual-Discrimination */
+
+.calendar-filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text2);
+  cursor: pointer;
+  user-select: none;
+}
+
+.calendar-filter-toggle input[type='checkbox'] {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* Imported-Event-Chip: linker Balken in Source-Farbe (User-waehlbar
+   pro External-Calendar). border-left wird durch Inline-Custom-Property
+   --cal-event-source-color gesetzt; CSS liest es hier. */
+.calendar-event.calendar-event-imported {
+  border-left: 3px solid var(--cal-event-source-color, var(--accent));
+}
+
+.calendar-event.calendar-event-atom-imported_event {
+  /* Subtile Differenzierung von Tasks/Links: imported_event-Chips
+     wirken bewusst etwas neutraler (kein Status-Color). */
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+/* Welle I.8 — ImportedEventDetailModal */
+
+.imported-event-modal {
+  width: min(560px, 96vw);
+}
+
+.imported-event-head {
+  border-bottom-color: var(--imp-source-color, var(--border));
+}
+
+.imported-event-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+}
+
+.imported-event-source-dot {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background: var(--imp-source-color, var(--accent));
+  flex-shrink: 0;
+}
+
+.imported-event-meta {
+  display: grid;
+  grid-template-columns: 7rem 1fr;
+  gap: var(--space-2) var(--space-3);
+  margin: 0 0 var(--space-3) 0;
+}
+
+.imported-event-meta dt {
+  font-weight: 600;
+  color: var(--text2);
+  font-size: var(--text-sm);
+}
+
+.imported-event-meta dd {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.imported-event-recur-badge {
+  margin-left: var(--space-2);
+  font-size: var(--text-xs);
+  padding: 0 var(--space-2);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: var(--radius);
+}
+
+.imported-event-description {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-2);
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+.imported-event-foot {
+  flex-wrap: wrap;
+}
+
+/* Welle I.8 — DeriveTaskModal */
+
+.derive-mode-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  margin: var(--space-2) 0;
+}
+
+.derive-mode-group legend {
+  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--text2);
+  padding: 0 var(--space-2);
+}
+
+.derive-mode-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-2);
+  align-items: start;
+  padding: var(--space-2) 0;
+  cursor: pointer;
+}
+
+.derive-mode-option input[type='radio'] {
+  margin-top: 4px;
+  cursor: pointer;
+}
+
+.derive-mode-option > span {
+  display: block;
+  font-size: var(--text-sm);
+}
+
+.derive-mode-option .hint {
+  grid-column: 2;
+  font-size: var(--text-xs);
+}
+
+/* Welle I.9 — Task-Detail Banner: aus externem Event abgeleitet */
+
+.task-derived-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  color: var(--text2);
+}
+
+.task-derived-banner.live {
+  border-left-color: var(--success);
+}

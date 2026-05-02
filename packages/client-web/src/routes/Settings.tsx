@@ -99,6 +99,12 @@ const Settings: ParentComponent = (props) => {
       hint: 'API-Key fuer Onboarding & Hilfe',
     },
     {
+      to: `${wsBase()}/account/calendars`,
+      label: 'Externe Kalender',
+      icon: 'arrow-top-right-on-square',
+      hint: 'Outlook / Google / iCal abonnieren',
+    },
+    {
       to: `${wsBase()}/account/working-hours`,
       label: 'Arbeitszeiten',
       icon: 'clock',

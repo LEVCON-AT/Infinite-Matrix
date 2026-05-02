@@ -24,7 +24,8 @@ import { runOptimisticDelete, runOptimisticInsert, runOptimisticUpdate } from '.
 import { supabase } from './supabase';
 import { showToast, showUndoToast } from './toasts';
 
-export type AtomKind = 'task' | 'link' | 'doc' | 'checklist';
+// Welle I: 'imported_event' als 5. atom_type. Source-Tabelle external_events.
+export type AtomKind = 'task' | 'link' | 'doc' | 'checklist' | 'imported_event';
 export type AtomManifestationKind = 'kanban' | 'checklist' | 'calendar' | 'standalone';
 
 export type AtomManifestationRow = {
@@ -44,7 +45,11 @@ export type AtomManifestationRow = {
 // nicht pro Event nochmal joinen muss.
 export type EnrichedAtomManifestation = AtomManifestationRow & {
   label: string;
-  url?: string | null; // nur fuer atom_type='link'
+  url?: string | null; // fuer atom_type='link' bzw. imported_event
+  // Welle I: nur fuer imported_event gesetzt — Provider-Kind + Farbe
+  // fuer Visual-Discrimination im Calendar-Chip.
+  source_provider?: string | null;
+  source_color?: string | null;
 };
 
 const ATOM_MANIF_TABLE: CacheTable = 'atom_manifestations';
@@ -162,6 +167,20 @@ export async function fetchAtomCalendarManifestations(
       return {
         ...r,
         label: snapLabel ?? checklistById.get(r.atom_id) ?? '(Liste geloescht)',
+      };
+    }
+    if (r.atom_type === 'imported_event') {
+      // Welle I: imported_event-Mirror-Trigger schreibt label + url +
+      // source_provider + source_color in display_meta. Source-Join
+      // (external_events) ist nicht noetig — alles ist im Snapshot.
+      return {
+        ...r,
+        label: snapLabel ?? '(Importierter Termin)',
+        url: snapUrl ?? null,
+        source_provider:
+          ((dm as Record<string, unknown>).source_provider as string | undefined) ?? null,
+        source_color:
+          ((dm as Record<string, unknown>).source_color as string | undefined) ?? null,
       };
     }
     return { ...r, label: snapLabel ?? '(Atom)' };
