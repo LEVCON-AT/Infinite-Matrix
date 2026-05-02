@@ -38,22 +38,35 @@ import {
 } from '../lib/recur';
 import { showToast } from '../lib/toasts';
 import type {
+  AtomPin,
+  AtomTagWithTag,
   BoardContent,
   CardRecur,
   CardRecurType,
+  DocRow,
   InlineChecklistItem,
   KbCardRow,
 } from '../lib/types';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 import { useViewerActive } from '../lib/workspace-role';
 import AliasText from './AliasText';
+import AtomDocsSection from './AtomDocsSection';
 import Icon from './Icon';
+import TagPills from './TagPills';
 
 type Props = {
   card: KbCardRow;
   content: BoardContent;
   onClose: () => void;
   onChanged?: () => void;
+  // Welle D.9: Pin-/Doc-Daten fuer AtomDocsSection. Bewusst optional —
+  // legacy Caller (z.B. TaskOverview) reichen nichts durch und sehen
+  // dann auch keine Doku-Sektion.
+  wsAtomPins?: AtomPin[];
+  wsDocs?: DocRow[];
+  // Welle D.9: TagPills (read-only) zur Anzeige der workspace_tags des
+  // Tasks. Editieren kommt in D.7b (TagInput in CardOverlay).
+  wsAtomTagsEnriched?: AtomTagWithTag[];
 };
 
 type OverlayItem = {
@@ -1224,6 +1237,31 @@ const CardOverlay: Component<Props> = (p) => {
                 stammt aus Checkliste-ID <code>{p.card.source_cl_id}</code>
               </Show>
             </p>
+          </Show>
+
+          {/* Welle D.9: Workspace-Tags-Sektion (read-only). Edit kommt
+              in D.7b (TagInput in CardOverlay). */}
+          <Show when={(p.wsAtomTagsEnriched ?? []).filter((t) => t.atom_type === 'task' && t.atom_id === p.card.id).length > 0}>
+            <section class="overlay-section card-ws-tags">
+              <h4>Tags</h4>
+              <TagPills
+                tags={(p.wsAtomTagsEnriched ?? []).filter(
+                  (t) => t.atom_type === 'task' && t.atom_id === p.card.id,
+                )}
+                maxVisible={20}
+              />
+            </section>
+          </Show>
+
+          {/* Welle D.9: Doku-Sektion. Zeigt gepinnte Dokus mit Vorschau. */}
+          <Show when={p.wsAtomPins && p.wsDocs}>
+            <AtomDocsSection
+              atomType="task"
+              atomId={p.card.id}
+              atomTitle={p.card.name ?? null}
+              atomPins={p.wsAtomPins ?? []}
+              docs={p.wsDocs ?? []}
+            />
           </Show>
 
           <footer class="overlay-edit-footer">

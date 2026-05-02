@@ -1320,19 +1320,22 @@ export async function fetchWorkspaceLinks(workspaceId: string): Promise<LinkRow[
   });
 }
 
-// Alle Dokus, die an Zellen gepinnt sind. Fuer den Sidebar-Tree-Docs-
-// Chip (SB.2) — Rendering haengt die Doc-Row unter die passende Cell-
-// Row. Welle D: Lookup ueber atom_pins (parent_kind='cell', atom_type='doc').
-export async function fetchWorkspaceAttachedDocs(workspaceId: string): Promise<DocRow[]> {
+// Alle Dokus, die irgendwo gepinnt sind (parent_kind='cell'|'atom'|'node').
+// Welle D.9 — vorher cell-only, jetzt alle Pin-Kinds, weil Sidebar-Tree
+// (cell-pin), NodeDocsButton (node-pin) und AtomDocsSection (atom-pin)
+// den gleichen Doc-Cache teilen. Filterung pro Konsument client-seitig
+// via wsAtomPins.
+export async function fetchWorkspacePinnedDocs(workspaceId: string): Promise<DocRow[]> {
   try {
     const pinsRes = await supabase
       .from('atom_pins')
       .select('atom_id')
       .eq('workspace_id', workspaceId)
-      .eq('parent_kind', 'cell')
       .eq('atom_type', 'doc');
     if (pinsRes.error) throw pinsRes.error;
-    const docIds = (pinsRes.data ?? []).map((p: { atom_id: string }) => p.atom_id);
+    const docIds = Array.from(
+      new Set((pinsRes.data ?? []).map((p: { atom_id: string }) => p.atom_id)),
+    );
     if (docIds.length === 0) {
       markLiveSuccess();
       return [];
@@ -1357,9 +1360,7 @@ export async function fetchWorkspaceAttachedDocs(workspaceId: string): Promise<D
       atom_id: string;
       parent_kind: string;
     }>('atom_pins', workspaceId);
-    const docIds = new Set(
-      pins.filter((p) => p.parent_kind === 'cell' && p.atom_type === 'doc').map((p) => p.atom_id),
-    );
+    const docIds = new Set(pins.filter((p) => p.atom_type === 'doc').map((p) => p.atom_id));
     const all = await getByWorkspace<DocRow>('docs', workspaceId);
     markCacheFallback();
     return all

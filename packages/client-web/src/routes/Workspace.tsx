@@ -21,6 +21,7 @@ import ContextMenu from '../components/ContextMenu';
 import CreateManifestationModal from '../components/CreateManifestationModal';
 import ImportedEventDetailModal from '../components/ImportedEventDetailModal';
 import NotificationBell from '../components/NotificationBell';
+import NodeDocsButton from '../components/NodeDocsButton';
 import DocsPopup from '../components/DocsPopup';
 import GlobalSearch from '../components/GlobalSearch';
 import HeaderSearchBar from '../components/HeaderSearchBar';
@@ -81,10 +82,12 @@ import {
   fetchMyWorkspaces,
   fetchNodesForWorkspace,
   fetchRowsForWorkspace,
-  fetchWorkspaceAttachedDocs,
+  fetchWorkspacePinnedDocs,
   fetchWorkspaceLinks,
 } from '../lib/queries';
 import { fetchAtomPinsByWorkspace } from '../lib/atom-pins';
+import { fetchAtomTagsByWorkspace, joinAtomTagsWithRegistry } from '../lib/atom-tags';
+import { fetchWorkspaceTagsByWorkspace } from '../lib/tag-index';
 import { openDokuForContext } from '../lib/docs-open';
 import { subscribeWorkspace } from '../lib/realtime';
 import { useSettingsBodyClassSync } from '../lib/settings';
@@ -391,21 +394,33 @@ const Workspace: Component = () => {
     () => params.workspaceId,
     async (wid) => (wid ? fetchAtomCalendarManifestations(wid) : []),
   );
+  // Welle D.9: wsDocs + wsAtomPins werden immer geladen (nicht mehr an
+  // chips.isOn('docs') gekoppelt), damit NodeDocsButton + DocsIndicator +
+  // AtomDocsSection auch dann Counts/Listen rendern, wenn der Sidebar-
+  // Doku-Chip ausgeschaltet ist. Daten sind klein (typisch <100 Rows pro
+  // Workspace) und werden eh per Realtime synchron gehalten.
   const [wsDocs] = createResource(
-    () =>
-      params.workspaceId && chips && chips.isOn('docs')
-        ? { workspaceId: params.workspaceId as string }
-        : null,
-    async (key) => (key ? fetchWorkspaceAttachedDocs(key.workspaceId) : []),
+    () => params.workspaceId ?? null,
+    async (wid) => (wid ? fetchWorkspacePinnedDocs(wid) : []),
   );
-  // Welle D: Atom-Pins fuer Sidebar-Tree (Doc→Cell-Mapping). Gleicher
-  // Trigger wie wsDocs, damit Tree konsistent rendert.
   const [wsAtomPins] = createResource(
-    () =>
-      params.workspaceId && chips && chips.isOn('docs')
-        ? { workspaceId: params.workspaceId as string }
-        : null,
-    async (key) => (key ? fetchAtomPinsByWorkspace(key.workspaceId) : []),
+    () => params.workspaceId ?? null,
+    async (wid) => (wid ? fetchAtomPinsByWorkspace(wid) : []),
+  );
+  // Welle D.9: Tag-System fuer TagPills-Render auf Atom-Chips. atom_tags
+  // (Junction) + workspace_tags (Registry) werden in einem Memo gejoint
+  // → AtomTagWithTag[]. Konsumenten filtern client-seitig auf
+  // (atom_type, atom_id) via filterTagsForAtom.
+  const [wsAtomTags] = createResource(
+    () => params.workspaceId ?? null,
+    async (wid) => (wid ? fetchAtomTagsByWorkspace(wid) : []),
+  );
+  const [wsWorkspaceTags] = createResource(
+    () => params.workspaceId ?? null,
+    async (wid) => (wid ? fetchWorkspaceTagsByWorkspace(wid) : []),
+  );
+  const wsAtomTagsEnriched = createMemo(() =>
+    joinAtomTagsWithRegistry(wsAtomTags() ?? [], wsWorkspaceTags() ?? []),
   );
 
   const chipData = createMemo<SidebarChipData | undefined>(() => {
@@ -1257,6 +1272,8 @@ const Workspace: Component = () => {
               workspaceId={req().workspaceId}
               eventId={req().eventId}
               snapshot={req().snapshot}
+              wsAtomPins={wsAtomPins() ?? []}
+              wsDocs={wsDocs() ?? []}
             />
           )}
         </Show>
@@ -1331,6 +1348,19 @@ const Workspace: Component = () => {
                 </span>
               </Show>
             </nav>
+            {/* Welle D.9 — NodeDocsButton: zeigt Doku-Count fuer den
+                aktuellen Matrix-/Board-Node + Popover mit Liste. Nur
+                sichtbar wenn currentNode existiert (also nicht in einer
+                Cell-Route — dort ist die Cell-Doku-Pill zustaendig). */}
+            <Show when={currentNode() && !currentCell()}>
+              <NodeDocsButton
+                nodeId={currentNode()!.id}
+                nodeKind={currentNode()!.type}
+                nodeAlias={currentNode()!.alias ?? null}
+                atomPins={wsAtomPins() ?? []}
+                docs={wsDocs() ?? []}
+              />
+            </Show>
             <Show when={params.workspaceId}>
               <HeaderSearchBar
                 workspaceId={params.workspaceId as string}
@@ -1643,6 +1673,9 @@ const Workspace: Component = () => {
                       selfUserId={user()?.id}
                       onCardHover={setHoverCardId}
                       wsManifestations={wsManifestations() ?? []}
+                      wsAtomPins={wsAtomPins() ?? []}
+                      wsDocs={wsDocs() ?? []}
+                      wsAtomTagsEnriched={wsAtomTagsEnriched()}
                       onChanged={() => {
                         void refetchBoard();
                       }}

@@ -12,6 +12,8 @@ import { fetchExternalEventById } from '../lib/calendar-inbound';
 import { installFocusRestore, installFocusTrap } from '../lib/dialog';
 import { closeImportedEventModal, type ImportedEventModalSnapshot } from '../lib/imported-event-modal-state';
 import { showToast } from '../lib/toasts';
+import type { AtomPin, DocRow } from '../lib/types';
+import AtomDocsSection from './AtomDocsSection';
 import DeriveTaskModal from './DeriveTaskModal';
 import Icon from './Icon';
 
@@ -26,6 +28,9 @@ export type ImportedEventDetailModalProps = {
   workspaceId: string;
   eventId: string;
   snapshot: ImportedEventModalSnapshot;
+  // Welle D.9: optional fuer AtomDocsSection.
+  wsAtomPins?: AtomPin[];
+  wsDocs?: DocRow[];
 };
 
 const ImportedEventDetailModal: Component<ImportedEventDetailModalProps> = (props) => {
@@ -152,6 +157,18 @@ const ImportedEventDetailModal: Component<ImportedEventDetailModalProps> = (prop
               in andere Sichten (Kanban, Checkliste) duplizieren — der Original-Termin bleibt
               extern verwaltet.
             </p>
+
+            {/* Welle D.9: Doku-Sektion am importierten Event. Pin-Owner
+                ist das external_event-Atom (atom_type='imported_event'). */}
+            <Show when={props.wsAtomPins && props.wsDocs}>
+              <AtomDocsSection
+                atomType="imported_event"
+                atomId={props.eventId}
+                atomTitle={props.snapshot.summary ?? null}
+                atomPins={props.wsAtomPins ?? []}
+                docs={props.wsDocs ?? []}
+              />
+            </Show>
           </div>
 
           <footer class="overlay-foot imported-event-foot">

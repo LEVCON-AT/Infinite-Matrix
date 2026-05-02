@@ -11,6 +11,7 @@ import {
 import { useBoardUi } from '../lib/board-ui-state';
 import { showConfirm, showPrompt } from '../lib/dialog';
 import { openDokuForContext, shouldIgnoreDKey } from '../lib/docs-open';
+import { openDocsPopup } from '../lib/docs-ui';
 import { activeDrag, endDrag, startDrag } from '../lib/drag-context';
 import { translateDbError } from '../lib/errors';
 import { dropOnKanbanCol } from '../lib/manifestation-cross-view';
@@ -45,7 +46,10 @@ import { isCardDone, isRecurCard, todayIso, toggleOccurrence } from '../lib/recu
 import { useVis } from '../lib/settings';
 import { showToast, showUndoToast } from '../lib/toasts';
 import type {
+  AtomPin,
+  AtomTagWithTag,
   BoardContent,
+  DocRow,
   KbCardRow,
   KbColRow,
   LinkRow,
@@ -64,7 +68,9 @@ import { useViewerActive } from '../lib/workspace-role';
 import BulkAddModal from './BulkAddModal';
 import CardOverlay from './CardOverlay';
 import ChecklistPanel from './ChecklistPanel';
+import DocsIndicator from './DocsIndicator';
 import Icon from './Icon';
+import TagPills from './TagPills';
 import { ModalTransition } from './ModalTransition';
 import PresenceMini from './PresenceMini';
 
@@ -80,6 +86,16 @@ type Props = {
   // Phase 4 T.1.G.2.C: Workspace-weite Manifestations fuer Cross-View-
   // Drop-Idempotenz (Move-vs-Add-Detect).
   wsManifestations?: TaskManifestationRow[];
+  // Welle D.9: Atom-Pins fuer DocsIndicator-Render auf Kanban-Cards.
+  // Liest atom_pins WHERE atom_type='doc' AND parent_kind='atom' AND
+  // parent_id=card.atom_id (Task-Atoms sind die Karten selbst).
+  wsAtomPins?: AtomPin[];
+  // Welle D.9: Doc-Rows fuer AtomDocsSection im CardOverlay (Title +
+  // Vorschau-Snippet). Pure Daten; werden ueber Workspace-Resource gefuettert.
+  wsDocs?: DocRow[];
+  // Welle D.9: Atom-Tags (joined mit workspace_tags-Registry) fuer
+  // TagPills-Render auf Kanban-Cards. Filter pro Card client-seitig.
+  wsAtomTagsEnriched?: AtomTagWithTag[];
 };
 
 // Liefert N/M fuer eine Karte — inline-Checkliste oder resolved via ref.
@@ -167,6 +183,45 @@ function sortComparator(
 
 const BoardView: Component<Props> = (p) => {
   const viewerActive = useViewerActive();
+
+  // Welle D.9: doc-Pin-Count pro Task-Atom (card.id = task.id). Card-Map
+  // einmal aus atom_pins berechnen, dann in der Render-Schleife O(1)-Lookup.
+  const docPinCountByCard = createMemo<Map<string, number>>(() => {
+    const map = new Map<string, number>();
+    for (const pin of p.wsAtomPins ?? []) {
+      if (pin.atom_type !== 'doc') continue;
+      if (pin.parent_kind !== 'atom') continue;
+      map.set(pin.parent_id, (map.get(pin.parent_id) ?? 0) + 1);
+    }
+    return map;
+  });
+
+  // Welle D.9: Erste gepinnte Doc-ID pro Task — wird beim DocsIndicator-
+  // Click direkt geoeffnet (statt Detail-Modal-Umweg). Mehrere Docs
+  // werden im Doc-Popup-Tab-Switcher sichtbar.
+  const firstDocIdByCard = createMemo<Map<string, string>>(() => {
+    const map = new Map<string, string>();
+    for (const pin of p.wsAtomPins ?? []) {
+      if (pin.atom_type !== 'doc') continue;
+      if (pin.parent_kind !== 'atom') continue;
+      if (map.has(pin.parent_id)) continue;
+      map.set(pin.parent_id, pin.atom_id);
+    }
+    return map;
+  });
+
+  // Welle D.9: AtomTagWithTag-Liste pro Task. Filtert die enriched
+  // Workspace-Liste auf atom_type='task' + atom_id=card.id.
+  const tagsByCard = createMemo<Map<string, AtomTagWithTag[]>>(() => {
+    const map = new Map<string, AtomTagWithTag[]>();
+    for (const t of p.wsAtomTagsEnriched ?? []) {
+      if (t.atom_type !== 'task') continue;
+      const arr = map.get(t.atom_id);
+      if (arr) arr.push(t);
+      else map.set(t.atom_id, [t]);
+    }
+    return map;
+  });
 
   // P1.D Live-Cursor-Map: Card-ID -> User-Liste (gehoverte Cards).
   const presenceByCard = createMemo<Map<string, PresenceUser[]>>(() => {
@@ -1243,7 +1298,9 @@ const BoardView: Component<Props> = (p) => {
                                       deadline ||
                                       card.priority != null ||
                                       card.recur != null ||
-                                      progress()
+                                      progress() ||
+                                      (docPinCountByCard().get(card.id) ?? 0) > 0 ||
+                                      (tagsByCard().get(card.id)?.length ?? 0) > 0
                                     }
                                   >
                                     <div class="kb-card-meta">
@@ -1253,6 +1310,19 @@ const BoardView: Component<Props> = (p) => {
                                       <For each={card.who ?? []}>
                                         {(w) => <span class="kb-who">@{w}</span>}
                                       </For>
+                                      <Show when={(tagsByCard().get(card.id)?.length ?? 0) > 0}>
+                                        <TagPills
+                                          tags={tagsByCard().get(card.id) ?? []}
+                                          onShowAll={() => setSelectedCardId(card.id)}
+                                        />
+                                      </Show>
+                                      <DocsIndicator
+                                        count={docPinCountByCard().get(card.id) ?? 0}
+                                        onClick={() => {
+                                          const docId = firstDocIdByCard().get(card.id);
+                                          if (docId) openDocsPopup({ initialDocId: docId });
+                                        }}
+                                      />
                                       <Show when={deadline}>
                                         <span
                                           class="kb-deadline"
@@ -1451,6 +1521,9 @@ const BoardView: Component<Props> = (p) => {
                   content={content()}
                   onClose={() => setSelectedCardId(null)}
                   onChanged={() => p.onChanged?.()}
+                  wsAtomPins={p.wsAtomPins}
+                  wsDocs={p.wsDocs}
+                  wsAtomTagsEnriched={p.wsAtomTagsEnriched}
                 />
               )}
             </Show>
