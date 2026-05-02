@@ -20,6 +20,7 @@ import CommandPalette from '../components/CommandPalette';
 import ContextMenu from '../components/ContextMenu';
 import CreateManifestationModal from '../components/CreateManifestationModal';
 import ImportedEventDetailModal from '../components/ImportedEventDetailModal';
+import NotificationBell from '../components/NotificationBell';
 import DocsPopup from '../components/DocsPopup';
 import GlobalSearch from '../components/GlobalSearch';
 import HeaderSearchBar from '../components/HeaderSearchBar';
@@ -1427,6 +1428,7 @@ const Workspace: Component = () => {
             >
               <Icon name="tag" size={18} />
             </button>
+            <NotificationBell workspaceId={params.workspaceId} />
             <button
               type="button"
               class="theme-toggle-btn"

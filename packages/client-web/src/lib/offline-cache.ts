@@ -76,6 +76,8 @@ const TABLES = [
   // Source-Tabelle fuer atom_type='imported_event'.
   'external_calendars',
   'external_events',
+  // Welle N — In-App-Notifications. Self-only RLS, workspace_id-Index.
+  'notifications',
 ] as const;
 
 export type CacheTable = (typeof TABLES)[number];
@@ -104,6 +106,7 @@ interface MatrixCacheSchema extends DBSchema {
   atom_manifestations: StoreDef;
   external_calendars: StoreDef;
   external_events: StoreDef;
+  notifications: StoreDef;
 }
 
 const DB_NAME = 'matrix-cache';
@@ -119,7 +122,8 @@ const DB_NAME = 'matrix-cache';
 // V9 (Welle I): external_calendars + external_events Stores fuer
 // Calendar-Inbound (Migration 059). Polymorphe Atom-Quelle
 // 'imported_event' wird ebenfalls in atom_manifestations gemirrored.
-const DB_VERSION = 9;
+// V10 (Welle N): notifications-Store fuer In-App-Benachrichtigungen.
+const DB_VERSION = 10;
 const OBSOLETE_STORES = ['kb_cards', 'checklist_items', 'task_manifestations'] as const;
 
 let dbPromise: Promise<IDBPDatabase<MatrixCacheSchema>> | null = null;
