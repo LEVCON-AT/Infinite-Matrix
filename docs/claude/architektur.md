@@ -23,6 +23,14 @@
                  │   Layer 2 — Abhaengigkeiten      │  ← depends_on / blocks (DAG)
                  │   (M:N atom_dependencies)        │     (T.3)
                  ├──────────────────────────────────┤
+                 │   Layer 2 — Pins + Tags          │  ← Welle D
+                 │   atom_pins (atom→parent)        │     Pin: Atom an Cell/Atom/Node
+                 │   workspace_tags + atom_tags     │     Tag-Owner = ausschliesslich Atom
+                 │   parent_kind ∈ {cell,atom,      │     (Manifestation erbt vom Atom)
+                 │     node,manifestation}          │     (Migration 063+064)
+                 │   tag_kind ∈ {freetext,atom_ref, │
+                 │     object_ref,alias_ref}        │
+                 ├──────────────────────────────────┤
                  │   Layer 1 — Manifestations       │  ← wo erscheint das Atom?
                  │   (1:N atom_manifestations)      │     Kanban / Checklist / Calendar /
                  │   atom_type ∈ {task,link,        │     Standalone / (spaeter Flowchart)
@@ -42,7 +50,7 @@ Jedes inhaltliche Objekt hat **eine** Aggregate-Tabelle:
 - `tasks` — id, label, note, status, deadline, who, recur, done_occurrences, attrs
 - `links` — id, label, url, type, alias
 - `checklists` — id, label, recur, close_mode, history, alias, label_template
-- `docs` — id, title, content, attached_cell_id, title_template
+- `docs` — id, title, content, title_template (Welle D: HTML-Body, kein attached_cell_id mehr — Pin lebt in atom_pins)
 
 **Regel:** ein Atom-Typ = eine Tabelle. Keine parallelen Tables fuer dieselbe Domain. Keine Mirror-Spalten. Keine "alternative" Repraesentation.
 
@@ -85,6 +93,44 @@ atom_manifestations (
 ### 1.5 Layer 4 — Additive Anhaenge (Phase T.2)
 
 `atom_comments`, `atom_attachments` (Supabase-Storage), `atom_doc_notes`. Alle 1:N an `(atom_type, atom_id)`. Realtime fuer Comments.
+
+### 1.5b Layer 2 — Pins + Tags (Welle D)
+
+**`atom_pins`** ist die generische "Atom A ist an Parent P gepinnt"-Relation. Loest `docs.attached_cell_id` ab und macht das Pin-Konzept symmetrisch ueber alle 5 Atom-Typen + 4 Parent-Kinds:
+
+```
+atom_pins (
+  id           uuid pk,
+  atom_type    enum('task','link','doc','checklist','imported_event'),
+  atom_id      uuid,                                      -- polymorph, kein FK
+  workspace_id uuid fk → workspaces ON DELETE CASCADE,
+  parent_kind  enum('cell','atom','node','manifestation'),
+  parent_id    uuid,                                      -- polymorph, kein FK
+  position     numeric,
+  created_at   timestamptz,
+  UNIQUE (atom_type, atom_id, parent_kind, parent_id)     -- Multi-Pin erlaubt, Doppel-Pin verboten
+)
+```
+
+`parent_kind='manifestation'` ist V2-deferred — V1 nur cell/atom/node. Cascade ueber Source-Trigger (5 Atom-Typen + 2 Parent-Kinds = 7 Trigger), Pattern aus Migration 044 `_atom_manif_purge_for_*`.
+
+**Tag-System** (`workspace_tags` + `atom_tags`) ist orthogonal zu Pins. **Tag-Owner = ausschliesslich Atom** (Manifestation erbt vom Atom — keine eigenen Tags pro Linse). Vier Tag-Kinds:
+
+| Kind | value | display_label | Use |
+|---|---|---|---|
+| `freetext` | canonical-string | NULL | `#design` |
+| `atom_ref` | target atom_id::text | title-Snapshot | `@TaskTitle` (Click → Atom) |
+| `object_ref` | `${kind}:${id}` | label-Snapshot | `⤴Cell ^kunde` (Click → Cell/Node) |
+| `alias_ref` | canonical-alias-string | `^kuerzel`-Snapshot | Live-Resolve gegen alias-index |
+
+`workspace_tags(id, ws, kind, value, display_label, usage_count)` ist die Registry. UNIQUE(ws, kind, value) — pro Wert eine Registry-Zeile. `atom_tags(id, atom_type, atom_id, ws, tag_id)` ist die Junction. Trigger `_workspace_tags_bump_usage` pflegt usage_count automatisch.
+
+**Konsequenzen fuer Code:**
+- `lib/atom-pins.ts`: Read/Write fuer atom_pins (offline-cache + Realtime). Helper `setDocSingleCellPin` fuer Compat-UX (DocsPopup-Attach-Input).
+- `lib/atom-tags.ts`: vier RPC-Wrapper (add_atom_tag_freetext/alias/atomref/objectref), `fetchAtomTagsForAtom` mit PostgREST-Embed (atom_tags → workspace_tags FK ist ECHT, Embed safe).
+- `lib/tag-index.ts`: Workspace-scoped `workspace_tags`-Cache fuer Autocomplete.
+- TagInput + TagPills: wiederverwendbare Komponenten in `components/`.
+- `pin_doc_with_create`-RPC bundled Doc-Insert + atom_pins-Insert atomar.
 
 ### 1.6 Konsequenzen fuer Code
 
