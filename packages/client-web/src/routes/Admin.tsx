@@ -15,7 +15,7 @@
 // - B.0.F — Stats-Section (User-Counts / Workspace-Counts).
 
 import { useNavigate } from '@solidjs/router';
-import { type Component, Show, createResource, createSignal } from 'solid-js';
+import { type Component, Show, createResource, createSignal, onCleanup, onMount } from 'solid-js';
 import Icon from '../components/Icon';
 import AuditLogSection from '../components/admin/AuditLogSection';
 import PlatformAdminsSection from '../components/admin/PlatformAdminsSection';
@@ -33,6 +33,21 @@ const Admin: Component = () => {
   const navigate = useNavigate();
 
   const [section, setSection] = createSignal<AdminSection>('config');
+
+  // ESC: zurueck zur App (history.back oder /).
+  onMount(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      e.preventDefault();
+      if (window.history.length > 1) navigate(-1);
+      else navigate('/', { replace: true });
+    };
+    document.addEventListener('keydown', onKey);
+    onCleanup(() => document.removeEventListener('keydown', onKey));
+  });
 
   // Auth-Guard: Plattform-Admin-Check via RPC. Nicht-Admins kriegen
   // einen Toast + Redirect zu / (Workspace-Default).

@@ -102,6 +102,39 @@ function toGeminiContents(messages: AssistMessage[]): GeminiContent[] {
   return out;
 }
 
+// Gemini's parameters-Field nutzt ein OpenAPI-3.0-Subset (Protocol-
+// Buffer-getrieben). Anthropic/OpenAI akzeptieren das gleiche
+// JSON-Schema, das wir in tools.ts deklarieren — Gemini nicht. Dieser
+// Sanitizer mapped die Differenzen:
+//   - type: ['string','null']  →  type: 'string', nullable: true
+//   - type: 'integer'          → bleibt
+//   - additionalProperties     → entfernt (kennt Gemini nicht)
+//   - $schema                  → entfernt
+//   - default                  → entfernt (ignored, gibt manchmal Probleme)
+// Rekursiv ueber properties/items.
+function sanitizeForGemini(schema: unknown): unknown {
+  if (Array.isArray(schema)) {
+    return schema.map(sanitizeForGemini);
+  }
+  if (schema == null || typeof schema !== 'object') return schema;
+  const src = schema as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(src)) {
+    if (k === '$schema' || k === 'additionalProperties' || k === 'default') continue;
+    if (k === 'type' && Array.isArray(v)) {
+      // ['string', 'null'] → 'string' + nullable. Bei mehreren non-null
+      // Typen Fallback auf 'string' (Gemini akzeptiert union nicht).
+      const nonNull = v.filter((t) => t !== 'null');
+      const hasNull = v.includes('null');
+      out.type = (nonNull[0] as string) ?? 'string';
+      if (hasNull) out.nullable = true;
+      continue;
+    }
+    out[k] = sanitizeForGemini(v);
+  }
+  return out;
+}
+
 function toGeminiTools(tools: ReadonlyArray<ToolDef>): GeminiTool[] {
   if (tools.length === 0) return [];
   return [
@@ -109,7 +142,7 @@ function toGeminiTools(tools: ReadonlyArray<ToolDef>): GeminiTool[] {
       functionDeclarations: tools.map((t) => ({
         name: t.name,
         description: t.description,
-        parameters: t.inputSchema,
+        parameters: sanitizeForGemini(t.inputSchema) as ToolDef['inputSchema'],
       })),
     },
   ];

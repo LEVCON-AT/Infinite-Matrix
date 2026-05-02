@@ -155,8 +155,17 @@ const Settings: ParentComponent = (props) => {
     };
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'f') return;
       if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      // ESC: zurueck zum Workspace (oder navigate -1 im History).
+      if (e.key === 'Escape') {
+        if (isTextInput(e.target)) return;
+        e.preventDefault();
+        if (window.history.length > 1) navigate(-1);
+        else navigate(`/w/${params.workspaceId}`);
+        return;
+      }
+      // f: Settings-Suchbar fokussieren.
+      if (e.key !== 'f') return;
       if (isTextInput(e.target)) return;
       e.preventDefault();
       searchInputEl?.focus();

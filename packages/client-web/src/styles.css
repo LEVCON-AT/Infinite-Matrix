@@ -10954,14 +10954,14 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
    Toggle ueber Sparkles-Floating-Button rechts oben oder Ctrl+K.
    ════════════════════════════════════════════════════════════════ */
 
-/* Toggle-Button (floating, rechts oben). */
+/* Toggle-Button (floating, rechts unten — typische Chat-Bubble-Position). */
 .ai-help-toggle {
   position: fixed;
-  top: var(--space-md);
-  right: var(--space-md);
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  bottom: var(--space-4);
+  right: var(--space-4);
+  inline-size: 3rem;
+  block-size: 3rem;
+  border-radius: var(--radius-full);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--amber);
@@ -10969,9 +10969,10 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  z-index: 40;
-  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.08));
-  transition: transform var(--tr-std), background var(--tr-std);
+  z-index: var(--z-popover);
+  box-shadow: var(--shadow-lg);
+  transition: transform var(--tr-fast) var(--ease-spring), box-shadow var(--tr-fast)
+    var(--ease-smooth), background-color var(--tr-fast) var(--ease-smooth);
 }
 
 .ai-help-toggle:hover {
