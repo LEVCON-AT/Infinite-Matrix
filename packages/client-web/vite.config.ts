@@ -47,23 +47,28 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // SPA-Fallback: alle Navigationen auf index.html. Nicht fuer
-        // Supabase-API-Calls (die laufen ueber fetch() und liegen
-        // ausserhalb der Navigations-Route). BASE-Praefix damit
-        // /app/-Deploy auf /app/index.html zeigt — sonst sucht der
-        // SW non-precached `/index.html` und schmeisst Console-Error.
+        // skipWaiting+clientsClaim: neuer SW uebernimmt sofort beim
+        // ersten Reload nach Deploy — ohne den User um zweites
+        // Reload zu bitten. Wichtig fuer kritische Bug-Fixes wie
+        // AI-Proxy-Routing.
+        skipWaiting: true,
+        clientsClaim: true,
         navigateFallback: `${BASE}index.html`,
-        // Auth- und API-Requests NIE cachen: Token-Refresh, Realtime-
-        // Handshake und RLS-gescopte Reads muessen den echten Server
-        // treffen. Supabase liegt am selben Host unter /auth, /rest,
-        // /realtime — deshalb explizit denylisten.
-        navigateFallbackDenylist: [/^\/auth\//, /^\/rest\//, /^\/realtime\//, /^\/storage\//],
+        navigateFallbackDenylist: [
+          /^\/auth\//,
+          /^\/rest\//,
+          /^\/realtime\//,
+          /^\/storage\//,
+          /^\/api\//,
+        ],
         runtimeCaching: [
           {
-            // Supabase-API: immer Netz, nie Cache. Offline liefert der
-            // SW einen synthetischen 503, die Mutations-Layer-Toasts
-            // fangen das dann ab. Echtes Offline-Verhalten baut 0g.2c.
-            urlPattern: /\/(auth|rest|realtime|storage)\//,
+            // Supabase-API + AI-Proxy: immer Netz, nie Cache. POSTs
+            // sollen sowieso nie zwischengespeichert werden, aber
+            // workbox routet sonst alles durch den SW — bei nicht
+            // gematchten Patterns kommt ein synthetischer Fail. Mit
+            // explizitem NetworkOnly ist der Pfad klar.
+            urlPattern: /\/(auth|rest|realtime|storage|api)\//,
             handler: 'NetworkOnly',
           },
           {

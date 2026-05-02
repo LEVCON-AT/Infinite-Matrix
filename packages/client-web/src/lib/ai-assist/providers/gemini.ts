@@ -173,6 +173,7 @@ export async function callGeminiStream(
     },
   };
 
+  console.log(`[gemini] POST ${url} model=${input.model} tools=${input.tools.length}`);
   const resp = await fetch(url, {
     method: 'POST',
     headers: {
@@ -182,6 +183,7 @@ export async function callGeminiStream(
     body: JSON.stringify(body),
     signal: input.signal,
   });
+  console.log(`[gemini] response status=${resp.status} ok=${resp.ok}`);
 
   if (!resp.ok || !resp.body) {
     let errMsg = `Gemini ${resp.status}`;
@@ -209,10 +211,14 @@ export async function callGeminiStream(
   let buf = '';
   let toolCallCounter = 0;
 
+  let bytesTotal = 0;
+  let chunkCount = 0;
   try {
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
+      bytesTotal += value.byteLength;
+      chunkCount += 1;
       buf += decoder.decode(value, { stream: true });
 
       let nl = buf.indexOf('\n\n');
@@ -228,6 +234,9 @@ export async function callGeminiStream(
     onEvent({ type: 'error', message: msg });
     throw e;
   }
+  console.log(
+    `[gemini] stream done bytes=${bytesTotal} chunks=${chunkCount} text-len=${state.assistantText.length} tool-uses=${state.toolUses.length} finish=${state.finishReason}`,
+  );
 
   // finish_reason mappen.
   let stop: GeminiCallResult['stopReason'] = 'end_turn';
