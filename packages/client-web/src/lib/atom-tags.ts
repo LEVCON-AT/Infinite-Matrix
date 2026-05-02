@@ -40,6 +40,59 @@ export async function fetchAtomTagsByWorkspace(workspaceId: string): Promise<Ato
   }
 }
 
+// Tags fuer einen einzelnen Atom holen (joined). Liefert AtomTagWithTag
+// fuer direkte Render-Konsumption. Nutzt PostgREST-Embed ueber den
+// FK atom_tags.tag_id → workspace_tags.id (real FK, Embed safe).
+export async function fetchAtomTagsForAtom(args: {
+  workspaceId: string;
+  atomType: AtomKind;
+  atomId: string;
+}): Promise<AtomTagWithTag[]> {
+  try {
+    const { data, error } = await supabase
+      .from('atom_tags')
+      .select('*, workspace_tags(*)')
+      .eq('workspace_id', args.workspaceId)
+      .eq('atom_type', args.atomType)
+      .eq('atom_id', args.atomId);
+    if (error) throw error;
+    const rows = (data ?? []) as Array<
+      AtomTag & { workspace_tags: WorkspaceTag | null }
+    >;
+    markLiveSuccess();
+    return rows.flatMap((r) => {
+      const reg = r.workspace_tags;
+      if (!reg) return [];
+      return [
+        {
+          id: r.id,
+          atom_type: r.atom_type,
+          atom_id: r.atom_id,
+          workspace_id: r.workspace_id,
+          tag_id: r.tag_id,
+          position: r.position,
+          created_at: r.created_at,
+          tag_kind: reg.kind,
+          tag_value: reg.value,
+          tag_display_label: reg.display_label,
+        } as AtomTagWithTag,
+      ];
+    });
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    // Offline: ueber zwei Stores joinen.
+    const [atomTags, wsTags] = await Promise.all([
+      getByWorkspace<AtomTag>(TABLE, args.workspaceId),
+      getByWorkspace<WorkspaceTag>('workspace_tags', args.workspaceId),
+    ]);
+    markCacheFallback();
+    const atomScoped = atomTags.filter(
+      (t) => t.atom_type === args.atomType && t.atom_id === args.atomId,
+    );
+    return joinAtomTagsWithRegistry(atomScoped, wsTags);
+  }
+}
+
 // Joint AtomTag + WorkspaceTag — was die TagPills-Render-Pfade brauchen.
 // In-Memory-Join, aufgerufen aus Workspace-Resolver.
 export function joinAtomTagsWithRegistry(

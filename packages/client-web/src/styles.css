@@ -2398,6 +2398,132 @@ button[type="submit"]:hover:not(:disabled) {
   padding: 0.25em 0.75em;
 }
 
+/* ─── Welle D.7: Tag-Pills + Tag-Input ─────────────────────── */
+.tag-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25em;
+  align-items: center;
+}
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15em;
+  padding: 0.1em 0.5em;
+  border: 0.5px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-hover, var(--bg));
+  color: var(--text);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background-color var(--tr-std), border-color var(--tr-std);
+  white-space: nowrap;
+}
+.tag-pill:hover {
+  background: var(--surface-active, var(--surface-hover));
+  border-color: var(--blue);
+}
+.tag-pill-prefix {
+  color: var(--text2);
+  font-weight: 600;
+}
+.tag-pill-freetext { color: var(--blue); }
+.tag-pill-alias_ref { color: var(--violet, var(--blue)); }
+.tag-pill-atom_ref { color: var(--green, var(--blue)); }
+.tag-pill-object_ref { color: var(--amber, var(--blue)); }
+.tag-pill-overflow {
+  color: var(--text2);
+  font-style: italic;
+}
+
+.tag-input {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25em;
+  align-items: center;
+  padding: 0.25em 0.5em;
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--bg);
+  min-height: 2em;
+}
+.tag-input:focus-within {
+  border-color: var(--blue);
+}
+.tag-input-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15em;
+  padding: 0.1em 0.4em;
+  border: 0.5px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-hover, var(--bg));
+  font-size: 0.78rem;
+}
+.tag-input-pill-prefix {
+  color: var(--text2);
+  font-weight: 600;
+}
+.tag-input-pill-remove {
+  background: transparent;
+  border: none;
+  color: var(--text2);
+  cursor: pointer;
+  font-size: 0.85em;
+  padding: 0 0.15em;
+  margin-left: 0.15em;
+  line-height: 1;
+}
+.tag-input-pill-remove:hover {
+  color: var(--red, var(--text));
+}
+.tag-input-field {
+  flex: 1 1 auto;
+  min-width: 6em;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.85rem;
+  font-family: inherit;
+  color: var(--text);
+}
+.tag-input-hint {
+  color: var(--text2);
+  font-size: 0.72rem;
+  font-style: italic;
+}
+.tag-input-pick-object {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2em;
+  background: transparent;
+  border: 0.5px dashed var(--border);
+  border-radius: var(--rs);
+  padding: 0.1em 0.4em;
+  font-size: 0.78rem;
+  color: var(--text2);
+  cursor: pointer;
+}
+.tag-input-pick-object:hover {
+  border-color: var(--blue);
+  color: var(--text);
+}
+
+.docs-popup-tag-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: var(--space-xs) 0;
+}
+.docs-popup-tag-label {
+  flex: 0 0 auto;
+  color: var(--text2);
+  font-size: 0.85rem;
+}
+.docs-popup-tag-row .tag-input {
+  flex: 1 1 auto;
+}
+
 .docs-popup-content-view {
   flex: 1 1 auto;
   min-height: 240px;

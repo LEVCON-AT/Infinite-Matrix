@@ -48,6 +48,7 @@ import { sanitizeHtml } from '../lib/sanitize-html';
 import { supabase } from '../lib/supabase';
 import { showToast, showUndoToast } from '../lib/toasts';
 import type { DocRow } from '../lib/types';
+import DocTagsEditor from './DocTagsEditor';
 import Icon from './Icon';
 import RichTextEditor from './RichTextEditor';
 // Welle D: textarea + MarkdownLightView ersetzt durch ProseMirror-Editor.
@@ -942,7 +943,7 @@ const DocsPopup: Component<Props> = (p) => {
                     type="text"
                     value={t().alias}
                     placeholder="^alias (optional)"
-                    maxLength={8}
+                    maxLength={64}
                     onInput={(e) => patchActive({ alias: e.currentTarget.value })}
                     onBlur={(e) => onAliasBlur(e.currentTarget.value)}
                     onKeyDown={(e) => {
@@ -1031,6 +1032,20 @@ const DocsPopup: Component<Props> = (p) => {
                     </span>
                   </Show>
                 </div>
+                {/* Welle D.7: Tag-Editor pro Doku. Nur fuer persistierte
+                  * Docs (Pending-Tabs haben noch keine atom_id). */}
+                <Show when={t().docId}>
+                  {(docId) => (
+                    <div class="docs-popup-tag-row">
+                      <span class="docs-popup-tag-label">Tags:</span>
+                      <DocTagsEditor
+                        workspaceId={p.workspaceId}
+                        docId={docId()}
+                        realtimeVersion={p.realtimeVersion}
+                      />
+                    </div>
+                  )}
+                </Show>
                 <Show
                   when={t().mode === 'edit'}
                   fallback={
