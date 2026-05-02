@@ -1,5 +1,7 @@
 import { registerTool } from '../dispatcher.js';
 import { aliasTools } from './alias.js';
+import { atomPinTools } from './atom-pin.js';
+import { atomTagTools } from './atom-tag.js';
 import { cardTools } from './card.js';
 import { cellTools } from './cell.js';
 import { checklistTools } from './checklist.js';
@@ -24,6 +26,8 @@ export function registerAllTools(): void {
     ...settingsTools,
     ...metaTools,
     ...templateTools,
+    ...atomPinTools,
+    ...atomTagTools,
   ]) {
     registerTool(tool);
   }
