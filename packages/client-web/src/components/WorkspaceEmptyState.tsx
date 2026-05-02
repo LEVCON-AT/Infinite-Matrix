@@ -11,6 +11,7 @@
 
 import { type Component, Show, createSignal } from 'solid-js';
 import Icon from './Icon';
+import { ModalTransition } from './ModalTransition';
 import TopLevelWizard from './TopLevelWizard';
 
 type Props = {
@@ -63,16 +64,18 @@ const WorkspaceEmptyState: Component<Props> = (p) => {
           </button>
         </div>
       </Show>
-      <Show when={wizardType()}>
-        {(type) => (
-          <TopLevelWizard
-            workspaceId={p.workspaceId}
-            type={type()}
-            onClose={() => setWizardType(null)}
-            onCreated={(nodeId) => p.onCreated(nodeId)}
-          />
-        )}
-      </Show>
+      <ModalTransition when={Boolean(wizardType())}>
+        <Show when={wizardType()}>
+          {(type) => (
+            <TopLevelWizard
+              workspaceId={p.workspaceId}
+              type={type()}
+              onClose={() => setWizardType(null)}
+              onCreated={(nodeId) => p.onCreated(nodeId)}
+            />
+          )}
+        </Show>
+      </ModalTransition>
     </section>
   );
 };

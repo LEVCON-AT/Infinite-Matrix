@@ -58,6 +58,7 @@ import ChecklistActionModal from './ChecklistActionModal';
 import ChecklistPastePopup from './ChecklistPastePopup';
 import ChecklistToCardPopup from './ChecklistToCardPopup';
 import Icon from './Icon';
+import { ModalTransition } from './ModalTransition';
 import PresenceMini from './PresenceMini';
 
 type Props = {
@@ -762,7 +763,7 @@ const ChecklistPanel: Component<Props> = (p) => {
         </section>
       </Show>
 
-      <Show when={showToCard()}>
+      <ModalTransition when={showToCard()}>
         <ChecklistToCardPopup
           workspaceId={p.workspaceId}
           checklistId={p.checklist.id}
@@ -770,9 +771,9 @@ const ChecklistPanel: Component<Props> = (p) => {
           onClose={() => setShowToCard(false)}
           onCreated={() => p.onChanged()}
         />
-      </Show>
+      </ModalTransition>
 
-      <Show when={showActionModal()}>
+      <ModalTransition when={showActionModal()}>
         <ChecklistActionModal
           workspaceId={p.workspaceId}
           checklistId={p.checklist.id}
@@ -780,9 +781,9 @@ const ChecklistPanel: Component<Props> = (p) => {
           onClose={() => setShowActionModal(false)}
           onSaved={() => p.onChanged()}
         />
-      </Show>
+      </ModalTransition>
 
-      <Show when={pasteText() !== null}>
+      <ModalTransition when={pasteText() !== null}>
         <ChecklistPastePopup
           initialText={pasteText() as string}
           checklistLabel={p.checklist.label}
@@ -800,7 +801,7 @@ const ChecklistPanel: Component<Props> = (p) => {
             );
           }}
         />
-      </Show>
+      </ModalTransition>
     </li>
   );
 };

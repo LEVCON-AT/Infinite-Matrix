@@ -715,26 +715,25 @@ const MatrixView: Component<Props> = (p) => {
 
   return (
     <div class="matrix-wrap">
-      <Show when={overlayTarget()}>
-        {(target) => {
-          // Phase 3 O.8.M.2: NewCellWizard handelt sowohl Anlage als
-          // auch Edit-Modus — fuer leere und befuellte Zellen identisch.
-          // CellOverlay wird in O.8.M.4 geloescht.
-          const t = target();
-          return (
-            <NewCellWizard
-              workspaceId={p.workspaceId}
-              matrixId={p.matrixId}
-              row={t.row}
-              col={t.col}
-              cell={t.cell}
-              resolverMaps={p.resolverMaps}
-              onClose={() => setOverlayTarget(null)}
-              onCreated={() => p.onChanged?.()}
-            />
-          );
-        }}
-      </Show>
+      <ModalTransition when={Boolean(overlayTarget())}>
+        <Show when={overlayTarget()}>
+          {(target) => {
+            const t = target();
+            return (
+              <NewCellWizard
+                workspaceId={p.workspaceId}
+                matrixId={p.matrixId}
+                row={t.row}
+                col={t.col}
+                cell={t.cell}
+                resolverMaps={p.resolverMaps}
+                onClose={() => setOverlayTarget(null)}
+                onCreated={() => p.onChanged?.()}
+              />
+            );
+          }}
+        </Show>
+      </ModalTransition>
 
       <Show
         when={
