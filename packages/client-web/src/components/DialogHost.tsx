@@ -117,11 +117,12 @@ const DialogHost: Component = () => {
     d: DialogRequest,
     variant: 'primary' | 'danger' | 'default' | undefined,
   ): string {
-    if (variant === 'danger') return 'btn-danger';
-    if (variant === 'primary') return 'btn-c';
+    // Manifest-konform: .btn-Base + Variant. lift fuer Hover-Effekt.
+    if (variant === 'danger') return 'btn btn-danger lift';
+    if (variant === 'primary') return 'btn btn-primary lift';
     if (d.kind === 'confirm' && d.variant === 'danger')
-      return variant === 'default' ? 'btn-subtle' : 'btn-danger';
-    return variant === 'default' ? 'btn-subtle' : 'btn-c';
+      return variant === 'default' ? 'btn btn-subtle' : 'btn btn-danger lift';
+    return variant === 'default' ? 'btn btn-subtle' : 'btn btn-primary lift';
   }
 
   return (
@@ -164,7 +165,7 @@ const DialogHost: Component = () => {
                       <input
                         ref={promptInputRef}
                         type={dd.inputType}
-                        class="dialog-input"
+                        class="input dialog-input"
                         value={promptValue()}
                         placeholder={dd.placeholder}
                         autocomplete={dd.inputType === 'password' ? 'new-password' : 'off'}
@@ -181,7 +182,11 @@ const DialogHost: Component = () => {
                     const dd = d() as Extract<DialogRequest, { kind: 'confirm' }>;
                     return (
                       <>
-                        <button type="button" class="btn-subtle" onClick={() => dd.resolve(false)}>
+                        <button
+                          type="button"
+                          class="btn btn-subtle"
+                          onClick={() => dd.resolve(false)}
+                        >
                           {dd.cancelLabel}
                         </button>
                         <button
@@ -201,13 +206,17 @@ const DialogHost: Component = () => {
                     const dd = d() as Extract<DialogRequest, { kind: 'prompt' }>;
                     return (
                       <>
-                        <button type="button" class="btn-subtle" onClick={() => dd.resolve(null)}>
+                        <button
+                          type="button"
+                          class="btn btn-subtle"
+                          onClick={() => dd.resolve(null)}
+                        >
                           {dd.cancelLabel}
                         </button>
                         <button
                           ref={primaryBtnRef}
                           type="button"
-                          class="btn-c"
+                          class="btn btn-primary lift"
                           onClick={() => dd.resolve(promptValue())}
                         >
                           {dd.confirmLabel}

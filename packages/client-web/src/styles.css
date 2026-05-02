@@ -5296,58 +5296,70 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   }
 }
 
+/* style.md §5.4 — Modal-Header / Body / Close (HyperUI-Spec). */
 .overlay-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-sm);
-  padding: var(--space-md) var(--space-lg);
-  border-bottom: 0.5px solid var(--border);
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-6) var(--space-4);
+  border-bottom: 1px solid var(--border);
 }
 
 .overlay-head-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-1);
+  min-inline-size: 0;
 }
 
 .overlay-head-text h2 {
   margin: 0;
-  font-size: var(--fs-title);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  line-height: var(--lh-tight);
+  color: var(--text);
 }
 
 .overlay-sub {
   color: var(--text2);
-  font-size: 12px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-sm);
+  line-height: var(--lh-normal);
 }
 
 .overlay-close {
   background: transparent;
-  color: var(--text2);
+  color: var(--text3);
   border: 0;
   cursor: pointer;
   padding: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--rs);
+  inline-size: 2rem;
+  block-size: 2rem;
+  border-radius: var(--radius-md);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
+  transition: background-color var(--tr-fast) var(--ease-smooth), color var(--tr-fast)
+    var(--ease-smooth);
 }
 
 .overlay-close:hover {
   color: var(--text);
-  background: var(--bg2);
+  background: var(--surface-hover);
+}
+
+.overlay-close:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
 }
 
 .overlay-body {
-  padding: var(--space-md) var(--space-lg);
+  padding: var(--space-5) var(--space-6);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: var(--space-4);
 }
 
 /* Card/Cell-Overlay spezifisch */
@@ -5610,18 +5622,20 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
 .dialog-body {
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: var(--space-3);
 }
 
 .dialog-message {
   margin: 0;
-  font-size: var(--fs-base);
-  line-height: 1.5;
+  font-size: var(--text-sm);
+  line-height: var(--lh-normal);
   color: var(--text);
   white-space: pre-wrap;
 }
 
 .dialog-input {
+  /* .input liefert die Manifest-Base — diese Klasse ueberschreibt nur
+     spezifische Werte falls noetig. */
   width: 100%;
   height: 36px;
   padding: 0 var(--space-sm);
@@ -5642,13 +5656,15 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
 .dialog-foot {
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-sm);
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6) var(--space-5);
+  border-top: 1px solid var(--border);
 }
 
 .dialog-choices {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-sm);
+  gap: var(--space-2);
   width: 100%;
   justify-content: flex-end;
 }
@@ -6124,19 +6140,21 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
 }
 
 .toast {
+  /* style.md §5.5 — HyperUI-Toast: Manifest-Tokens, --shadow-lg fuer
+     prominente Tiefe ueber dem Workspace-Hintergrund. */
   pointer-events: auto;
-  background: var(--bg);
+  background: var(--surface);
   color: var(--text);
-  border: 0.5px solid var(--border2);
+  border: 1px solid var(--border);
   border-left: 3px solid var(--text3);
-  border-radius: var(--r);
-  padding: 10px 14px 10px 12px;
-  font-size: 12.5px;
-  line-height: 1.4;
-  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  line-height: var(--lh-normal);
+  box-shadow: var(--shadow-lg);
   display: flex;
   align-items: flex-start;
-  gap: var(--space-sm);
+  gap: var(--space-3);
   animation: toastIn var(--tr-enter) var(--ease-smooth);
   max-width: 100%;
   word-wrap: break-word;
