@@ -432,7 +432,17 @@ p.ok {
    ico-btn, ws-sidebar-mode-btn, ...) unerwuenscht die Base. */
 /* Q.3.B+B.1.X: HyperUI-Spec (style.md §5.1). Border-radius-md, Manifest-
    Spacing/Typo-Tokens, hover-shadow-Lift, active-press-scale. */
+/* Q.3.B+UI-Audit: alle .btn-*-Modifier-Klassen erben automatisch die
+   Base-Styles, auch ohne explizites .btn dazu. Existing-Code nutzt
+   teils nur Modifier (z.B. class="btn-c") — das war optisch kaputt
+   ohne Base. Die Variante-spezifischen Color/Border-Overrides kommen
+   weiter unten und ueberschreiben background/color/border. */
 .btn,
+.btn-p,
+.btn-primary,
+.btn-c,
+.btn-secondary,
+.btn-danger,
 button[type="submit"] {
   display: inline-flex;
   align-items: center;
@@ -460,6 +470,11 @@ button[type="submit"] {
 }
 
 .btn:hover:not(:disabled),
+.btn-p:hover:not(:disabled),
+.btn-primary:hover:not(:disabled),
+.btn-c:hover:not(:disabled),
+.btn-secondary:hover:not(:disabled),
+.btn-danger:hover:not(:disabled),
 button[type="submit"]:hover:not(:disabled) {
   background: var(--surface-hover);
   border-color: var(--text3);
@@ -467,12 +482,22 @@ button[type="submit"]:hover:not(:disabled) {
 }
 
 .btn:active:not(:disabled),
+.btn-p:active:not(:disabled),
+.btn-primary:active:not(:disabled),
+.btn-c:active:not(:disabled),
+.btn-secondary:active:not(:disabled),
+.btn-danger:active:not(:disabled),
 button[type="submit"]:active:not(:disabled) {
   transform: scale(var(--scale-press));
   box-shadow: var(--shadow-xs);
 }
 
 .btn:focus-visible,
+.btn-p:focus-visible,
+.btn-primary:focus-visible,
+.btn-c:focus-visible,
+.btn-secondary:focus-visible,
+.btn-danger:focus-visible,
 button[type="submit"]:focus-visible {
   outline: 2px solid var(--focus-color);
   outline-offset: 2px;
