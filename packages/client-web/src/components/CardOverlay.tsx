@@ -2,6 +2,7 @@ import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount
 import { validateAlias } from '../lib/alias';
 import { formatDateDE } from '../lib/dates';
 import { installFocusRestore, showConfirm } from '../lib/dialog';
+import { openDokuForContext, shouldIgnoreDKey } from '../lib/docs-open';
 import { openDocsPopup } from '../lib/docs-ui';
 import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
@@ -108,6 +109,25 @@ const CardOverlay: Component<Props> = (p) => {
       if (e.key === 'Escape') {
         e.stopImmediatePropagation();
         p.onClose();
+        return;
+      }
+      // Welle D.5b: 'd' im Modal-Body (kein Input-Focus) → Doku am Card-Atom.
+      if (
+        (e.key === 'd' || e.key === 'D') &&
+        !e.shiftKey &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        !shouldIgnoreDKey(e.target)
+      ) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        openDokuForContext({
+          kind: 'atom',
+          atomType: 'task',
+          atomId: p.card.id,
+          atomTitle: p.card.name ?? null,
+        });
       }
     };
     document.addEventListener('keydown', h, true);

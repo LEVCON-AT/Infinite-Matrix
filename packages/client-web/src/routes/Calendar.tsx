@@ -51,6 +51,7 @@ import {
   monthLabelDe,
   startOfMonth,
 } from '../lib/calendar';
+import { openDokuForContext, shouldIgnoreDKey } from '../lib/docs-open';
 import { translateDbError } from '../lib/errors';
 import { installEscReturn, useGridNav } from '../lib/keyboard-nav';
 import { openManifestationModal } from '../lib/manifestation-modal-state';
@@ -461,6 +462,27 @@ const Calendar: Component = () => {
                         }
                         onClick={(ev) => openEvent(e, ev)}
                         onDblClick={(ev) => onDoubleClickEvent(e, ev)}
+                        onKeyDown={(ev) => {
+                          // Welle D.5b: 'd' auf fokussiertem Calendar-Event
+                          // → atom-Doku am Event-Atom anlegen.
+                          if (
+                            (ev.key === 'd' || ev.key === 'D') &&
+                            !ev.shiftKey &&
+                            !ev.ctrlKey &&
+                            !ev.metaKey &&
+                            !ev.altKey
+                          ) {
+                            if (shouldIgnoreDKey(ev.target)) return;
+                            ev.preventDefault();
+                            ev.stopPropagation();
+                            openDokuForContext({
+                              kind: 'atom',
+                              atomType: e.atomType,
+                              atomId: e.atomId,
+                              atomTitle: e.label ?? null,
+                            });
+                          }
+                        }}
                         title={e.label}
                       >
                         <Show when={e.atomType === 'task' && e.instanceDate}>

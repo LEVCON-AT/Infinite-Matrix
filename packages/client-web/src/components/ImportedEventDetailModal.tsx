@@ -10,6 +10,7 @@
 import { type Component, Show, createResource, createSignal, onCleanup, onMount } from 'solid-js';
 import { fetchExternalEventById } from '../lib/calendar-inbound';
 import { installFocusRestore, installFocusTrap } from '../lib/dialog';
+import { openDokuForContext, shouldIgnoreDKey } from '../lib/docs-open';
 import { closeImportedEventModal, type ImportedEventModalSnapshot } from '../lib/imported-event-modal-state';
 import { showToast } from '../lib/toasts';
 import type { AtomPin, CellRow, DocRow, NodeRow } from '../lib/types';
@@ -61,10 +62,31 @@ const ImportedEventDetailModal: Component<ImportedEventDetailModalProps> = (prop
       onCleanup(releaseTrap);
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (deriveOpen()) return; // ESC im Sub-Modal landet dort.
-      e.stopImmediatePropagation();
-      closeImportedEventModal();
+      if (e.key === 'Escape') {
+        if (deriveOpen()) return; // ESC im Sub-Modal landet dort.
+        e.stopImmediatePropagation();
+        closeImportedEventModal();
+        return;
+      }
+      // Welle D.5b: 'd' im Modal-Body → Doku am imported_event-Atom.
+      if (
+        (e.key === 'd' || e.key === 'D') &&
+        !e.shiftKey &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        !shouldIgnoreDKey(e.target)
+      ) {
+        if (deriveOpen()) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        openDokuForContext({
+          kind: 'atom',
+          atomType: 'imported_event',
+          atomId: props.eventId,
+          atomTitle: props.snapshot.summary ?? null,
+        });
+      }
     };
     document.addEventListener('keydown', onKey, true);
     onCleanup(() => document.removeEventListener('keydown', onKey, true));
