@@ -85,6 +85,7 @@ import {
   fetchWorkspaceLinks,
 } from '../lib/queries';
 import { fetchAtomPinsByWorkspace } from '../lib/atom-pins';
+import { openDokuForContext } from '../lib/docs-open';
 import { subscribeWorkspace } from '../lib/realtime';
 import { useSettingsBodyClassSync } from '../lib/settings';
 import { useSidebarCalendarState } from '../lib/sidebar-calendar-state';
@@ -846,11 +847,39 @@ const Workspace: Component = () => {
         return;
       }
 
-      // Shift+D: Dokumentations-Popup oeffnen.
+      // Shift+D: Dokumentations-Popup oeffnen (Workspace-Root, kein Pin).
       if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'D' || e.key === 'd')) {
         if (isTextInput(e.target)) return;
         e.preventDefault();
         openDocsPopup();
+        return;
+      }
+
+      // Welle D: plain `d` ohne Modifier in Matrix/Board-Sicht ohne Cell-
+      // Focus → node-level Doku. Cell-Focus-Variante haengt im Cell-keydown
+      // (MatrixView L602).
+      if (
+        !e.shiftKey &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        (e.key === 'd' || e.key === 'D')
+      ) {
+        if (isTextInput(e.target)) return;
+        // Nur greifen wenn wir auf einer Node-Sicht sind (Matrix oder Board).
+        const nodeId = params.nodeId;
+        if (!nodeId) return;
+        // Per-Cell-Handler hat e.preventDefault() gesetzt — wenn wir hier
+        // landen, war kein Cell focused. Auf Node-Ebene oeffnen.
+        const node = (nodes() ?? []).find((n) => n.id === nodeId);
+        if (!node) return;
+        e.preventDefault();
+        openDokuForContext({
+          kind: 'node',
+          nodeId,
+          nodeKind: node.type === 'board' ? 'board' : 'matrix',
+          nodeAlias: node.alias ?? null,
+        });
         return;
       }
 

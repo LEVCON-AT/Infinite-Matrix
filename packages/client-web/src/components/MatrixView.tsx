@@ -11,7 +11,7 @@ import {
 } from 'solid-js';
 import { drillNavigate } from '../lib/animations';
 import { showChoice, showConfirm } from '../lib/dialog';
-import { openDocsPopup } from '../lib/docs-ui';
+import { openDokuForContext } from '../lib/docs-open';
 import { useEditMode } from '../lib/edit-mode';
 import { translateDbError } from '../lib/errors';
 import { findFeatureByHotkey } from '../lib/features';
@@ -594,17 +594,18 @@ const MatrixView: Component<Props> = (p) => {
         return;
       }
 
-      // "d" — Doku-Popup fuer diese Zelle oeffnen. source_alias +
-      // attachedCellId werden vorausgefuellt, damit die Doku direkt
-      // mit der Quelle verknuepft entsteht. Klappt auch auf Zellen
-      // ohne Alias: source_alias ist dann null, der Doc bleibt
-      // trotzdem via attached_cell_id und Doku-Pill auffindbar.
-      if (e.key === 'd' || e.key === 'D') {
+      // "d" — Doku-Popup fuer diese Zelle oeffnen. Welle D: zentraler
+      // Handler ueber openDokuForContext({kind:'cell',...}) — der setzt
+      // sourceAlias + attachedCellId, beim Save laeuft pin_doc_with_create
+      // (atomar Doc + atom_pins-Eintrag).
+      if ((e.key === 'd' || e.key === 'D') && !e.shiftKey) {
         const cell = cellMap().get(`${rowId}::${colId}`);
+        if (!cell) return;
         e.preventDefault();
-        openDocsPopup({
-          sourceAlias: cell?.alias ?? null,
-          attachedCellId: cell?.id ?? null,
+        openDokuForContext({
+          kind: 'cell',
+          cellId: cell.id,
+          cellAlias: cell.alias ?? null,
         });
         return;
       }

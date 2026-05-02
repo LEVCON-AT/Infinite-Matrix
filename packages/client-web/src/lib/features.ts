@@ -21,7 +21,9 @@
 // einzelne Buchstaben (Phase 3 O.8: 'd' fuer Doku, 'n' als Platzhalter
 // fuer zukuenftige Features). Der Button-Handler ist dispatch-based.
 
-export type FeatureKind = 'structural' | 'flag' | 'doc';
+// Welle D: 'doc' raus — Doc ist kein Cell-Feature mehr, sondern ein
+// pinbares Atom (atom_type='doc' + atom_pins).
+export type FeatureKind = 'structural' | 'flag';
 
 import type { IconName } from '../components/Icon';
 
@@ -74,15 +76,13 @@ export const CELL_FEATURES: FeatureDef[] = [
     kind: 'flag',
     nameable: true,
   },
-  {
-    key: 'doc',
-    hotkey: 'd',
-    label: 'Doku',
-    icon: '¶',
-    iconName: 'document-text',
-    kind: 'doc',
-    nameable: true,
-  },
+  // Welle D: 'doc' aus den Wizard-Features entfernt — Doku ist kein
+  // klassisches Cell-Feature mehr, sondern ein eigenstaendiger Atom-
+  // Typ ('atom_type=doc') mit Pin-Relation in atom_pins. Pill ent-
+  // steht lazy via cellsWithDocs sobald ein Doc gepinnt wird (siehe
+  // MatrixView L1000+). 'd'-Hotkey lebt jetzt global in lib/docs-open.ts
+  // und triggert openDokuForContext(ctx) fuer die jeweils fokussierte
+  // Sicht.
   // Hotkeys 5-9 + 'n' frei fuer zukuenftige Features.
 ];
 

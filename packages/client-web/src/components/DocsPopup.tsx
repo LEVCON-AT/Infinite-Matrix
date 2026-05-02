@@ -79,6 +79,15 @@ type Tab = {
   // Tab-Load oder nach Attach-Blur. Leer wenn nicht attached oder die
   // Zelle hat keinen Alias (dann sieht der User "(Zelle)" als Hinweis).
   attachedCellAlias: string | null;
+  // Welle D: zusaetzliches Pin-Target fuer parent_kind=atom|node. Wird
+  // vom openDokuForContext-Hook gesetzt; pin_doc_with_create wird beim
+  // Save mit diesen Args gerufen. Cell-Pins laufen weiterhin ueber
+  // attachedCellId fuer Backwaerts-Kompat des Attach-Inputs.
+  pinTarget: {
+    parentKind: 'atom' | 'node';
+    parentId: string;
+    parentLabel: string;
+  } | null;
   // View/Edit-Umschaltung pro Tab. Default: 'edit' bei leerem Content,
   // 'view' wenn Content beim Tab-Oeffnen vorhanden. Klick auf den
   // View-Bereich wechselt zu 'edit'; Toggle-Button im Meta-Row macht
@@ -131,6 +140,7 @@ function tabFromRow(row: DocRow, attachedCellId: string | null = null): Tab {
     // einfach ins Leere.
     attachedCellId,
     attachedCellAlias: null, // wird asynchron nachgezogen
+    pinTarget: null,
     mode: row.content.trim().length > 0 ? 'view' : 'edit',
     dirty: false,
   };
@@ -146,6 +156,7 @@ function tabFromDraft(d: Draft): Tab {
     sourceAlias: d.sourceAlias,
     attachedCellId: d.attachedCellId,
     attachedCellAlias: null,
+    pinTarget: null,
     // Drafts starten in Edit — der User hatte vor dem Crash getippt,
     // will also weiterarbeiten, nicht nur lesen.
     mode: 'edit',
@@ -217,6 +228,7 @@ const DocsPopup: Component<Props> = (p) => {
   function newPendingTab(
     sourceAlias: string | null = null,
     attachedCellId: string | null = null,
+    pinTarget: Tab['pinTarget'] = null,
   ): Tab {
     return {
       docId: null,
@@ -229,6 +241,7 @@ const DocsPopup: Component<Props> = (p) => {
       sourceAlias,
       attachedCellId,
       attachedCellAlias: null,
+      pinTarget,
       mode: 'edit',
       dirty: false,
     };
@@ -331,7 +344,13 @@ const DocsPopup: Component<Props> = (p) => {
     }
 
     if (loaded.length === 0) {
-      loaded.push(newPendingTab(req?.sourceAlias ?? null, req?.attachedCellId ?? null));
+      loaded.push(
+        newPendingTab(
+          req?.sourceAlias ?? null,
+          req?.attachedCellId ?? null,
+          req?.pinTarget ?? null,
+        ),
+      );
     }
 
     setTabs(loaded);
@@ -548,7 +567,15 @@ const DocsPopup: Component<Props> = (p) => {
             : t.alias.trim()
               ? t.alias.trim()
               : null;
-        const created: DocRow = t.attachedCellId
+        // Welle D: Pin-Routing — pinTarget hat Vorrang vor attachedCellId
+        // (atom/node), Cell-Pin ueber attachedCellId (Compat-Pfad).
+        // Standalone (kein Pin) → createDoc ohne Pin.
+        const pinKind: 'atom' | 'node' | 'cell' | null =
+          t.pinTarget ? t.pinTarget.parentKind : t.attachedCellId ? 'cell' : null;
+        const pinId: string | null = t.pinTarget
+          ? t.pinTarget.parentId
+          : t.attachedCellId ?? null;
+        const created: DocRow = pinKind && pinId
           ? ((
               await pinDocWithCreate({
                 workspaceId: p.workspaceId,
@@ -556,8 +583,8 @@ const DocsPopup: Component<Props> = (p) => {
                 content: contentValue || '<p></p>',
                 alias: aliasValue,
                 sourceAlias: t.sourceAlias,
-                parentKind: 'cell',
-                parentId: t.attachedCellId,
+                parentKind: pinKind,
+                parentId: pinId,
               })
             ).doc as DocRow)
           : await createDoc({

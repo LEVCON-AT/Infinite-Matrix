@@ -18,7 +18,19 @@ export type OpenDocsRequest = {
   // vorausgefuellt (Phase 2: Abspringen aus Card/Cell mit Quell-Ref).
   sourceAlias?: string | null;
   // Falls gesetzt: beim "+ neuer Tab" an diese Cell angehaengt.
+  // Welle D Compat: cell-Pin laeuft ueber diesen Pfad weiter (DocsPopup
+  // setzt pin_doc_with_create mit parent_kind='cell' beim Save).
   attachedCellId?: string | null;
+  // Welle D: generisches Pin-Ziel (atom/node). Wird vom DocsPopup beim
+  // Pending-Tab-Save in pin_doc_with_create umgesetzt. attachedCellId
+  // bleibt als Spezialfall fuer parent_kind='cell' erhalten —
+  // pinTarget wird benutzt fuer parent_kind='atom' bzw. 'node'.
+  pinTarget?: {
+    parentKind: 'atom' | 'node';
+    parentId: string;
+    // User-sichtbare Label-Vorschau (z.B. Task-Title oder Node-Alias).
+    parentLabel: string;
+  } | null;
   // Monoton steigender Counter — erlaubt dem Workspace-Effect, auf
   // "jede neue Request reagieren", auch wenn die Payload identisch ist.
   // Wird in openDocsPopup() automatisch erhoeht.

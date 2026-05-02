@@ -10,6 +10,7 @@ import {
 } from 'solid-js';
 import { useBoardUi } from '../lib/board-ui-state';
 import { showConfirm, showPrompt } from '../lib/dialog';
+import { openDokuForContext, shouldIgnoreDKey } from '../lib/docs-open';
 import { activeDrag, endDrag, startDrag } from '../lib/drag-context';
 import { translateDbError } from '../lib/errors';
 import { dropOnKanbanCol } from '../lib/manifestation-cross-view';
@@ -1190,6 +1191,25 @@ const BoardView: Component<Props> = (p) => {
                                     if (e.key === 'Enter' || e.key === ' ') {
                                       e.preventDefault();
                                       setSelectedCardId(card.id);
+                                      return;
+                                    }
+                                    // Welle D: 'd' auf Card → atom-Doku.
+                                    if (
+                                      (e.key === 'd' || e.key === 'D') &&
+                                      !e.shiftKey &&
+                                      !e.ctrlKey &&
+                                      !e.metaKey &&
+                                      !e.altKey
+                                    ) {
+                                      if (shouldIgnoreDKey(e.target)) return;
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      openDokuForContext({
+                                        kind: 'atom',
+                                        atomType: 'task',
+                                        atomId: card.id,
+                                        atomTitle: card.name ?? null,
+                                      });
                                     }
                                   }}
                                 >
