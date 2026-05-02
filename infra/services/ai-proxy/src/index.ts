@@ -76,17 +76,27 @@ async function streamUpstream(
     'content-type': upstream.headers.get('content-type') ?? 'application/json',
     'cache-control': 'no-cache',
   });
+  // Bei Non-2xx Upstream-Response Body in Log spiegeln (max 2KB) damit
+  // wir bei 4xx/5xx den eigentlichen Fehlercode/Message sehen.
+  const isError = upstream.status < 200 || upstream.status >= 300;
   if (!upstream.body) {
+    if (isError) console.warn(`[ai-proxy] upstream ${upstream.status} (no body)`);
     res.end();
     return;
   }
   const reader = upstream.body.getReader();
+  let firstChunk: Uint8Array | null = null;
   while (true) {
     const { value, done } = await reader.read();
     if (done) break;
+    if (isError && !firstChunk) firstChunk = value;
     res.write(Buffer.from(value));
   }
   res.end();
+  if (isError && firstChunk) {
+    const snippet = new TextDecoder().decode(firstChunk).slice(0, 2048);
+    console.warn(`[ai-proxy] upstream ${upstream.status} body: ${snippet}`);
+  }
 }
 
 function jsonError(req: IncomingMessage, res: ServerResponse, status: number, msg: string): void {
@@ -157,47 +167,59 @@ async function handleGemini(
 }
 
 const server = createServer(async (req, res) => {
+  const startMs = Date.now();
+  const reqLog = `${req.method} ${req.url}`;
   try {
     // CORS preflight
     if (req.method === 'OPTIONS') {
       res.writeHead(204, corsHeaders(req));
       res.end();
+      console.log(`[ai-proxy] ${reqLog} 204 (preflight) ${Date.now() - startMs}ms`);
       return;
     }
     if (req.method !== 'POST') {
       jsonError(req, res, 405, 'method_not_allowed');
+      console.warn(`[ai-proxy] ${reqLog} 405`);
       return;
     }
     // Origin-Check (nicht via cors-headers, hart blocken).
     const origin = (req.headers.origin as string | undefined) ?? '';
     if (origin && !ALLOWED_ORIGIN_PATTERNS.some((p) => p.test(origin))) {
       jsonError(req, res, 403, 'origin_not_allowed');
+      console.warn(`[ai-proxy] ${reqLog} 403 origin=${origin}`);
       return;
     }
     // User-JWT Anwesenheits-Check (V1).
     const auth = req.headers['authorization'] as string | undefined;
     if (!auth || !auth.startsWith('Bearer ')) {
       jsonError(req, res, 401, 'unauthenticated');
+      console.warn(`[ai-proxy] ${reqLog} 401 (no bearer)`);
       return;
     }
 
     const url = new URL(req.url ?? '/', 'http://internal');
     if (url.pathname === '/openai') {
       await handleOpenAi(req, res);
+      console.log(`[ai-proxy] POST /openai ${res.statusCode} ${Date.now() - startMs}ms`);
       return;
     }
     if (url.pathname.startsWith('/gemini/')) {
       const modelId = url.pathname.slice('/gemini/'.length);
       if (!modelId) {
         jsonError(req, res, 400, 'model_required');
+        console.warn(`[ai-proxy] ${reqLog} 400 (no model)`);
         return;
       }
       await handleGemini(req, res, modelId);
+      console.log(
+        `[ai-proxy] POST /gemini/${modelId} ${res.statusCode} ${Date.now() - startMs}ms`,
+      );
       return;
     }
     jsonError(req, res, 404, 'not_found');
+    console.warn(`[ai-proxy] ${reqLog} 404`);
   } catch (err) {
-    console.error('[ai-proxy] error:', err);
+    console.error(`[ai-proxy] ${reqLog} 502:`, err);
     jsonError(req, res, 502, (err as Error).message ?? 'upstream_error');
   }
 });
