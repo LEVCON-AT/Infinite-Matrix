@@ -64,7 +64,7 @@ build_env() {
     google)
       echo "ENABLE_GOOGLE_OAUTH=$enabled"
       echo "GOOGLE_CLIENT_ID=$client_id"
-      echo "GOOGLE_SECRET=$client_secret"
+      echo "GOOGLE_CLIENT_SECRET=$client_secret"
       ;;
     microsoft)
       tenant_id=$(echo "$data" | jq -r '.tenant_id // "common"')
