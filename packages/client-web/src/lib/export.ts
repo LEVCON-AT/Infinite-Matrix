@@ -86,6 +86,13 @@ export type WorkspaceExport = {
   // Welle D — atom_pins (Doc→Cell-Verknuepfungen + V2 atom→atom etc.).
   // Optional damit V0-Parser ohne Pin-Awareness alte Exports lesen.
   atom_pins?: Record<string, unknown>[];
+  // Welle D — globales Tag-System. workspace_tags ist die Registry pro
+  // Workspace (UNIQUE auf workspace_id+kind+value), atom_tags die
+  // Junction Atom→Tag. Beide optional fuer V0-Parser-Kompat. Beim
+  // Subtree-Export werden atom_tags auf Subtree-Atome gefiltert,
+  // workspace_tags wird ueber referenzierte tag_ids verkuerzt.
+  workspace_tags?: Record<string, unknown>[];
+  atom_tags?: Record<string, unknown>[];
   // AU-B1 K11c.2 (B1-A-006 / B1-F-003 / CC2): Object-Layer-Tabellen.
   // Optional, damit V0-Parser ohne Object-Awareness alte Exports
   // weiterhin lesen koennen. rows/cols/kb_cols/nodes haben
@@ -216,6 +223,8 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     linksRes,
     docsRes,
     atomPinsRes,
+    workspaceTagsRes,
+    atomTagsRes,
     objectsRes,
     objectTagsRes,
     groupsRes,
@@ -231,6 +240,8 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     supabase.from('links').select('*').eq('workspace_id', workspaceId),
     supabase.from('docs').select('*').eq('workspace_id', workspaceId),
     supabase.from('atom_pins').select('*').eq('workspace_id', workspaceId),
+    supabase.from('workspace_tags').select('*').eq('workspace_id', workspaceId),
+    supabase.from('atom_tags').select('*').eq('workspace_id', workspaceId),
     supabase.from('objects').select('*').eq('workspace_id', workspaceId),
     supabase.from('object_tags').select('*').eq('workspace_id', workspaceId),
     supabase.from('groups').select('*').eq('workspace_id', workspaceId),
@@ -247,6 +258,8 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     linksRes,
     docsRes,
     atomPinsRes,
+    workspaceTagsRes,
+    atomTagsRes,
     objectsRes,
     objectTagsRes,
     groupsRes,
@@ -271,6 +284,8 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     links: (linksRes.data ?? []) as Record<string, unknown>[],
     docs: (docsRes.data ?? []) as Record<string, unknown>[],
     atom_pins: (atomPinsRes.data ?? []) as Record<string, unknown>[],
+    workspace_tags: (workspaceTagsRes.data ?? []) as Record<string, unknown>[],
+    atom_tags: (atomTagsRes.data ?? []) as Record<string, unknown>[],
     objects: (objectsRes.data ?? []) as Record<string, unknown>[],
     object_tags: (objectTagsRes.data ?? []) as Record<string, unknown>[],
     groups: (groupsRes.data ?? []) as Record<string, unknown>[],
@@ -346,6 +361,8 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     linksRes,
     docsRes,
     atomPinsRes,
+    workspaceTagsRes,
+    atomTagsRes,
     objectsRes,
     objectTagsRes,
     groupsRes,
@@ -362,6 +379,8 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     supabase.from('links').select('*').eq('workspace_id', workspaceId),
     supabase.from('docs').select('*').eq('workspace_id', workspaceId),
     supabase.from('atom_pins').select('*').eq('workspace_id', workspaceId),
+    supabase.from('workspace_tags').select('*').eq('workspace_id', workspaceId),
+    supabase.from('atom_tags').select('*').eq('workspace_id', workspaceId),
     supabase.from('objects').select('*').eq('workspace_id', workspaceId),
     supabase.from('object_tags').select('*').eq('workspace_id', workspaceId),
     supabase.from('groups').select('*').eq('workspace_id', workspaceId),
@@ -378,6 +397,8 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     linksRes,
     docsRes,
     atomPinsRes,
+    workspaceTagsRes,
+    atomTagsRes,
     objectsRes,
     objectTagsRes,
     groupsRes,
@@ -441,6 +462,17 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
       atom_id: string;
       parent_kind: string;
       parent_id: string;
+    }>,
+    workspace_tags: (workspaceTagsRes.data ?? []) as Array<{
+      id: string;
+      kind: string;
+      value: string;
+    }>,
+    atom_tags: (atomTagsRes.data ?? []) as Array<{
+      id: string;
+      atom_type: string;
+      atom_id: string;
+      tag_id: string;
     }>,
     objects: (objectsRes.data ?? []) as Array<{ id: string }>,
     object_tags: (objectTagsRes.data ?? []) as Array<{
@@ -575,6 +607,24 @@ export async function exportSubtree(
       inCells(pin.parent_id),
   );
 
+  // Welle D — atom_tags-Subtree-Filter. Tag-Owner = Atom; ein Tag
+  // wandert nur mit, wenn der Owner-Atom im Subtree liegt. Owner-Atome:
+  // Tasks (filteredTaskIds), Docs (docIdsInSubtree), Links (filteredLinks-
+  // ids), Checklists (filteredChecklistIds). Imported-Events sind
+  // workspace-global → im Subtree-Export raus. Referenced workspace_tags
+  // werden ueber tag_id gesammelt — Registry-Rows wandern mit, damit
+  // Imports ohne dangling-FK funktionieren.
+  const filteredLinkIds = new Set(filteredLinks.map((l) => l.id));
+  const filteredAtomTags = all.atom_tags.filter((t) => {
+    if (t.atom_type === 'task') return filteredTaskIds.has(t.atom_id);
+    if (t.atom_type === 'doc') return docIdsInSubtree.has(t.atom_id);
+    if (t.atom_type === 'link') return filteredLinkIds.has(t.atom_id);
+    if (t.atom_type === 'checklist') return filteredChecklistIds.has(t.atom_id);
+    return false;
+  });
+  const referencedTagIds = new Set(filteredAtomTags.map((t) => t.tag_id));
+  const filteredWorkspaceTags = all.workspace_tags.filter((t) => referencedTagIds.has(t.id));
+
   // AU-B1 K11c.2 (B1-A-006): Object-Layer-Subtree-Filter. Sammeln alle
   // object_ids, die von Subtree-Rows/Cols/KbCols/Nodes referenziert
   // werden — diese Objects + ihre Tags + Group-Memberships gehoeren
@@ -616,6 +666,8 @@ export async function exportSubtree(
     links: filteredLinks as unknown as Record<string, unknown>[],
     docs: filteredDocs as unknown as Record<string, unknown>[],
     atom_pins: filteredAtomPins as unknown as Record<string, unknown>[],
+    workspace_tags: filteredWorkspaceTags as unknown as Record<string, unknown>[],
+    atom_tags: filteredAtomTags as unknown as Record<string, unknown>[],
     objects: filteredObjects as unknown as Record<string, unknown>[],
     object_tags: filteredObjectTags as unknown as Record<string, unknown>[],
     groups: filteredGroups as unknown as Record<string, unknown>[],
@@ -727,6 +779,21 @@ export async function exportCellSubtree(
   const filteredTaskIdsCell = new Set(filteredManifestationsCell.map((m) => m.atom_id));
   const filteredTasksCell = all.tasks.filter((t) => filteredTaskIdsCell.has(t.id));
 
+  // Welle D — atom_tags + workspace_tags fuer Cell-Subtree (analog
+  // exportSubtree, aber mit den Cell-Subtree-Owner-Sets).
+  const filteredLinkIdsCell = new Set(filteredLinks.map((l) => l.id));
+  const filteredAtomTagsCell = all.atom_tags.filter((t) => {
+    if (t.atom_type === 'task') return filteredTaskIdsCell.has(t.atom_id);
+    if (t.atom_type === 'doc') return docIdsInSubtreeCell.has(t.atom_id);
+    if (t.atom_type === 'link') return filteredLinkIdsCell.has(t.atom_id);
+    if (t.atom_type === 'checklist') return filteredChecklistIds.has(t.atom_id);
+    return false;
+  });
+  const referencedTagIdsCell = new Set(filteredAtomTagsCell.map((t) => t.tag_id));
+  const filteredWorkspaceTagsCell = all.workspace_tags.filter((t) =>
+    referencedTagIdsCell.has(t.id),
+  );
+
   return {
     version: WORKSPACE_EXPORT_VERSION,
     payloadType: 'subtree',
@@ -743,6 +810,8 @@ export async function exportCellSubtree(
     links: filteredLinks as unknown as Record<string, unknown>[],
     docs: filteredDocs as unknown as Record<string, unknown>[],
     atom_pins: filteredAtomPinsCell as unknown as Record<string, unknown>[],
+    workspace_tags: filteredWorkspaceTagsCell as unknown as Record<string, unknown>[],
+    atom_tags: filteredAtomTagsCell as unknown as Record<string, unknown>[],
     tasks: filteredTasksCell as unknown as Record<string, unknown>[],
     atom_manifestations: filteredManifestationsCell as unknown as Record<string, unknown>[],
     sourceCell: {
@@ -834,6 +903,13 @@ export async function exportFeatureChecklists(
   const cellChecklists = all.checklists.filter((cl) => cl.cell_id === cellId);
   const clIds = new Set(cellChecklists.map((cl) => cl.id));
   const items = all.checklist_items.filter((it) => clIds.has(it.checklist_id));
+  // Welle D — atom_tags fuer die Checklist-Atoms mit-exportieren.
+  // workspace_tags-Registry ueber referenced tag_ids verkuerzen.
+  const checklistTags = all.atom_tags.filter(
+    (t) => t.atom_type === 'checklist' && clIds.has(t.atom_id),
+  );
+  const refTagIds = new Set(checklistTags.map((t) => t.tag_id));
+  const checklistRegistryTags = all.workspace_tags.filter((t) => refTagIds.has(t.id));
   return {
     version: WORKSPACE_EXPORT_VERSION,
     payloadType: 'feature-checklists',
@@ -849,5 +925,7 @@ export async function exportFeatureChecklists(
     checklist_items: items as unknown as Record<string, unknown>[],
     links: [],
     docs: [],
+    workspace_tags: checklistRegistryTags as unknown as Record<string, unknown>[],
+    atom_tags: checklistTags as unknown as Record<string, unknown>[],
   };
 }

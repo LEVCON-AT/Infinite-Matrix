@@ -46,7 +46,12 @@ export type RealtimeTable =
   // T.AC.A.5 + Q.2: Calendar-Slot fuer non-task Atoms (Link/Checklist via
   // atom_manifestations). Bumps refetchen wsAtomManifestations in
   // Workspace.tsx.
-  | 'atom_manifestations';
+  | 'atom_manifestations'
+  // Welle D.9: Multi-User-Sync fuer Pins + Tag-System. Andere User
+  // pinnen Doku, taggen Atome → Sicht muss live ohne Refresh updaten.
+  | 'atom_pins'
+  | 'workspace_tags'
+  | 'atom_tags';
 
 export type RealtimeBumps = Partial<Record<RealtimeTable, () => void>>;
 
@@ -61,6 +66,9 @@ const DIRECT_TABLES: Array<Exclude<RealtimeTable, 'kb_cards' | 'checklist_items'
   'links',
   'docs',
   'objects',
+  'atom_pins',
+  'workspace_tags',
+  'atom_tags',
 ];
 
 type AtomManifPayload = {

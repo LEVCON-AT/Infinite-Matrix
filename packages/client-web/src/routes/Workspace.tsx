@@ -399,11 +399,11 @@ const Workspace: Component = () => {
   // AtomDocsSection auch dann Counts/Listen rendern, wenn der Sidebar-
   // Doku-Chip ausgeschaltet ist. Daten sind klein (typisch <100 Rows pro
   // Workspace) und werden eh per Realtime synchron gehalten.
-  const [wsDocs] = createResource(
+  const [wsDocs, { refetch: refetchWsDocs }] = createResource(
     () => params.workspaceId ?? null,
     async (wid) => (wid ? fetchWorkspacePinnedDocs(wid) : []),
   );
-  const [wsAtomPins] = createResource(
+  const [wsAtomPins, { refetch: refetchWsAtomPins }] = createResource(
     () => params.workspaceId ?? null,
     async (wid) => (wid ? fetchAtomPinsByWorkspace(wid) : []),
   );
@@ -411,11 +411,11 @@ const Workspace: Component = () => {
   // (Junction) + workspace_tags (Registry) werden in einem Memo gejoint
   // → AtomTagWithTag[]. Konsumenten filtern client-seitig auf
   // (atom_type, atom_id) via filterTagsForAtom.
-  const [wsAtomTags] = createResource(
+  const [wsAtomTags, { refetch: refetchWsAtomTags }] = createResource(
     () => params.workspaceId ?? null,
     async (wid) => (wid ? fetchAtomTagsByWorkspace(wid) : []),
   );
-  const [wsWorkspaceTags] = createResource(
+  const [wsWorkspaceTags, { refetch: refetchWsWorkspaceTags }] = createResource(
     () => params.workspaceId ?? null,
     async (wid) => (wid ? fetchWorkspaceTagsByWorkspace(wid) : []),
   );
@@ -1020,7 +1020,23 @@ const Workspace: Component = () => {
       docs: () => {
         setRtDocs((v) => v + 1);
         void refetchCellsWithDocs();
+        void refetchWsDocs();
         scheduleAliasRefresh(wid);
+      },
+      // Welle D.9 — Pin-Mutationen anderer User triggern Pill-/Indicator-
+      // /NodeDocsButton-Refresh sofort. setRtDocs bumpt auch DocsPopup-
+      // realtimeVersion damit ein offener Tab mit-aktualisiert.
+      atom_pins: () => {
+        setRtDocs((v) => v + 1);
+        void refetchWsAtomPins();
+        void refetchCellsWithDocs();
+        void refetchWsDocs();
+      },
+      workspace_tags: () => {
+        void refetchWsWorkspaceTags();
+      },
+      atom_tags: () => {
+        void refetchWsAtomTags();
       },
       // T.AC.A.5 + Q.2: atom_manifestations ist Single-Source. Der
       // realtime-Subscriber (lib/realtime.ts) routet task-Atoms in

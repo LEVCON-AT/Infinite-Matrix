@@ -1182,6 +1182,83 @@ export async function executeSubtreeImportIntoCell(args: {
     }
   }
 
+  // ─── Welle D — workspace_tags + atom_tags ────────────────────
+  // Idempotenter Tag-Import: existing workspace_tags-Rows im Ziel-Workspace
+  // werden via (kind,value) wiederverwendet (UNIQUE-Constraint sonst).
+  // tag_id-Remap-Map mappt Source-Tag-IDs auf Target-Tag-IDs (existierend
+  // oder neu). Nur atom_tags die einen remapped atom_id UND einen
+  // remapped tag_id haben werden aus-importiert.
+  const workspaceTagsOut: Array<Record<string, unknown>> = [];
+  const atomTagsOut: Array<Record<string, unknown>> = [];
+  const tagIdRemap = new Map<string, string>();
+  const sourceWsTags = Array.isArray((payload as Record<string, unknown>).workspace_tags)
+    ? ((payload as { workspace_tags: Array<Record<string, unknown>> }).workspace_tags ?? [])
+    : [];
+  const sourceAtomTags = Array.isArray((payload as Record<string, unknown>).atom_tags)
+    ? ((payload as { atom_tags: Array<Record<string, unknown>> }).atom_tags ?? [])
+    : [];
+  if (sourceWsTags.length > 0 || sourceAtomTags.length > 0) {
+    // Existing Tags im Ziel-Workspace lesen — wir referenzieren sie ueber
+    // (kind,value) statt neu anzulegen.
+    const { data: existing, error: existingErr } = await supabase
+      .from('workspace_tags')
+      .select('id, kind, value')
+      .eq('workspace_id', workspaceId);
+    if (existingErr) throw existingErr;
+    const existingByKv = new Map<string, string>();
+    for (const e of (existing ?? []) as Array<{ id: string; kind: string; value: string }>) {
+      existingByKv.set(`${e.kind}|${e.value}`, e.id);
+    }
+    for (const raw of sourceWsTags) {
+      const r = raw as { id: string; kind: string; value: string; display_label?: string | null };
+      const kv = `${r.kind}|${r.value}`;
+      const existingId = existingByKv.get(kv);
+      if (existingId) {
+        tagIdRemap.set(r.id, existingId);
+        continue;
+      }
+      // Neu anlegen — UUID generieren, Registry-Row inserten.
+      const newId = newUuid();
+      tagIdRemap.set(r.id, newId);
+      workspaceTagsOut.push({
+        id: newId,
+        workspace_id: workspaceId,
+        kind: r.kind,
+        value: r.value,
+        display_label: r.display_label ?? null,
+        usage_count: 0,
+      });
+    }
+    // alias_ref-Tags koennen target-IDs als value haben — die haben
+    // wir nicht im Ziel-Workspace. Bei alias_ref ist value = der
+    // alias-string ('^kuerzel'), bei atom_ref / object_ref = die UUID
+    // des Targets. Wenn Target nicht im remapMap, droppen wir die
+    // Junction (das atom_ref/object_ref haengt ins Leere).
+    for (const raw of sourceAtomTags) {
+      const r = raw as {
+        id: string;
+        atom_type: string;
+        atom_id: string;
+        tag_id: string;
+        position?: number;
+      };
+      // Atom-id muss im remapMap sein (sonst gehoert das Atom nicht
+      // zum Subtree-Import).
+      if (!remapMap.has(r.atom_id)) continue;
+      const newAtomId = mustRemap(r.atom_id, remapMap);
+      const newTagId = tagIdRemap.get(r.tag_id);
+      if (!newTagId) continue; // dangling — Source-Tag fehlte im Export
+      atomTagsOut.push({
+        id: newUuid(),
+        atom_type: r.atom_type,
+        atom_id: newAtomId,
+        workspace_id: workspaceId,
+        tag_id: newTagId,
+        position: r.position ?? 0,
+      });
+    }
+  }
+
   // Insert-Reihenfolge loest die FK-Schleife nodes<->cells so auf:
   //   Phase A: alle Nodes mit parent_cell_id=NULL einfuegen.
   //   Phase B: Rows + Cols (haengen an Matrix-Nodes, existieren).
@@ -1242,6 +1319,14 @@ export async function executeSubtreeImportIntoCell(args: {
     if (atomPinsOut.length > 0) {
       step('Doku-Pins einfuegen…');
       await insertBatch('atom_pins', atomPinsOut);
+    }
+    if (workspaceTagsOut.length > 0) {
+      step('Tag-Registry einfuegen…');
+      await insertBatch('workspace_tags', workspaceTagsOut);
+    }
+    if (atomTagsOut.length > 0) {
+      step('Atom-Tags einfuegen…');
+      await insertBatch('atom_tags', atomTagsOut);
     }
   } catch (err) {
     await cleanupPartialImport(insertedNodeIds, insertedDocIds);
@@ -2084,6 +2169,68 @@ export async function executeSubtreeImportIntoMatrix(args: {
     }
   }
 
+  // ─── Welle D — workspace_tags + atom_tags (Matrix-Subtree) ──
+  const workspaceTagsOutMatrix: Array<Record<string, unknown>> = [];
+  const atomTagsOutMatrix: Array<Record<string, unknown>> = [];
+  const tagIdRemapMatrix = new Map<string, string>();
+  const sourceWsTagsMatrix = Array.isArray((payload as Record<string, unknown>).workspace_tags)
+    ? ((payload as { workspace_tags: Array<Record<string, unknown>> }).workspace_tags ?? [])
+    : [];
+  const sourceAtomTagsMatrix = Array.isArray((payload as Record<string, unknown>).atom_tags)
+    ? ((payload as { atom_tags: Array<Record<string, unknown>> }).atom_tags ?? [])
+    : [];
+  if (sourceWsTagsMatrix.length > 0 || sourceAtomTagsMatrix.length > 0) {
+    const { data: existing, error: existingErr } = await supabase
+      .from('workspace_tags')
+      .select('id, kind, value')
+      .eq('workspace_id', workspaceId);
+    if (existingErr) throw existingErr;
+    const existingByKv = new Map<string, string>();
+    for (const e of (existing ?? []) as Array<{ id: string; kind: string; value: string }>) {
+      existingByKv.set(`${e.kind}|${e.value}`, e.id);
+    }
+    for (const raw of sourceWsTagsMatrix) {
+      const r = raw as { id: string; kind: string; value: string; display_label?: string | null };
+      const kv = `${r.kind}|${r.value}`;
+      const existingId = existingByKv.get(kv);
+      if (existingId) {
+        tagIdRemapMatrix.set(r.id, existingId);
+        continue;
+      }
+      const newId = newUuid();
+      tagIdRemapMatrix.set(r.id, newId);
+      workspaceTagsOutMatrix.push({
+        id: newId,
+        workspace_id: workspaceId,
+        kind: r.kind,
+        value: r.value,
+        display_label: r.display_label ?? null,
+        usage_count: 0,
+      });
+    }
+    for (const raw of sourceAtomTagsMatrix) {
+      const r = raw as {
+        id: string;
+        atom_type: string;
+        atom_id: string;
+        tag_id: string;
+        position?: number;
+      };
+      if (!remapMap.has(r.atom_id)) continue;
+      const newAtomId = mustRemap(r.atom_id, remapMap);
+      const newTagId = tagIdRemapMatrix.get(r.tag_id);
+      if (!newTagId) continue;
+      atomTagsOutMatrix.push({
+        id: newUuid(),
+        atom_type: r.atom_type,
+        atom_id: newAtomId,
+        workspace_id: workspaceId,
+        tag_id: newTagId,
+        position: r.position ?? 0,
+      });
+    }
+  }
+
   // FK-Order wie bei Cell-Variante: Nodes (parent=null) → Rows → Cols →
   // Cells → UPDATE Nodes.parent_cell_id → kb/checklists/items/links/docs.
   // Bei Failure raeumt cleanupPartialImport angelegte Nodes + Docs auf.
@@ -2129,6 +2276,14 @@ export async function executeSubtreeImportIntoMatrix(args: {
     if (atomPinsOutMatrix.length > 0) {
       step('Doku-Pins einfuegen…');
       await insertBatch('atom_pins', atomPinsOutMatrix);
+    }
+    if (workspaceTagsOutMatrix.length > 0) {
+      step('Tag-Registry einfuegen…');
+      await insertBatch('workspace_tags', workspaceTagsOutMatrix);
+    }
+    if (atomTagsOutMatrix.length > 0) {
+      step('Atom-Tags einfuegen…');
+      await insertBatch('atom_tags', atomTagsOutMatrix);
     }
   } catch (err) {
     await cleanupPartialImport(insertedNodeIds, insertedDocIds);
