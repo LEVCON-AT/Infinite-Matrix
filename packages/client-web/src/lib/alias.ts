@@ -12,14 +12,21 @@
 
 import { ALIAS_TABLE_LABEL, type AliasTable, findAliasConflict } from './alias-check';
 
-// Analog zum Alt-Client: 8 Zeichen, a-z/0-9, Reserved-Keywords.
-export const ALIAS_MAX_LEN = 8;
+// Welle D: 8-Zeichen-Limit gefallen, Hyphen erlaubt fuer datierte
+// Doku-Aliases (z.B. `kunde-mueller-d020526`). Bindestrich darf nicht
+// am Anfang/Ende stehen + nicht doppelt — sauberer Slug-Stil.
+// 64 als Sanity-Upper-Bound (DB-Spalte ist text, Index-Performance bei
+// rar-langen Aliases unproblematisch).
+export const ALIAS_MAX_LEN = 64;
 // Validierungs-Form: matched ein KOMPLETTER Alias-String von Anfang bis Ende.
-export const ALIAS_RE = /^[a-z0-9]+$/;
-// Render-Form: matched ein `^alias`-Token im Fliesstext (g+i fuer alle Vorkommen,
-// case-insensitive Eingabe). Konsumenten setzen `lastIndex = 0` vor jedem
-// Iteration-Lauf — siehe AliasText/markdown-lite/alias-tokenizer.
-export const ALIAS_REF_RE = /\^([a-z0-9]+)/gi;
+// Muss mit a-z/0-9 anfangen UND aufhoeren; dazwischen optional Hyphen-
+// separierte Zeichen.
+export const ALIAS_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
+// Render-Form: matched ein `^alias`-Token im Fliesstext (g+i fuer alle
+// Vorkommen, case-insensitive Eingabe). Konsumenten setzen
+// `lastIndex = 0` vor jedem Iteration-Lauf — siehe AliasText/
+// markdown-lite/alias-tokenizer.
+export const ALIAS_REF_RE = /\^([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)/gi;
 // `admin` ist reserviert seit Welle B.0 — ^admin navigiert zur
 // Plattform-Admin-Konsole. User koennen ihn deshalb nicht auf eigene
 // Atome legen.
@@ -55,7 +62,10 @@ export function validateAliasFormat(raw: string | null): AliasValidationResult {
     return { ok: false, msg: `Alias max ${ALIAS_MAX_LEN} Zeichen.` };
   }
   if (!ALIAS_RE.test(a)) {
-    return { ok: false, msg: 'Alias: nur a-z und 0-9.' };
+    return {
+      ok: false,
+      msg: 'Alias: a-z, 0-9 und Bindestrich (nicht am Anfang/Ende).',
+    };
   }
   if (RESERVED_ALIASES.includes(a)) {
     return { ok: false, msg: `"${a}" ist reserviert.` };

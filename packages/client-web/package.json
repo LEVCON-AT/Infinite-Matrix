@@ -16,11 +16,22 @@
   "dependencies": {
     "@solidjs/router": "^0.14.10",
     "@supabase/supabase-js": "^2.45.4",
+    "dompurify": "^3.2.4",
     "idb": "^8.0.3",
+    "prosemirror-commands": "^1.7.0",
+    "prosemirror-history": "^1.4.1",
+    "prosemirror-inputrules": "^1.5.0",
+    "prosemirror-keymap": "^1.2.2",
+    "prosemirror-model": "^1.25.0",
+    "prosemirror-schema-basic": "^1.2.4",
+    "prosemirror-schema-list": "^1.5.1",
+    "prosemirror-state": "^1.4.3",
+    "prosemirror-view": "^1.40.0",
     "solid-js": "^1.9.3"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@types/dompurify": "^3.0.5",
     "typescript": "^5.7.3",
     "vite": "^5.4.11",
     "vite-plugin-pwa": "^1.2.0",

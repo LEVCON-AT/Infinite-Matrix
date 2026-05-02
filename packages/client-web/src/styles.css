@@ -2293,6 +2293,111 @@ button[type="submit"]:hover:not(:disabled) {
   border-color: var(--blue);
 }
 
+/* ─── Welle D: ProseMirror-Editor im DocsPopup ───────────────── */
+.pm-editor-container {
+  flex: 1 1 auto;
+  min-height: 240px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--fs-base);
+  line-height: 1.5;
+  padding: var(--space-sm);
+  overflow-y: auto;
+  transition: border-color var(--tr-std);
+}
+
+.pm-editor-container:focus-within {
+  border-color: var(--blue);
+}
+
+.pm-editor {
+  outline: none;
+  min-height: 100%;
+}
+
+.pm-editor p {
+  margin: 0 0 var(--space-sm) 0;
+}
+.pm-editor p:last-child {
+  margin-bottom: 0;
+}
+.pm-editor h1 {
+  font-size: 1.5em;
+  font-weight: 600;
+  margin: var(--space-md) 0 var(--space-sm);
+}
+.pm-editor h2 {
+  font-size: 1.25em;
+  font-weight: 600;
+  margin: var(--space-md) 0 var(--space-sm);
+}
+.pm-editor h3 {
+  font-size: 1.1em;
+  font-weight: 600;
+  margin: var(--space-md) 0 var(--space-sm);
+}
+.pm-editor blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: var(--space-sm);
+  color: var(--text2);
+  margin: var(--space-sm) 0;
+}
+.pm-editor pre {
+  background: var(--surface-hover, var(--bg));
+  padding: var(--space-sm);
+  border-radius: var(--rs);
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+}
+.pm-editor code {
+  background: var(--surface-hover, var(--bg));
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+}
+.pm-editor pre code {
+  background: transparent;
+  padding: 0;
+}
+.pm-editor ul,
+.pm-editor ol {
+  padding-left: 1.5em;
+  margin: var(--space-sm) 0;
+}
+.pm-editor li {
+  margin: 0.2em 0;
+}
+.pm-editor a {
+  color: var(--blue);
+  text-decoration: underline;
+}
+
+/* Empty-State Placeholder via ::before, weil contentEditable kein
+ * placeholder-Attribut kennt. Nur sichtbar wenn kein Inhalt. */
+.pm-editor-container:has(.pm-editor p:first-child:last-child:empty)::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted, var(--text2));
+  pointer-events: none;
+  position: absolute;
+  font-style: italic;
+}
+
+/* Save-Button im Header */
+.docs-popup-actions {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+}
+.docs-popup-save {
+  font-size: var(--fs-small);
+  padding: 0.25em 0.75em;
+}
+
 .docs-popup-content-view {
   flex: 1 1 auto;
   min-height: 240px;

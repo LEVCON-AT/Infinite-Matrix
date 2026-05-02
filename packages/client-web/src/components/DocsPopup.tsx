@@ -44,12 +44,14 @@ import {
   setDocTitle,
 } from '../lib/mutations';
 import { fetchAttachedCellIdForDoc, fetchDocById, fetchDocsRecent } from '../lib/queries';
+import { sanitizeHtml } from '../lib/sanitize-html';
 import { supabase } from '../lib/supabase';
 import { showToast, showUndoToast } from '../lib/toasts';
 import type { DocRow } from '../lib/types';
-import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 import Icon from './Icon';
-import MarkdownLightView from './MarkdownLightView';
+import RichTextEditor from './RichTextEditor';
+// Welle D: textarea + MarkdownLightView ersetzt durch ProseMirror-Editor.
+// bindAliasAutocomplete entfaellt — Mention-Plugin in D.8 uebernimmt das.
 
 type Props = {
   workspaceId: string;
@@ -96,16 +98,18 @@ function todayDE(): string {
   return `${dd}.${mm}.${yyyy}`;
 }
 
-// Kompaktes Alias-Default "YYMMDD" — 6 Zeichen, passt in den 8-
-// Zeichen-Alias-Limit. Bei Mehrfach-Docs am selben Tag muss der User
-// selbst einen Suffix ergaenzen (z.B. "260423a") — Collision-Toast
-// weist beim Blur darauf hin.
-function todayAliasCompact(): string {
+// Welle D: Alias-Default mit Parent-Praefix + Datum (DDMMYY).
+// Beispiel: Doku an `^kunde-mueller` am 02.05.2026 → `kunde-mueller-d020526`.
+// Ohne Parent: `doc-d020526`. Bei Collision (mehrere Dokus an gleichem
+// Tag mit gleichem Parent) ergaenzt der User selbst einen Suffix —
+// Validation-Toast weist beim Blur darauf hin.
+function defaultDocAlias(parentAlias: string | null): string {
   const d = new Date();
-  const yy = String(d.getFullYear()).slice(2);
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
-  return `${yy}${mm}${dd}`;
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yy = String(d.getFullYear()).slice(2);
+  const base = parentAlias && parentAlias.trim() ? parentAlias.trim().toLowerCase() : 'doc';
+  return `${base}-d${dd}${mm}${yy}`;
 }
 
 function defaultTitle(sourceAlias: string | null): string {
@@ -176,7 +180,6 @@ const DocsPopup: Component<Props> = (p) => {
   // zurueckgesetzt.
   const [attachDraft, setAttachDraft] = createSignal('');
   let titleRef: HTMLInputElement | undefined;
-  let contentRef: HTMLTextAreaElement | undefined;
   let aliasRef: HTMLInputElement | undefined;
   let attachRef: HTMLInputElement | undefined;
 
@@ -219,8 +222,10 @@ const DocsPopup: Component<Props> = (p) => {
       docId: null,
       clientId: newClientId(),
       title: defaultTitle(sourceAlias),
-      content: '',
-      alias: todayAliasCompact(),
+      // Welle D: HTML-Editor (ProseMirror) erwartet einen leeren <p></p>.
+      content: '<p></p>',
+      // Welle D: Alias-Default `<parent>-d<DDMMYY>`.
+      alias: defaultDocAlias(sourceAlias),
       sourceAlias,
       attachedCellId,
       attachedCellAlias: null,
@@ -236,8 +241,8 @@ const DocsPopup: Component<Props> = (p) => {
     return (
       t.docId === null &&
       t.title === defaultTitle(t.sourceAlias) &&
-      t.content === '' &&
-      t.alias === todayAliasCompact() &&
+      (t.content === '' || t.content === '<p></p>') &&
+      t.alias === defaultDocAlias(t.sourceAlias) &&
       !t.attachedCellId
     );
   }
@@ -452,16 +457,58 @@ const DocsPopup: Component<Props> = (p) => {
     setAttachDraft(t.attachedCellAlias ?? '');
   });
 
-  // ESC schliesst (Capture-Phase, sonst greift der globale Back-Handler).
+  // Welle D: ESC mit Dirty-State-Confirm. Capture-Phase, sonst greift
+  // der globale Back-Handler.
   onMount(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       e.stopImmediatePropagation();
-      p.onClose();
+      void closeWithConfirm();
     };
     document.addEventListener('keydown', onKey, true);
     onCleanup(() => document.removeEventListener('keydown', onKey, true));
   });
+
+  // Schliessen mit Dirty-Check. Verschmilzt ESC + Backdrop-Click +
+  // Schliessen-Button auf einen Pfad.
+  async function closeWithConfirm(): Promise<void> {
+    const dirty = tabs().some((t) => t.dirty);
+    if (!dirty) {
+      p.onClose();
+      return;
+    }
+    const ok = await showConfirm({
+      title: 'Aenderungen verwerfen?',
+      message: 'Du hast ungespeicherte Aenderungen. Wirklich verwerfen?',
+      variant: 'danger',
+      confirmLabel: 'Verwerfen',
+      cancelLabel: 'Weiter bearbeiten',
+    });
+    if (ok) p.onClose();
+  }
+
+  // Save-Button + Cmd/Ctrl+Enter: aktiven Tab speichern, dann schliessen.
+  async function onSaveAndClose(): Promise<void> {
+    const t = activeTab();
+    if (!t) {
+      p.onClose();
+      return;
+    }
+    if (busy()) return;
+    // persistField speichert das aktuelle Content-Feld; falls Pending,
+    // kreiert es Doc + Pin atomar. Andere Felder (Title/Alias) wurden
+    // schon via Blur gespeichert — dirty bleibt nur fuer Content stehen.
+    const ok = await persistField('content', t.content);
+    if (ok) p.onClose();
+  }
+
+  // Save without close (Save-Button Click).
+  async function onSaveOnly(): Promise<void> {
+    const t = activeTab();
+    if (!t) return;
+    if (busy()) return;
+    await persistField('content', t.content);
+  }
 
   const activeTab = createMemo<Tab | undefined>(() => tabs()[activeIdx()]);
 
@@ -563,14 +610,6 @@ const DocsPopup: Component<Props> = (p) => {
     if (val === t.title && t.docId) return; // persisted, nichts geaendert
     if (val === t.title && !t.docId && val === '' && !t.content) return; // pending, voellig leer
     await persistField('title', val);
-  }
-
-  async function onContentBlur(val: string) {
-    const t = activeTab();
-    if (!t) return;
-    if (val === t.content && t.docId) return;
-    if (val === t.content && !t.docId && !val && !t.title) return;
-    await persistField('content', val);
   }
 
   async function onAliasBlur(val: string) {
@@ -773,7 +812,7 @@ const DocsPopup: Component<Props> = (p) => {
     <div
       class="overlay-scrim docs-popup-scrim"
       onClick={(e) => {
-        if (e.target === e.currentTarget) p.onClose();
+        if (e.target === e.currentTarget) void closeWithConfirm();
       }}
     >
       <div
@@ -828,9 +867,26 @@ const DocsPopup: Component<Props> = (p) => {
               +
             </button>
           </div>
-          <button type="button" class="overlay-close" onClick={p.onClose} aria-label="Schliessen">
-            <Icon name="x" size={18} />
-          </button>
+          <div class="docs-popup-actions">
+            <button
+              type="button"
+              class="btn-primary docs-popup-save"
+              onClick={() => void onSaveOnly()}
+              disabled={busy()}
+              title="Speichern (ohne Schliessen)"
+            >
+              Speichern
+            </button>
+            <button
+              type="button"
+              class="overlay-close"
+              onClick={() => void closeWithConfirm()}
+              aria-label="Schliessen"
+              title="Schliessen (ESC) · Cmd/Ctrl+Enter speichert + schliesst"
+            >
+              <Icon name="x" size={18} />
+            </button>
+          </div>
         </header>
 
         <Show when={activeTab()}>
@@ -953,37 +1009,38 @@ const DocsPopup: Component<Props> = (p) => {
                   fallback={
                     <div
                       class="docs-popup-content-view"
-                      // biome-ignore lint/a11y/useSemanticElements: bewusst <div role="button"> — Inhalt rendert <MarkdownLightView> mit klickbaren Alias-Chips; nested <button>-in-<button> waere invalid.
+                      // biome-ignore lint/a11y/useSemanticElements: bewusst <div role="button"> — Inhalt rendert HTML mit klickbaren Alias-Chips; nested <button>-in-<button> waere invalid.
                       role="button"
                       tabIndex={0}
                       title="Klicken oder Enter zum Bearbeiten"
                       onClick={() => {
                         patchActive({ mode: 'edit' });
-                        setTimeout(() => contentRef?.focus(), 0);
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
                           patchActive({ mode: 'edit' });
-                          setTimeout(() => contentRef?.focus(), 0);
                         }
                       }}
-                    >
-                      <MarkdownLightView text={t().content} workspaceId={p.workspaceId} />
-                    </div>
+                      // Welle D: Read-Mode rendert HTML (ProseMirror-Output).
+                      // dompurify-Sanitize verhindert XSS bei kompromittiertem
+                      // Server-Content. Alias-Token-Rewriting macht die View-
+                      // Komponente in D.4b — V1 ohne, dafuer einfach.
+                      // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML-Render mit Sanitize, Quelle ist Doc-Owner.
+                      innerHTML={sanitizeHtml(t().content)}
+                    />
                   }
                 >
-                  <textarea
-                    ref={(el) => {
-                      contentRef = el;
-                      const cleanup = bindAliasAutocomplete(el, p.workspaceId);
-                      onCleanup(cleanup);
-                    }}
-                    class="docs-popup-content"
+                  <RichTextEditor
                     value={t().content}
-                    placeholder="Markdown: **bold**, *italic*, `code`, http-Links. Leerzeile = Absatz."
-                    onInput={(e) => patchActive({ content: e.currentTarget.value })}
-                    onBlur={(e) => onContentBlur(e.currentTarget.value)}
+                    onChange={(html) => {
+                      patchActive({ content: html, dirty: true });
+                    }}
+                    onSaveCloseHotkey={() => {
+                      void onSaveAndClose();
+                    }}
+                    placeholder="Markdown-Shortcuts moeglich (**bold**, *italic*, # Headline, > Zitat, * Liste)."
+                    ariaLabel="Doku-Inhalt"
                   />
                 </Show>
               </div>
