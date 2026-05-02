@@ -202,8 +202,13 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`[ai-proxy] listening on :${PORT}`);
+// Bind nur auf 127.0.0.1 (loopback). nginx proxy_pass routed darauf.
+// Defense-in-Depth: selbst wenn Ionos-Firewall Port 8081 oeffnet,
+// kommt nichts von ausserhalb durch — der Service ist nicht
+// reachable.
+const HOST = process.env.HOST ?? '127.0.0.1';
+server.listen(PORT, HOST, () => {
+  console.log(`[ai-proxy] listening on ${HOST}:${PORT}`);
 });
 
 const shutdown = (sig: string) => {
