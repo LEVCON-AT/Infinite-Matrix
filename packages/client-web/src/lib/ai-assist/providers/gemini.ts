@@ -236,8 +236,9 @@ export async function callGeminiStream(
       chunkCount += 1;
       buf += decoder.decode(value, { stream: true });
 
-      let m: RegExpMatchArray | null;
-      while ((m = buf.match(FRAME_RE)) !== null) {
+      while (true) {
+        const m = buf.match(FRAME_RE);
+        if (!m) break;
         const idx = m.index ?? 0;
         const frame = buf.slice(0, idx);
         buf = buf.slice(idx + m[0].length);

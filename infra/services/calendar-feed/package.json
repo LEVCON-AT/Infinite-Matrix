@@ -1,0 +1,25 @@
+{
+  "name": "matrix-calendar-feed",
+  "version": "0.1.0",
+  "description": "Calendar V2 — Live-ICS-Feed fuer Outlook/Google/Apple Calendar Subscriptions.",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "pg": "^8.11.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/pg": "^8.10.9",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -15,6 +15,11 @@ import { ModalTransition } from '../../components/ModalTransition';
 import TransferOwnershipModal from '../../components/TransferOwnershipModal';
 import { useSession } from '../../lib/auth';
 import { downloadIcs, exportWorkspaceCalendarIcs } from '../../lib/calendar-export';
+import {
+  createCalendarSubscription,
+  getCalendarSubscription,
+  revokeCalendarSubscription,
+} from '../../lib/calendar-subscription';
 import { translateDbError } from '../../lib/errors';
 import { fetchMembers } from '../../lib/members';
 import { fetchMyWorkspaces } from '../../lib/queries';
@@ -194,25 +199,132 @@ function CalendarExportSection(props: { workspaceId: string; workspaceName: stri
   }
 
   return (
+    <>
+      <CalendarSubscriptionPane workspaceId={props.workspaceId} />
+      <section class="settings-form-section">
+        <h3>Einmal-Export</h3>
+        <p class="hint">
+          .ics-Datei zum manuellen Import. Fuer Live-Sync nutze stattdessen das Abo oben.
+        </p>
+        <button
+          type="button"
+          class="btn btn-subtle"
+          onClick={() => void onDownload()}
+          disabled={busy()}
+        >
+          {busy() ? 'Exportiere…' : '.ics herunterladen'}
+        </button>
+      </section>
+    </>
+  );
+}
+
+// Calendar V2 — Live-Subscription-Feed.
+function CalendarSubscriptionPane(props: { workspaceId: string }) {
+  const [sub, { refetch }] = createResource(
+    () => props.workspaceId,
+    async (wsId) => {
+      try {
+        return await getCalendarSubscription(wsId);
+      } catch (err) {
+        console.error('getCalendarSubscription:', err);
+        return null;
+      }
+    },
+  );
+  const [busy, setBusy] = createSignal(false);
+
+  async function onCreate() {
+    setBusy(true);
+    try {
+      await createCalendarSubscription(props.workspaceId);
+      void refetch();
+      showToast('Calendar-Abo erstellt.', 'success');
+    } catch (err) {
+      showToast(translateDbError(err, 'Erstellen fehlgeschlagen.'), 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onRevoke() {
+    setBusy(true);
+    try {
+      await revokeCalendarSubscription(props.workspaceId);
+      void refetch();
+      showToast('Calendar-Abo entfernt.', 'success');
+    } catch (err) {
+      showToast(translateDbError(err, 'Entfernen fehlgeschlagen.'), 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function copyUrl() {
+    const s = sub();
+    if (!s) return;
+    void navigator.clipboard.writeText(s.url);
+    showToast('URL kopiert.', 'success');
+  }
+
+  return (
     <section class="settings-form-section">
-      <h3>Kalender-Export</h3>
+      <h3>Kalender-Abo (Live-Feed)</h3>
       <p class="hint">
-        Exportiere alle Tasks + atom-Calendar-Events als .ics-Datei (RFC 5545). Outlook / Google
-        Calendar / Apple Calendar koennen die Datei direkt importieren. Wiederholungen (taeglich /
-        woechentlich / monatlich / jaehrlich) sind als RRULE enthalten.
+        Outlook / Google / Apple Calendar abonnieren die URL — der Calendar-Client polled periodisch
+        und holt aktuelle Events automatisch. Pro Workspace ein Token. Token ist URL- zugaenglich;
+        ein anderer mit der URL kann den Feed lesen — bei Verdacht: Abo entfernen + neu erstellen.
       </p>
-      <p class="hint">
-        Live-Subscription-Feed (Calendar abonniert URL und aktualisiert automatisch) folgt in einem
-        eigenen Sprint mit dediziertem ICS-Service.
-      </p>
-      <button
-        type="button"
-        class="btn btn-primary lift"
-        onClick={() => void onDownload()}
-        disabled={busy()}
+
+      <Show
+        when={sub()}
+        fallback={
+          <button
+            type="button"
+            class="btn btn-primary lift"
+            onClick={() => void onCreate()}
+            disabled={busy() || sub.loading}
+          >
+            {busy() ? 'Erstelle…' : 'Abo erstellen'}
+          </button>
+        }
       >
-        {busy() ? 'Exportiere…' : '.ics herunterladen'}
-      </button>
+        {(s) => (
+          <div class="calendar-sub-pane">
+            <label class="login-field">
+              <span>Feed-URL (in Calendar einfuegen)</span>
+              <input
+                class="input"
+                type="text"
+                readonly
+                value={s().url}
+                onClick={(e) => e.currentTarget.select()}
+              />
+            </label>
+            <div class="settings-foot">
+              <button type="button" class="btn btn-subtle" onClick={copyUrl}>
+                Kopieren
+              </button>
+              <button
+                type="button"
+                class="btn btn-subtle"
+                onClick={() => void onCreate()}
+                disabled={busy()}
+              >
+                Token rotieren
+              </button>
+              <button
+                type="button"
+                class="btn btn-danger"
+                onClick={() => void onRevoke()}
+                disabled={busy()}
+              >
+                Abo entfernen
+              </button>
+            </div>
+          </div>
+        )}
+      </Show>
     </section>
   );
 }
