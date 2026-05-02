@@ -131,10 +131,16 @@ export const PROVIDER_LABELS: Record<AiProviderKind, string> = {
 };
 
 // Default-Modell pro Provider-Kind. User darf ueberschreiben.
+//
+// Gemini-2.5-pro ist im Free-Tier NICHT verfuegbar (limit=0); 2.5-flash
+// dagegen ja. Plus: Wir setzen thinkingConfig.thinkingBudget=0 (siehe
+// providers/gemini.ts) um Thinking-Mode auszuschalten — das erfordert
+// gemini-2.5-flash oder gemini-2.5-flash-lite (gemini-2.5-pro
+// akzeptiert thinkingBudget:0 nicht).
 export const PROVIDER_DEFAULT_MODELS: Record<AiProviderKind, string> = {
   anthropic: 'claude-opus-4-7',
   openai: 'gpt-4o',
-  gemini: 'gemini-2.5-pro',
+  gemini: 'gemini-2.5-flash',
 };
 
 // ─── Resource + Has-Default-Helper ──────────────────────────────

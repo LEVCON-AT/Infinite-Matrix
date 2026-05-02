@@ -158,20 +158,23 @@ export async function callOpenAiStream(
   const decoder = new TextDecoder();
   let buf = '';
 
+  // Robust gegen \r\n-Endings (Windows-style HTTP-Stacks).
+  const FRAME_RE = /\r?\n\r?\n/;
   try {
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
       buf += decoder.decode(value, { stream: true });
 
-      let nl = buf.indexOf('\n\n');
-      while (nl !== -1) {
-        const frame = buf.slice(0, nl);
-        buf = buf.slice(nl + 2);
+      let m: RegExpMatchArray | null;
+      while ((m = buf.match(FRAME_RE)) !== null) {
+        const idx = m.index ?? 0;
+        const frame = buf.slice(0, idx);
+        buf = buf.slice(idx + m[0].length);
         handleSseFrame(frame, state, onEvent);
-        nl = buf.indexOf('\n\n');
       }
     }
+    if (buf.trim()) handleSseFrame(buf, state, onEvent);
   } catch (e) {
     const msg = (e as Error).message ?? String(e);
     onEvent({ type: 'error', message: msg });

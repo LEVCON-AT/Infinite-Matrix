@@ -560,6 +560,20 @@ Stand 2026-05-01 nach Q.3.A-Sweep:
 
 ---
 
-## 7. Aenderungen an diesem Manifest
+## 7. Standing Orders (User 2026-05-02)
+
+**Wenn beim Implementieren eine Animation / Easing / Token fehlt:**
+
+1. **Nicht ad-hoc inline definieren** (kein `transition: 0.2s ease` direkt im Component-CSS).
+2. **Manifest-Definition** waehlen oder ergaenzen — Pflicht-Token-Suite §1.1-1.5.
+3. **Globale Klasse** anlegen wenn ein Pattern fehlt (z.B. `.card-flip`, `.shimmer`, `.shake`).
+4. **Verdrahten** — Komponente konsumiert die Klasse / Token.
+5. **Dokumentieren** — Eintrag in §2 (Pflicht-Pattern).
+
+Ohne User zu fragen. User testet danach + meldet ggf. Tweak-Bedarf.
+
+---
+
+## 8. Aenderungen an diesem Manifest
 
 Nicht ohne Plan-Eintrag und User-Freigabe. Wenn ein neues UI-Pattern auftaucht (Bottom-Sheet, Carousel, Stepper-Indicator), dieses Manifest erweitern, **niemals inline anders machen**.

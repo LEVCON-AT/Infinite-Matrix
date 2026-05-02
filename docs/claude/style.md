@@ -630,6 +630,20 @@ Stand 2026-05-01, zu fixen in Q.3.B Style-Sweep:
 
 ---
 
-## 12. Aenderungen am Manifest
+## 12. Standing Orders (User 2026-05-02)
+
+**Wenn beim Implementieren ein Style-Token / eine Klasse / ein Pattern fehlt:**
+
+1. **Nicht ad-hoc inline definieren.** Auch nicht "nur lokal in dieser Komponente".
+2. **HyperUI-Vorbild waehlen** (hyperui.dev) — dort gibts die Spec.
+3. **Global anlegen** (in `:root`-Tokens / `.btn`-/`.card`-/etc.-Klassen / Manifest-Section).
+4. **Verdrahten** — die Komponente konsumiert die globale Klasse.
+5. **Dokumentieren** — kurzer Abschnitt im passenden Manifest.
+
+Ohne User zu fragen — User testet danach und sieht ob Optimierungsbedarf besteht. Default-Hypothese: HyperUI matched 80% der Use-Cases out-of-the-box.
+
+---
+
+## 13. Aenderungen am Manifest
 
 Nicht ohne Plan-Eintrag und User-Freigabe. Wenn ein neues Visual-Pattern auftaucht (z.B. Carousel, Stepper, Tree-Connector), Manifest erweitern, niemals inline anders machen.

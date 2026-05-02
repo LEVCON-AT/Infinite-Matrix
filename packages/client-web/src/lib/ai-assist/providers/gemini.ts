@@ -25,7 +25,16 @@ import type { AssistEvent, AssistMessage, AssistToolUse, ToolDef } from '../type
 // Stelle fuer Future-Cost-Quotas.
 const PROXY_BASE = (import.meta.env.VITE_AI_PROXY_BASE as string | undefined) ?? '/api/ai-proxy';
 const GEMINI_BASE = `${PROXY_BASE}/gemini`;
-const DEFAULT_MAX_TOKENS = 4096;
+// Gemini-2.5-{flash,pro} sind "Thinking"-Modelle: per Default verbraucht
+// das Modell einen grossen Teil von maxOutputTokens fuer internes
+// Reasoning (thoughtsTokenCount), nicht fuer die sichtbare Antwort.
+// Bei knappem Budget bleibt der text-content leer.
+//
+// Wir setzen thinkingBudget:0 (disable thinking-mode) damit Gemini wie
+// Anthropic/OpenAI antwortet — Tool-Use-Loop braucht das Reasoning
+// nicht, weil unser Tool-Pattern den Loop selber macht.
+const DEFAULT_MAX_TOKENS = 8192;
+const DEFAULT_THINKING_BUDGET = 0;
 
 type GeminiPart =
   | { text: string }
@@ -170,6 +179,9 @@ export async function callGeminiStream(
     tools: toGeminiTools(input.tools),
     generationConfig: {
       maxOutputTokens: DEFAULT_MAX_TOKENS,
+      // Thinking-Mode aus — sonst frisst das interne Reasoning das
+      // Token-Budget und der sichtbare text-content bleibt leer.
+      thinkingConfig: { thinkingBudget: DEFAULT_THINKING_BUDGET },
     },
   };
 
@@ -213,6 +225,9 @@ export async function callGeminiStream(
 
   let bytesTotal = 0;
   let chunkCount = 0;
+  // Robust gegen \r\n-Endings (Windows-style HTTP-Stacks).
+  // Frame-Separator ist \n\n ODER \r\n\r\n.
+  const FRAME_RE = /\r?\n\r?\n/;
   try {
     while (true) {
       const { value, done } = await reader.read();
@@ -221,13 +236,17 @@ export async function callGeminiStream(
       chunkCount += 1;
       buf += decoder.decode(value, { stream: true });
 
-      let nl = buf.indexOf('\n\n');
-      while (nl !== -1) {
-        const frame = buf.slice(0, nl);
-        buf = buf.slice(nl + 2);
+      let m: RegExpMatchArray | null;
+      while ((m = buf.match(FRAME_RE)) !== null) {
+        const idx = m.index ?? 0;
+        const frame = buf.slice(0, idx);
+        buf = buf.slice(idx + m[0].length);
         toolCallCounter = handleSseFrame(frame, state, onEvent, toolCallCounter);
-        nl = buf.indexOf('\n\n');
       }
+    }
+    // Final-Frame in buf falls Stream ohne trailing-newline endet.
+    if (buf.trim()) {
+      toolCallCounter = handleSseFrame(buf, state, onEvent, toolCallCounter);
     }
   } catch (e) {
     const msg = (e as Error).message ?? String(e);
@@ -257,11 +276,14 @@ function handleSseFrame(
   onEvent: (e: AssistEvent) => void,
   toolCallCounter: number,
 ): number {
+  // Gemini schickt pro Frame EINE data:-line mit JSON. Wir nehmen die
+  // letzte data:-line falls mehrere erscheinen (event: + data: + leere
+  // Zeile). \r-trailing wird via trim() entfernt.
   let data = '';
-  for (const line of frame.split('\n')) {
-    if (line.startsWith('data:')) data += line.slice(5).trim();
+  for (const line of frame.split(/\r?\n/)) {
+    if (line.startsWith('data:')) data = line.slice(5).trim();
   }
-  if (!data) return toolCallCounter;
+  if (!data || data === '[DONE]') return toolCallCounter;
 
   let chunk: {
     candidates?: Array<{
