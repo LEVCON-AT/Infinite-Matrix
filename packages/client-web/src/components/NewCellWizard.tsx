@@ -43,6 +43,7 @@ import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount
 import { validateAlias } from '../lib/alias';
 import { openCellSuggest } from '../lib/cell-suggest';
 import { installFocusRestore, installFocusTrap, showConfirm } from '../lib/dialog';
+import { pinDocWithCreate } from '../lib/atom-pins';
 import { translateDbError } from '../lib/errors';
 import { CELL_FEATURES, type FeatureDef, findFeatureByHotkey } from '../lib/features';
 import {
@@ -55,7 +56,6 @@ import {
   addCellChecklist,
   createChildBoard,
   createChildMatrix,
-  createDoc,
   delCellRow,
   deleteNode,
   insertCell,
@@ -461,11 +461,14 @@ const NewCellWizard: Component<Props> = (p) => {
           });
           if (!workingFeatures.includes('checklists')) workingFeatures.push('checklists');
         } else if (def.kind === 'doc') {
-          await createDoc({
+          // Welle D: Doc + Cell-Pin als atomarer RPC. attached_cell_id
+          // existiert nicht mehr in docs — Pin lebt in atom_pins.
+          await pinDocWithCreate({
             workspaceId: p.workspaceId,
-            attached_cell_id: cellRow.id,
             title: snapshot,
-            titleTemplate: labelTemplate,
+            content: '<p></p>',
+            parentKind: 'cell',
+            parentId: cellRow.id,
           });
         }
       }

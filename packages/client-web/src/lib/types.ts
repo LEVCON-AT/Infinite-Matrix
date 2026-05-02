@@ -354,11 +354,69 @@ export type DocRow = {
   // Phase 3 O.8: Source-of-Truth fuer Display-Title. Plain rendert wie
   // title; mit {row.object}/{column.object} resolved der Client live.
   title_template: string;
+  // Welle D: HTML statt Markdown. ProseMirror-Output, dompurify-sanitized.
   content: string;
   source_alias: string | null;
-  attached_cell_id: string | null;
   created_at: string;
   updated_at: string;
+};
+
+// ─── Welle D — Atom-Pin + Tag-System ──────────────────────────
+// atom_pins ist die generische Atom→Parent-Pin-Relation. Loest
+// docs.attached_cell_id ab und erweitert auf alle Atom-Typen +
+// Parent-Kinds. Eine Doku kann an Cell, Atom oder Node (matrix/board)
+// gepinnt sein. parent_kind='manifestation' ist V2-deferred.
+export type AtomParentKind = 'cell' | 'atom' | 'node' | 'manifestation';
+
+export type AtomPin = {
+  id: string;
+  atom_type: 'task' | 'link' | 'doc' | 'checklist' | 'imported_event';
+  atom_id: string;
+  workspace_id: string;
+  parent_kind: AtomParentKind;
+  parent_id: string;
+  position: number;
+  created_at: string;
+};
+
+// Vier Tag-Kinds:
+// - freetext: User tippt `#design`, value = canonical-string.
+// - atom_ref: Tag verweist auf konkretes Atom, value = atom_id::text,
+//             display_label = title-Snapshot.
+// - object_ref: Tag verweist auf Cell/Node, value = `${kind}:${id}`,
+//               display_label = alias-or-label-Snapshot.
+// - alias_ref: User tippt `^kuerzel`, value = canonical-alias-string,
+//              display_label = `^kuerzel` Snapshot, Live-Resolve gegen
+//              alias-index zur Anzeige (mit Stale-Indicator-Fallback).
+export type TagKind = 'freetext' | 'atom_ref' | 'object_ref' | 'alias_ref';
+
+export type WorkspaceTag = {
+  id: string;
+  workspace_id: string;
+  kind: TagKind;
+  value: string;
+  display_label: string | null;
+  usage_count: number;
+  created_at: string;
+};
+
+export type AtomTag = {
+  id: string;
+  atom_type: 'task' | 'link' | 'doc' | 'checklist' | 'imported_event';
+  atom_id: string;
+  workspace_id: string;
+  tag_id: string;
+  position: number;
+  created_at: string;
+};
+
+// AtomTag mit gejointen workspace_tags-Feldern. Was die Pin-Render-Pfade
+// (TagPills) wirklich brauchen: Title + Kind. RPC-Returns liefern das
+// gebundled — beim Read aus IDB-Cache muessen wir es selbst joinen.
+export type AtomTagWithTag = AtomTag & {
+  tag_kind: TagKind;
+  tag_value: string;
+  tag_display_label: string | null;
 };
 
 // ─── AI-Provider (Phase 2 Welle A.0) ───────────────────────────

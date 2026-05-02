@@ -78,10 +78,14 @@ export type WorkspaceExport = {
   checklists: Record<string, unknown>[];
   checklist_items: Record<string, unknown>[];
   links: Record<string, unknown>[];
-  // Dokumente mit attached_cell_id innerhalb des Subtree. Workspace-
-  // freie Docs (attached_cell_id=NULL) werden nur vom Full-Workspace-
-  // Export erfasst. Default leer, damit alte Parser nichts brechen.
+  // Dokumente die ueber atom_pins (parent_kind='cell') an Subtree-Cells
+  // gepinnt sind. Workspace-freie Docs (ohne Cell-Pin) werden nur vom
+  // Full-Workspace-Export erfasst. Default leer, damit alte Parser
+  // nichts brechen.
   docs: Record<string, unknown>[];
+  // Welle D — atom_pins (Doc→Cell-Verknuepfungen + V2 atom→atom etc.).
+  // Optional damit V0-Parser ohne Pin-Awareness alte Exports lesen.
+  atom_pins?: Record<string, unknown>[];
   // AU-B1 K11c.2 (B1-A-006 / B1-F-003 / CC2): Object-Layer-Tabellen.
   // Optional, damit V0-Parser ohne Object-Awareness alte Exports
   // weiterhin lesen koennen. rows/cols/kb_cols/nodes haben
@@ -211,6 +215,7 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     checklistsRes,
     linksRes,
     docsRes,
+    atomPinsRes,
     objectsRes,
     objectTagsRes,
     groupsRes,
@@ -225,6 +230,7 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     supabase.from('checklists').select('*').eq('workspace_id', workspaceId),
     supabase.from('links').select('*').eq('workspace_id', workspaceId),
     supabase.from('docs').select('*').eq('workspace_id', workspaceId),
+    supabase.from('atom_pins').select('*').eq('workspace_id', workspaceId),
     supabase.from('objects').select('*').eq('workspace_id', workspaceId),
     supabase.from('object_tags').select('*').eq('workspace_id', workspaceId),
     supabase.from('groups').select('*').eq('workspace_id', workspaceId),
@@ -240,6 +246,7 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     checklistsRes,
     linksRes,
     docsRes,
+    atomPinsRes,
     objectsRes,
     objectTagsRes,
     groupsRes,
@@ -263,6 +270,7 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     checklist_items: legacyShapes.checklist_items,
     links: (linksRes.data ?? []) as Record<string, unknown>[],
     docs: (docsRes.data ?? []) as Record<string, unknown>[],
+    atom_pins: (atomPinsRes.data ?? []) as Record<string, unknown>[],
     objects: (objectsRes.data ?? []) as Record<string, unknown>[],
     object_tags: (objectTagsRes.data ?? []) as Record<string, unknown>[],
     groups: (groupsRes.data ?? []) as Record<string, unknown>[],
@@ -337,6 +345,7 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     checklistsRes,
     linksRes,
     docsRes,
+    atomPinsRes,
     objectsRes,
     objectTagsRes,
     groupsRes,
@@ -352,6 +361,7 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     supabase.from('checklists').select('*').eq('workspace_id', workspaceId),
     supabase.from('links').select('*').eq('workspace_id', workspaceId),
     supabase.from('docs').select('*').eq('workspace_id', workspaceId),
+    supabase.from('atom_pins').select('*').eq('workspace_id', workspaceId),
     supabase.from('objects').select('*').eq('workspace_id', workspaceId),
     supabase.from('object_tags').select('*').eq('workspace_id', workspaceId),
     supabase.from('groups').select('*').eq('workspace_id', workspaceId),
@@ -367,6 +377,7 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     checklistsRes,
     linksRes,
     docsRes,
+    atomPinsRes,
     objectsRes,
     objectTagsRes,
     groupsRes,
@@ -421,9 +432,15 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
       checklist_id: string;
     }>,
     links: (linksRes.data ?? []) as Array<{ id: string; board_id: string }>,
-    docs: (docsRes.data ?? []) as Array<{
+    // Welle D: docs.attached_cell_id existiert nicht mehr. Subtree-
+    // Filter nutzt atom_pins (siehe Aufrufer).
+    docs: (docsRes.data ?? []) as Array<{ id: string }>,
+    atom_pins: (atomPinsRes.data ?? []) as Array<{
       id: string;
-      attached_cell_id: string | null;
+      atom_type: string;
+      atom_id: string;
+      parent_kind: string;
+      parent_id: string;
     }>,
     objects: (objectsRes.data ?? []) as Array<{ id: string }>,
     object_tags: (objectTagsRes.data ?? []) as Array<{
@@ -541,8 +558,22 @@ export async function exportSubtree(
   const filteredTaskIds = new Set(filteredManifestations.map((m) => m.atom_id));
   const filteredTasks = all.tasks.filter((t) => filteredTaskIds.has(t.id));
   const filteredLinks = all.links.filter((l) => inNodes(l.board_id));
-  // Docs wandern mit, wenn sie an einer Subtree-Cell kleben.
-  const filteredDocs = all.docs.filter((d) => d.attached_cell_id && inCells(d.attached_cell_id));
+  // Welle D: Doc-Subtree-Filter via atom_pins. Doc wandert mit, wenn
+  // mind. ein cell-Pin im Subtree liegt.
+  const docIdsInSubtree = new Set<string>();
+  for (const pin of all.atom_pins) {
+    if (pin.atom_type === 'doc' && pin.parent_kind === 'cell' && inCells(pin.parent_id)) {
+      docIdsInSubtree.add(pin.atom_id);
+    }
+  }
+  const filteredDocs = all.docs.filter((d) => docIdsInSubtree.has(d.id));
+  const filteredAtomPins = all.atom_pins.filter(
+    (pin) =>
+      pin.atom_type === 'doc' &&
+      pin.parent_kind === 'cell' &&
+      docIdsInSubtree.has(pin.atom_id) &&
+      inCells(pin.parent_id),
+  );
 
   // AU-B1 K11c.2 (B1-A-006): Object-Layer-Subtree-Filter. Sammeln alle
   // object_ids, die von Subtree-Rows/Cols/KbCols/Nodes referenziert
@@ -584,6 +615,7 @@ export async function exportSubtree(
     checklist_items: filteredChecklistItems as unknown as Record<string, unknown>[],
     links: filteredLinks as unknown as Record<string, unknown>[],
     docs: filteredDocs as unknown as Record<string, unknown>[],
+    atom_pins: filteredAtomPins as unknown as Record<string, unknown>[],
     objects: filteredObjects as unknown as Record<string, unknown>[],
     object_tags: filteredObjectTags as unknown as Record<string, unknown>[],
     groups: filteredGroups as unknown as Record<string, unknown>[],
@@ -661,9 +693,25 @@ export async function exportCellSubtree(
     filteredChecklistIds.has(it.checklist_id),
   );
   const filteredLinks = all.links.filter((l) => inNodes(l.board_id));
-  // Docs: die an der Quell-Zelle haengen UND die in Sub-Struktur-Cells.
-  const filteredDocs = all.docs.filter(
-    (d) => d.attached_cell_id === cellId || (d.attached_cell_id && inCells(d.attached_cell_id)),
+  // Welle D: Doc-Subtree-Filter via atom_pins. Doc wandert mit, wenn
+  // mind. ein cell-Pin auf cellId selbst ODER auf eine Cell im Sub-
+  // baum zeigt.
+  const docIdsInSubtreeCell = new Set<string>();
+  for (const pin of all.atom_pins) {
+    if (
+      pin.atom_type === 'doc' &&
+      pin.parent_kind === 'cell' &&
+      (pin.parent_id === cellId || inCells(pin.parent_id))
+    ) {
+      docIdsInSubtreeCell.add(pin.atom_id);
+    }
+  }
+  const filteredDocs = all.docs.filter((d) => docIdsInSubtreeCell.has(d.id));
+  const filteredAtomPinsCell = all.atom_pins.filter(
+    (pin) =>
+      pin.atom_type === 'doc' &&
+      pin.parent_kind === 'cell' &&
+      (pin.parent_id === cellId || inCells(pin.parent_id)),
   );
 
   // Phase 4 T.1.I + Q.2: Task-Layer-Subtree-Filter (analog exportSubtree).
@@ -694,6 +742,7 @@ export async function exportCellSubtree(
     checklist_items: filteredChecklistItems as unknown as Record<string, unknown>[],
     links: filteredLinks as unknown as Record<string, unknown>[],
     docs: filteredDocs as unknown as Record<string, unknown>[],
+    atom_pins: filteredAtomPinsCell as unknown as Record<string, unknown>[],
     tasks: filteredTasksCell as unknown as Record<string, unknown>[],
     atom_manifestations: filteredManifestationsCell as unknown as Record<string, unknown>[],
     sourceCell: {

@@ -564,12 +564,34 @@ export async function clearCellChecklistsData(cellId: string): Promise<void> {
   }
 }
 
-// Loescht Docs mit attached_cell_id=cellId. Overwrite-Semantik: auch
-// Dokus, die an der Zelle haengen, gelten als Cell-Inhalt und werden
-// entfernt.
+// Loescht Docs die an cellId gepinnt sind. Welle D: Lookup ueber
+// atom_pins (parent_kind='cell',atom_type='doc'), dann Doc-Delete.
+// Multi-Pin: ein Doc das auch an andere Cells haengt verschwindet
+// nicht — nur sein Pin auf cellId. Das passiert automatisch beim
+// Cell-Delete via Cascade-Trigger auf atom_pins, hier brauchen wir
+// nur den Doc-Delete fuer Single-Cell-Docs.
 async function clearCellDocs(cellId: string): Promise<void> {
-  const { error } = await supabase.from('docs').delete().eq('attached_cell_id', cellId);
-  if (error) throw error;
+  // Pins finden
+  const { data: pins, error: pinsErr } = await supabase
+    .from('atom_pins')
+    .select('atom_id')
+    .eq('parent_kind', 'cell')
+    .eq('parent_id', cellId)
+    .eq('atom_type', 'doc');
+  if (pinsErr) throw pinsErr;
+  const docIds = ((pins ?? []) as Array<{ atom_id: string }>).map((p) => p.atom_id);
+  if (docIds.length === 0) return;
+  // Pins purgen
+  const { error: delPinErr } = await supabase
+    .from('atom_pins')
+    .delete()
+    .eq('parent_kind', 'cell')
+    .eq('parent_id', cellId)
+    .eq('atom_type', 'doc');
+  if (delPinErr) throw delPinErr;
+  // Docs purgen
+  const { error: delDocErr } = await supabase.from('docs').delete().in('id', docIds);
+  if (delDocErr) throw delDocErr;
 }
 
 // Alle zusammen — wird bei Cell-Subtree-Overwrite benutzt, weil der
@@ -725,8 +747,41 @@ export async function clearMatrixContents(matrixId: string): Promise<void> {
   await cleanupTasksForCellIds(cellIds);
 
   if (cellIds.length > 0) {
-    const { error: dErr } = await supabase.from('docs').delete().in('attached_cell_id', cellIds);
-    if (dErr) throw dErr;
+    // Welle D: Doc-an-Cell-Pin lebt in atom_pins. Erst Pin-Lookup,
+    // dann Pins+Docs purgen. Multi-Pin-Docs verlieren nur ihre Cell-
+    // Pins, die Doc bleibt erhalten wenn weitere Pins existieren.
+    const { data: pinsToDel, error: pinsErr } = await supabase
+      .from('atom_pins')
+      .select('id, atom_id')
+      .eq('parent_kind', 'cell')
+      .eq('atom_type', 'doc')
+      .in('parent_id', cellIds);
+    if (pinsErr) throw pinsErr;
+    const pinRows = (pinsToDel ?? []) as Array<{ id: string; atom_id: string }>;
+    if (pinRows.length > 0) {
+      const docIds = pinRows.map((p) => p.atom_id);
+      const pinIds = pinRows.map((p) => p.id);
+      const { error: delPinErr } = await supabase
+        .from('atom_pins')
+        .delete()
+        .in('id', pinIds);
+      if (delPinErr) throw delPinErr;
+      // Welle D: Single-Pin-Docs purgen wir vollstaendig (Behavior wie
+      // pre-Welle-D). Multi-Pin-Docs (die auch an anderen Cells haengen)
+      // wollen wir nicht killen — pruefen via verbleibende atom_pins.
+      const { data: remaining, error: remErr } = await supabase
+        .from('atom_pins')
+        .select('atom_id')
+        .eq('atom_type', 'doc')
+        .in('atom_id', docIds);
+      if (remErr) throw remErr;
+      const stillPinned = new Set(((remaining ?? []) as Array<{ atom_id: string }>).map((r) => r.atom_id));
+      const orphaned = docIds.filter((id) => !stillPinned.has(id));
+      if (orphaned.length > 0) {
+        const { error: delDocErr } = await supabase.from('docs').delete().in('id', orphaned);
+        if (delDocErr) throw delDocErr;
+      }
+    }
   }
 
   if (descendants.length > 0) {
@@ -1039,32 +1094,93 @@ export async function executeSubtreeImportIntoCell(args: {
     );
   });
 
-  // Docs: neue UUID pro Doc, attached_cell_id remappen. Falls eine
-  // Doc im Export an der Quell-Container-Zelle (NICHT in remapMap) hing,
-  // faellt sie auf die Ziel-Zelle.
-  // (Pre-map Doc-IDs in remapMap, damit alle FKs aufloesbar sind.)
+  // Docs: neue UUID pro Doc. Welle D — attached_cell_id existiert nicht
+  // mehr; legacy-Exporte (vor Welle D) tragen es noch, neuere haben
+  // atom_pins separat. Wir bauen zwei Listen: docs (ohne FK) + atom_pins
+  // (Doc→Cell, ggf. aus legacy-attached_cell_id rekonstruiert oder aus
+  // payload.atom_pins gemappt).
   for (const d of payload.docs) remap((d as { id: string }).id, remapMap);
+  const docPinTargets = new Map<string, string>(); // newDocId -> newCellId
   const docsOut = (payload.docs as Array<Record<string, unknown>>).map((d) => {
     const raw = d as {
       id: string;
-      attached_cell_id: string | null;
+      attached_cell_id?: string | null;
     };
-    let attached: string | null = null;
+    const newDocId = mustRemap(raw.id, remapMap);
+    // Legacy-Pfad: wenn attached_cell_id im Export, daraus den Pin
+    // rekonstruieren. Falls Cell nicht im remapMap → faellt auf Ziel-
+    // Container-Zelle.
     if (raw.attached_cell_id) {
-      attached = remapMap.has(raw.attached_cell_id)
+      const remappedCell = remapMap.has(raw.attached_cell_id)
         ? mustRemap(raw.attached_cell_id, remapMap)
         : targetCellId;
+      docPinTargets.set(newDocId, remappedCell);
     }
+    // attached_cell_id explizit aus dem Insert-Object entfernen — die
+    // Spalte existiert nicht mehr.
+    const { attached_cell_id: _drop, ...rest } = d as Record<string, unknown> & {
+      attached_cell_id?: unknown;
+    };
     return applyAliasMap(
       {
-        ...d,
-        id: mustRemap(raw.id, remapMap),
+        ...rest,
+        id: newDocId,
         workspace_id: workspaceId,
-        attached_cell_id: attached,
       },
       aliasMap,
     );
   });
+
+  // Welle D: atom_pins aus payload (V1-Exporte) plus legacy-rekonstruierte
+  // Pins (V0-Exporte). Wir filtern auf doc-Pins; Tag-Junctions kommen
+  // mit eigenem Schema spaeter (V3 import-Erweiterung).
+  const atomPinsOut: Array<Record<string, unknown>> = [];
+  // Legacy-Pfad: Doc→Cell-Pins aus docPinTargets.
+  for (const [docId, cellId] of docPinTargets.entries()) {
+    atomPinsOut.push({
+      id: newUuid(),
+      atom_type: 'doc',
+      atom_id: docId,
+      workspace_id: workspaceId,
+      parent_kind: 'cell',
+      parent_id: cellId,
+      position: 0,
+    });
+  }
+  // V1-Pfad: payload.atom_pins remappen falls vorhanden.
+  if (Array.isArray((payload as Record<string, unknown>).atom_pins)) {
+    for (const raw of (payload as { atom_pins: Array<Record<string, unknown>> }).atom_pins) {
+      const r = raw as {
+        id: string;
+        atom_type: string;
+        atom_id: string;
+        parent_kind: string;
+        parent_id: string;
+        position?: number;
+      };
+      // Nur doc-Pins importieren (Tasks/Links/Checklists kommen ueber
+      // ihre eigenen Kanaele; falls diese spaeter Pins haben, hier
+      // erweitern). parent_kind='cell' nur wenn die Cell im remapMap
+      // ist — sonst skippen (Pin-Target nicht im Subtree).
+      if (r.atom_type !== 'doc') continue;
+      if (r.parent_kind !== 'cell') continue;
+      if (!remapMap.has(r.atom_id)) continue;
+      const newDocId = mustRemap(r.atom_id, remapMap);
+      const newCellId = remapMap.has(r.parent_id) ? mustRemap(r.parent_id, remapMap) : null;
+      if (!newCellId) continue;
+      // Doppel-Pins (legacy + V1) ueberspringen.
+      if (docPinTargets.get(newDocId) === newCellId) continue;
+      atomPinsOut.push({
+        id: newUuid(),
+        atom_type: 'doc',
+        atom_id: newDocId,
+        workspace_id: workspaceId,
+        parent_kind: 'cell',
+        parent_id: newCellId,
+        position: r.position ?? 0,
+      });
+    }
+  }
 
   // Insert-Reihenfolge loest die FK-Schleife nodes<->cells so auf:
   //   Phase A: alle Nodes mit parent_cell_id=NULL einfuegen.
@@ -1123,6 +1239,10 @@ export async function executeSubtreeImportIntoCell(args: {
     await insertBatch('links', linksOut);
     step('Dokus einfuegen…');
     await insertBatch('docs', docsOut);
+    if (atomPinsOut.length > 0) {
+      step('Doku-Pins einfuegen…');
+      await insertBatch('atom_pins', atomPinsOut);
+    }
   } catch (err) {
     await cleanupPartialImport(insertedNodeIds, insertedDocIds);
     throw err;
@@ -1373,7 +1493,9 @@ async function executeCellContainerMerge(args: {
     }
   }
 
-  // 3. Docs aus dem Payload auf die Ziel-Zelle umhaengen.
+  // 3. Docs aus dem Payload auf die Ziel-Zelle umhaengen. Welle D:
+  // Doc-Row + atom_pin getrennt — Doc-Row hat keine attached_cell_id
+  // mehr, der Pin lebt in atom_pins(parent_kind='cell').
   step?.('Dokus mergen…');
   if (payload.docs.length > 0) {
     const aliasMap = await reserveAliases(
@@ -1382,18 +1504,32 @@ async function executeCellContainerMerge(args: {
         typeof d.alias === 'string' && d.alias ? [d.alias] : [],
       ),
     );
-    const docsOut = (payload.docs as Array<Record<string, unknown>>).map((d) =>
-      applyAliasMap(
+    const pairs = (payload.docs as Array<Record<string, unknown>>).map((d) => {
+      const newDocId = newUuid();
+      const { attached_cell_id: _drop, ...rest } = d as Record<string, unknown> & {
+        attached_cell_id?: unknown;
+      };
+      const doc = applyAliasMap(
         {
-          ...d,
-          id: newUuid(),
+          ...rest,
+          id: newDocId,
           workspace_id: workspaceId,
-          attached_cell_id: targetCellId,
         },
         aliasMap,
-      ),
-    );
-    await insertBatch('docs', docsOut);
+      );
+      const pin = {
+        id: newUuid(),
+        atom_type: 'doc',
+        atom_id: newDocId,
+        workspace_id: workspaceId,
+        parent_kind: 'cell',
+        parent_id: targetCellId,
+        position: 0,
+      };
+      return { doc, pin };
+    });
+    await insertBatch('docs', pairs.map((p) => p.doc));
+    await insertBatch('atom_pins', pairs.map((p) => p.pin));
   }
 }
 
@@ -1884,24 +2020,69 @@ export async function executeSubtreeImportIntoMatrix(args: {
       aliasMap,
     );
   });
+  // Welle D: Docs ohne attached_cell_id-Spalte; Pin-Map separat als
+  // atom_pins-INSERT. Legacy-Pfad: attached_cell_id im Export → Pin
+  // rekonstruieren (nur wenn Cell im remapMap).
+  const docPinTargetsMatrix = new Map<string, string>(); // newDocId -> newCellId
   const docsOut = (payload.docs as Array<Record<string, unknown>>).map((d) => {
-    const raw = d as { id: string; attached_cell_id: string | null };
-    // attached_cell_id remappen (wenn im Export dabei), sonst NULL lassen —
-    // workspace-freie Docs haengen im Matrix-Import ohne Zelle.
-    const attached =
-      raw.attached_cell_id && remapMap.has(raw.attached_cell_id)
-        ? mustRemap(raw.attached_cell_id, remapMap)
-        : null;
+    const raw = d as { id: string; attached_cell_id?: string | null };
+    const newDocId = mustRemap(raw.id, remapMap);
+    if (raw.attached_cell_id && remapMap.has(raw.attached_cell_id)) {
+      docPinTargetsMatrix.set(newDocId, mustRemap(raw.attached_cell_id, remapMap));
+    }
+    const { attached_cell_id: _drop, ...rest } = d as Record<string, unknown> & {
+      attached_cell_id?: unknown;
+    };
     return applyAliasMap(
       {
-        ...d,
-        id: mustRemap(raw.id, remapMap),
+        ...rest,
+        id: newDocId,
         workspace_id: workspaceId,
-        attached_cell_id: attached,
       },
       aliasMap,
     );
   });
+  const atomPinsOutMatrix: Array<Record<string, unknown>> = [];
+  for (const [docId, cellId] of docPinTargetsMatrix.entries()) {
+    atomPinsOutMatrix.push({
+      id: newUuid(),
+      atom_type: 'doc',
+      atom_id: docId,
+      workspace_id: workspaceId,
+      parent_kind: 'cell',
+      parent_id: cellId,
+      position: 0,
+    });
+  }
+  // V1-Pfad: payload.atom_pins remappen falls vorhanden.
+  if (Array.isArray((payload as Record<string, unknown>).atom_pins)) {
+    for (const raw of (payload as { atom_pins: Array<Record<string, unknown>> }).atom_pins) {
+      const r = raw as {
+        id: string;
+        atom_type: string;
+        atom_id: string;
+        parent_kind: string;
+        parent_id: string;
+        position?: number;
+      };
+      if (r.atom_type !== 'doc') continue;
+      if (r.parent_kind !== 'cell') continue;
+      if (!remapMap.has(r.atom_id)) continue;
+      const newDocId = mustRemap(r.atom_id, remapMap);
+      const newCellId = remapMap.has(r.parent_id) ? mustRemap(r.parent_id, remapMap) : null;
+      if (!newCellId) continue;
+      if (docPinTargetsMatrix.get(newDocId) === newCellId) continue;
+      atomPinsOutMatrix.push({
+        id: newUuid(),
+        atom_type: 'doc',
+        atom_id: newDocId,
+        workspace_id: workspaceId,
+        parent_kind: 'cell',
+        parent_id: newCellId,
+        position: r.position ?? 0,
+      });
+    }
+  }
 
   // FK-Order wie bei Cell-Variante: Nodes (parent=null) → Rows → Cols →
   // Cells → UPDATE Nodes.parent_cell_id → kb/checklists/items/links/docs.
@@ -1945,6 +2126,10 @@ export async function executeSubtreeImportIntoMatrix(args: {
     await insertBatch('links', linksOut);
     step('Dokus einfuegen…');
     await insertBatch('docs', docsOut);
+    if (atomPinsOutMatrix.length > 0) {
+      step('Doku-Pins einfuegen…');
+      await insertBatch('atom_pins', atomPinsOutMatrix);
+    }
   } catch (err) {
     await cleanupPartialImport(insertedNodeIds, insertedDocIds);
     throw err;

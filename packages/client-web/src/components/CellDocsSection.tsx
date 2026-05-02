@@ -1,13 +1,14 @@
 // Docs-Sektion auf Cell-Seiten (Info + Checklisten). Zeigt alle Dokus,
-// die via attached_cell_id an diese Zelle haengen — Tab-artige Button-
-// Leiste, Klick oeffnet Doku-Popup mit dem gewaehlten Doc als aktivem
-// Tab.
+// die ueber atom_pins (parent_kind='cell') an diese Zelle gepinnt sind
+// — Tab-artige Button-Leiste, Klick oeffnet Doku-Popup mit dem
+// gewaehlten Doc als aktivem Tab.
 //
 // "+ In Doku erfassen": oeffnet Popup mit neuem Pending-Tab, das
-// source_alias = cell.alias (falls vorhanden) und attached_cell_id =
+// source_alias = cell.alias (falls vorhanden) und attachedCellId =
 // cell.id vorausgefuellt hat. Beim ersten Blur-Save materialisiert
-// der Tab als DB-Row — dann taucht die neue Doku hier in der Liste
-// auf (nach realtimeVersion-bump).
+// der Tab als DB-Row + atom_pins-Eintrag (Welle D: pin_doc_with_create-
+// RPC). Dann taucht die neue Doku hier in der Liste auf nach Realtime-
+// Bump.
 //
 // Edit-Gate: "+"-Button nur sichtbar im Edit-Mode (wie andere
 // Add-Buttons im Zell-Bereich). Die bestehenden Docs bleiben immer
@@ -94,7 +95,9 @@ const CellDocsSection: Component<Props> = (p) => {
                     <span class="cell-docs-item-title">
                       {(() => {
                         const maps = p.resolverMaps?.();
-                        const resolved = maps ? resolveDocTitle(d, maps) : d.title;
+                        const resolved = maps
+                          ? resolveDocTitle(d, maps, p.cell.id)
+                          : d.title;
                         return resolved || '(ohne Titel)';
                       })()}
                     </span>

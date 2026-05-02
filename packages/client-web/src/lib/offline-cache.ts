@@ -78,6 +78,12 @@ const TABLES = [
   'external_events',
   // Welle N — In-App-Notifications. Self-only RLS, workspace_id-Index.
   'notifications',
+  // Welle D — Atom-Pin + Tag-System. atom_pins ist die generische
+  // Atom→Parent-Pin-Relation (loest docs.attached_cell_id ab).
+  // workspace_tags ist die Tag-Registry; atom_tags die Junction.
+  'atom_pins',
+  'workspace_tags',
+  'atom_tags',
 ] as const;
 
 export type CacheTable = (typeof TABLES)[number];
@@ -107,6 +113,9 @@ interface MatrixCacheSchema extends DBSchema {
   external_calendars: StoreDef;
   external_events: StoreDef;
   notifications: StoreDef;
+  atom_pins: StoreDef;
+  workspace_tags: StoreDef;
+  atom_tags: StoreDef;
 }
 
 const DB_NAME = 'matrix-cache';
@@ -123,7 +132,11 @@ const DB_NAME = 'matrix-cache';
 // Calendar-Inbound (Migration 059). Polymorphe Atom-Quelle
 // 'imported_event' wird ebenfalls in atom_manifestations gemirrored.
 // V10 (Welle N): notifications-Store fuer In-App-Benachrichtigungen.
-const DB_VERSION = 10;
+// V11 (Welle D): atom_pins + workspace_tags + atom_tags fuer Atom-Pin-
+// Relation + globales Tag-System. docs.attached_cell_id wurde dabei
+// gedroppt (Migration 063), aber der `docs`-Store traegt das eh nicht
+// strukturell — die Spalte verschwindet einfach aus den Row-Keys.
+const DB_VERSION = 11;
 const OBSOLETE_STORES = ['kb_cards', 'checklist_items', 'task_manifestations'] as const;
 
 let dbPromise: Promise<IDBPDatabase<MatrixCacheSchema>> | null = null;

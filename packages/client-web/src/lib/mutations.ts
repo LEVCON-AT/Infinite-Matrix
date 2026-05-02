@@ -2289,9 +2289,9 @@ export async function restoreChecklistItem(snap: ChecklistItemRow): Promise<void
 }
 
 // ─── Docs ────────────────────────────────────────────────────────
-// Freischwebende Markdown-Light-Notizen. Create ist explizit — weder
-// JSONB-Read-Modify-Write noch Position-Dance; Docs haben weder
-// position noch Parent-Zwang.
+// Welle D: Docs sind Atome ohne Parent-Spalte. "Doku gehoert zu Cell"
+// lebt jetzt in atom_pins (siehe lib/atom-pins.ts). Mutations hier
+// touchen nur die docs-Source-Tabelle (Title/Content/Alias/Source-Alias).
 export async function createDoc(args: {
   workspaceId: string;
   title?: string;
@@ -2300,10 +2300,11 @@ export async function createDoc(args: {
   content?: string;
   alias?: string | null;
   source_alias?: string | null;
-  attached_cell_id?: string | null;
 }): Promise<DocRow> {
   const titleValue = args.title ?? '';
   const templateValue = args.titleTemplate ?? titleValue;
+  // Welle D: docs.content enthaelt HTML statt Markdown.
+  const contentValue = args.content ?? '<p></p>';
   return runOptimisticInsert<DocRow>({
     table: 'docs',
     workspaceId: args.workspaceId,
@@ -2315,10 +2316,9 @@ export async function createDoc(args: {
           workspace_id: args.workspaceId,
           title: titleValue,
           title_template: templateValue,
-          content: args.content ?? '',
+          content: contentValue,
           alias: args.alias ?? null,
           source_alias: args.source_alias ?? null,
-          attached_cell_id: args.attached_cell_id ?? null,
         })
         .select()
         .single();
@@ -2333,9 +2333,8 @@ export async function createDoc(args: {
         alias: args.alias ?? null,
         title: titleValue,
         title_template: templateValue,
-        content: args.content ?? '',
+        content: contentValue,
         source_alias: args.source_alias ?? null,
-        attached_cell_id: args.attached_cell_id ?? null,
         created_at: now,
         updated_at: now,
       } as unknown as DocRow;
@@ -2346,10 +2345,7 @@ export async function createDoc(args: {
 async function updateDoc(
   docId: string,
   patch: Partial<
-    Pick<
-      DocRow,
-      'title' | 'title_template' | 'content' | 'alias' | 'source_alias' | 'attached_cell_id'
-    >
+    Pick<DocRow, 'title' | 'title_template' | 'content' | 'alias' | 'source_alias'>
   >,
 ): Promise<DocRow> {
   return runOptimisticUpdate<DocRow>({
@@ -2387,10 +2383,6 @@ export function setDocContent(docId: string, content: string): Promise<DocRow> {
 
 export function setDocAlias(docId: string, alias: string | null): Promise<DocRow> {
   return updateDoc(docId, { alias });
-}
-
-export function setDocAttachedCell(docId: string, cellId: string | null): Promise<DocRow> {
-  return updateDoc(docId, { attached_cell_id: cellId });
 }
 
 export async function delDoc(docId: string): Promise<void> {

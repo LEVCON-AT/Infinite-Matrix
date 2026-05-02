@@ -84,6 +84,7 @@ import {
   fetchWorkspaceAttachedDocs,
   fetchWorkspaceLinks,
 } from '../lib/queries';
+import { fetchAtomPinsByWorkspace } from '../lib/atom-pins';
 import { subscribeWorkspace } from '../lib/realtime';
 import { useSettingsBodyClassSync } from '../lib/settings';
 import { useSidebarCalendarState } from '../lib/sidebar-calendar-state';
@@ -396,6 +397,15 @@ const Workspace: Component = () => {
         : null,
     async (key) => (key ? fetchWorkspaceAttachedDocs(key.workspaceId) : []),
   );
+  // Welle D: Atom-Pins fuer Sidebar-Tree (Doc→Cell-Mapping). Gleicher
+  // Trigger wie wsDocs, damit Tree konsistent rendert.
+  const [wsAtomPins] = createResource(
+    () =>
+      params.workspaceId && chips && chips.isOn('docs')
+        ? { workspaceId: params.workspaceId as string }
+        : null,
+    async (key) => (key ? fetchAtomPinsByWorkspace(key.workspaceId) : []),
+  );
 
   const chipData = createMemo<SidebarChipData | undefined>(() => {
     if (!chips) return undefined;
@@ -411,12 +421,22 @@ const Workspace: Component = () => {
       arr.push(l);
       linksByBoardId.set(l.board_id, arr);
     }
+    // Welle D: Doc-an-Cell-Pin lebt in atom_pins; wsDocs liefert die
+    // Doc-Rows die irgendwo gepinnt sind (server-seitig via atom_pins
+    // gefiltert), wsAtomPins haelt die Cell-Zuordnung.
     const docsByCellId = new Map<string, DocRow[]>();
+    const docToCellMap = new Map<string, string>();
+    for (const pin of wsAtomPins() ?? []) {
+      if (pin.atom_type === 'doc' && pin.parent_kind === 'cell') {
+        docToCellMap.set(pin.atom_id, pin.parent_id);
+      }
+    }
     for (const d of wsDocs() ?? []) {
-      if (!d.attached_cell_id) continue;
-      const arr = docsByCellId.get(d.attached_cell_id) ?? [];
+      const cellId = docToCellMap.get(d.id);
+      if (!cellId) continue;
+      const arr = docsByCellId.get(cellId) ?? [];
       arr.push(d);
-      docsByCellId.set(d.attached_cell_id, arr);
+      docsByCellId.set(cellId, arr);
     }
     return {
       linksByBoardId,
@@ -1428,7 +1448,7 @@ const Workspace: Component = () => {
             >
               <Icon name="tag" size={18} />
             </button>
-            <NotificationBell workspaceId={params.workspaceId} />
+            <NotificationBell workspaceId={params.workspaceId ?? ''} />
             <button
               type="button"
               class="theme-toggle-btn"

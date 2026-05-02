@@ -97,9 +97,14 @@ export function resolveNodeLabel(node: NodeRow, maps: ContextMaps): string {
   return resolveLabel(node.label_template, ctx, node.label || '(ohne Label)');
 }
 
-// Doc: title_template + attached_cell_id.
-export function resolveDocTitle(doc: DocRow, maps: ContextMaps): string {
-  const ctx = buildContext(doc.attached_cell_id, maps);
+// Doc: title_template + attached cell (Welle D: ueber atom_pins, vom
+// Caller via attachedCellId-Lookup vorberechnet und uebergeben).
+export function resolveDocTitle(
+  doc: DocRow,
+  maps: ContextMaps,
+  attachedCellId: string | null = null,
+): string {
+  const ctx = buildContext(attachedCellId, maps);
   return resolveLabel(doc.title_template, ctx, doc.title);
 }
 

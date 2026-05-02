@@ -693,16 +693,26 @@ export async function fetchCellExistingTemplates(
       })(),
     );
   }
-  // Doku: prueft NICHT cell.features (Doku haengt ueber attached_cell_id,
-  // kein Feature-Flag in cells.features). Wir laden alle Docs der Cell
-  // und nehmen das juengste — falls keine, bleibt 'doc' aus der Map.
+  // Doku: prueft NICHT cell.features (Doku haengt ueber atom_pins, kein
+  // Feature-Flag in cells.features). Welle D: Lookup geht ueber
+  // atom_pins(parent_kind='cell',parent_id=cell.id,atom_type='doc') →
+  // docs.id-Set, dann juengstes Doc.
   tasks.push(
     (async () => {
+      const pinsRes = await supabase
+        .from('atom_pins')
+        .select('atom_id')
+        .eq('workspace_id', workspaceId)
+        .eq('parent_kind', 'cell')
+        .eq('parent_id', cell.id)
+        .eq('atom_type', 'doc');
+      const docIds = ((pinsRes.data ?? []) as Array<{ atom_id: string }>).map((p) => p.atom_id);
+      if (docIds.length === 0) return;
       const { data } = await supabase
         .from('docs')
         .select('id,title_template')
         .eq('workspace_id', workspaceId)
-        .eq('attached_cell_id', cell.id)
+        .in('id', docIds)
         .order('updated_at', { ascending: false })
         .limit(1);
       const row = (data ?? [])[0] as { id: string; title_template?: string } | undefined;
@@ -1088,17 +1098,31 @@ export async function fetchDocById(docId: string, workspaceId: string): Promise<
   }
 }
 
-// Alle Dokus, die an eine bestimmte Zelle angehaengt sind. Fuer die
+// Alle Dokus, die an eine bestimmte Zelle angeheftet sind. Fuer die
 // Cell-Info/Checklists-Pages — zeigt dem User "welche Dokus liegen
-// hier". Sort nach updated_at DESC (zuletzt geaenderte zuerst, wie
-// im Alt-Client-Vorbild).
+// hier". Welle D: Lookup ueber atom_pins (parent_kind='cell',
+// parent_id=cellId, atom_type='doc'). Sort nach updated_at DESC
+// (zuletzt geaenderte zuerst).
 export async function fetchDocsForCell(cellId: string, workspaceId: string): Promise<DocRow[]> {
   try {
+    const pinsRes = await supabase
+      .from('atom_pins')
+      .select('atom_id')
+      .eq('workspace_id', workspaceId)
+      .eq('parent_kind', 'cell')
+      .eq('parent_id', cellId)
+      .eq('atom_type', 'doc');
+    if (pinsRes.error) throw pinsRes.error;
+    const docIds = (pinsRes.data ?? []).map((p: { atom_id: string }) => p.atom_id);
+    if (docIds.length === 0) {
+      markLiveSuccess();
+      return [];
+    }
     const { data, error } = await supabase
       .from('docs')
       .select('*')
       .eq('workspace_id', workspaceId)
-      .eq('attached_cell_id', cellId)
+      .in('id', docIds)
       .order('updated_at', { ascending: false });
     if (error) throw error;
     const rows = (data ?? []) as DocRow[];
@@ -1107,10 +1131,26 @@ export async function fetchDocsForCell(cellId: string, workspaceId: string): Pro
     return rows;
   } catch (err) {
     if (!isNetworkError(err)) throw err;
+    // Offline-Fallback: aus IDB-Cache atom_pins lesen + docs joinen.
+    const pins = await getByWorkspace<{
+      id: string;
+      workspace_id: string;
+      atom_type: string;
+      atom_id: string;
+      parent_kind: string;
+      parent_id: string;
+    }>('atom_pins', workspaceId);
+    const docIds = new Set(
+      pins
+        .filter(
+          (p) => p.parent_kind === 'cell' && p.parent_id === cellId && p.atom_type === 'doc',
+        )
+        .map((p) => p.atom_id),
+    );
     const all = await getByWorkspace<DocRow>('docs', workspaceId);
     markCacheFallback();
     return all
-      .filter((d) => d.attached_cell_id === cellId)
+      .filter((d) => docIds.has(d.id))
       .sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''));
   }
 }
@@ -1280,19 +1320,28 @@ export async function fetchWorkspaceLinks(workspaceId: string): Promise<LinkRow[
   });
 }
 
-// Alle Dokus mit attached_cell_id im Workspace. Fuer den Sidebar-
-// Tree-Docs-Chip (SB.2) — Rendering haengt die Doc-Row unter die
-// passende Cell-Row.
+// Alle Dokus, die an Zellen gepinnt sind. Fuer den Sidebar-Tree-Docs-
+// Chip (SB.2) — Rendering haengt die Doc-Row unter die passende Cell-
+// Row. Welle D: Lookup ueber atom_pins (parent_kind='cell', atom_type='doc').
 export async function fetchWorkspaceAttachedDocs(workspaceId: string): Promise<DocRow[]> {
-  // Wir cachen workspace-weit (alle Docs), filtern dann lokal.
-  // Lookups via fetchDocsForCell / fetchCellIdsWithDocs nutzen den
-  // gleichen Cache, daher konsistent.
   try {
+    const pinsRes = await supabase
+      .from('atom_pins')
+      .select('atom_id')
+      .eq('workspace_id', workspaceId)
+      .eq('parent_kind', 'cell')
+      .eq('atom_type', 'doc');
+    if (pinsRes.error) throw pinsRes.error;
+    const docIds = (pinsRes.data ?? []).map((p: { atom_id: string }) => p.atom_id);
+    if (docIds.length === 0) {
+      markLiveSuccess();
+      return [];
+    }
     const { data, error } = await supabase
       .from('docs')
       .select('*')
       .eq('workspace_id', workspaceId)
-      .not('attached_cell_id', 'is', null)
+      .in('id', docIds)
       .order('updated_at', { ascending: false });
     if (error) throw error;
     const rows = (data ?? []) as DocRow[];
@@ -1301,39 +1350,91 @@ export async function fetchWorkspaceAttachedDocs(workspaceId: string): Promise<D
     return rows;
   } catch (err) {
     if (!isNetworkError(err)) throw err;
+    const pins = await getByWorkspace<{
+      id: string;
+      workspace_id: string;
+      atom_type: string;
+      atom_id: string;
+      parent_kind: string;
+    }>('atom_pins', workspaceId);
+    const docIds = new Set(
+      pins.filter((p) => p.parent_kind === 'cell' && p.atom_type === 'doc').map((p) => p.atom_id),
+    );
     const all = await getByWorkspace<DocRow>('docs', workspaceId);
     markCacheFallback();
     return all
-      .filter((d) => d.attached_cell_id != null)
+      .filter((d) => docIds.has(d.id))
       .sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''));
   }
 }
 
-// Set der cell_ids, an denen mindestens eine Doku haengt. Fuer die
-// derived Doku-Pill in der Matrix-Ansicht. Eine einzelne Query, wir
-// filtern workspace-weit und deduplizieren client-seitig. Erwartete
-// Groesse: wenige hundert Rows selbst bei grossen Workspaces —
-// tragbar ohne Paging.
+// Welle D: Single-Cell-Attach-Lookup fuer einen Doc. Liefert die erste
+// Cell-Pin (es duerfte nur eine geben in V1) oder null. DocsPopup nutzt
+// das beim Tab-Open damit der Attach-Input vorausgefuellt ist.
+export async function fetchAttachedCellIdForDoc(
+  docId: string,
+  workspaceId: string,
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from('atom_pins')
+      .select('parent_id')
+      .eq('workspace_id', workspaceId)
+      .eq('atom_type', 'doc')
+      .eq('atom_id', docId)
+      .eq('parent_kind', 'cell')
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    markLiveSuccess();
+    return ((data as { parent_id?: string } | null) ?? null)?.parent_id ?? null;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const pins = await getByWorkspace<{
+      id: string;
+      workspace_id: string;
+      atom_type: string;
+      atom_id: string;
+      parent_kind: string;
+      parent_id: string;
+    }>('atom_pins', workspaceId);
+    markCacheFallback();
+    const hit = pins.find(
+      (p) => p.atom_type === 'doc' && p.atom_id === docId && p.parent_kind === 'cell',
+    );
+    return hit?.parent_id ?? null;
+  }
+}
+
+// Set der cell_ids, an denen mindestens eine Doku gepinnt ist. Fuer die
+// lazy Doku-Pill in der Matrix-Ansicht. Welle D: Lookup ueber atom_pins.
 export async function fetchCellIdsWithDocs(workspaceId: string): Promise<Set<string>> {
   try {
     const { data, error } = await supabase
-      .from('docs')
-      .select('attached_cell_id')
+      .from('atom_pins')
+      .select('parent_id')
       .eq('workspace_id', workspaceId)
-      .not('attached_cell_id', 'is', null);
+      .eq('parent_kind', 'cell')
+      .eq('atom_type', 'doc');
     if (error) throw error;
     const set = new Set<string>();
-    for (const row of (data ?? []) as Array<{ attached_cell_id: string | null }>) {
-      if (row.attached_cell_id) set.add(row.attached_cell_id);
+    for (const row of (data ?? []) as Array<{ parent_id: string }>) {
+      if (row.parent_id) set.add(row.parent_id);
     }
     markLiveSuccess();
     return set;
   } catch (err) {
     if (!isNetworkError(err)) throw err;
-    const all = await getByWorkspace<DocRow>('docs', workspaceId);
+    const pins = await getByWorkspace<{
+      id: string;
+      workspace_id: string;
+      atom_type: string;
+      parent_kind: string;
+      parent_id: string;
+    }>('atom_pins', workspaceId);
     const set = new Set<string>();
-    for (const d of all) {
-      if (d.attached_cell_id) set.add(d.attached_cell_id);
+    for (const p of pins) {
+      if (p.atom_type === 'doc' && p.parent_kind === 'cell') set.add(p.parent_id);
     }
     markCacheFallback();
     return set;

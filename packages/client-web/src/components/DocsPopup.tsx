@@ -34,16 +34,16 @@ import { type Draft, getDrafts, newClientId, persistDrafts, removeDraft } from '
 import { getPersistedTabIds, persistTabIds } from '../lib/docs-tab-restore';
 import { type OpenDocsRequest, clearDocsRequest } from '../lib/docs-ui';
 import { translateDbError } from '../lib/errors';
+import { pinDocWithCreate, setDocSingleCellPin } from '../lib/atom-pins';
 import {
   createDoc,
   delDoc,
   restoreDoc,
   setDocAlias,
-  setDocAttachedCell,
   setDocContent,
   setDocTitle,
 } from '../lib/mutations';
-import { fetchDocById, fetchDocsRecent } from '../lib/queries';
+import { fetchAttachedCellIdForDoc, fetchDocById, fetchDocsRecent } from '../lib/queries';
 import { supabase } from '../lib/supabase';
 import { showToast, showUndoToast } from '../lib/toasts';
 import type { DocRow } from '../lib/types';
@@ -113,7 +113,7 @@ function defaultTitle(sourceAlias: string | null): string {
   return todayDE();
 }
 
-function tabFromRow(row: DocRow): Tab {
+function tabFromRow(row: DocRow, attachedCellId: string | null = null): Tab {
   return {
     docId: row.id,
     clientId: newClientId(),
@@ -121,7 +121,11 @@ function tabFromRow(row: DocRow): Tab {
     content: row.content,
     alias: row.alias ?? '',
     sourceAlias: row.source_alias,
-    attachedCellId: row.attached_cell_id,
+    // Welle D: attached_cell_id lebt nicht mehr in docs. Caller (Caller-
+    // Hook in TabManager) muss den Wert aus atom_pins lookuppen und hier
+    // mitgeben — sonst bleibt er null, der Detach-Button greift dann
+    // einfach ins Leere.
+    attachedCellId,
     attachedCellAlias: null, // wird asynchron nachgezogen
     mode: row.content.trim().length > 0 ? 'view' : 'edit',
     dirty: false,
@@ -278,7 +282,12 @@ const DocsPopup: Component<Props> = (p) => {
     for (const id of persisted) {
       try {
         const row = await fetchDocById(id, p.workspaceId);
-        if (row) loaded.push(tabFromRow(row));
+        if (row) {
+          const attachedCellId = await fetchAttachedCellIdForDoc(row.id, p.workspaceId).catch(
+            () => null,
+          );
+          loaded.push(tabFromRow(row, attachedCellId));
+        }
       } catch {
         // Stale-Eintrag oder Permission-Error — still skippen,
         // naechster persist raeumt auf.
@@ -301,7 +310,11 @@ const DocsPopup: Component<Props> = (p) => {
         try {
           const row = await fetchDocById(req.initialDocId, p.workspaceId);
           if (row) {
-            loaded.push(tabFromRow(row));
+            const attachedCellId = await fetchAttachedCellIdForDoc(
+              row.id,
+              p.workspaceId,
+            ).catch(() => null);
+            loaded.push(tabFromRow(row, attachedCellId));
             activeIdxAfter = loaded.length - 1;
           } else {
             showToast('Doku nicht gefunden.', 'error');
@@ -416,7 +429,10 @@ const DocsPopup: Component<Props> = (p) => {
         try {
           const row = await fetchDocById(req.initialDocId as string, p.workspaceId);
           if (!row) return;
-          openTab(tabFromRow(row));
+          const attachedCellId = await fetchAttachedCellIdForDoc(row.id, p.workspaceId).catch(
+            () => null,
+          );
+          openTab(tabFromRow(row, attachedCellId));
           resolveAllAttachedAliases();
         } catch {
           /* silent — ein evtl. Fehler ist schon beim initial-load gemeldet */
@@ -473,23 +489,37 @@ const DocsPopup: Component<Props> = (p) => {
     setBusy(true);
     try {
       if (!t.docId) {
-        // Pending → createDoc mit aktuellen Feldwerten. Dann wird die
-        // Aenderung "automatisch" mit angelegt.
-        const created = await createDoc({
-          workspaceId: p.workspaceId,
-          title: field === 'title' ? value : t.title,
-          content: field === 'content' ? value : t.content,
-          alias:
-            field === 'alias'
+        // Pending → createDoc mit aktuellen Feldwerten + Pin in einer
+        // Transaktion (Welle D: pin_doc_with_create-RPC).
+        const titleValue = field === 'title' ? value : t.title;
+        const contentValue = field === 'content' ? value : t.content;
+        const aliasValue =
+          field === 'alias'
+            ? value.trim()
               ? value.trim()
-                ? value.trim()
-                : null
-              : t.alias.trim()
-                ? t.alias.trim()
-                : null,
-          source_alias: t.sourceAlias,
-          attached_cell_id: t.attachedCellId,
-        });
+              : null
+            : t.alias.trim()
+              ? t.alias.trim()
+              : null;
+        const created: DocRow = t.attachedCellId
+          ? ((
+              await pinDocWithCreate({
+                workspaceId: p.workspaceId,
+                title: titleValue,
+                content: contentValue || '<p></p>',
+                alias: aliasValue,
+                sourceAlias: t.sourceAlias,
+                parentKind: 'cell',
+                parentId: t.attachedCellId,
+              })
+            ).doc as DocRow)
+          : await createDoc({
+              workspaceId: p.workspaceId,
+              title: titleValue,
+              content: contentValue,
+              alias: aliasValue,
+              source_alias: t.sourceAlias,
+            });
         // Draft ist jetzt materialisiert — localStorage-Eintrag kann
         // weg. Ohne diese Zeile wuerde der Draft in der Sidebar
         // weiter auftauchen, obwohl er als Doc in der DB lebt.
@@ -618,7 +648,6 @@ const DocsPopup: Component<Props> = (p) => {
       title_template: t.title,
       content: t.content,
       source_alias: t.sourceAlias,
-      attached_cell_id: t.attachedCellId,
       created_at: '',
       updated_at: '',
     };
@@ -643,7 +672,10 @@ const DocsPopup: Component<Props> = (p) => {
   }
 
   async function openRecent(row: DocRow) {
-    openTab(tabFromRow(row));
+    const attachedCellId = await fetchAttachedCellIdForDoc(row.id, p.workspaceId).catch(
+      () => null,
+    );
+    openTab(tabFromRow(row, attachedCellId));
     // Nach dem setTabs-Batch den lookup fuer den neuen Tab triggern.
     resolveAllAttachedAliases();
   }
@@ -681,10 +713,14 @@ const DocsPopup: Component<Props> = (p) => {
     const currentAlias = (t.attachedCellAlias ?? '').toLowerCase();
     if (cleaned === currentAlias) return; // nichts geaendert
     if (!cleaned) {
-      // Detach
+      // Detach (Welle D: ueber atom_pins).
       if (t.docId && t.attachedCellId) {
         try {
-          await setDocAttachedCell(t.docId, null);
+          await setDocSingleCellPin({
+            workspaceId: p.workspaceId,
+            docId: t.docId,
+            cellId: null,
+          });
         } catch (err) {
           showToast(translateDbError(err), 'error');
           setAttachDraft(t.attachedCellAlias ?? '');
@@ -717,7 +753,11 @@ const DocsPopup: Component<Props> = (p) => {
     const cellId = res.result.cellId;
     if (t.docId) {
       try {
-        await setDocAttachedCell(t.docId, cellId);
+        await setDocSingleCellPin({
+          workspaceId: p.workspaceId,
+          docId: t.docId,
+          cellId,
+        });
       } catch (err) {
         showToast(translateDbError(err), 'error');
         setAttachDraft(t.attachedCellAlias ?? '');
