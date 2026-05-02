@@ -43,16 +43,18 @@ import type {
   BoardContent,
   CardRecur,
   CardRecurType,
+  CellRow,
   DocRow,
   InlineChecklistItem,
   KbCardRow,
+  NodeRow,
 } from '../lib/types';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 import { useViewerActive } from '../lib/workspace-role';
 import AliasText from './AliasText';
 import AtomDocsSection from './AtomDocsSection';
+import AtomTagsEditor from './AtomTagsEditor';
 import Icon from './Icon';
-import TagPills from './TagPills';
 
 type Props = {
   card: KbCardRow;
@@ -65,8 +67,17 @@ type Props = {
   wsAtomPins?: AtomPin[];
   wsDocs?: DocRow[];
   // Welle D.9: TagPills (read-only) zur Anzeige der workspace_tags des
-  // Tasks. Editieren kommt in D.7b (TagInput in CardOverlay).
+  // Tasks.
   wsAtomTagsEnriched?: AtomTagWithTag[];
+  // Welle D.7c: Tag-Editor (read-write). atomPickerEntries fuer @-Trigger,
+  // cells/nodes/cellLabelById fuer Object-Picker. realtimeVersion bumpt
+  // Refetch wenn andere User taggen. Workspace-Resources-Bundle.
+  workspaceId?: string;
+  atomPickerEntries?: import('./AtomPickerModal').AtomPickerEntry[];
+  wsCells?: CellRow[];
+  wsNodes?: NodeRow[];
+  cellLabelById?: Map<string, string>;
+  tagsRealtimeVersion?: number;
 };
 
 type OverlayItem = {
@@ -1239,16 +1250,20 @@ const CardOverlay: Component<Props> = (p) => {
             </p>
           </Show>
 
-          {/* Welle D.9: Workspace-Tags-Sektion (read-only). Edit kommt
-              in D.7b (TagInput in CardOverlay). */}
-          <Show when={(p.wsAtomTagsEnriched ?? []).filter((t) => t.atom_type === 'task' && t.atom_id === p.card.id).length > 0}>
+          {/* Welle D.7c: Tag-Editor (read-write) wenn Workspace-Resources
+              vorhanden. Fallback: legacy nur read-only durch wsAtomTagsEnriched. */}
+          <Show when={p.workspaceId}>
             <section class="overlay-section card-ws-tags">
               <h4>Tags</h4>
-              <TagPills
-                tags={(p.wsAtomTagsEnriched ?? []).filter(
-                  (t) => t.atom_type === 'task' && t.atom_id === p.card.id,
-                )}
-                maxVisible={20}
+              <AtomTagsEditor
+                workspaceId={p.workspaceId!}
+                atomType="task"
+                atomId={p.card.id}
+                realtimeVersion={p.tagsRealtimeVersion ?? 0}
+                atomPickerEntries={p.atomPickerEntries}
+                cells={p.wsCells}
+                nodes={p.wsNodes}
+                cellLabelById={p.cellLabelById}
               />
             </section>
           </Show>

@@ -423,6 +423,59 @@ const Workspace: Component = () => {
     joinAtomTagsWithRegistry(wsAtomTags() ?? [], wsWorkspaceTags() ?? []),
   );
 
+  // Welle D.7b: Flache Picker-Entry-Liste fuer AtomPickerModal — Tasks +
+  // Links + Docs + Checklists in einem einheitlichen Format. Der Modal
+  // bleibt source-agnostisch.
+  const atomPickerEntries = createMemo(() => {
+    const out: Array<{ atomType: 'task' | 'link' | 'doc' | 'checklist'; atomId: string; label: string; alias: string | null }> = [];
+    for (const t of wsTasks() ?? []) {
+      out.push({ atomType: 'task', atomId: t.id, label: t.label || '(ohne Titel)', alias: null });
+    }
+    for (const l of wsLinks() ?? []) {
+      out.push({
+        atomType: 'link',
+        atomId: l.id,
+        label: l.label || l.url || '(Link)',
+        alias: l.alias ?? null,
+      });
+    }
+    for (const d of wsDocs() ?? []) {
+      out.push({
+        atomType: 'doc',
+        atomId: d.id,
+        label: d.title || '(ohne Titel)',
+        alias: d.alias ?? null,
+      });
+    }
+    for (const c of wsChecklists() ?? []) {
+      out.push({
+        atomType: 'checklist',
+        atomId: c.id,
+        label: c.label || '(ohne Titel)',
+        alias: null,
+      });
+    }
+    return out;
+  });
+
+  // Welle D.7b: cellLabelById fuer ObjectPickerModal — "Zeilen × Spalten"-
+  // Labels einmal pro Workspace memoized.
+  const cellLabelById = createMemo(() => {
+    const map = new Map<string, string>();
+    const rowsList = rows() ?? [];
+    const colsList = colsData() ?? [];
+    const rowById = new Map(rowsList.map((r) => [r.id, r]));
+    const colById = new Map(colsList.map((c) => [c.id, c]));
+    for (const c of cells() ?? []) {
+      const r = rowById.get(c.row_id);
+      const co = colById.get(c.col_id);
+      const rl = r?.label ?? '(Zeile)';
+      const cl = co?.label ?? '(Spalte)';
+      map.set(c.id, `${rl} × ${cl}`);
+    }
+    return map;
+  });
+
   const chipData = createMemo<SidebarChipData | undefined>(() => {
     if (!chips) return undefined;
     const linkTypes = new Set<'url' | 'mail'>();
@@ -749,6 +802,9 @@ const Workspace: Component = () => {
   // fetcht ueber board_id IN (subtree), unabhaengig vom aktuellen
   // Board-Context.
   const [rtCards, setRtCards] = createSignal(0);
+  // Welle D.7c: Realtime-Bump fuer Tag-Editor (workspace_tags + atom_tags).
+  // AtomTagsEditor-Wrapper liest realtimeVersion-Prop und refetchet.
+  const [rtTags, setRtTags] = createSignal(0);
 
   const cellRow = createMemo(() => {
     const c = currentCell();
@@ -1034,9 +1090,13 @@ const Workspace: Component = () => {
       },
       workspace_tags: () => {
         void refetchWsWorkspaceTags();
+        setRtTags((v) => v + 1);
       },
       atom_tags: () => {
         void refetchWsAtomTags();
+        setRtTags((v) => v + 1);
+        // DocTagsEditor im offenen DocsPopup haengt an rtDocs.
+        setRtDocs((v) => v + 1);
       },
       // T.AC.A.5 + Q.2: atom_manifestations ist Single-Source. Der
       // realtime-Subscriber (lib/realtime.ts) routet task-Atoms in
@@ -1290,6 +1350,11 @@ const Workspace: Component = () => {
               snapshot={req().snapshot}
               wsAtomPins={wsAtomPins() ?? []}
               wsDocs={wsDocs() ?? []}
+              atomPickerEntries={atomPickerEntries()}
+              wsCells={cells() ?? []}
+              wsNodes={nodes() ?? []}
+              cellLabelById={cellLabelById()}
+              tagsRealtimeVersion={rtTags()}
             />
           )}
         </Show>
@@ -1692,6 +1757,11 @@ const Workspace: Component = () => {
                       wsAtomPins={wsAtomPins() ?? []}
                       wsDocs={wsDocs() ?? []}
                       wsAtomTagsEnriched={wsAtomTagsEnriched()}
+                      atomPickerEntries={atomPickerEntries()}
+                      wsCells={cells() ?? []}
+                      wsNodes={nodes() ?? []}
+                      cellLabelById={cellLabelById()}
+                      tagsRealtimeVersion={rtTags()}
                       onChanged={() => {
                         void refetchBoard();
                       }}

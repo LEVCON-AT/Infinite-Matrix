@@ -1,11 +1,13 @@
 // Welle D.7 — Tag-Editor fuer einen einzelnen Doc-Atom.
 //
-// Wrapped TagInput mit dem Fetch- und Refetch-Pfad. Nutzt
-// fetchAtomTagsForAtom (lib/atom-tags.ts) fuer den Read.
+// Welle D.7c: Wrapper um den generischen AtomTagsEditor. Behaelt seine
+// eigene API damit Caller (DocsPopup) nicht alle Picker-Resources
+// durchreichen muessen — Doc-Tags brauchen typisch eh nur freetext +
+// alias_ref. Wenn DocsPopup spaeter atom_ref/object_ref-Tags fuer Docs
+// erlauben soll, kann es einfach AtomTagsEditor direkt nutzen.
 
-import { type Component, createEffect, createResource } from 'solid-js';
-import { fetchAtomTagsForAtom } from '../lib/atom-tags';
-import TagInput from './TagInput';
+import type { Component } from 'solid-js';
+import AtomTagsEditor from './AtomTagsEditor';
 
 export type DocTagsEditorProps = {
   workspaceId: string;
@@ -14,31 +16,12 @@ export type DocTagsEditorProps = {
 };
 
 const DocTagsEditor: Component<DocTagsEditorProps> = (p) => {
-  const [tags, { refetch }] = createResource(
-    () => ({ wsId: p.workspaceId, docId: p.docId }),
-    async (key) =>
-      fetchAtomTagsForAtom({
-        workspaceId: key.wsId,
-        atomType: 'doc',
-        atomId: key.docId,
-      }),
-  );
-
-  // Realtime-Bump auf workspace_tags / atom_tags triggert Refetch via
-  // realtimeVersion-Prop (Workspace.subscribeWorkspace wird in D.10
-  // erweitert um die neuen Tabellen).
-  createEffect(() => {
-    void p.realtimeVersion;
-    void refetch();
-  });
-
   return (
-    <TagInput
+    <AtomTagsEditor
       workspaceId={p.workspaceId}
       atomType="doc"
       atomId={p.docId}
-      tags={tags() ?? []}
-      onTagsChange={() => void refetch()}
+      realtimeVersion={p.realtimeVersion}
     />
   );
 };

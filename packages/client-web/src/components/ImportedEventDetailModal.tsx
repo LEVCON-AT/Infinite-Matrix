@@ -12,8 +12,9 @@ import { fetchExternalEventById } from '../lib/calendar-inbound';
 import { installFocusRestore, installFocusTrap } from '../lib/dialog';
 import { closeImportedEventModal, type ImportedEventModalSnapshot } from '../lib/imported-event-modal-state';
 import { showToast } from '../lib/toasts';
-import type { AtomPin, DocRow } from '../lib/types';
+import type { AtomPin, CellRow, DocRow, NodeRow } from '../lib/types';
 import AtomDocsSection from './AtomDocsSection';
+import AtomTagsEditor from './AtomTagsEditor';
 import DeriveTaskModal from './DeriveTaskModal';
 import Icon from './Icon';
 
@@ -31,6 +32,13 @@ export type ImportedEventDetailModalProps = {
   // Welle D.9: optional fuer AtomDocsSection.
   wsAtomPins?: AtomPin[];
   wsDocs?: DocRow[];
+  // Welle D.7c: AtomTagsEditor-Resources. Optional — Calendar-Route
+  // ohne Workspace-Resources blendet die Sektion aus.
+  atomPickerEntries?: import('./AtomPickerModal').AtomPickerEntry[];
+  wsCells?: CellRow[];
+  wsNodes?: NodeRow[];
+  cellLabelById?: Map<string, string>;
+  tagsRealtimeVersion?: number;
 };
 
 const ImportedEventDetailModal: Component<ImportedEventDetailModalProps> = (props) => {
@@ -157,6 +165,27 @@ const ImportedEventDetailModal: Component<ImportedEventDetailModalProps> = (prop
               in andere Sichten (Kanban, Checkliste) duplizieren — der Original-Termin bleibt
               extern verwaltet.
             </p>
+
+            {/* Welle D.7c: Tag-Editor (read-write) wenn Workspace-
+                Resources vorhanden. */}
+            <Show when={props.atomPickerEntries || props.wsCells || props.wsNodes}>
+              <section class="atom-docs-section">
+                <header class="atom-docs-section-head">
+                  <Icon name="link" size={14} />
+                  <span>Tags</span>
+                </header>
+                <AtomTagsEditor
+                  workspaceId={props.workspaceId}
+                  atomType="imported_event"
+                  atomId={props.eventId}
+                  realtimeVersion={props.tagsRealtimeVersion ?? 0}
+                  atomPickerEntries={props.atomPickerEntries}
+                  cells={props.wsCells}
+                  nodes={props.wsNodes}
+                  cellLabelById={props.cellLabelById}
+                />
+              </section>
+            </Show>
 
             {/* Welle D.9: Doku-Sektion am importierten Event. Pin-Owner
                 ist das external_event-Atom (atom_type='imported_event'). */}

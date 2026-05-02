@@ -49,11 +49,13 @@ import type {
   AtomPin,
   AtomTagWithTag,
   BoardContent,
+  CellRow,
   DocRow,
   KbCardRow,
   KbColRow,
   LinkRow,
   LinkType,
+  NodeRow,
   TaskManifestationRow,
 } from '../lib/types';
 import { sanitizeUrl } from '../lib/url';
@@ -96,6 +98,14 @@ type Props = {
   // Welle D.9: Atom-Tags (joined mit workspace_tags-Registry) fuer
   // TagPills-Render auf Kanban-Cards. Filter pro Card client-seitig.
   wsAtomTagsEnriched?: AtomTagWithTag[];
+  // Welle D.7c: Bundle der Workspace-Resources fuer den Tag-Editor +
+  // Picker-Modals im CardOverlay. Optional durchgeleitet — Caller
+  // (Workspace.tsx) reicht alles als atomPickerEntries-Memo + cells/nodes.
+  atomPickerEntries?: import('./AtomPickerModal').AtomPickerEntry[];
+  wsCells?: CellRow[];
+  wsNodes?: NodeRow[];
+  cellLabelById?: Map<string, string>;
+  tagsRealtimeVersion?: number;
 };
 
 // Liefert N/M fuer eine Karte — inline-Checkliste oder resolved via ref.
@@ -1524,6 +1534,12 @@ const BoardView: Component<Props> = (p) => {
                   wsAtomPins={p.wsAtomPins}
                   wsDocs={p.wsDocs}
                   wsAtomTagsEnriched={p.wsAtomTagsEnriched}
+                  workspaceId={p.workspaceId}
+                  atomPickerEntries={p.atomPickerEntries}
+                  wsCells={p.wsCells}
+                  wsNodes={p.wsNodes}
+                  cellLabelById={p.cellLabelById}
+                  tagsRealtimeVersion={p.tagsRealtimeVersion}
                 />
               )}
             </Show>

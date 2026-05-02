@@ -1626,6 +1626,148 @@ button[type="submit"]:hover:not(:disabled) {
   gap: 6px;
 }
 
+/* AtomPickerModal + ObjectPickerModal — Tab + Search + Liste. */
+.atom-picker-modal {
+  width: min(560px, 92vw);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.atom-picker-tabs {
+  display: flex;
+  gap: 2px;
+  padding: var(--space-xs) var(--space-md) 0;
+  border-bottom: 0.5px solid var(--border2);
+}
+
+.atom-picker-tab {
+  padding: 6px var(--space-sm);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text2);
+  font-size: var(--fs-small);
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--tr-std), border-color var(--tr-std);
+}
+
+.atom-picker-tab:hover {
+  color: var(--text);
+}
+
+.atom-picker-tab-active {
+  color: var(--text);
+  border-bottom-color: var(--text);
+}
+
+.atom-picker-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 0.5px solid var(--border2);
+  color: var(--text3);
+}
+
+.atom-picker-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--fs-base);
+}
+
+.atom-picker-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-xs) 0;
+}
+
+.atom-picker-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.atom-picker-empty {
+  padding: var(--space-md);
+  text-align: center;
+}
+
+.atom-picker-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-xs) var(--space-md);
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--fs-small);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--tr-std);
+}
+
+.atom-picker-item:hover {
+  background: var(--surface-hover);
+}
+
+.atom-picker-item-kind {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: var(--rs);
+  background: color-mix(in srgb, var(--text2) 8%, transparent);
+  color: var(--text2);
+  font-size: var(--fs-tiny);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex: 0 0 auto;
+  min-width: 60px;
+  text-align: center;
+}
+
+.atom-picker-kind-task {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+.atom-picker-kind-link {
+  background: color-mix(in srgb, var(--blue, #3b82f6) 12%, transparent);
+  color: var(--blue, #3b82f6);
+}
+.atom-picker-kind-doc {
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
+  color: var(--amber);
+}
+.atom-picker-kind-checklist {
+  background: color-mix(in srgb, var(--green, #16a34a) 12%, transparent);
+  color: var(--green, #16a34a);
+}
+.atom-picker-kind-cell {
+  background: color-mix(in srgb, var(--text3) 18%, transparent);
+}
+.atom-picker-kind-node {
+  background: color-mix(in srgb, var(--text2) 16%, transparent);
+}
+
+.atom-picker-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atom-picker-item-alias {
+  color: var(--text3);
+  font-size: var(--fs-tiny);
+  flex: 0 0 auto;
+}
+
 /* ── Command-Palette (^) ──────────────────────────────────────── */
 /* Einheitliche Palette (frueher getrennt als alias-quicknav + command-
    palette). Breiterer Input fuer Commands, Amber-^ als Kontext-Anker.
