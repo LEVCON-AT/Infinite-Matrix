@@ -215,10 +215,10 @@ const AiProviderEditModal: Component<AiProviderEditModalProps> = (p) => {
             </label>
           </div>
           <div class="overlay-actions">
-            <button type="button" class="btn-c" onClick={p.onClose} disabled={busy()}>
+            <button type="button" class="btn btn-subtle" onClick={p.onClose} disabled={busy()}>
               Abbrechen
             </button>
-            <button type="submit" class="btn-p" disabled={busy()}>
+            <button type="submit" class="btn btn-primary lift" disabled={busy()}>
               <Show when={busy()} fallback={p.provider ? 'Speichern' : 'Anlegen'}>
                 Speichert…
               </Show>

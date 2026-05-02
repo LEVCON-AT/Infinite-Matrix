@@ -382,195 +382,201 @@ const AiHelpDrawer: Component = () => {
   const wsId = createMemo(() => params.workspaceId);
   const noWorkspace = () => !wsId();
 
+  // Drawer permanent gemountet — animations.md §2.10 Drawer-Pattern.
+  // data-open steuert transform translateX (100% → 0). Inhalt bleibt
+  // im DOM bei Close, damit der Slide-Out smooth laeuft.
   return (
-    <Show when={open()}>
-      <aside class="ai-help-drawer" aria-label="KI-Hilfe">
-        <header class="ai-help-head">
-          <span class="ai-help-title">
-            <Icon name="sparkles" size={16} />
-            <span>KI-Hilfe</span>
-          </span>
-          <Show when={readOnlyForced()}>
-            <button
-              type="button"
-              class="ai-help-mode-toggle"
-              onClick={() => setReadOnly((v) => !v)}
-              title={
-                readOnly()
-                  ? 'Aktion-Modus aktivieren (Tool-Calls erlauben)'
-                  : 'Read-Only-Modus aktivieren'
-              }
-            >
-              {readOnly() ? '🔒 Read-Only' : '⚡ Action'}
-            </button>
-          </Show>
+    <aside
+      class="ai-help-drawer"
+      data-open={open() ? 'true' : 'false'}
+      aria-label="KI-Hilfe"
+      aria-hidden={!open()}
+    >
+      <header class="ai-help-head">
+        <span class="ai-help-title">
+          <Icon name="sparkles" size={16} />
+          <span>KI-Hilfe</span>
+        </span>
+        <Show when={readOnlyForced()}>
           <button
             type="button"
-            class="ai-help-close"
-            onClick={() => closeDrawer()}
-            aria-label="Schliessen"
+            class="ai-help-mode-toggle"
+            onClick={() => setReadOnly((v) => !v)}
+            title={
+              readOnly()
+                ? 'Aktion-Modus aktivieren (Tool-Calls erlauben)'
+                : 'Read-Only-Modus aktivieren'
+            }
           >
-            <Icon name="x" size={16} />
+            {readOnly() ? '🔒 Read-Only' : '⚡ Action'}
           </button>
-        </header>
-
-        <Show when={readOnlyForced() && readOnly()}>
-          <div class="ai-help-banner ai-help-banner-warn">
-            <Icon name="lock-closed" size={12} />
-            <span>
-              Du bist auf einem Knoten den ein anderes Mitglied erstellt hat. Tool-Calls sind aus
-              Sicherheitsgruenden deaktiviert. "Action" oben rechts klicken um sie freizuschalten.
-            </span>
-          </div>
         </Show>
+        <button
+          type="button"
+          class="ai-help-close"
+          onClick={() => closeDrawer()}
+          aria-label="Schliessen"
+        >
+          <Icon name="x" size={16} />
+        </button>
+      </header>
 
-        <Show when={noWorkspace()}>
-          <div class="ai-help-empty">
-            <Icon name="information-circle" size={20} />
-            <p>Bitte zuerst einen Workspace oeffnen.</p>
-          </div>
-        </Show>
+      <Show when={readOnlyForced() && readOnly()}>
+        <div class="ai-help-banner ai-help-banner-warn">
+          <Icon name="lock-closed" size={12} />
+          <span>
+            Du bist auf einem Knoten den ein anderes Mitglied erstellt hat. Tool-Calls sind aus
+            Sicherheitsgruenden deaktiviert. "Action" oben rechts klicken um sie freizuschalten.
+          </span>
+        </div>
+      </Show>
 
-        <Show when={!noWorkspace()}>
-          <div
-            class="ai-help-body"
-            ref={(el) => {
-              scrollerEl = el;
-            }}
-          >
-            {/* AU-B1 K7 (B1-D-005 / B1-H-004): EIN For-Loop in
+      <Show when={noWorkspace()}>
+        <div class="ai-help-empty">
+          <Icon name="information-circle" size={20} />
+          <p>Bitte zuerst einen Workspace oeffnen.</p>
+        </div>
+      </Show>
+
+      <Show when={!noWorkspace()}>
+        <div
+          class="ai-help-body"
+          ref={(el) => {
+            scrollerEl = el;
+          }}
+        >
+          {/* AU-B1 K7 (B1-D-005 / B1-H-004): EIN For-Loop in
                 Konversations-Reihenfolge. Vorher zwei separate Loops
                 (User dann Assistant) brachen den DOM-Order — Chat zeigte
                 erst alle Fragen, dann alle Antworten als Block. */}
-            <For each={messages()}>
-              {(m) => (
-                <>
-                  <Show when={m.kind === 'user' ? (m as { text: string }) : null}>
-                    {(u) => <div class="ai-help-msg ai-help-msg-user">{u().text}</div>}
-                  </Show>
-                  <Show
-                    when={
-                      m.kind === 'assistant'
-                        ? (m as { text: string; toolCalls: ChatToolCall[] })
-                        : null
-                    }
-                  >
-                    {(am) => (
-                      <div class="ai-help-msg ai-help-msg-assistant">
-                        <Show when={am().text}>
-                          <div class="ai-help-msg-text">{am().text}</div>
-                        </Show>
-                        <For each={am().toolCalls}>
-                          {(tc) => (
-                            <div class={`ai-help-tool ai-help-tool-${tc.status}`}>
-                              <Icon
-                                name={
-                                  tc.status === 'ok'
-                                    ? 'check-circle'
-                                    : tc.status === 'error'
-                                      ? 'x-circle'
-                                      : 'arrow-path'
-                                }
-                                size={12}
-                              />
-                              <span class="ai-help-tool-name">{tc.name}</span>
-                              <Show when={tc.errorMsg}>
-                                <span class="ai-help-tool-err">— {tc.errorMsg}</span>
-                              </Show>
-                            </div>
-                          )}
-                        </For>
-                      </div>
-                    )}
-                  </Show>
-                </>
-              )}
-            </For>
-            <Show when={isStreaming()}>
-              <div class="ai-help-msg ai-help-msg-assistant ai-help-msg-streaming">
-                <Show when={streamingText()}>
-                  <div class="ai-help-msg-text">{streamingText()}</div>
+          <For each={messages()}>
+            {(m) => (
+              <>
+                <Show when={m.kind === 'user' ? (m as { text: string }) : null}>
+                  {(u) => <div class="ai-help-msg ai-help-msg-user">{u().text}</div>}
                 </Show>
-                <For each={activeTools()}>
-                  {(tc) => (
-                    <div class={`ai-help-tool ai-help-tool-${tc.status}`}>
-                      <Icon
-                        name={
-                          tc.status === 'ok'
-                            ? 'check-circle'
-                            : tc.status === 'error'
-                              ? 'x-circle'
-                              : 'arrow-path'
-                        }
-                        size={12}
-                      />
-                      <span class="ai-help-tool-name">{tc.name}</span>
+                <Show
+                  when={
+                    m.kind === 'assistant'
+                      ? (m as { text: string; toolCalls: ChatToolCall[] })
+                      : null
+                  }
+                >
+                  {(am) => (
+                    <div class="ai-help-msg ai-help-msg-assistant">
+                      <Show when={am().text}>
+                        <div class="ai-help-msg-text">{am().text}</div>
+                      </Show>
+                      <For each={am().toolCalls}>
+                        {(tc) => (
+                          <div class={`ai-help-tool ai-help-tool-${tc.status}`}>
+                            <Icon
+                              name={
+                                tc.status === 'ok'
+                                  ? 'check-circle'
+                                  : tc.status === 'error'
+                                    ? 'x-circle'
+                                    : 'arrow-path'
+                              }
+                              size={12}
+                            />
+                            <span class="ai-help-tool-name">{tc.name}</span>
+                            <Show when={tc.errorMsg}>
+                              <span class="ai-help-tool-err">— {tc.errorMsg}</span>
+                            </Show>
+                          </div>
+                        )}
+                      </For>
                     </div>
                   )}
-                </For>
-                <div class="ai-help-streaming-dot">…</div>
-              </div>
-            </Show>
-            <Show when={error()}>
-              <div class="ai-help-banner ai-help-banner-error">
-                <Icon name="x-circle" size={12} />
-                <span>{error()}</span>
-              </div>
-            </Show>
-          </div>
-
+                </Show>
+              </>
+            )}
+          </For>
           <Show when={isStreaming()}>
-            <div class="ai-help-status">
-              <span class="ai-help-status-counter">
-                Tool {toolCount()} / {ITER_CAP_HELP}
-              </span>
-              <button type="button" class="btn-c btn-small" onClick={cancel}>
-                Abbrechen
-              </button>
+            <div class="ai-help-msg ai-help-msg-assistant ai-help-msg-streaming">
+              <Show when={streamingText()}>
+                <div class="ai-help-msg-text">{streamingText()}</div>
+              </Show>
+              <For each={activeTools()}>
+                {(tc) => (
+                  <div class={`ai-help-tool ai-help-tool-${tc.status}`}>
+                    <Icon
+                      name={
+                        tc.status === 'ok'
+                          ? 'check-circle'
+                          : tc.status === 'error'
+                            ? 'x-circle'
+                            : 'arrow-path'
+                      }
+                      size={12}
+                    />
+                    <span class="ai-help-tool-name">{tc.name}</span>
+                  </div>
+                )}
+              </For>
+              <div class="ai-help-streaming-dot">…</div>
             </div>
           </Show>
-
-          <form
-            class="ai-help-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void send();
-            }}
-          >
-            <textarea
-              ref={(el) => {
-                inputEl = el;
-              }}
-              class="ai-help-input"
-              value={input()}
-              onInput={(e) => setInput(e.currentTarget.value)}
-              onKeyDown={onInputKey}
-              placeholder="Frag mich was — Cmd/Ctrl+Enter zum Senden"
-              rows={2}
-              disabled={isStreaming()}
-              maxlength={4000}
-            />
-            <div class="ai-help-form-actions">
-              <button
-                type="button"
-                class="btn-subtle btn-small"
-                onClick={reset}
-                disabled={isStreaming() || messages().length === 0}
-              >
-                Verlauf loeschen
-              </button>
-              <button
-                type="submit"
-                class="btn-p btn-small"
-                disabled={isStreaming() || !input().trim()}
-              >
-                Senden
-              </button>
+          <Show when={error()}>
+            <div class="ai-help-banner ai-help-banner-error">
+              <Icon name="x-circle" size={12} />
+              <span>{error()}</span>
             </div>
-          </form>
+          </Show>
+        </div>
+
+        <Show when={isStreaming()}>
+          <div class="ai-help-status">
+            <span class="ai-help-status-counter">
+              Tool {toolCount()} / {ITER_CAP_HELP}
+            </span>
+            <button type="button" class="btn-c btn-small" onClick={cancel}>
+              Abbrechen
+            </button>
+          </div>
         </Show>
-      </aside>
-    </Show>
+
+        <form
+          class="ai-help-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void send();
+          }}
+        >
+          <textarea
+            ref={(el) => {
+              inputEl = el;
+            }}
+            class="ai-help-input"
+            value={input()}
+            onInput={(e) => setInput(e.currentTarget.value)}
+            onKeyDown={onInputKey}
+            placeholder="Frag mich was — Cmd/Ctrl+Enter zum Senden"
+            rows={2}
+            disabled={isStreaming()}
+            maxlength={4000}
+          />
+          <div class="ai-help-form-actions">
+            <button
+              type="button"
+              class="btn-subtle btn-small"
+              onClick={reset}
+              disabled={isStreaming() || messages().length === 0}
+            >
+              Verlauf loeschen
+            </button>
+            <button
+              type="submit"
+              class="btn-p btn-small"
+              disabled={isStreaming() || !input().trim()}
+            >
+              Senden
+            </button>
+          </div>
+        </form>
+      </Show>
+    </aside>
   );
 };
 
