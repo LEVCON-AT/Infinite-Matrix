@@ -1436,7 +1436,7 @@ const BoardView: Component<Props> = (p) => {
             </Show>
           </ModalTransition>
 
-          <Show when={bulkAddOpen()}>
+          <ModalTransition when={bulkAddOpen()}>
             <BulkAddModal
               workspaceId={p.workspaceId}
               mode="board-cols"
@@ -1445,7 +1445,7 @@ const BoardView: Component<Props> = (p) => {
               onClose={() => setBulkAddOpen(false)}
               onCreated={() => p.onChanged?.()}
             />
-          </Show>
+          </ModalTransition>
         </div>
       )}
     </Show>

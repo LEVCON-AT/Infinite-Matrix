@@ -23,6 +23,7 @@ import {
 } from 'solid-js';
 import GroupMatrixGenerator from '../components/GroupMatrixGenerator';
 import Icon from '../components/Icon';
+import { ModalTransition } from '../components/ModalTransition';
 import { dialogQueue } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
 import {
@@ -617,9 +618,9 @@ const ObjectsList: Component = () => {
         </Show>
       </Show>
 
-      <Show when={generatorOpen()}>
+      <ModalTransition when={generatorOpen()}>
         <GroupMatrixGenerator workspaceId={wsId()} onClose={() => setGeneratorOpen(false)} />
-      </Show>
+      </ModalTransition>
     </div>
   );
 };

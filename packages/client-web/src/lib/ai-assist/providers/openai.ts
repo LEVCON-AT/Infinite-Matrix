@@ -11,9 +11,16 @@
 // Output-Shape ist identisch zu callAnthropicStream — der ai-assist-
 // Orchestrator kann beide austauschbar konsumieren.
 
+import { supabase } from '../../supabase';
 import type { AssistEvent, AssistMessage, AssistToolUse, ToolDef } from '../types';
 
-const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+// VITE_AI_PROXY_BASE: konfiguriert via build-time env-var. Default
+// '/api/ai-proxy' (nginx routet zum Node-Service auf 127.0.0.1:8081).
+// Falls leer → Direct-Mode an api.openai.com (klappt nur in Browsern
+// die CORS sehen, was bei OpenAI _nicht_ der Fall ist — also nur fuer
+// Tests aus Tools wie Postman).
+const PROXY_BASE = (import.meta.env.VITE_AI_PROXY_BASE as string | undefined) ?? '/api/ai-proxy';
+const OPENAI_URL = `${PROXY_BASE}/openai`;
 const DEFAULT_MAX_TOKENS = 4096;
 
 type OpenAiToolDef = {
@@ -103,7 +110,11 @@ export async function callOpenAiStream(
   input: OpenAiCallInput,
   onEvent: (e: AssistEvent) => void,
 ): Promise<OpenAiCallResult> {
+  // Proxy-Mode: apiKey im Body, User-JWT im Authorization-Header.
+  const session = (await supabase.auth.getSession()).data.session;
+  const userJwt = session?.access_token ?? '';
   const body = {
+    apiKey: input.apiKey,
     model: input.model,
     max_tokens: DEFAULT_MAX_TOKENS,
     messages: toOpenAiMessages(input.systemPrompt, input.messages),
@@ -116,7 +127,7 @@ export async function callOpenAiStream(
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      authorization: `Bearer ${input.apiKey}`,
+      authorization: `Bearer ${userJwt}`,
     },
     body: JSON.stringify(body),
     signal: input.signal,

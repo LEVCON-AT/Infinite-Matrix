@@ -50,7 +50,7 @@ import {
   parseImportPayload,
 } from '../lib/subtree-import';
 import { showToast, showUndoToast } from '../lib/toasts';
-import { useTreeExpand } from '../lib/tree-expand';
+import { hasBeenExpanded, markEverExpanded, useTreeExpand } from '../lib/tree-expand';
 import type { CellFeature, CellRow, TreeEntry } from '../lib/types';
 import { sanitizeUrl } from '../lib/url';
 import { runResetScope } from '../lib/workspace-reset';
@@ -353,6 +353,14 @@ const TreeItem: Component<{
     return false;
   };
 
+  // Lazy-Mount fuer Children — O(visible) statt O(n). Bei erstem
+  // Expand wird die ID gecached; Re-Open laeuft danach ohne Mount-
+  // Latency (Children bleiben in der Session-Cache).
+  createEffect(() => {
+    if (expanded()) markEverExpanded(p.entry.id);
+  });
+  const shouldRenderChildren = () => expanded() || hasBeenExpanded(p.entry.id);
+
   let rowRef: HTMLDivElement | undefined;
 
   const dotStyle = { background: dotColorFor(p.entry) };
@@ -513,33 +521,35 @@ const TreeItem: Component<{
       </div>
       <Show when={hasChildren()}>
         <div class="tree-children-wrap" data-open={expanded() ? 'true' : 'false'}>
-          <ul class="tree-children">
-            <For each={p.entry.children}>
-              {(child) => (
-                <TreeItem
-                  workspaceId={p.workspaceId}
-                  entry={child}
-                  currentNodeId={p.currentNodeId}
-                  currentFeature={p.currentFeature}
-                  depth={p.depth + 1}
-                  parentId={p.entry.id}
-                  expand={p.expand}
-                  query={p.query}
-                  activePath={p.activePath}
-                  openMenu={p.openMenu}
-                  onPasteChecklist={p.onPasteChecklist}
-                  dragOverBoardId={p.dragOverBoardId}
-                  onCardDragOver={p.onCardDragOver}
-                  onCardDragLeave={p.onCardDragLeave}
-                  onCardDrop={p.onCardDrop}
-                  presence={p.presence}
-                  selfUserId={p.selfUserId}
-                  members={p.members}
-                  resolverMaps={p.resolverMaps}
-                />
-              )}
-            </For>
-          </ul>
+          <Show when={shouldRenderChildren()}>
+            <ul class="tree-children">
+              <For each={p.entry.children}>
+                {(child) => (
+                  <TreeItem
+                    workspaceId={p.workspaceId}
+                    entry={child}
+                    currentNodeId={p.currentNodeId}
+                    currentFeature={p.currentFeature}
+                    depth={p.depth + 1}
+                    parentId={p.entry.id}
+                    expand={p.expand}
+                    query={p.query}
+                    activePath={p.activePath}
+                    openMenu={p.openMenu}
+                    onPasteChecklist={p.onPasteChecklist}
+                    dragOverBoardId={p.dragOverBoardId}
+                    onCardDragOver={p.onCardDragOver}
+                    onCardDragLeave={p.onCardDragLeave}
+                    onCardDrop={p.onCardDrop}
+                    presence={p.presence}
+                    selfUserId={p.selfUserId}
+                    members={p.members}
+                    resolverMaps={p.resolverMaps}
+                  />
+                )}
+              </For>
+            </ul>
+          </Show>
         </div>
       </Show>
     </li>

@@ -136,3 +136,21 @@ export function useTreeExpand(workspaceId: string) {
     seedIfFresh,
   };
 }
+
+// Lazy-Mount-Cache: einmal expanded → Children bleiben gemountet
+// (sticky in der Session). Nicht persistiert — beim Reload starten
+// nur die initial-expanded Knoten mit gemounteten Children. So wird
+// O(visible) statt O(n) bei vollem Tree, ohne Re-Open-Flicker.
+const EVER_EXPANDED = new Set<string>();
+
+export function markEverExpanded(nodeId: string): void {
+  EVER_EXPANDED.add(nodeId);
+}
+
+export function hasBeenExpanded(nodeId: string): boolean {
+  return EVER_EXPANDED.has(nodeId);
+}
+
+export function clearEverExpandedCache(): void {
+  EVER_EXPANDED.clear();
+}

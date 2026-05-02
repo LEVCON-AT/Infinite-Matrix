@@ -57,6 +57,7 @@ import BulkAddModal, { type BulkAddMode } from './BulkAddModal';
 import CellTaskSummary from './CellTaskSummary';
 import Icon, { type IconName } from './Icon';
 import MatrixAggregateSection from './MatrixAggregateSection';
+import { ModalTransition } from './ModalTransition';
 import NewCellWizard from './NewCellWizard';
 import PresenceMini from './PresenceMini';
 
@@ -1118,18 +1119,20 @@ const MatrixView: Component<Props> = (p) => {
         realtimeVersion={p.cardsRealtimeVersion}
       />
 
-      <Show when={bulkAddMode()}>
-        {(mode) => (
-          <BulkAddModal
-            workspaceId={p.workspaceId}
-            mode={mode()}
-            parentId={p.matrixId}
-            sourceNodeId={p.matrixId}
-            onClose={() => setBulkAddMode(null)}
-            onCreated={() => p.onChanged?.()}
-          />
-        )}
-      </Show>
+      <ModalTransition when={Boolean(bulkAddMode())}>
+        <Show when={bulkAddMode()}>
+          {(mode) => (
+            <BulkAddModal
+              workspaceId={p.workspaceId}
+              mode={mode()}
+              parentId={p.matrixId}
+              sourceNodeId={p.matrixId}
+              onClose={() => setBulkAddMode(null)}
+              onCreated={() => p.onChanged?.()}
+            />
+          )}
+        </Show>
+      </ModalTransition>
     </div>
   );
 };

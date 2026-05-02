@@ -12,6 +12,7 @@ import { showToast } from '../lib/toasts';
 import type { AiProvider } from '../lib/types';
 import AiProviderEditModal from './AiProviderEditModal';
 import Icon from './Icon';
+import { ModalTransition } from './ModalTransition';
 
 export type AiProviderListProps = {
   providers: AiProvider[];
@@ -138,24 +139,26 @@ const AiProviderList: Component<AiProviderListProps> = (p) => {
           <span>Provider hinzufuegen</span>
         </button>
       </div>
-      <Show when={editing()}>
-        {(provider) => (
-          <AiProviderEditModal
-            provider={provider()}
-            hasOtherProviders={p.providers.length > 1}
-            onClose={() => setEditing(null)}
-            onSaved={p.onChange}
-          />
-        )}
-      </Show>
-      <Show when={adding()}>
+      <ModalTransition when={Boolean(editing())}>
+        <Show when={editing()}>
+          {(provider) => (
+            <AiProviderEditModal
+              provider={provider()}
+              hasOtherProviders={p.providers.length > 1}
+              onClose={() => setEditing(null)}
+              onSaved={p.onChange}
+            />
+          )}
+        </Show>
+      </ModalTransition>
+      <ModalTransition when={adding()}>
         <AiProviderEditModal
           provider={null}
           hasOtherProviders={p.providers.length > 0}
           onClose={() => setAdding(false)}
           onSaved={p.onChange}
         />
-      </Show>
+      </ModalTransition>
     </>
   );
 };

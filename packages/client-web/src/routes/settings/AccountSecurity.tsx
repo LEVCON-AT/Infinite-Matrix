@@ -7,7 +7,7 @@
 
 import { useNavigate } from '@solidjs/router';
 import { type Component, For, Show, createResource, createSignal } from 'solid-js';
-import { signOut } from '../../lib/auth';
+import { signOut, signOutAllSessions, signOutOtherSessions } from '../../lib/auth';
 import {
   type BackupCodesStatus,
   generateBackupCodes,
@@ -223,16 +223,52 @@ const AccountSecurity: Component = () => {
       <BackupCodesPane />
 
       <section class="settings-form-section">
-        <h3>Session</h3>
-        <button
-          type="button"
-          class="btn-c"
-          onClick={() => {
-            void handleLogout();
-          }}
-        >
-          Abmelden
-        </button>
+        <h3>Sessions</h3>
+        <p class="hint">
+          Du bist auf diesem Geraet eingeloggt. "Andere Geraete abmelden" invalidiert die JWTs aller
+          anderen offenen Sessions; sie muessen sich neu anmelden.
+        </p>
+        <div class="settings-foot">
+          <button type="button" class="btn-c" onClick={() => void handleLogout()}>
+            Abmelden (nur dieses Geraet)
+          </button>
+          <button
+            type="button"
+            class="btn-c"
+            onClick={async () => {
+              try {
+                await signOutOtherSessions();
+                showToast('Andere Sessions abgemeldet.', 'success');
+              } catch (err) {
+                showToast(translateDbError(err, 'Aktion fehlgeschlagen.'), 'error');
+              }
+            }}
+          >
+            Andere Geraete abmelden
+          </button>
+          <button
+            type="button"
+            class="btn btn-danger"
+            onClick={async () => {
+              const ok = await showConfirm({
+                title: 'Alle Sessions abmelden?',
+                message:
+                  'Auch diese Session wird beendet. Du landest auf der Login-Seite und musst dich neu anmelden.',
+                confirmLabel: 'Alle abmelden',
+                variant: 'danger',
+              });
+              if (!ok) return;
+              try {
+                await signOutAllSessions();
+                navigate('/login', { replace: true });
+              } catch (err) {
+                showToast(translateDbError(err, 'Aktion fehlgeschlagen.'), 'error');
+              }
+            }}
+          >
+            Alle Sessions abmelden
+          </button>
+        </div>
       </section>
     </article>
   );

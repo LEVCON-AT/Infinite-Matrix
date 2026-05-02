@@ -3348,13 +3348,91 @@ button[type="submit"]:hover:not(:disabled) {
   border-color: transparent;
 }
 
-/* ── Card / Shell — wiederkehrende Box ────────────────────────── */
+/* ── Card / Shell — wiederkehrende Box (Legacy + HyperUI-Modifier) ── */
+/* Legacy-Behaviour: kein Padding (Children setzen via .cardhd/etc),
+   margin-bottom fuer Stack-Spacing, overflow:hidden fuer rounded
+   Corners ueber Children. */
 .card {
-  background: var(--bg);
-  border: 0.5px solid var(--border2);
-  border-radius: var(--rl);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  margin-bottom: var(--space-sm);
+  margin-bottom: var(--space-2);
+  box-shadow: var(--shadow-xs);
+}
+
+/* style.md §5.3 — HyperUI-Modifier mit Manifest-Padding. */
+.card.card-padded {
+  padding: var(--space-5);
+}
+
+/* Interactive-Variante mit Hover-Lift (HyperUI-Signature). */
+.card-interactive {
+  cursor: pointer;
+  transition: transform var(--tr-fast) var(--ease-smooth), box-shadow var(--tr-fast)
+    var(--ease-smooth), border-color var(--tr-fast) var(--ease-smooth);
+}
+.card-interactive:hover {
+  transform: translateY(var(--lift-sm));
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
+}
+.card-interactive:active {
+  transform: translateY(0) scale(var(--scale-press));
+  box-shadow: var(--shadow-xs);
+}
+
+/* style.md §5.7 — Chip / Badge (HyperUI-Pille). */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding-inline: var(--space-2);
+  padding-block: var(--space-0_5);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  border-radius: var(--radius-full);
+  background: var(--bg2);
+  color: var(--text2);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.chip-accent {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.chip-success {
+  background: var(--success-soft);
+  color: var(--tealtxt);
+}
+.chip-warning {
+  background: var(--warning-soft);
+  color: var(--ambertxt);
+}
+.chip-danger {
+  background: var(--danger-soft);
+  color: var(--redtxt);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 1.25rem;
+  padding-inline: var(--space-1_5);
+  padding-block: var(--space-0_5);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  line-height: 1;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--text-inverse);
+}
+
+.badge-subtle {
+  background: var(--bg-active);
+  color: var(--text2);
 }
 
 .cardhd {

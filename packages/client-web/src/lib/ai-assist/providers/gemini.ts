@@ -17,9 +17,14 @@
 // Output-Shape ist identisch zu callAnthropicStream / callOpenAiStream
 // — der ai-assist-Orchestrator kann austauschbar konsumieren.
 
+import { supabase } from '../../supabase';
 import type { AssistEvent, AssistMessage, AssistToolUse, ToolDef } from '../types';
 
-const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+// Proxy-Mode (siehe openai.ts). Gemini koennte auch direct-browser
+// gehen, aber der Proxy ist konsistent und bietet eine zentrale
+// Stelle fuer Future-Cost-Quotas.
+const PROXY_BASE = (import.meta.env.VITE_AI_PROXY_BASE as string | undefined) ?? '/api/ai-proxy';
+const GEMINI_BASE = `${PROXY_BASE}/gemini`;
 const DEFAULT_MAX_TOKENS = 4096;
 
 type GeminiPart =
@@ -121,8 +126,12 @@ export async function callGeminiStream(
   input: GeminiCallInput,
   onEvent: (e: AssistEvent) => void,
 ): Promise<GeminiCallResult> {
-  const url = `${GEMINI_BASE}/${encodeURIComponent(input.model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(input.apiKey)}`;
+  // Proxy-Mode: User-JWT im Header, apiKey im Body, Modell im Pfad.
+  const session = (await supabase.auth.getSession()).data.session;
+  const userJwt = session?.access_token ?? '';
+  const url = `${GEMINI_BASE}/${encodeURIComponent(input.model)}`;
   const body = {
+    apiKey: input.apiKey,
     contents: toGeminiContents(input.messages),
     systemInstruction: { parts: [{ text: input.systemPrompt }] },
     tools: toGeminiTools(input.tools),
@@ -133,7 +142,10 @@ export async function callGeminiStream(
 
   const resp = await fetch(url, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${userJwt}`,
+    },
     body: JSON.stringify(body),
     signal: input.signal,
   });

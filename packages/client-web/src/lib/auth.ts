@@ -8,6 +8,7 @@ import { clearAll as clearAllOfflineCache } from './offline-cache';
 import { resetOfflineState } from './offline-state';
 import { resetOnboardingGate } from './onboarding-gate';
 import { supabase } from './supabase';
+import { clearEverExpandedCache } from './tree-expand';
 import { resetWelcomeTourCache } from './welcome-tour';
 
 // Magic-Link-Redirect-URI: aus VITE_SITE_URL (Build-time-Konstante).
@@ -128,6 +129,11 @@ async function clearLocalUserData(): Promise<void> {
     resetWelcomeTourCache();
   } catch (err) {
     console.warn('clearLocalUserData: resetWelcomeTourCache failed:', err);
+  }
+  try {
+    clearEverExpandedCache();
+  } catch (err) {
+    console.warn('clearLocalUserData: clearEverExpandedCache failed:', err);
   }
   try {
     resetOfflineState();
@@ -293,6 +299,21 @@ export async function updatePassword(newPassword: string): Promise<void> {
 
 export async function signOut(): Promise<void> {
   const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+}
+
+// B.5 — alle anderen Sessions des Users invalidieren. Aktuelle Session
+// bleibt aktiv. JWT-Refresh bei den anderen Geraeten faellt fehl, sie
+// landen automatisch im Login-Flow.
+export async function signOutOtherSessions(): Promise<void> {
+  const { error } = await supabase.auth.signOut({ scope: 'others' });
+  if (error) throw error;
+}
+
+// B.5 — alle Sessions des Users (inkl. aktueller) invalidieren.
+// Sinnvoll wenn der User glaubt sein Account ist kompromittiert.
+export async function signOutAllSessions(): Promise<void> {
+  const { error } = await supabase.auth.signOut({ scope: 'global' });
   if (error) throw error;
 }
 
