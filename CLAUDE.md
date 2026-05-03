@@ -106,6 +106,7 @@ Plus **`packages/bridge/`** — Node + WebSocket + MCP fuer AI-Steuerung. Self-h
 - **Kein `*:focus { outline: none }`-Universal-Reset.** Accessibility-Killer.
 - **Kein Refactor ohne Auftrag.**
 - **Kein "V1-pragmatisch"-Banner fuer Code-Shortcuts.** Pragmatik = UX-Scope, nicht Code-Tiefe.
+- **Kein `biome-ignore` als Workaround.** Wenn der Linter anschlaegt → Refactor (Element migrieren / Pattern aendern / Render-Function nutzen / for-of statt forEach), NIE die Suppression. Einzige Ausnahme: dokumentierte Library-Limitation mit Begruendung. Detail `code-quality.md` §5.4.
 - **Kein `git clean -fd` im Deploy-Mirror** (`/opt/matrix-repo` auf VPS). Bind-Mount-Volumes wuerden gewischt. Memory `feedback_no_pauschal_git_clean.md`.
 
 ---
