@@ -113,6 +113,79 @@ export const TOOL_REGISTRY: ReadonlyArray<ToolDef> = [
     allowedInModes: ['help', 'cell-suggest'],
   },
   {
+    name: 'mcp_add_row',
+    description:
+      'Legt eine neue Zeile in einer Matrix an. Position automatisch = max+1024. Label darf leer sein. Nutze das, um Matrix-Inhalt zu erstellen — der User erwartet nicht, dass er Zeilen manuell ueber die UI bauen muss.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        p_matrix_id: { ...UUID, description: 'UUID des Matrix-Knotens (nodes.id mit type=matrix)' },
+        p_label: {
+          type: 'string',
+          description: 'Zeilen-Label, max 200 Zeichen. Leerstring "" erlaubt.',
+        },
+      },
+      required: ['p_matrix_id', 'p_label'],
+    },
+    riskLevel: 'safe',
+    allowedInModes: ['help', 'cell-suggest'],
+  },
+  {
+    name: 'mcp_add_col',
+    description:
+      'Legt eine neue Spalte in einer Matrix an. Position automatisch = max+1024. Label darf leer sein. Pendant zu mcp_add_row.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        p_matrix_id: { ...UUID, description: 'UUID des Matrix-Knotens (nodes.id mit type=matrix)' },
+        p_label: {
+          type: 'string',
+          description: 'Spalten-Label, max 200 Zeichen. Leerstring "" erlaubt.',
+        },
+      },
+      required: ['p_matrix_id', 'p_label'],
+    },
+    riskLevel: 'safe',
+    allowedInModes: ['help', 'cell-suggest'],
+  },
+  {
+    name: 'mcp_add_cell',
+    description:
+      'Legt eine Cell am Schnittpunkt von Zeile + Spalte an. Idempotent: existiert die Cell bereits, wird ihre id zurueckgegeben (existed=true). Cell ist die Voraussetzung, um eine Sub-Matrix oder ein Sub-Board (zweite Ebene) per mcp_link_cell_child_node anzuhaengen.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        p_row_id: { ...UUID, description: 'UUID der Zeile (rows.id)' },
+        p_col_id: { ...UUID, description: 'UUID der Spalte (cols.id) — gleiche Matrix wie row' },
+        p_alias: {
+          type: ['string', 'null'],
+          description: 'Optional: Cell-Alias zum schnellen Springen. NULL erlaubt.',
+        },
+      },
+      required: ['p_row_id', 'p_col_id', 'p_alias'],
+    },
+    riskLevel: 'safe',
+    allowedInModes: ['help', 'cell-suggest'],
+  },
+  {
+    name: 'mcp_link_cell_child_node',
+    description:
+      'Verknuepft eine Cell mit einem Sub-Knoten (Matrix oder Board) — verkabelt damit eine "zweite Ebene". Voraussetzung: Cell und Sub-Knoten existieren bereits. Workflow fuer Sub-Matrix in einer Cell: (1) mcp_add_row + mcp_add_col + mcp_add_cell um die Cell anzulegen, (2) mcp_create_node mit p_parent_cell_id=cell_id und p_type=matrix, (3) mcp_link_cell_child_node mit cell_id + neue node_id.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        p_cell_id: { ...UUID, description: 'UUID der Cell (cells.id)' },
+        p_node_id: {
+          ...UUID,
+          description: 'UUID des Sub-Knotens (nodes.id mit type=matrix oder type=board)',
+        },
+      },
+      required: ['p_cell_id', 'p_node_id'],
+    },
+    riskLevel: 'safe',
+    allowedInModes: ['help', 'cell-suggest'],
+  },
+  {
     name: 'mcp_add_checklist_item',
     description:
       'Fuegt ein Item zu einer Checkliste hinzu. Level 0 (Default), 1 oder 2 fuer Einrueckung. Text max 500 Zeichen.',
