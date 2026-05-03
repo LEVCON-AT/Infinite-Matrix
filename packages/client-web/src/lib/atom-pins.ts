@@ -9,18 +9,14 @@
 // atomare INSERTs (create_atom_pin, pin_doc_with_create) damit Server-
 // side parent-existence + RLS-Check sauber laufen.
 
+import type { AtomKind } from './atom-manifestations';
 import { isNetworkError } from './mutation-queue';
 import { type CacheTable, getByWorkspace, mergeRows, putOne } from './offline-cache';
 import { markCacheFallback, markLiveSuccess } from './offline-state';
-import {
-  runOptimisticDelete,
-  runOptimisticInsert,
-  runOptimisticUpdate,
-} from './safe-mutation';
+import { runOptimisticDelete, runOptimisticInsert, runOptimisticUpdate } from './safe-mutation';
 import { supabase } from './supabase';
 import { showToast } from './toasts';
 import type { AtomParentKind, AtomPin } from './types';
-import type { AtomKind } from './atom-manifestations';
 
 const TABLE: CacheTable = 'atom_pins';
 
@@ -56,11 +52,7 @@ export function filterPinsForParent(
   return pins.filter((p) => p.parent_kind === parentKind && p.parent_id === parentId);
 }
 
-export function filterPinsForAtom(
-  pins: AtomPin[],
-  atomType: AtomKind,
-  atomId: string,
-): AtomPin[] {
+export function filterPinsForAtom(pins: AtomPin[], atomType: AtomKind, atomId: string): AtomPin[] {
   return pins.filter((p) => p.atom_type === atomType && p.atom_id === atomId);
 }
 
@@ -177,10 +169,7 @@ export async function setDocSingleCellPin(args: {
     if (!isNetworkError(err)) throw err;
     const cachedPins = await getByWorkspace<AtomPin>(TABLE, args.workspaceId);
     existing = cachedPins
-      .filter(
-        (p) =>
-          p.atom_type === 'doc' && p.atom_id === args.docId && p.parent_kind === 'cell',
-      )
+      .filter((p) => p.atom_type === 'doc' && p.atom_id === args.docId && p.parent_kind === 'cell')
       .map((p) => ({ id: p.id }));
   }
   // Existing-Pins via wrapper loeschen (offline-tauglich).

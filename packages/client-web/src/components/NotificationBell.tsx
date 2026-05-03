@@ -37,7 +37,7 @@ const NotificationBell: Component<NotificationBellProps> = (props) => {
   const navigate = useNavigate();
   const [open, setOpen] = createSignal(false);
   const [items, setItems] = createSignal<Notification[]>([]);
-  let drawerEl: HTMLDivElement | undefined;
+  let drawerEl: HTMLElement | undefined;
   let bellEl: HTMLButtonElement | undefined;
 
   const [, { refetch }] = createResource(
@@ -161,22 +161,17 @@ const NotificationBell: Component<NotificationBellProps> = (props) => {
       </button>
 
       <Show when={open()}>
-        <div
+        <aside
           ref={(el) => {
             drawerEl = el;
           }}
           class="notification-drawer"
-          role="dialog"
           aria-label="Benachrichtigungen"
         >
           <header class="notification-drawer-head">
             <h3>Benachrichtigungen</h3>
             <Show when={unreadCount() > 0}>
-              <button
-                type="button"
-                class="btn-subtle"
-                onClick={() => void onMarkAllRead()}
-              >
+              <button type="button" class="btn-subtle" onClick={() => void onMarkAllRead()}>
                 Alle als gelesen
               </button>
             </Show>
@@ -209,9 +204,7 @@ const NotificationBell: Component<NotificationBellProps> = (props) => {
                           <Show when={n.body}>
                             <span class="notification-item-body">{n.body}</span>
                           </Show>
-                          <span class="notification-item-time">
-                            {relativeTime(n.created_at)}
-                          </span>
+                          <span class="notification-item-time">{relativeTime(n.created_at)}</span>
                         </div>
                       </button>
                     </li>
@@ -220,7 +213,7 @@ const NotificationBell: Component<NotificationBellProps> = (props) => {
               </ul>
             </Show>
           </div>
-        </div>
+        </aside>
       </Show>
     </div>
   );

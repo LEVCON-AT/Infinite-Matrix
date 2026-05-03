@@ -179,8 +179,7 @@ export async function fetchAtomCalendarManifestations(
         url: snapUrl ?? null,
         source_provider:
           ((dm as Record<string, unknown>).source_provider as string | undefined) ?? null,
-        source_color:
-          ((dm as Record<string, unknown>).source_color as string | undefined) ?? null,
+        source_color: ((dm as Record<string, unknown>).source_color as string | undefined) ?? null,
       };
     }
     return { ...r, label: snapLabel ?? '(Atom)' };

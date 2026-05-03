@@ -15,7 +15,7 @@
 // onToggleInstance) werden vom Calendar.tsx durchgereicht.
 
 import { type Accessor, type Component, For, Show } from 'solid-js';
-import type { CalendarEvent, CalendarDay } from '../../lib/calendar';
+import type { CalendarDay, CalendarEvent } from '../../lib/calendar';
 import Icon from '../Icon';
 
 type MobileCalendarProps = {
@@ -62,7 +62,7 @@ const MobileCalendar: Component<MobileCalendarProps> = (props) => {
         <div class="mobile-cal-heatmap-weekdays" aria-hidden="true">
           <For each={WEEKDAY_HEADERS_SHORT}>{(w) => <span>{w}</span>}</For>
         </div>
-        <div class="mobile-cal-heatmap-grid" role="grid">
+        <div class="mobile-cal-heatmap-grid">
           <For each={props.grid()}>
             {(day) => {
               const dayEvents = () => props.eventsByDay().get(day.iso) ?? [];
@@ -79,7 +79,6 @@ const MobileCalendar: Component<MobileCalendarProps> = (props) => {
                   data-density={level()}
                   onClick={() => props.onDayClick(day.iso)}
                   aria-label={`${day.iso} (${dayEvents().length} Termine)`}
-                  role="gridcell"
                 />
               );
             }}
@@ -96,7 +95,10 @@ const MobileCalendar: Component<MobileCalendarProps> = (props) => {
           {(day) => {
             const dayEvents = () => props.eventsByDay().get(day.iso) ?? [];
             return (
-              <article class="mobile-cal-agenda-day" classList={{ 'mobile-cal-agenda-day-today': day.isToday }}>
+              <article
+                class="mobile-cal-agenda-day"
+                classList={{ 'mobile-cal-agenda-day-today': day.isToday }}
+              >
                 <header class="mobile-cal-agenda-day-head">
                   <span class="mobile-cal-agenda-day-date">
                     {Number.parseInt(day.iso.slice(8, 10), 10)}

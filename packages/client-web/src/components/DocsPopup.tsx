@@ -29,12 +29,12 @@ import {
 import { validateAlias } from '../lib/alias';
 import { dispatchAliasResult } from '../lib/alias-dispatch';
 import { resolveAlias } from '../lib/alias-resolve';
+import { pinDocWithCreate, setDocSingleCellPin } from '../lib/atom-pins';
 import { installFocusRestore, showConfirm } from '../lib/dialog';
 import { type Draft, getDrafts, newClientId, persistDrafts, removeDraft } from '../lib/docs-drafts';
 import { getPersistedTabIds, persistTabIds } from '../lib/docs-tab-restore';
 import { type OpenDocsRequest, clearDocsRequest } from '../lib/docs-ui';
 import { translateDbError } from '../lib/errors';
-import { pinDocWithCreate, setDocSingleCellPin } from '../lib/atom-pins';
 import {
   createDoc,
   delDoc,
@@ -43,16 +43,16 @@ import {
   setDocContent,
   setDocTitle,
 } from '../lib/mutations';
+import type { MentionTriggerEvent } from '../lib/pm-mention-plugin';
 import { fetchAttachedCellIdForDoc, fetchDocById, fetchDocsRecent } from '../lib/queries';
 import { sanitizeHtml } from '../lib/sanitize-html';
 import { supabase } from '../lib/supabase';
 import { showToast, showUndoToast } from '../lib/toasts';
 import type { DocRow } from '../lib/types';
+import AtomPickerModal from './AtomPickerModal';
 import DocTagsEditor from './DocTagsEditor';
 import Icon from './Icon';
-import AtomPickerModal from './AtomPickerModal';
 import RichTextEditor, { type RichTextEditorHandle } from './RichTextEditor';
-import type { MentionTriggerEvent } from '../lib/pm-mention-plugin';
 // Welle D: textarea + MarkdownLightView ersetzt durch ProseMirror-Editor.
 // bindAliasAutocomplete entfaellt — Mention-Plugin in D.8 uebernimmt das.
 
@@ -123,7 +123,7 @@ function defaultDocAlias(parentAlias: string | null): string {
   const dd = String(d.getDate()).padStart(2, '0');
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const yy = String(d.getFullYear()).slice(2);
-  const base = parentAlias && parentAlias.trim() ? parentAlias.trim().toLowerCase() : 'doc';
+  const base = parentAlias?.trim() ? parentAlias.trim().toLowerCase() : 'doc';
   return `${base}-d${dd}${mm}${yy}`;
 }
 
@@ -337,10 +337,9 @@ const DocsPopup: Component<Props> = (p) => {
         try {
           const row = await fetchDocById(req.initialDocId, p.workspaceId);
           if (row) {
-            const attachedCellId = await fetchAttachedCellIdForDoc(
-              row.id,
-              p.workspaceId,
-            ).catch(() => null);
+            const attachedCellId = await fetchAttachedCellIdForDoc(row.id, p.workspaceId).catch(
+              () => null,
+            );
             loaded.push(tabFromRow(row, attachedCellId));
             activeIdxAfter = loaded.length - 1;
           } else {
@@ -579,30 +578,34 @@ const DocsPopup: Component<Props> = (p) => {
         // Welle D: Pin-Routing — pinTarget hat Vorrang vor attachedCellId
         // (atom/node), Cell-Pin ueber attachedCellId (Compat-Pfad).
         // Standalone (kein Pin) → createDoc ohne Pin.
-        const pinKind: 'atom' | 'node' | 'cell' | null =
-          t.pinTarget ? t.pinTarget.parentKind : t.attachedCellId ? 'cell' : null;
+        const pinKind: 'atom' | 'node' | 'cell' | null = t.pinTarget
+          ? t.pinTarget.parentKind
+          : t.attachedCellId
+            ? 'cell'
+            : null;
         const pinId: string | null = t.pinTarget
           ? t.pinTarget.parentId
-          : t.attachedCellId ?? null;
-        const created: DocRow = pinKind && pinId
-          ? ((
-              await pinDocWithCreate({
+          : (t.attachedCellId ?? null);
+        const created: DocRow =
+          pinKind && pinId
+            ? ((
+                await pinDocWithCreate({
+                  workspaceId: p.workspaceId,
+                  title: titleValue,
+                  content: contentValue || '<p></p>',
+                  alias: aliasValue,
+                  sourceAlias: t.sourceAlias,
+                  parentKind: pinKind,
+                  parentId: pinId,
+                })
+              ).doc as DocRow)
+            : await createDoc({
                 workspaceId: p.workspaceId,
                 title: titleValue,
-                content: contentValue || '<p></p>',
+                content: contentValue,
                 alias: aliasValue,
-                sourceAlias: t.sourceAlias,
-                parentKind: pinKind,
-                parentId: pinId,
-              })
-            ).doc as DocRow)
-          : await createDoc({
-              workspaceId: p.workspaceId,
-              title: titleValue,
-              content: contentValue,
-              alias: aliasValue,
-              source_alias: t.sourceAlias,
-            });
+                source_alias: t.sourceAlias,
+              });
         // Draft ist jetzt materialisiert — localStorage-Eintrag kann
         // weg. Ohne diese Zeile wuerde der Draft in der Sidebar
         // weiter auftauchen, obwohl er als Doc in der DB lebt.
@@ -747,9 +750,7 @@ const DocsPopup: Component<Props> = (p) => {
   }
 
   async function openRecent(row: DocRow) {
-    const attachedCellId = await fetchAttachedCellIdForDoc(row.id, p.workspaceId).catch(
-      () => null,
-    );
+    const attachedCellId = await fetchAttachedCellIdForDoc(row.id, p.workspaceId).catch(() => null);
     openTab(tabFromRow(row, attachedCellId));
     // Nach dem setTabs-Batch den lookup fuer den neuen Tab triggern.
     resolveAllAttachedAliases();
@@ -1041,7 +1042,7 @@ const DocsPopup: Component<Props> = (p) => {
                   </Show>
                 </div>
                 {/* Welle D.7: Tag-Editor pro Doku. Nur fuer persistierte
-                  * Docs (Pending-Tabs haben noch keine atom_id). */}
+                 * Docs (Pending-Tabs haben noch keine atom_id). */}
                 <Show when={t().docId}>
                   {(docId) => (
                     <div class="docs-popup-tag-row">
@@ -1059,7 +1060,6 @@ const DocsPopup: Component<Props> = (p) => {
                   fallback={
                     <div
                       class="docs-popup-content-view"
-                      // biome-ignore lint/a11y/useSemanticElements: bewusst <div role="button"> — Inhalt rendert HTML mit klickbaren Alias-Chips; nested <button>-in-<button> waere invalid.
                       role="button"
                       tabIndex={0}
                       title="Klicken oder Enter zum Bearbeiten"
@@ -1076,7 +1076,6 @@ const DocsPopup: Component<Props> = (p) => {
                       // dompurify-Sanitize verhindert XSS bei kompromittiertem
                       // Server-Content. Alias-Token-Rewriting macht die View-
                       // Komponente in D.4b — V1 ohne, dafuer einfach.
-                      // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML-Render mit Sanitize, Quelle ist Doc-Owner.
                       innerHTML={sanitizeHtml(t().content)}
                     />
                   }

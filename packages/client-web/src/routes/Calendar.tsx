@@ -32,15 +32,14 @@ import {
 } from 'solid-js';
 import Icon from '../components/Icon';
 import ImportedEventDetailModal from '../components/ImportedEventDetailModal';
-import MobileCalendar from '../components/mobile/MobileCalendar';
 import { ModalTransition } from '../components/ModalTransition';
+import MobileCalendar from '../components/mobile/MobileCalendar';
 import { pageEnter, slideIn, slideOut } from '../lib/animations';
 import {
   fetchAtomCalendarManifestations,
   removeAtomManifestation,
 } from '../lib/atom-manifestations';
 import { navigateToAtomEvent } from '../lib/atom-routing';
-import { importedEventModalRequest } from '../lib/imported-event-modal-state';
 import {
   type CalendarEvent,
   addMonths,
@@ -54,14 +53,15 @@ import {
 } from '../lib/calendar';
 import { openDokuForContext, shouldIgnoreDKey } from '../lib/docs-open';
 import { translateDbError } from '../lib/errors';
+import { importedEventModalRequest } from '../lib/imported-event-modal-state';
 import { installEscReturn, useGridNav } from '../lib/keyboard-nav';
 import { openManifestationModal } from '../lib/manifestation-modal-state';
 import { fetchAgendaTasks } from '../lib/queries';
 import { todayIso } from '../lib/task-aggregate';
 import { toggleTaskInstanceDone } from '../lib/tasks';
 import { showToast } from '../lib/toasts';
-import { useMobile } from '../lib/use-mobile';
 import type { TaskStatus } from '../lib/types';
+import { useMobile } from '../lib/use-mobile';
 
 type RouteParams = { workspaceId: string };
 
@@ -399,11 +399,7 @@ const Calendar: Component = () => {
           Wiederkehrende Termine erscheinen V1 nur am Original-Datum.
         </span>
         <label class="calendar-filter-toggle">
-          <input
-            type="checkbox"
-            checked={showImported()}
-            onChange={toggleShowImported}
-          />
+          <input type="checkbox" checked={showImported()} onChange={toggleShowImported} />
           <span>Importierte Termine</span>
         </label>
       </div>
@@ -423,153 +419,155 @@ const Calendar: Component = () => {
           />
         }
       >
-      <div
-        class="calendar-grid"
-        aria-label={`Kalender ${monthLabelDe(anchorIso())}`}
-        ref={(el) => {
-          gridRef = el;
-          useGridNav(el, '.calendar-day', 7, {
-            onPageNext: () => void navMonth(1),
-            onPagePrev: () => void navMonth(-1),
-            onHome: goToday,
-          });
-        }}
-      >
-        <For each={WEEKDAY_HEADERS}>{(w) => <div class="calendar-weekday-head">{w}</div>}</For>
-        <For each={grid()}>
-          {(day) => {
-            const dayEvents = () => eventsByDay().get(day.iso) ?? [];
-            const visibleEvents = () => dayEvents().slice(0, MAX_PER_DAY);
-            const overflowCount = () => Math.max(0, dayEvents().length - MAX_PER_DAY);
-            return (
-              <button
-                type="button"
-                class="calendar-day"
-                classList={{
-                  'calendar-day-out': !day.inMonth,
-                  'calendar-day-today': day.isToday,
-                  'calendar-day-weekend': day.isWeekend,
-                  'calendar-day-anchor': day.iso === anchorIso(),
-                }}
-                onClick={() => onDayClick(day.iso)}
-                aria-label={day.iso}
-              >
-                <span class="calendar-day-num">
-                  {day.iso === isoDate(new Date(`${day.iso}T00:00:00`))
-                    ? Number.parseInt(day.iso.slice(8, 10), 10)
-                    : ''}
-                </span>
-                <For each={visibleEvents()}>
-                  {(e) => (
-                    <div class="calendar-event-wrap">
-                      <button
-                        type="button"
-                        class="calendar-event"
-                        classList={{
-                          [`calendar-event-${statusKey(e.status)}`]: true,
-                          [`calendar-event-atom-${e.atomType}`]: true,
-                          'calendar-event-range': e.isRange,
-                          'calendar-event-instance-done': e.instanceDone === true,
-                          'calendar-event-imported':
-                            e.atomType === 'imported_event' && !!e.sourceColor,
-                        }}
-                        style={
-                          e.atomType === 'imported_event' && e.sourceColor
-                            ? { '--cal-event-source-color': e.sourceColor }
-                            : undefined
-                        }
-                        onClick={(ev) => openEvent(e, ev)}
-                        onDblClick={(ev) => onDoubleClickEvent(e, ev)}
-                        onKeyDown={(ev) => {
-                          // Welle D.5b: 'd' auf fokussiertem Calendar-Event
-                          // → atom-Doku am Event-Atom anlegen.
-                          if (
-                            (ev.key === 'd' || ev.key === 'D') &&
-                            !ev.shiftKey &&
-                            !ev.ctrlKey &&
-                            !ev.metaKey &&
-                            !ev.altKey
-                          ) {
-                            if (shouldIgnoreDKey(ev.target)) return;
-                            ev.preventDefault();
-                            ev.stopPropagation();
-                            openDokuForContext({
-                              kind: 'atom',
-                              atomType: e.atomType,
-                              atomId: e.atomId,
-                              atomTitle: e.label ?? null,
-                            });
-                          }
-                        }}
-                        title={e.label}
-                      >
-                        <Show when={e.atomType === 'task' && e.instanceDate}>
-                          <input
-                            type="checkbox"
-                            class="calendar-event-check"
-                            checked={e.instanceDone === true}
-                            onClick={(ev) => ev.stopPropagation()}
-                            onChange={(ev) => {
-                              ev.stopPropagation();
-                              void onToggleInstance(e, ev as unknown as MouseEvent);
-                            }}
-                            aria-label={e.instanceDone ? 'Wieder offen' : 'Als erledigt markieren'}
-                            title={e.instanceDone ? 'Wieder offen' : 'Als erledigt markieren'}
-                          />
-                        </Show>
-                        <Show when={e.atomType === 'link'}>
-                          <Icon name="link" size={10} />
-                        </Show>
-                        <Show when={e.atomType === 'checklist'}>
-                          <Icon name="list-bullet" size={10} />
-                        </Show>
-                        <Show when={e.atomType === 'imported_event'}>
-                          <Icon name="arrow-top-right-on-square" size={10} />
-                        </Show>
-                        <Show when={e.time}>
-                          <span class="calendar-event-time">{e.time}</span>
-                        </Show>
-                        <span class="calendar-event-label">{e.label || '(ohne Label)'}</span>
-                        <Show when={e.isRecurring}>
-                          <Icon name="arrow-path" size={10} />
-                        </Show>
-                        <Show when={e.isRange}>
-                          <Icon name="arrows-pointing-out" size={10} />
-                        </Show>
-                      </button>
-                      <Show when={e.originalManifId}>
-                        <button
-                          type="button"
-                          class="calendar-event-edit"
-                          onClick={(ev) => onEditEvent(e, ev)}
-                          title="Termin bearbeiten"
-                          aria-label="Termin bearbeiten"
-                        >
-                          <Icon name="pencil" size={10} />
-                        </button>
-                      </Show>
-                      <Show when={e.atomType !== 'task' && e.manifId}>
-                        <button
-                          type="button"
-                          class="calendar-event-remove"
-                          onClick={(ev) => void onRemoveAtomEvent(e, ev)}
-                          title="Aus Kalender entfernen"
-                          aria-label="Aus Kalender entfernen"
-                        >
-                          <Icon name="x" size={10} />
-                        </button>
-                      </Show>
-                    </div>
-                  )}
-                </For>
-                <Show when={overflowCount() > 0}>
-                  <span class="calendar-overflow">+{overflowCount()} weitere</span>
-                </Show>
-              </button>
-            );
+        <div
+          class="calendar-grid"
+          aria-label={`Kalender ${monthLabelDe(anchorIso())}`}
+          ref={(el) => {
+            gridRef = el;
+            useGridNav(el, '.calendar-day', 7, {
+              onPageNext: () => void navMonth(1),
+              onPagePrev: () => void navMonth(-1),
+              onHome: goToday,
+            });
           }}
-        </For>
-      </div>
+        >
+          <For each={WEEKDAY_HEADERS}>{(w) => <div class="calendar-weekday-head">{w}</div>}</For>
+          <For each={grid()}>
+            {(day) => {
+              const dayEvents = () => eventsByDay().get(day.iso) ?? [];
+              const visibleEvents = () => dayEvents().slice(0, MAX_PER_DAY);
+              const overflowCount = () => Math.max(0, dayEvents().length - MAX_PER_DAY);
+              return (
+                <button
+                  type="button"
+                  class="calendar-day"
+                  classList={{
+                    'calendar-day-out': !day.inMonth,
+                    'calendar-day-today': day.isToday,
+                    'calendar-day-weekend': day.isWeekend,
+                    'calendar-day-anchor': day.iso === anchorIso(),
+                  }}
+                  onClick={() => onDayClick(day.iso)}
+                  aria-label={day.iso}
+                >
+                  <span class="calendar-day-num">
+                    {day.iso === isoDate(new Date(`${day.iso}T00:00:00`))
+                      ? Number.parseInt(day.iso.slice(8, 10), 10)
+                      : ''}
+                  </span>
+                  <For each={visibleEvents()}>
+                    {(e) => (
+                      <div class="calendar-event-wrap">
+                        <button
+                          type="button"
+                          class="calendar-event"
+                          classList={{
+                            [`calendar-event-${statusKey(e.status)}`]: true,
+                            [`calendar-event-atom-${e.atomType}`]: true,
+                            'calendar-event-range': e.isRange,
+                            'calendar-event-instance-done': e.instanceDone === true,
+                            'calendar-event-imported':
+                              e.atomType === 'imported_event' && !!e.sourceColor,
+                          }}
+                          style={
+                            e.atomType === 'imported_event' && e.sourceColor
+                              ? { '--cal-event-source-color': e.sourceColor }
+                              : undefined
+                          }
+                          onClick={(ev) => openEvent(e, ev)}
+                          onDblClick={(ev) => onDoubleClickEvent(e, ev)}
+                          onKeyDown={(ev) => {
+                            // Welle D.5b: 'd' auf fokussiertem Calendar-Event
+                            // → atom-Doku am Event-Atom anlegen.
+                            if (
+                              (ev.key === 'd' || ev.key === 'D') &&
+                              !ev.shiftKey &&
+                              !ev.ctrlKey &&
+                              !ev.metaKey &&
+                              !ev.altKey
+                            ) {
+                              if (shouldIgnoreDKey(ev.target)) return;
+                              ev.preventDefault();
+                              ev.stopPropagation();
+                              openDokuForContext({
+                                kind: 'atom',
+                                atomType: e.atomType,
+                                atomId: e.atomId,
+                                atomTitle: e.label ?? null,
+                              });
+                            }
+                          }}
+                          title={e.label}
+                        >
+                          <Show when={e.atomType === 'task' && e.instanceDate}>
+                            <input
+                              type="checkbox"
+                              class="calendar-event-check"
+                              checked={e.instanceDone === true}
+                              onClick={(ev) => ev.stopPropagation()}
+                              onChange={(ev) => {
+                                ev.stopPropagation();
+                                void onToggleInstance(e, ev as unknown as MouseEvent);
+                              }}
+                              aria-label={
+                                e.instanceDone ? 'Wieder offen' : 'Als erledigt markieren'
+                              }
+                              title={e.instanceDone ? 'Wieder offen' : 'Als erledigt markieren'}
+                            />
+                          </Show>
+                          <Show when={e.atomType === 'link'}>
+                            <Icon name="link" size={10} />
+                          </Show>
+                          <Show when={e.atomType === 'checklist'}>
+                            <Icon name="list-bullet" size={10} />
+                          </Show>
+                          <Show when={e.atomType === 'imported_event'}>
+                            <Icon name="arrow-top-right-on-square" size={10} />
+                          </Show>
+                          <Show when={e.time}>
+                            <span class="calendar-event-time">{e.time}</span>
+                          </Show>
+                          <span class="calendar-event-label">{e.label || '(ohne Label)'}</span>
+                          <Show when={e.isRecurring}>
+                            <Icon name="arrow-path" size={10} />
+                          </Show>
+                          <Show when={e.isRange}>
+                            <Icon name="arrows-pointing-out" size={10} />
+                          </Show>
+                        </button>
+                        <Show when={e.originalManifId}>
+                          <button
+                            type="button"
+                            class="calendar-event-edit"
+                            onClick={(ev) => onEditEvent(e, ev)}
+                            title="Termin bearbeiten"
+                            aria-label="Termin bearbeiten"
+                          >
+                            <Icon name="pencil" size={10} />
+                          </button>
+                        </Show>
+                        <Show when={e.atomType !== 'task' && e.manifId}>
+                          <button
+                            type="button"
+                            class="calendar-event-remove"
+                            onClick={(ev) => void onRemoveAtomEvent(e, ev)}
+                            title="Aus Kalender entfernen"
+                            aria-label="Aus Kalender entfernen"
+                          >
+                            <Icon name="x" size={10} />
+                          </button>
+                        </Show>
+                      </div>
+                    )}
+                  </For>
+                  <Show when={overflowCount() > 0}>
+                    <span class="calendar-overflow">+{overflowCount()} weitere</span>
+                  </Show>
+                </button>
+              );
+            }}
+          </For>
+        </div>
       </Show>
 
       <ModalTransition when={Boolean(importedEventModalRequest())}>

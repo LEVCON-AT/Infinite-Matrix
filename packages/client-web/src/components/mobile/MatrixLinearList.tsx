@@ -37,19 +37,15 @@ type MatrixLinearListProps = {
 
 const MatrixLinearList: Component<MatrixLinearListProps> = (props) => {
   return (
-    <div class="matrix-linear-list" role="list">
-      <For
-        each={props.cols}
-        fallback={<p class="hint">Leere Matrix.</p>}
-      >
+    <ul class="matrix-linear-list">
+      <For each={props.cols} fallback={<li class="hint">Leere Matrix.</li>}>
         {(col) => (
-          <section class="matrix-linear-section" role="listitem">
+          <li class="matrix-linear-section">
             <header class="matrix-linear-section-head">
               <h2 class="matrix-linear-section-title">{col.label || '—'}</h2>
             </header>
-            <div
+            <ul
               class="matrix-linear-section-rail"
-              role="list"
               aria-label={`Zellen in Spalte ${col.label || ''}`}
             >
               <For each={props.rows}>
@@ -69,9 +65,8 @@ const MatrixLinearList: Component<MatrixLinearListProps> = (props) => {
                     return c ? (props.presenceByCell.get(c.id) ?? []) : [];
                   };
                   return (
-                    <div
+                    <li
                       class="matrix-linear-cell-wrap"
-                      role="listitem"
                       onPointerEnter={() => props.onCellHover?.(cell()?.id)}
                       onPointerLeave={() => props.onCellHover?.(undefined)}
                     >
@@ -84,20 +79,18 @@ const MatrixLinearList: Component<MatrixLinearListProps> = (props) => {
                         presence={presence()}
                         editMode={props.editMode}
                         workspaceId={props.workspaceId}
-                        onChipClick={(e, feat) =>
-                          props.onChipClick(e, cell(), feat, row, col)
-                        }
+                        onChipClick={(e, feat) => props.onChipClick(e, cell(), feat, row, col)}
                         onCardTap={() => props.onCardTap(row, col, cell())}
                       />
-                    </div>
+                    </li>
                   );
                 }}
               </For>
-            </div>
-          </section>
+            </ul>
+          </li>
         )}
       </For>
-    </div>
+    </ul>
   );
 };
 

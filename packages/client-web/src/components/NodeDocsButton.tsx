@@ -36,9 +36,7 @@ const NodeDocsButton: Component<NodeDocsButtonProps> = (p) => {
       p.atomPins
         .filter(
           (pin) =>
-            pin.atom_type === 'doc' &&
-            pin.parent_kind === 'node' &&
-            pin.parent_id === p.nodeId,
+            pin.atom_type === 'doc' && pin.parent_kind === 'node' && pin.parent_id === p.nodeId,
         )
         .map((pin) => pin.atom_id),
     );
@@ -132,11 +130,7 @@ const NodeDocsButton: Component<NodeDocsButtonProps> = (p) => {
             <For each={pinnedDocs()}>
               {(d) => (
                 <li>
-                  <button
-                    type="button"
-                    class="node-docs-pop-item"
-                    onClick={() => onItemClick(d)}
-                  >
+                  <button type="button" class="node-docs-pop-item" onClick={() => onItemClick(d)}>
                     <Icon name="document-text" size={14} />
                     <span class="node-docs-pop-item-title">{d.title || '(ohne Titel)'}</span>
                     <Show when={d.alias}>

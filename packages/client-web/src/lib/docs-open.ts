@@ -18,8 +18,8 @@
 // Guard: 'd' darf nicht in <input>, <textarea> oder contentEditable
 // feuern — dafuer hat jeder Caller einen Guard via shouldIgnoreDKey().
 
-import { openDocsPopup } from './docs-ui';
 import type { AtomKind } from './atom-manifestations';
+import { openDocsPopup } from './docs-ui';
 
 export type DocsContext =
   | { kind: 'cell'; cellId: string; cellAlias: string | null }

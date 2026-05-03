@@ -27,7 +27,7 @@ const MobileHeader: Component<MobileHeaderProps> = (props) => {
   };
 
   return (
-    <header class="mobile-header" role="banner">
+    <header class="mobile-header">
       <button
         type="button"
         class="mobile-header-btn click-pulse"

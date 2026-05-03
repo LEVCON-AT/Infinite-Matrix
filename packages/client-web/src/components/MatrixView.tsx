@@ -35,7 +35,6 @@ import type { PresenceUser } from '../lib/presence';
 import { useVis } from '../lib/settings';
 import { buildCellTaskSummaries, todayIso } from '../lib/task-aggregate';
 import { showToast, showUndoToast } from '../lib/toasts';
-import { useMobile } from '../lib/use-mobile';
 import type {
   CellFeature,
   CellRow,
@@ -47,6 +46,7 @@ import type {
   TaskManifestationRow,
   TaskRow,
 } from '../lib/types';
+import { useMobile } from '../lib/use-mobile';
 import {
   closeObjectSuggest,
   commitObjectSuggest,
@@ -58,10 +58,10 @@ import BulkAddModal, { type BulkAddMode } from './BulkAddModal';
 import CellTaskSummary from './CellTaskSummary';
 import Icon, { type IconName } from './Icon';
 import MatrixAggregateSection from './MatrixAggregateSection';
-import MatrixLinearList from './mobile/MatrixLinearList';
 import { ModalTransition } from './ModalTransition';
 import NewCellWizard from './NewCellWizard';
 import PresenceMini from './PresenceMini';
+import MatrixLinearList from './mobile/MatrixLinearList';
 
 export const FEATURE_ORDER: CellFeature[] = ['matrix', 'board', 'info', 'checklists'];
 
@@ -818,103 +818,27 @@ const MatrixView: Component<Props> = (p) => {
                 />
               }
             >
-            <div class="matrix-grid" style={gridStyle()}>
-              {/* Header-Ecke */}
-              <div class="mx-corner" />
+              <div class="matrix-grid" style={gridStyle()}>
+                {/* Header-Ecke */}
+                <div class="mx-corner" />
 
-              <For each={cols()}>
-                {(col, colIdx) => {
-                  const handlers = makeHeaderHandlers({
-                    getLabel: () => col.label,
-                    getObjectId: () => col.object_id ?? null,
-                    workspaceId: p.workspaceId,
-                    commit: (label, pickedId) => onRenameCol(col, label, pickedId),
-                  });
-                  return (
-                    <div class="mx-col-head" classList={{ 'mx-editable': headerEditable() }}>
-                      {/* IMMER Input: readOnly togglet statt span-swap — so
+                <For each={cols()}>
+                  {(col, colIdx) => {
+                    const handlers = makeHeaderHandlers({
+                      getLabel: () => col.label,
+                      getObjectId: () => col.object_id ?? null,
+                      workspaceId: p.workspaceId,
+                      commit: (label, pickedId) => onRenameCol(col, label, pickedId),
+                    });
+                    return (
+                      <div class="mx-col-head" classList={{ 'mx-editable': headerEditable() }}>
+                        {/* IMMER Input: readOnly togglet statt span-swap — so
                         bleibt die Kopfzeile beim Edit-Toggle formstabil. */}
-                      <input
-                        class="mx-head-input"
-                        type="text"
-                        value={col.label}
-                        placeholder="(Spalte)"
-                        readOnly={!canRenameHeaders()}
-                        tabIndex={canRenameHeaders() ? 0 : -1}
-                        onInput={handlers.onInput}
-                        onKeyDown={handlers.onKeyDown}
-                        onBlur={handlers.onBlur}
-                      />
-                      <button
-                        type="button"
-                        class="mx-move-btn"
-                        title="Spalte nach links"
-                        aria-label="Spalte nach links"
-                        tabIndex={canMoveRowCol() ? 0 : -1}
-                        onClick={() => onMoveCol(col, 'left')}
-                        disabled={busy() || !canMoveRowCol() || colIdx() === 0}
-                      >
-                        ‹
-                      </button>
-                      <button
-                        type="button"
-                        class="mx-move-btn"
-                        title="Spalte nach rechts"
-                        aria-label="Spalte nach rechts"
-                        tabIndex={canMoveRowCol() ? 0 : -1}
-                        onClick={() => onMoveCol(col, 'right')}
-                        disabled={busy() || !canMoveRowCol() || colIdx() === cols().length - 1}
-                      >
-                        ›
-                      </button>
-                      <button
-                        type="button"
-                        class="mx-del-btn"
-                        title="Spalte loeschen"
-                        aria-label="Spalte loeschen"
-                        tabIndex={canDeleteRowCol() ? 0 : -1}
-                        onClick={() => onDelCol(col)}
-                        disabled={busy() || !canDeleteRowCol()}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  );
-                }}
-              </For>
-
-              {/* Ecke rechts oben: "+ Spalte" (Shift+Klick = Bulk-Modal) */}
-              <Show when={canAddRowCol()}>
-                <div class="mx-add-col-cell">
-                  <button
-                    type="button"
-                    class="mx-add-btn"
-                    onClick={(e) => onAddCol(e)}
-                    disabled={busy()}
-                    title="Spalte hinzufuegen (Shift+Klick: mehrere)"
-                  >
-                    +
-                  </button>
-                </div>
-              </Show>
-
-              {/* Zeilen */}
-              <For each={rows()}>
-                {(row, rowIdx) => {
-                  const handlers = makeHeaderHandlers({
-                    getLabel: () => row.label,
-                    getObjectId: () => row.object_id ?? null,
-                    workspaceId: p.workspaceId,
-                    commit: (label, pickedId) => onRenameRow(row, label, pickedId),
-                  });
-                  return (
-                    <>
-                      <div class="mx-row-head" classList={{ 'mx-editable': headerEditable() }}>
                         <input
                           class="mx-head-input"
                           type="text"
-                          value={row.label}
-                          placeholder="(Zeile)"
+                          value={col.label}
+                          placeholder="(Spalte)"
                           readOnly={!canRenameHeaders()}
                           tabIndex={canRenameHeaders() ? 0 : -1}
                           onInput={handlers.onInput}
@@ -924,217 +848,295 @@ const MatrixView: Component<Props> = (p) => {
                         <button
                           type="button"
                           class="mx-move-btn"
-                          title="Zeile nach oben"
-                          aria-label="Zeile nach oben"
+                          title="Spalte nach links"
+                          aria-label="Spalte nach links"
                           tabIndex={canMoveRowCol() ? 0 : -1}
-                          onClick={() => onMoveRow(row, 'up')}
-                          disabled={busy() || !canMoveRowCol() || rowIdx() === 0}
+                          onClick={() => onMoveCol(col, 'left')}
+                          disabled={busy() || !canMoveRowCol() || colIdx() === 0}
                         >
-                          ↑
+                          ‹
                         </button>
                         <button
                           type="button"
                           class="mx-move-btn"
-                          title="Zeile nach unten"
-                          aria-label="Zeile nach unten"
+                          title="Spalte nach rechts"
+                          aria-label="Spalte nach rechts"
                           tabIndex={canMoveRowCol() ? 0 : -1}
-                          onClick={() => onMoveRow(row, 'down')}
-                          disabled={busy() || !canMoveRowCol() || rowIdx() === rows().length - 1}
+                          onClick={() => onMoveCol(col, 'right')}
+                          disabled={busy() || !canMoveRowCol() || colIdx() === cols().length - 1}
                         >
-                          ↓
+                          ›
                         </button>
                         <button
                           type="button"
                           class="mx-del-btn"
-                          title="Zeile loeschen"
-                          aria-label="Zeile loeschen"
+                          title="Spalte loeschen"
+                          aria-label="Spalte loeschen"
                           tabIndex={canDeleteRowCol() ? 0 : -1}
-                          onClick={() => onDelRow(row)}
+                          onClick={() => onDelCol(col)}
                           disabled={busy() || !canDeleteRowCol()}
                         >
                           ✕
                         </button>
                       </div>
-                      <For each={cols()}>
-                        {(col) => {
-                          const cell = () => cellMap().get(`${row.id}::${col.id}`);
-                          const features = () =>
-                            (cell()?.features ?? []).filter((f): f is CellFeature =>
-                              (FEATURE_ORDER as string[]).includes(f),
-                            );
-                          // Klare Trennung:
-                          //   - Hintergrund-Click:
-                          //       View  → nichts
-                          //       Edit  → Overlay (Konfiguration)
-                          //   - Chip-Click:
-                          //       Matrix/Board → navigiere zum Sub-Node
-                          //       Info/Checklisten → Panel (WIP, siehe onChipClick)
-                          // tabIndex=0 immer, damit der User per Tab/Arrow durch
-                          // die Matrix navigieren kann (auch im View-Mode).
-                          return (
-                            <div
-                              class="mx-cell"
-                              classList={{
-                                'mx-cell-empty': !cell(),
-                                'mx-cell-clickable': editMode(),
-                                'mx-cell-editable': editMode(),
-                              }}
-                              role={editMode() ? 'button' : 'gridcell'}
-                              tabIndex={0}
-                              data-row-id={row.id}
-                              data-col-id={col.id}
-                              onFocus={() => {
-                                // Jeder Cell-Focus (Pfeiltasten, Tab, Maus)
-                                // aktualisiert lastFocusCell. So kann der
-                                // User die Matrix via Sidebar verlassen und
-                                // beim Zurueckkommen auf derselben Zelle
-                                // landen. Ohne das greift nur der Chip-Click-
-                                // oder 1/2-Hotkey-Setter.
-                                rememberCellFocus(row.id, col.id);
-                              }}
-                              onMouseEnter={() => {
-                                // P1.D: Live-Cursor — broadcaste die
-                                // gehoverte Cell-ID. Leere Zellen haben
-                                // keine cell()?.id, dort bleibt der Indi-
-                                // kator aus.
-                                const cid = cell()?.id;
-                                if (cid) p.onCellHover?.(cid);
-                              }}
-                              onMouseLeave={() => {
-                                p.onCellHover?.(undefined);
-                              }}
-                              onClick={() => {
-                                if (editMode()) onCellEdit(row, col, cell());
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault();
-                                  if (editMode()) {
-                                    onCellEdit(row, col, cell());
-                                  } else {
-                                    // Phase 3 O.8.G: Non-Edit Enter mit
-                                    // Matrix-Vorrang / 1 nav / Picker.
-                                    void enterCellNonEdit(cell());
+                    );
+                  }}
+                </For>
+
+                {/* Ecke rechts oben: "+ Spalte" (Shift+Klick = Bulk-Modal) */}
+                <Show when={canAddRowCol()}>
+                  <div class="mx-add-col-cell">
+                    <button
+                      type="button"
+                      class="mx-add-btn"
+                      onClick={(e) => onAddCol(e)}
+                      disabled={busy()}
+                      title="Spalte hinzufuegen (Shift+Klick: mehrere)"
+                    >
+                      +
+                    </button>
+                  </div>
+                </Show>
+
+                {/* Zeilen */}
+                <For each={rows()}>
+                  {(row, rowIdx) => {
+                    const handlers = makeHeaderHandlers({
+                      getLabel: () => row.label,
+                      getObjectId: () => row.object_id ?? null,
+                      workspaceId: p.workspaceId,
+                      commit: (label, pickedId) => onRenameRow(row, label, pickedId),
+                    });
+                    return (
+                      <>
+                        <div class="mx-row-head" classList={{ 'mx-editable': headerEditable() }}>
+                          <input
+                            class="mx-head-input"
+                            type="text"
+                            value={row.label}
+                            placeholder="(Zeile)"
+                            readOnly={!canRenameHeaders()}
+                            tabIndex={canRenameHeaders() ? 0 : -1}
+                            onInput={handlers.onInput}
+                            onKeyDown={handlers.onKeyDown}
+                            onBlur={handlers.onBlur}
+                          />
+                          <button
+                            type="button"
+                            class="mx-move-btn"
+                            title="Zeile nach oben"
+                            aria-label="Zeile nach oben"
+                            tabIndex={canMoveRowCol() ? 0 : -1}
+                            onClick={() => onMoveRow(row, 'up')}
+                            disabled={busy() || !canMoveRowCol() || rowIdx() === 0}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            class="mx-move-btn"
+                            title="Zeile nach unten"
+                            aria-label="Zeile nach unten"
+                            tabIndex={canMoveRowCol() ? 0 : -1}
+                            onClick={() => onMoveRow(row, 'down')}
+                            disabled={busy() || !canMoveRowCol() || rowIdx() === rows().length - 1}
+                          >
+                            ↓
+                          </button>
+                          <button
+                            type="button"
+                            class="mx-del-btn"
+                            title="Zeile loeschen"
+                            aria-label="Zeile loeschen"
+                            tabIndex={canDeleteRowCol() ? 0 : -1}
+                            onClick={() => onDelRow(row)}
+                            disabled={busy() || !canDeleteRowCol()}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        <For each={cols()}>
+                          {(col) => {
+                            const cell = () => cellMap().get(`${row.id}::${col.id}`);
+                            const features = () =>
+                              (cell()?.features ?? []).filter((f): f is CellFeature =>
+                                (FEATURE_ORDER as string[]).includes(f),
+                              );
+                            // Klare Trennung:
+                            //   - Hintergrund-Click:
+                            //       View  → nichts
+                            //       Edit  → Overlay (Konfiguration)
+                            //   - Chip-Click:
+                            //       Matrix/Board → navigiere zum Sub-Node
+                            //       Info/Checklisten → Panel (WIP, siehe onChipClick)
+                            // tabIndex=0 immer, damit der User per Tab/Arrow durch
+                            // die Matrix navigieren kann (auch im View-Mode).
+                            return (
+                              <div
+                                class="mx-cell"
+                                classList={{
+                                  'mx-cell-empty': !cell(),
+                                  'mx-cell-clickable': editMode(),
+                                  'mx-cell-editable': editMode(),
+                                }}
+                                role={editMode() ? 'button' : 'gridcell'}
+                                tabIndex={0}
+                                data-row-id={row.id}
+                                data-col-id={col.id}
+                                onFocus={() => {
+                                  // Jeder Cell-Focus (Pfeiltasten, Tab, Maus)
+                                  // aktualisiert lastFocusCell. So kann der
+                                  // User die Matrix via Sidebar verlassen und
+                                  // beim Zurueckkommen auf derselben Zelle
+                                  // landen. Ohne das greift nur der Chip-Click-
+                                  // oder 1/2-Hotkey-Setter.
+                                  rememberCellFocus(row.id, col.id);
+                                }}
+                                onMouseEnter={() => {
+                                  // P1.D: Live-Cursor — broadcaste die
+                                  // gehoverte Cell-ID. Leere Zellen haben
+                                  // keine cell()?.id, dort bleibt der Indi-
+                                  // kator aus.
+                                  const cid = cell()?.id;
+                                  if (cid) p.onCellHover?.(cid);
+                                }}
+                                onMouseLeave={() => {
+                                  p.onCellHover?.(undefined);
+                                }}
+                                onClick={() => {
+                                  if (editMode()) onCellEdit(row, col, cell());
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    if (editMode()) {
+                                      onCellEdit(row, col, cell());
+                                    } else {
+                                      // Phase 3 O.8.G: Non-Edit Enter mit
+                                      // Matrix-Vorrang / 1 nav / Picker.
+                                      void enterCellNonEdit(cell());
+                                    }
                                   }
-                                }
-                              }}
-                            >
-                              <PresenceMini
-                                users={(() => {
-                                  const c = cell();
-                                  return c ? (presenceByCell().get(c.id) ?? []) : [];
-                                })()}
-                              />
-                              <Show when={cell()?.alias}>
-                                {(alias) => <span class="mx-cell-alias">^{alias()}</span>}
-                              </Show>
-                              <Show
-                                when={(() => {
-                                  const c = cell();
-                                  return features().length > 0 || (c && p.cellsWithDocs.has(c.id));
-                                })()}
+                                }}
                               >
-                                <div class="mx-cell-feats">
-                                  <For each={features()}>
-                                    {(f) => {
-                                      // Alle Features sind klickbar, sobald die
-                                      // Zelle existiert: Strukturelle (matrix/
-                                      // board) navigieren zum Sub-Node, Flag-
-                                      // Features (info/checklists) auf die
-                                      // Zell-Page.
-                                      const chipClickable = () => !!cell();
-                                      return (
-                                        // biome-ignore lint/a11y/useKeyWithClickEvents: Chip-Klick offen-Feature; Tastatur-Bedienung erfolgt via globaler Matrix-Navigation (Pfeiltasten + Enter auf Zelle, dann 1-9 fuer Features).
-                                        <span
-                                          class="mx-feat-chip"
-                                          classList={{
-                                            'mx-feat-chip-link': chipClickable(),
-                                          }}
-                                          data-feat={f}
-                                          title={`${FEATURE_LABEL[f]} oeffnen`}
-                                          onClick={(e) => onChipClick(e, cell(), f, row, col)}
-                                        >
-                                          <Icon name={FEATURE_ICON[f]} size={14} />
-                                        </span>
-                                      );
-                                    }}
-                                  </For>
-                                  <Show
-                                    when={(() => {
-                                      const c = cell();
-                                      return c ? p.cellsWithDocs.has(c.id) : false;
-                                    })()}
-                                  >
-                                    {/* biome-ignore lint/a11y/useKeyWithClickEvents: Chip-Klick offen-Doku; Tastatur-Bedienung via Matrix-Navigation + 'd'-Shortcut (siehe KeyboardHelp). */}
-                                    <span
-                                      class="mx-feat-chip mx-feat-chip-link"
-                                      data-feat="doc"
-                                      title="Dokumentation dieser Zelle oeffnen"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const c = cell();
-                                        if (!c) return;
-                                        navigate(`/w/${p.workspaceId}/c/${c.id}/docs`);
+                                <PresenceMini
+                                  users={(() => {
+                                    const c = cell();
+                                    return c ? (presenceByCell().get(c.id) ?? []) : [];
+                                  })()}
+                                />
+                                <Show when={cell()?.alias}>
+                                  {(alias) => <span class="mx-cell-alias">^{alias()}</span>}
+                                </Show>
+                                <Show
+                                  when={(() => {
+                                    const c = cell();
+                                    return (
+                                      features().length > 0 || (c && p.cellsWithDocs.has(c.id))
+                                    );
+                                  })()}
+                                >
+                                  <div class="mx-cell-feats">
+                                    <For each={features()}>
+                                      {(f) => {
+                                        // Alle Features sind klickbar, sobald die
+                                        // Zelle existiert: Strukturelle (matrix/
+                                        // board) navigieren zum Sub-Node, Flag-
+                                        // Features (info/checklists) auf die
+                                        // Zell-Page.
+                                        const chipClickable = () => !!cell();
+                                        return (
+                                          // biome-ignore lint/a11y/useKeyWithClickEvents: Chip-Klick offen-Feature; Tastatur-Bedienung erfolgt via globaler Matrix-Navigation (Pfeiltasten + Enter auf Zelle, dann 1-9 fuer Features).
+                                          <span
+                                            class="mx-feat-chip"
+                                            classList={{
+                                              'mx-feat-chip-link': chipClickable(),
+                                            }}
+                                            data-feat={f}
+                                            title={`${FEATURE_LABEL[f]} oeffnen`}
+                                            onClick={(e) => onChipClick(e, cell(), f, row, col)}
+                                          >
+                                            <Icon name={FEATURE_ICON[f]} size={14} />
+                                          </span>
+                                        );
                                       }}
+                                    </For>
+                                    <Show
+                                      when={(() => {
+                                        const c = cell();
+                                        return c ? p.cellsWithDocs.has(c.id) : false;
+                                      })()}
                                     >
-                                      <Icon name="document-text" size={14} />
-                                    </span>
-                                  </Show>
-                                </div>
-                              </Show>
-                              {/* Phase 4 T.1.E.2 / Layout-Fix: Smart-Summary-
+                                      {/* biome-ignore lint/a11y/useKeyWithClickEvents: Chip-Klick offen-Doku; Tastatur-Bedienung via Matrix-Navigation + 'd'-Shortcut (siehe KeyboardHelp). */}
+                                      <span
+                                        class="mx-feat-chip mx-feat-chip-link"
+                                        data-feat="doc"
+                                        title="Dokumentation dieser Zelle oeffnen"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const c = cell();
+                                          if (!c) return;
+                                          navigate(`/w/${p.workspaceId}/c/${c.id}/docs`);
+                                        }}
+                                      >
+                                        <Icon name="document-text" size={14} />
+                                      </span>
+                                    </Show>
+                                  </div>
+                                </Show>
+                                {/* Phase 4 T.1.E.2 / Layout-Fix: Smart-Summary-
                                   Container in eigener Zeile, nie inline mit
                                   den Feature-Chips. Eigenes Show-Outer, damit
                                   der Block auch erscheint wenn die Cell keine
                                   klassischen Features hat (theoretisch — heute
                                   unmoeglich, defensiv geguardet). */}
-                              <Show
-                                when={(() => {
-                                  const c = cell();
-                                  if (!c) return undefined;
-                                  const s = cellSummaries().get(c.id);
-                                  return s ? { cell: c, summary: s } : undefined;
-                                })()}
-                              >
-                                {(ctx) => (
-                                  <div class="mx-cell-summary-row">
-                                    <CellTaskSummary
-                                      workspaceId={p.workspaceId}
-                                      cellId={ctx().cell.id}
-                                      summary={ctx().summary}
-                                    />
-                                  </div>
-                                )}
-                              </Show>
-                            </div>
-                          );
-                        }}
-                      </For>
-                      <Show when={canAddRowCol()}>
-                        <div class="mx-row-tail" />
-                      </Show>
-                    </>
-                  );
-                }}
-              </For>
+                                <Show
+                                  when={(() => {
+                                    const c = cell();
+                                    if (!c) return undefined;
+                                    const s = cellSummaries().get(c.id);
+                                    return s ? { cell: c, summary: s } : undefined;
+                                  })()}
+                                >
+                                  {(ctx) => (
+                                    <div class="mx-cell-summary-row">
+                                      <CellTaskSummary
+                                        workspaceId={p.workspaceId}
+                                        cellId={ctx().cell.id}
+                                        summary={ctx().summary}
+                                      />
+                                    </div>
+                                  )}
+                                </Show>
+                              </div>
+                            );
+                          }}
+                        </For>
+                        <Show when={canAddRowCol()}>
+                          <div class="mx-row-tail" />
+                        </Show>
+                      </>
+                    );
+                  }}
+                </For>
 
-              {/* Ecke unten links: "+ Zeile" (Shift+Klick = Bulk-Modal) */}
-              <Show when={canAddRowCol()}>
-                <div class="mx-add-row-cell">
-                  <button
-                    type="button"
-                    class="mx-add-btn"
-                    onClick={(e) => onAddRow(e)}
-                    disabled={busy()}
-                    title="Zeile hinzufuegen (Shift+Klick: mehrere)"
-                  >
-                    +
-                  </button>
-                </div>
-                <For each={cols()}>{() => <div class="mx-add-row-filler" />}</For>
-                <div class="mx-add-row-filler" />
-              </Show>
-            </div>
+                {/* Ecke unten links: "+ Zeile" (Shift+Klick = Bulk-Modal) */}
+                <Show when={canAddRowCol()}>
+                  <div class="mx-add-row-cell">
+                    <button
+                      type="button"
+                      class="mx-add-btn"
+                      onClick={(e) => onAddRow(e)}
+                      disabled={busy()}
+                      title="Zeile hinzufuegen (Shift+Klick: mehrere)"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <For each={cols()}>{() => <div class="mx-add-row-filler" />}</For>
+                  <div class="mx-add-row-filler" />
+                </Show>
+              </div>
             </Show>
           );
         }}

@@ -9,9 +9,9 @@ import { type Accessor, createSignal } from 'solid-js';
 
 export type ImportedEventModalSnapshot = {
   summary: string;
-  startDate: string;        // 'YYYY-MM-DD'
-  endDate: string;          // 'YYYY-MM-DD' (= startDate wenn nicht Range)
-  time: string | null;      // 'HH:MM' bei timed
+  startDate: string; // 'YYYY-MM-DD'
+  endDate: string; // 'YYYY-MM-DD' (= startDate wenn nicht Range)
+  time: string | null; // 'HH:MM' bei timed
   isRange: boolean;
   isRecurring: boolean;
   url: string | null;

@@ -1273,19 +1273,21 @@ const CardOverlay: Component<Props> = (p) => {
           {/* Welle D.7c: Tag-Editor (read-write) wenn Workspace-Resources
               vorhanden. Fallback: legacy nur read-only durch wsAtomTagsEnriched. */}
           <Show when={p.workspaceId}>
-            <section class="overlay-section card-ws-tags">
-              <h4>Tags</h4>
-              <AtomTagsEditor
-                workspaceId={p.workspaceId!}
-                atomType="task"
-                atomId={p.card.id}
-                realtimeVersion={p.tagsRealtimeVersion ?? 0}
-                atomPickerEntries={p.atomPickerEntries}
-                cells={p.wsCells}
-                nodes={p.wsNodes}
-                cellLabelById={p.cellLabelById}
-              />
-            </section>
+            {(wsId) => (
+              <section class="overlay-section card-ws-tags">
+                <h4>Tags</h4>
+                <AtomTagsEditor
+                  workspaceId={wsId()}
+                  atomType="task"
+                  atomId={p.card.id}
+                  realtimeVersion={p.tagsRealtimeVersion ?? 0}
+                  atomPickerEntries={p.atomPickerEntries}
+                  cells={p.wsCells}
+                  nodes={p.wsNodes}
+                  cellLabelById={p.cellLabelById}
+                />
+              </section>
+            )}
           </Show>
 
           {/* Welle D.9: Doku-Sektion. Zeigt gepinnte Dokus mit Vorschau. */}

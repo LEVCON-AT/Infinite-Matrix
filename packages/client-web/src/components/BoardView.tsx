@@ -72,9 +72,9 @@ import CardOverlay from './CardOverlay';
 import ChecklistPanel from './ChecklistPanel';
 import DocsIndicator from './DocsIndicator';
 import Icon from './Icon';
-import TagPills from './TagPills';
 import { ModalTransition } from './ModalTransition';
 import PresenceMini from './PresenceMini';
+import TagPills from './TagPills';
 
 type Props = {
   workspaceId: string;

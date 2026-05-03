@@ -9,9 +9,11 @@
 
 import { type Component, Show, createResource, createSignal, onCleanup, onMount } from 'solid-js';
 import { fetchExternalEventById } from '../lib/calendar-inbound';
-import { installFocusRestore, installFocusTrap } from '../lib/dialog';
 import { openDokuForContext, shouldIgnoreDKey } from '../lib/docs-open';
-import { closeImportedEventModal, type ImportedEventModalSnapshot } from '../lib/imported-event-modal-state';
+import {
+  type ImportedEventModalSnapshot,
+  closeImportedEventModal,
+} from '../lib/imported-event-modal-state';
 import { showToast } from '../lib/toasts';
 import type { AtomPin, CellRow, DocRow, NodeRow } from '../lib/types';
 import AtomDocsSection from './AtomDocsSection';
@@ -52,23 +54,13 @@ const ImportedEventDetailModal: Component<ImportedEventDetailModalProps> = (prop
     (id) => fetchExternalEventById(id),
   );
 
-  let containerEl: HTMLDivElement | undefined;
+  let dialogEl: HTMLDialogElement | undefined;
 
   onMount(() => {
-    const restoreFocus = installFocusRestore();
-    onCleanup(restoreFocus);
-    if (containerEl) {
-      const releaseTrap = installFocusTrap(containerEl);
-      onCleanup(releaseTrap);
-    }
+    dialogEl?.showModal();
+    // Welle D.5b: 'd'-Doku-Trigger bleibt, weil dialog-Element nur ESC
+    // nativ handled. ESC selbst geht ueber onCancel im JSX.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (deriveOpen()) return; // ESC im Sub-Modal landet dort.
-        e.stopImmediatePropagation();
-        closeImportedEventModal();
-        return;
-      }
-      // Welle D.5b: 'd' im Modal-Body → Doku am imported_event-Atom.
       if (
         (e.key === 'd' || e.key === 'D') &&
         !e.shiftKey &&
@@ -90,6 +82,10 @@ const ImportedEventDetailModal: Component<ImportedEventDetailModalProps> = (prop
     };
     document.addEventListener('keydown', onKey, true);
     onCleanup(() => document.removeEventListener('keydown', onKey, true));
+  });
+
+  onCleanup(() => {
+    dialogEl?.close();
   });
 
   function close(): void {
@@ -120,20 +116,25 @@ const ImportedEventDetailModal: Component<ImportedEventDetailModalProps> = (prop
 
   return (
     <>
-      <div
-        class="overlay-scrim"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) close();
+      <dialog
+        ref={dialogEl}
+        class="overlay-modal imported-event-modal"
+        aria-labelledby="imported-event-title"
+        onCancel={(e) => {
+          e.preventDefault();
+          if (deriveOpen()) return;
+          close();
         }}
       >
+        <button
+          type="button"
+          class="overlay-modal-backdrop-closer"
+          onClick={close}
+          aria-label="Schliessen"
+          tabIndex={-1}
+        />
         <div
-          ref={(el) => {
-            containerEl = el;
-          }}
-          class="overlay-card imported-event-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="imported-event-title"
+          class="overlay-card imported-event-modal-card"
           style={
             props.snapshot.sourceColor
               ? { '--imp-source-color': props.snapshot.sourceColor }
@@ -145,12 +146,7 @@ const ImportedEventDetailModal: Component<ImportedEventDetailModalProps> = (prop
               <span class="imported-event-source-dot" aria-hidden="true" />
               <h3 id="imported-event-title">{props.snapshot.summary}</h3>
             </div>
-            <button
-              type="button"
-              class="overlay-close"
-              onClick={close}
-              aria-label="Schliessen"
-            >
+            <button type="button" class="overlay-close" onClick={close} aria-label="Schliessen">
               <Icon name="x" size={18} />
             </button>
           </header>
@@ -160,7 +156,7 @@ const ImportedEventDetailModal: Component<ImportedEventDetailModalProps> = (prop
               <dt>Quelle</dt>
               <dd>
                 {props.snapshot.sourceProvider
-                  ? PROVIDER_LABEL[props.snapshot.sourceProvider] ?? props.snapshot.sourceProvider
+                  ? (PROVIDER_LABEL[props.snapshot.sourceProvider] ?? props.snapshot.sourceProvider)
                   : '—'}
               </dd>
               <dt>Datum</dt>
@@ -183,9 +179,9 @@ const ImportedEventDetailModal: Component<ImportedEventDetailModalProps> = (prop
             </dl>
 
             <p class="hint">
-              Importierte Termine sind read-only. Du kannst aus ihnen eine Task ableiten oder sie
-              in andere Sichten (Kanban, Checkliste) duplizieren — der Original-Termin bleibt
-              extern verwaltet.
+              Importierte Termine sind read-only. Du kannst aus ihnen eine Task ableiten oder sie in
+              andere Sichten (Kanban, Checkliste) duplizieren — der Original-Termin bleibt extern
+              verwaltet.
             </p>
 
             {/* Welle D.7c: Tag-Editor (read-write) wenn Workspace-
@@ -232,17 +228,13 @@ const ImportedEventDetailModal: Component<ImportedEventDetailModalProps> = (prop
                 <span>Original</span>
               </button>
             </Show>
-            <button
-              type="button"
-              class="btn btn-primary lift"
-              onClick={() => setDeriveOpen(true)}
-            >
+            <button type="button" class="btn btn-primary lift" onClick={() => setDeriveOpen(true)}>
               <Icon name="sparkles" size={14} />
               <span>Task ableiten</span>
             </button>
           </footer>
         </div>
-      </div>
+      </dialog>
 
       <Show when={deriveOpen()}>
         <DeriveTaskModal

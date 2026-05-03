@@ -16,18 +16,12 @@
 // Direkt-Reads gegen die Tabellen (RLS schuetzt: external_calendars
 // self-only, external_events workspace-scoped).
 
-import {
-  type CacheTable,
-  getByWorkspace,
-  mergeRows,
-  putAll,
-  putOne,
-} from './offline-cache';
+import { translateDbError } from './errors';
 import { isNetworkError } from './mutation-queue';
+import { type CacheTable, getByWorkspace, mergeRows, putAll, putOne } from './offline-cache';
 import { markCacheFallback, markLiveSuccess } from './offline-state';
 import { supabase } from './supabase';
 import { showToast } from './toasts';
-import { translateDbError } from './errors';
 import type {
   DeriveScope,
   DeriveSyncMode,
@@ -40,9 +34,7 @@ const EXT_CAL_TABLE: CacheTable = 'external_calendars';
 const EXT_EV_TABLE: CacheTable = 'external_events';
 
 // ─── Reads ─────────────────────────────────────────────────────
-export async function fetchExternalCalendars(
-  workspaceId?: string,
-): Promise<ExternalCalendar[]> {
+export async function fetchExternalCalendars(workspaceId?: string): Promise<ExternalCalendar[]> {
   try {
     const q = supabase.from('external_calendars').select('*');
     const { data, error } = workspaceId ? await q.eq('workspace_id', workspaceId) : await q;
@@ -90,9 +82,7 @@ export async function fetchExternalEventsByCalendar(
   }
 }
 
-export async function fetchExternalEventById(
-  eventId: string,
-): Promise<ExternalEvent | null> {
+export async function fetchExternalEventById(eventId: string): Promise<ExternalEvent | null> {
   try {
     const { data, error } = await supabase
       .from('external_events')
@@ -194,7 +184,7 @@ export type ParsedEventInput = {
   description?: string | null;
   location?: string | null;
   url?: string | null;
-  start_at: string;          // ISO timestamp
+  start_at: string; // ISO timestamp
   end_at?: string | null;
   all_day?: boolean;
   rrule?: string | null;
@@ -230,7 +220,7 @@ export type DeriveTaskInput = {
   mode: DeriveSyncMode;
   scope: DeriveScope;
   titleOverride?: string;
-  deadlineOverride?: string;  // 'YYYY-MM-DD'
+  deadlineOverride?: string; // 'YYYY-MM-DD'
 };
 
 export type DeriveTaskResult = {
@@ -253,10 +243,7 @@ export async function deriveTaskFromEvent(args: DeriveTaskInput): Promise<Derive
 }
 
 // ─── Convenience: User-facing Wrapper mit Toast-Fehlerbehandlung ──
-export async function runWithToast<T>(
-  fn: () => Promise<T>,
-  errorMsg: string,
-): Promise<T | null> {
+export async function runWithToast<T>(fn: () => Promise<T>, errorMsg: string): Promise<T | null> {
   try {
     return await fn();
   } catch (err) {

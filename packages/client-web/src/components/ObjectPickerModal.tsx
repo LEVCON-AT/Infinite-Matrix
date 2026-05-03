@@ -8,7 +8,6 @@
 // ESC). Daten kommen vom Caller via Workspace-Resources.
 
 import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
-import { installFocusRestore, installFocusTrap } from '../lib/dialog';
 import type { CellRow, NodeRow } from '../lib/types';
 import Icon from './Icon';
 
@@ -34,7 +33,7 @@ type PickerEntry = {
 const ObjectPickerModal: Component<ObjectPickerModalProps> = (p) => {
   const [filter, setFilter] = createSignal('');
   const [tab, setTab] = createSignal<FilterTab>('all');
-  let containerEl: HTMLDivElement | undefined;
+  let dialogEl: HTMLDialogElement | undefined;
   let inputEl: HTMLInputElement | undefined;
 
   const entries = createMemo<PickerEntry[]>(() => {
@@ -62,27 +61,19 @@ const ObjectPickerModal: Component<ObjectPickerModalProps> = (p) => {
     const q = filter().toLowerCase().trim();
     if (!q) return out.slice(0, 100);
     return out
-      .filter((e) => e.label.toLowerCase().includes(q) || (e.alias?.toLowerCase().includes(q) ?? false))
+      .filter(
+        (e) => e.label.toLowerCase().includes(q) || (e.alias?.toLowerCase().includes(q) ?? false),
+      )
       .slice(0, 100);
   });
 
   onMount(() => {
-    const restoreFocus = installFocusRestore();
-    onCleanup(restoreFocus);
-    if (containerEl) {
-      const release = installFocusTrap(containerEl);
-      onCleanup(release);
-    }
+    dialogEl?.showModal();
     inputEl?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopImmediatePropagation();
-        e.preventDefault();
-        p.onClose();
-      }
-    };
-    document.addEventListener('keydown', onKey, true);
-    onCleanup(() => document.removeEventListener('keydown', onKey, true));
+  });
+
+  onCleanup(() => {
+    dialogEl?.close();
   });
 
   function tabLabel(t: FilterTab): string {
@@ -92,29 +83,26 @@ const ObjectPickerModal: Component<ObjectPickerModalProps> = (p) => {
   }
 
   return (
-    <div
-      class="overlay-scrim"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) p.onClose();
+    <dialog
+      ref={dialogEl}
+      class="overlay-modal atom-picker-modal"
+      aria-labelledby="object-picker-title"
+      onCancel={(e) => {
+        e.preventDefault();
+        p.onClose();
       }}
     >
-      <div
-        ref={(el) => {
-          containerEl = el;
-        }}
-        class="overlay-card atom-picker-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="object-picker-title"
-      >
+      <button
+        type="button"
+        class="overlay-modal-backdrop-closer"
+        onClick={p.onClose}
+        aria-label="Schliessen"
+        tabIndex={-1}
+      />
+      <div class="overlay-card">
         <header class="overlay-head">
           <h3 id="object-picker-title">Bereich oder Zelle verlinken</h3>
-          <button
-            type="button"
-            class="overlay-close"
-            onClick={p.onClose}
-            aria-label="Schliessen"
-          >
+          <button type="button" class="overlay-close" onClick={p.onClose} aria-label="Schliessen">
             <Icon name="x" size={18} />
           </button>
         </header>
@@ -153,7 +141,9 @@ const ObjectPickerModal: Component<ObjectPickerModalProps> = (p) => {
         <div class="atom-picker-list">
           <Show
             when={entries().length > 0}
-            fallback={<p class="hint atom-picker-empty">Keine passenden Bereiche/Zellen gefunden.</p>}
+            fallback={
+              <p class="hint atom-picker-empty">Keine passenden Bereiche/Zellen gefunden.</p>
+            }
           >
             <ul>
               <For each={entries()}>
@@ -179,7 +169,7 @@ const ObjectPickerModal: Component<ObjectPickerModalProps> = (p) => {
           </Show>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 };
 

@@ -109,11 +109,7 @@ function unfold(text: string): string {
 
 // SUMMARY, DESCRIPTION, LOCATION nutzen escaped commas/semicolons/newlines.
 function unescapeIcs(s: string): string {
-  return s
-    .replace(/\\\\/g, '\\')
-    .replace(/\\n/gi, '\n')
-    .replace(/\\,/g, ',')
-    .replace(/\\;/g, ';');
+  return s.replace(/\\\\/g, '\\').replace(/\\n/gi, '\n').replace(/\\,/g, ',').replace(/\\;/g, ';');
 }
 
 // VALUE=DATE → all-day (YYYYMMDD).
@@ -138,9 +134,7 @@ function parseDateValue(
   if (m) {
     const [, y, mo, d, hh, mm, ss, z] = m;
     const iso =
-      z === 'Z'
-        ? `${y}-${mo}-${d}T${hh}:${mm}:${ss}Z`
-        : `${y}-${mo}-${d}T${hh}:${mm}:${ss}`;
+      z === 'Z' ? `${y}-${mo}-${d}T${hh}:${mm}:${ss}Z` : `${y}-${mo}-${d}T${hh}:${mm}:${ss}`;
     return {
       iso: new Date(iso).toISOString(),
       allDay: false,

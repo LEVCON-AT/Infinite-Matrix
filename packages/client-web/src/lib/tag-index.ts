@@ -19,9 +19,7 @@ import type { TagKind, WorkspaceTag } from './types';
 const TABLE: CacheTable = 'workspace_tags';
 
 // ─── Read ──────────────────────────────────────────────────────
-export async function fetchWorkspaceTagsByWorkspace(
-  workspaceId: string,
-): Promise<WorkspaceTag[]> {
+export async function fetchWorkspaceTagsByWorkspace(workspaceId: string): Promise<WorkspaceTag[]> {
   if (!workspaceId) return [];
   try {
     const { data, error } = await supabase

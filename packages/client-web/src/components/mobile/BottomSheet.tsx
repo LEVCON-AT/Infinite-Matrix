@@ -39,11 +39,9 @@ type BottomSheetProps = {
 };
 
 const BottomSheet: Component<BottomSheetProps> = (props) => {
-  let sheetEl: HTMLDivElement | undefined;
-  let backdropEl: HTMLDivElement | undefined;
-  const [snap, setSnap] = createSignal<'default' | 'expanded'>(
-    props.initialSnap ?? 'default',
-  );
+  let sheetEl: HTMLElement | undefined;
+  let backdropEl: HTMLButtonElement | undefined;
+  const [snap, setSnap] = createSignal<'default' | 'expanded'>(props.initialSnap ?? 'default');
 
   // Open/Close-Trigger.
   createEffect(() => {
@@ -76,29 +74,23 @@ const BottomSheet: Component<BottomSheetProps> = (props) => {
 
   return (
     <Show when={props.open()}>
-      <div
+      <button
+        type="button"
         ref={backdropEl}
         class="bottom-sheet-backdrop"
         onClick={props.onClose}
-        aria-hidden="true"
+        aria-label="Sheet schliessen"
+        tabIndex={-1}
       />
-      <div
-        ref={sheetEl}
-        class="bottom-sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-label={props.title}
-      >
+      <aside ref={sheetEl} class="bottom-sheet" aria-modal="true" aria-label={props.title}>
         <button
           type="button"
           class="bottom-sheet-handle"
           onClick={toggleSnap}
-          aria-label={
-            snap() === 'expanded' ? 'Sheet verkleinern' : 'Sheet vergroessern'
-          }
+          aria-label={snap() === 'expanded' ? 'Sheet verkleinern' : 'Sheet vergroessern'}
         />
         <div class="bottom-sheet-content">{props.children}</div>
-      </div>
+      </aside>
     </Show>
   );
 };

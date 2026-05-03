@@ -11,7 +11,7 @@
 // Drawer (kein Routing). More-Tab oeffnet Bottom-Sheet (kein Routing).
 
 import { useLocation, useNavigate } from '@solidjs/router';
-import { type Component } from 'solid-js';
+import type { Component } from 'solid-js';
 import Icon from '../Icon';
 
 type MobileBottomNavProps = {
@@ -33,7 +33,7 @@ const MobileBottomNav: Component<MobileBottomNavProps> = (props) => {
     location.pathname.startsWith(`/w/${props.workspaceId}/calendar`);
 
   return (
-    <nav class="mobile-bottom-nav" role="navigation" aria-label="Mobile-Hauptnavigation">
+    <nav class="mobile-bottom-nav" aria-label="Mobile-Hauptnavigation">
       <button
         type="button"
         class="mobile-bottom-nav-tab click-pulse"

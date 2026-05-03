@@ -26,7 +26,6 @@
 //   `> ` → blockquote
 //   `* ` / `- ` / `1. ` → list (bullet/ordered)
 
-import { type Component, createEffect, onCleanup, onMount } from 'solid-js';
 import { baseKeymap, toggleMark } from 'prosemirror-commands';
 import { history, redo, undo } from 'prosemirror-history';
 import {
@@ -38,21 +37,17 @@ import {
 import { keymap } from 'prosemirror-keymap';
 import { DOMParser, DOMSerializer, Schema } from 'prosemirror-model';
 import { schema as basicSchema } from 'prosemirror-schema-basic';
-import {
-  addListNodes,
-  liftListItem,
-  sinkListItem,
-  splitListItem,
-} from 'prosemirror-schema-list';
+import { addListNodes, liftListItem, sinkListItem, splitListItem } from 'prosemirror-schema-list';
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
+import { type Component, createEffect, onCleanup, onMount } from 'solid-js';
 import {
-  buildMentionPlugin,
-  insertMentionTransaction,
-  mentionNodeSpec,
   type MentionRefKind,
   type MentionTrigger,
   type MentionTriggerEvent,
+  buildMentionPlugin,
+  insertMentionTransaction,
+  mentionNodeSpec,
 } from '../lib/pm-mention-plugin';
 
 // ─── Schema ─────────────────────────────────────────────────────
@@ -84,9 +79,11 @@ const DOMParser2 = window.DOMParser;
 function buildInputRules() {
   const rules: InputRule[] = [];
   // Heading: # ... ### am Zeilen-Anfang.
-  rules.push(textblockTypeInputRule(/^(#{1,3})\s$/, editorSchema.nodes.heading, (match) => ({
-    level: match[1].length,
-  })));
+  rules.push(
+    textblockTypeInputRule(/^(#{1,3})\s$/, editorSchema.nodes.heading, (match) => ({
+      level: match[1].length,
+    })),
+  );
   // Blockquote: > am Anfang.
   rules.push(wrappingInputRule(/^\s*>\s$/, editorSchema.nodes.blockquote));
   // Bullet-List.

@@ -9,6 +9,7 @@
 // macht das Bundling von register_workspace_tag + atom_tags.insert
 // in einer Transaktion + dekrementiert usage_count via Trigger.
 
+import type { AtomKind } from './atom-manifestations';
 import { enqueueMutation, isNetworkError } from './mutation-queue';
 import { type CacheTable, getByWorkspace, mergeRows, putOne } from './offline-cache';
 import { markCacheFallback, markLiveSuccess } from './offline-state';
@@ -16,7 +17,6 @@ import { runOptimisticDelete } from './safe-mutation';
 import { supabase } from './supabase';
 import { showToast } from './toasts';
 import type { AtomTag, AtomTagWithTag, WorkspaceTag } from './types';
-import type { AtomKind } from './atom-manifestations';
 
 const TABLE: CacheTable = 'atom_tags';
 
@@ -57,9 +57,7 @@ export async function fetchAtomTagsForAtom(args: {
       .eq('atom_type', args.atomType)
       .eq('atom_id', args.atomId);
     if (error) throw error;
-    const rows = (data ?? []) as Array<
-      AtomTag & { workspace_tags: WorkspaceTag | null }
-    >;
+    const rows = (data ?? []) as Array<AtomTag & { workspace_tags: WorkspaceTag | null }>;
     markLiveSuccess();
     return rows.flatMap((r) => {
       const reg = r.workspace_tags;
@@ -177,7 +175,11 @@ async function offlineTagAdd(args: {
   };
   await putOne(TABLE, junction);
   await enqueueMutation({
-    spec: { kind: 'insert', table: 'atom_tags', values: junction as unknown as Record<string, unknown> },
+    spec: {
+      kind: 'insert',
+      table: 'atom_tags',
+      values: junction as unknown as Record<string, unknown>,
+    },
     workspaceId: args.workspaceId,
     label: 'Tag setzen',
   });

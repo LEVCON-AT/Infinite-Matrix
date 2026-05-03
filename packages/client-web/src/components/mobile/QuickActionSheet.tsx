@@ -7,7 +7,7 @@
 // Migration in S9.
 
 import { useNavigate } from '@solidjs/router';
-import { type Accessor, type Component } from 'solid-js';
+import type { Accessor, Component } from 'solid-js';
 import { showToast } from '../../lib/toasts';
 import Icon from '../Icon';
 import BottomSheet from './BottomSheet';

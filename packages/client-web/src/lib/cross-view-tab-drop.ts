@@ -21,8 +21,8 @@
 // nur dafuer, dass der User die Ziel-Sicht waehrend des Drags
 // erreichen kann.
 
-import { activeDrag } from './drag-context';
 import { tabHoverPulse } from './animations';
+import { activeDrag } from './drag-context';
 
 const DWELL_MS = 600;
 

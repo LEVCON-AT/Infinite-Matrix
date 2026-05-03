@@ -761,10 +761,7 @@ export async function clearMatrixContents(matrixId: string): Promise<void> {
     if (pinRows.length > 0) {
       const docIds = pinRows.map((p) => p.atom_id);
       const pinIds = pinRows.map((p) => p.id);
-      const { error: delPinErr } = await supabase
-        .from('atom_pins')
-        .delete()
-        .in('id', pinIds);
+      const { error: delPinErr } = await supabase.from('atom_pins').delete().in('id', pinIds);
       if (delPinErr) throw delPinErr;
       // Welle D: Single-Pin-Docs purgen wir vollstaendig (Behavior wie
       // pre-Welle-D). Multi-Pin-Docs (die auch an anderen Cells haengen)
@@ -775,7 +772,9 @@ export async function clearMatrixContents(matrixId: string): Promise<void> {
         .eq('atom_type', 'doc')
         .in('atom_id', docIds);
       if (remErr) throw remErr;
-      const stillPinned = new Set(((remaining ?? []) as Array<{ atom_id: string }>).map((r) => r.atom_id));
+      const stillPinned = new Set(
+        ((remaining ?? []) as Array<{ atom_id: string }>).map((r) => r.atom_id),
+      );
       const orphaned = docIds.filter((id) => !stillPinned.has(id));
       if (orphaned.length > 0) {
         const { error: delDocErr } = await supabase.from('docs').delete().in('id', orphaned);
@@ -1613,8 +1612,14 @@ async function executeCellContainerMerge(args: {
       };
       return { doc, pin };
     });
-    await insertBatch('docs', pairs.map((p) => p.doc));
-    await insertBatch('atom_pins', pairs.map((p) => p.pin));
+    await insertBatch(
+      'docs',
+      pairs.map((p) => p.doc),
+    );
+    await insertBatch(
+      'atom_pins',
+      pairs.map((p) => p.pin),
+    );
   }
 }
 

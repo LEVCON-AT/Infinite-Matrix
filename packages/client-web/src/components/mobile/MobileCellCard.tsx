@@ -10,14 +10,14 @@
 // Tap auf Feature-Chip → onChipClick (gleicher Handler wie Desktop).
 
 import { type Component, For, Show } from 'solid-js';
+import type { PresenceUser } from '../../lib/presence';
+import type { CellTaskSummary as CellSummary } from '../../lib/task-aggregate';
 import type { CellFeature } from '../../lib/types';
 import type { CellRow, ColRow, RowRow } from '../../lib/types';
-import type { CellTaskSummary as CellSummary } from '../../lib/task-aggregate';
 import CellTaskSummary from '../CellTaskSummary';
 import Icon from '../Icon';
-import PresenceMini from '../PresenceMini';
-import type { PresenceUser } from '../../lib/presence';
 import { FEATURE_ICON, FEATURE_LABEL, FEATURE_ORDER } from '../MatrixView';
+import PresenceMini from '../PresenceMini';
 
 type MobileCellCardProps = {
   row: RowRow;
@@ -49,8 +49,6 @@ const MobileCellCard: Component<MobileCellCardProps> = (props) => {
       }}
       data-row-id={props.row.id}
       data-col-id={props.col.id}
-      role="button"
-      tabIndex={0}
       onClick={props.onCardTap}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {

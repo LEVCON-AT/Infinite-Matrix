@@ -11,7 +11,6 @@
 import { useNavigate } from '@solidjs/router';
 import { type Component, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
 import { deriveTaskFromEvent } from '../lib/calendar-inbound';
-import { installFocusRestore, installFocusTrap } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
 import { showToast } from '../lib/toasts';
 import type { DeriveScope, DeriveSyncMode } from '../lib/types';
@@ -43,23 +42,14 @@ const DeriveTaskModal: Component<DeriveTaskModalProps> = (props) => {
     () => !busy() && title().trim().length > 0 && /^\d{4}-\d{2}-\d{2}$/.test(deadline()),
   );
 
-  let containerEl: HTMLDivElement | undefined;
+  let dialogEl: HTMLDialogElement | undefined;
 
   onMount(() => {
-    const restoreFocus = installFocusRestore();
-    onCleanup(restoreFocus);
-    if (containerEl) {
-      const releaseTrap = installFocusTrap(containerEl);
-      onCleanup(releaseTrap);
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      e.stopImmediatePropagation();
-      if (busy()) return;
-      props.onClose();
-    };
-    document.addEventListener('keydown', onKey, true);
-    onCleanup(() => document.removeEventListener('keydown', onKey, true));
+    dialogEl?.showModal();
+  });
+
+  onCleanup(() => {
+    dialogEl?.close();
   });
 
   async function submit(e: Event): Promise<void> {
@@ -86,21 +76,25 @@ const DeriveTaskModal: Component<DeriveTaskModalProps> = (props) => {
   }
 
   return (
-    <div
-      class="overlay-scrim"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !busy()) props.onClose();
+    <dialog
+      ref={dialogEl}
+      class="overlay-modal"
+      aria-labelledby="derive-task-title"
+      onCancel={(e) => {
+        e.preventDefault();
+        if (!busy()) props.onClose();
       }}
     >
-      <div
-        ref={(el) => {
-          containerEl = el;
+      <button
+        type="button"
+        class="overlay-modal-backdrop-closer"
+        onClick={() => {
+          if (!busy()) props.onClose();
         }}
-        class="overlay-card"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="derive-task-title"
-      >
+        aria-label="Schliessen"
+        tabIndex={-1}
+      />
+      <div class="overlay-card">
         <header class="overlay-head">
           <h3 id="derive-task-title">Task aus Termin ableiten</h3>
           <button
@@ -198,9 +192,7 @@ const DeriveTaskModal: Component<DeriveTaskModalProps> = (props) => {
                   <span>
                     <strong>Komplette Serie</strong>
                   </span>
-                  <small class="hint">
-                    Recurring-Task, die an jedem Serien-Termin erscheint.
-                  </small>
+                  <small class="hint">Recurring-Task, die an jedem Serien-Termin erscheint.</small>
                 </label>
               </fieldset>
             </Show>
@@ -229,7 +221,7 @@ const DeriveTaskModal: Component<DeriveTaskModalProps> = (props) => {
           </footer>
         </form>
       </div>
-    </div>
+    </dialog>
   );
 };
 

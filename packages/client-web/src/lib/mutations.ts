@@ -2344,9 +2344,7 @@ export async function createDoc(args: {
 
 async function updateDoc(
   docId: string,
-  patch: Partial<
-    Pick<DocRow, 'title' | 'title_template' | 'content' | 'alias' | 'source_alias'>
-  >,
+  patch: Partial<Pick<DocRow, 'title' | 'title_template' | 'content' | 'alias' | 'source_alias'>>,
 ): Promise<DocRow> {
   return runOptimisticUpdate<DocRow>({
     table: 'docs',

@@ -19,28 +19,26 @@ import CellSummaryPage from '../components/CellSummaryPage';
 import CommandPalette from '../components/CommandPalette';
 import ContextMenu from '../components/ContextMenu';
 import CreateManifestationModal from '../components/CreateManifestationModal';
-import ImportedEventDetailModal from '../components/ImportedEventDetailModal';
-import NotificationBell from '../components/NotificationBell';
-import NodeDocsButton from '../components/NodeDocsButton';
 import DocsPopup from '../components/DocsPopup';
 import GlobalSearch from '../components/GlobalSearch';
 import HeaderSearchBar from '../components/HeaderSearchBar';
 import Icon from '../components/Icon';
+import ImportedEventDetailModal from '../components/ImportedEventDetailModal';
 import KeyboardHelp from '../components/KeyboardHelp';
 import MatrixView from '../components/MatrixView';
-import MobileShell from '../components/mobile/MobileShell';
-import MobileTreeDrawer from '../components/mobile/MobileTreeDrawer';
 import { ModalTransition } from '../components/ModalTransition';
 import NodeDescription from '../components/NodeDescription';
+import NodeDocsButton from '../components/NodeDocsButton';
 import NodeTree from '../components/NodeTree';
+import NotificationBell from '../components/NotificationBell';
 import ObjectSuggestion from '../components/ObjectSuggestion';
 import PresenceStack from '../components/PresenceStack';
 import SidebarCalendarMini from '../components/SidebarCalendarMini';
 import SidebarDayView from '../components/SidebarDayView';
 import WorkspaceEmptyState from '../components/WorkspaceEmptyState';
 import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
-import { useMobile } from '../lib/use-mobile';
-import { installCrossViewTabDrop } from '../lib/cross-view-tab-drop';
+import MobileShell from '../components/mobile/MobileShell';
+import MobileTreeDrawer from '../components/mobile/MobileTreeDrawer';
 import { useAggregateView } from '../lib/aggregate-view';
 import { aliasChipMenuState, closeAliasChipMenu } from '../lib/alias-chip-menu';
 import { clearAliasIndex, fetchAliasIndex, scheduleAliasRefresh } from '../lib/alias-index';
@@ -51,6 +49,8 @@ import {
 } from '../lib/atom-manifestations';
 import { signOut, useUser } from '../lib/auth';
 import { buildEvents, isoDate } from '../lib/calendar';
+import { installCrossViewTabDrop } from '../lib/cross-view-tab-drop';
+import { useMobile } from '../lib/use-mobile';
 
 // addMonthsToDate: lokale Monatsverschiebung ohne UTC-Drift. Nicht in
 // lib/calendar.ts weil dort addMonths nur ISO-Strings nimmt.
@@ -59,11 +59,14 @@ function addMonthsToDate(d: Date, months: number): Date {
   next.setMonth(next.getMonth() + months);
   return next;
 }
+import { fetchAtomPinsByWorkspace } from '../lib/atom-pins';
+import { fetchAtomTagsByWorkspace, joinAtomTagsWithRegistry } from '../lib/atom-tags';
+import { openDokuForContext } from '../lib/docs-open';
 import { clearDocsRequest, openDocsPopup, useDocsRequest } from '../lib/docs-ui';
 import { setEditModeValue, toggleEditMode, useEditMode } from '../lib/edit-mode';
+import { importedEventModalRequest } from '../lib/imported-event-modal-state';
 import { toggleIncognito, useIncognito } from '../lib/incognito';
 import { resolveNodeLabel } from '../lib/label-template';
-import { importedEventModalRequest } from '../lib/imported-event-modal-state';
 import {
   closeManifestationModal,
   manifestationModalRequest,
@@ -86,13 +89,9 @@ import {
   fetchMyWorkspaces,
   fetchNodesForWorkspace,
   fetchRowsForWorkspace,
-  fetchWorkspacePinnedDocs,
   fetchWorkspaceLinks,
+  fetchWorkspacePinnedDocs,
 } from '../lib/queries';
-import { fetchAtomPinsByWorkspace } from '../lib/atom-pins';
-import { fetchAtomTagsByWorkspace, joinAtomTagsWithRegistry } from '../lib/atom-tags';
-import { fetchWorkspaceTagsByWorkspace } from '../lib/tag-index';
-import { openDokuForContext } from '../lib/docs-open';
 import { subscribeWorkspace } from '../lib/realtime';
 import { useSettingsBodyClassSync } from '../lib/settings';
 import { useSidebarCalendarState } from '../lib/sidebar-calendar-state';
@@ -102,6 +101,7 @@ import {
   bindSectionDragExpand,
   installGlobalSectionShortcuts,
 } from '../lib/sidebar-section-controls';
+import { fetchWorkspaceTagsByWorkspace } from '../lib/tag-index';
 import { fetchManifestationsByWorkspace, fetchTasks } from '../lib/tasks';
 import { toggleTheme, useTheme } from '../lib/theme';
 import { showToast } from '../lib/toasts';
@@ -444,7 +444,12 @@ const Workspace: Component = () => {
   // Links + Docs + Checklists in einem einheitlichen Format. Der Modal
   // bleibt source-agnostisch.
   const atomPickerEntries = createMemo(() => {
-    const out: Array<{ atomType: 'task' | 'link' | 'doc' | 'checklist'; atomId: string; label: string; alias: string | null }> = [];
+    const out: Array<{
+      atomType: 'task' | 'link' | 'doc' | 'checklist';
+      atomId: string;
+      label: string;
+      alias: string | null;
+    }> = [];
     for (const t of wsTasks() ?? []) {
       out.push({ atomType: 'task', atomId: t.id, label: t.label || '(ohne Titel)', alias: null });
     }
@@ -1158,664 +1163,672 @@ const Workspace: Component = () => {
         />
       </Show>
       <div class="ws-shell" data-sb-mode={sidebar.mode()}>
-      <aside class="ws-sidebar" data-sb-mode={sidebar.mode()}>
-        {/* Schmale Top-Bar — Pendant zur ws-main-header. Workspace-
+        <aside class="ws-sidebar" data-sb-mode={sidebar.mode()}>
+          {/* Schmale Top-Bar — Pendant zur ws-main-header. Workspace-
             Switcher-Chip links (flex:1), Collapse-Button rechts.
             Beide Seiten auf derselben Y-Linie mit dem Main-Header-
             Content rechts. */}
-        <div class="ws-sidebar-head">
-          <WorkspaceSwitcher workspaces={workspaces()} currentWorkspaceId={params.workspaceId} />
-          <button
-            type="button"
-            class="ws-sidebar-mode-btn"
-            onClick={() => sidebar.cycle()}
-            title={
-              sidebar.mode() === 'full'
-                ? 'Sidebar einklappen (Shift+N)'
-                : sidebar.mode() === 'rails'
-                  ? 'Sidebar ausblenden (Shift+N)'
-                  : 'Sidebar aufklappen (Shift+N)'
-            }
-            aria-label="Sidebar-Modus"
-          >
-            <Show
-              when={sidebar.mode() === 'full'}
-              fallback={
-                <Show
-                  when={sidebar.mode() === 'rails'}
-                  fallback={<Icon name="chevron-right" size={16} />}
-                >
-                  <Icon name="chevron-double-left" size={16} />
-                </Show>
+          <div class="ws-sidebar-head">
+            <WorkspaceSwitcher workspaces={workspaces()} currentWorkspaceId={params.workspaceId} />
+            <button
+              type="button"
+              class="ws-sidebar-mode-btn"
+              onClick={() => sidebar.cycle()}
+              title={
+                sidebar.mode() === 'full'
+                  ? 'Sidebar einklappen (Shift+N)'
+                  : sidebar.mode() === 'rails'
+                    ? 'Sidebar ausblenden (Shift+N)'
+                    : 'Sidebar aufklappen (Shift+N)'
               }
+              aria-label="Sidebar-Modus"
             >
-              <Icon name="chevron-left" size={16} />
-            </Show>
-          </button>
-        </div>
-        <Show when={params.workspaceId && sbCal}>
-          <div
-            class="ws-sb-section"
-            classList={{ 'ws-sb-section-open': sbCal?.state().isOpen ?? false }}
-          >
-            <button
-              type="button"
-              class="ws-sb-section-head click-pulse"
-              onClick={() => sbCal?.update({ isOpen: !sbCal.state().isOpen })}
-              aria-expanded={sbCal?.state().isOpen ?? false}
-              ref={(el) => {
-                bindSectionDragExpand(el, () => {
-                  if (!sbCal?.state().isOpen) sbCal?.update({ isOpen: true });
-                });
-              }}
-            >
-              <Icon name={sbCal?.state().isOpen ? 'chevron-down' : 'chevron-right'} size={14} />
-              <span>Kalender</span>
-              <span class="ws-sb-section-kbd" aria-hidden="true">
-                K
-              </span>
+              <Show
+                when={sidebar.mode() === 'full'}
+                fallback={
+                  <Show
+                    when={sidebar.mode() === 'rails'}
+                    fallback={<Icon name="chevron-right" size={16} />}
+                  >
+                    <Icon name="chevron-double-left" size={16} />
+                  </Show>
+                }
+              >
+                <Icon name="chevron-left" size={16} />
+              </Show>
             </button>
-            <Show when={sbCal?.state().isOpen}>
-              <div class="ws-sb-section-body">
-                <SidebarCalendarMini
-                  workspaceId={params.workspaceId as string}
-                  events={calendarEvents()}
-                  tasksById={tasksById()}
-                  manifestationsById={manifestationsById()}
-                  atomManifestations={
-                    (wsAtomManifestations() ?? []) as unknown as AtomManifestationRow[]
-                  }
-                  onAtomManifestationsChanged={() => void refetchAtomManifs()}
-                />
-                <SidebarDayView
-                  workspaceId={params.workspaceId as string}
-                  selectedDay={sbCal?.state().selectedDay ?? new Date().toISOString().slice(0, 10)}
-                  events={calendarEvents()}
-                  tasksById={tasksById()}
-                  manifestationsById={manifestationsById()}
-                  onAtomManifestationsChanged={() => void refetchAtomManifs()}
-                />
-              </div>
-            </Show>
           </div>
-        </Show>
-        <Show when={params.workspaceId && sbCal}>
-          <div
-            class="ws-sb-section"
-            classList={{ 'ws-sb-section-open': sbCal?.state().treeOpen ?? true }}
-          >
-            <button
-              type="button"
-              class="ws-sb-section-head click-pulse"
-              onClick={() => sbCal?.update({ treeOpen: !sbCal.state().treeOpen })}
-              aria-expanded={sbCal?.state().treeOpen ?? true}
-              ref={(el) => {
-                bindSectionDragExpand(el, () => {
-                  if (!sbCal?.state().treeOpen) sbCal?.update({ treeOpen: true });
-                });
-              }}
+          <Show when={params.workspaceId && sbCal}>
+            <div
+              class="ws-sb-section"
+              classList={{ 'ws-sb-section-open': sbCal?.state().isOpen ?? false }}
             >
-              <Icon name={sbCal?.state().treeOpen ? 'chevron-down' : 'chevron-right'} size={14} />
-              <span>Struktur</span>
-              <span class="ws-sb-section-kbd" aria-hidden="true">
-                N
-              </span>
-            </button>
-            <Show when={sbCal?.state().treeOpen}>
-              <div class="ws-sb-section-body">
-                <NodeTree
-                  workspaceId={params.workspaceId as string}
-                  tree={tree()}
-                  currentNodeId={params.nodeId ?? params.cellId}
-                  currentFeature={cellFeature()}
-                  presence={presenceUsers}
-                  selfUserId={user()?.id}
-                  members={() => workspaceMembers() ?? []}
-                  resolverMaps={resolverMaps}
-                  onChanged={() => {
-                    void refetchCells();
-                    void refetchCellsWithDocs();
-                  }}
-                />
-              </div>
-            </Show>
-          </div>
-        </Show>
-        {/* Workspace-Level Import/Export haben wir entfernt — Import +
+              <button
+                type="button"
+                class="ws-sb-section-head click-pulse"
+                onClick={() => sbCal?.update({ isOpen: !sbCal.state().isOpen })}
+                aria-expanded={sbCal?.state().isOpen ?? false}
+                ref={(el) => {
+                  bindSectionDragExpand(el, () => {
+                    if (!sbCal?.state().isOpen) sbCal?.update({ isOpen: true });
+                  });
+                }}
+              >
+                <Icon name={sbCal?.state().isOpen ? 'chevron-down' : 'chevron-right'} size={14} />
+                <span>Kalender</span>
+                <span class="ws-sb-section-kbd" aria-hidden="true">
+                  K
+                </span>
+              </button>
+              <Show when={sbCal?.state().isOpen}>
+                <div class="ws-sb-section-body">
+                  <SidebarCalendarMini
+                    workspaceId={params.workspaceId as string}
+                    events={calendarEvents()}
+                    tasksById={tasksById()}
+                    manifestationsById={manifestationsById()}
+                    atomManifestations={
+                      (wsAtomManifestations() ?? []) as unknown as AtomManifestationRow[]
+                    }
+                    onAtomManifestationsChanged={() => void refetchAtomManifs()}
+                  />
+                  <SidebarDayView
+                    workspaceId={params.workspaceId as string}
+                    selectedDay={
+                      sbCal?.state().selectedDay ?? new Date().toISOString().slice(0, 10)
+                    }
+                    events={calendarEvents()}
+                    tasksById={tasksById()}
+                    manifestationsById={manifestationsById()}
+                    onAtomManifestationsChanged={() => void refetchAtomManifs()}
+                  />
+                </div>
+              </Show>
+            </div>
+          </Show>
+          <Show when={params.workspaceId && sbCal}>
+            <div
+              class="ws-sb-section"
+              classList={{ 'ws-sb-section-open': sbCal?.state().treeOpen ?? true }}
+            >
+              <button
+                type="button"
+                class="ws-sb-section-head click-pulse"
+                onClick={() => sbCal?.update({ treeOpen: !sbCal.state().treeOpen })}
+                aria-expanded={sbCal?.state().treeOpen ?? true}
+                ref={(el) => {
+                  bindSectionDragExpand(el, () => {
+                    if (!sbCal?.state().treeOpen) sbCal?.update({ treeOpen: true });
+                  });
+                }}
+              >
+                <Icon name={sbCal?.state().treeOpen ? 'chevron-down' : 'chevron-right'} size={14} />
+                <span>Struktur</span>
+                <span class="ws-sb-section-kbd" aria-hidden="true">
+                  N
+                </span>
+              </button>
+              <Show when={sbCal?.state().treeOpen}>
+                <div class="ws-sb-section-body">
+                  <NodeTree
+                    workspaceId={params.workspaceId as string}
+                    tree={tree()}
+                    currentNodeId={params.nodeId ?? params.cellId}
+                    currentFeature={cellFeature()}
+                    presence={presenceUsers}
+                    selfUserId={user()?.id}
+                    members={() => workspaceMembers() ?? []}
+                    resolverMaps={resolverMaps}
+                    onChanged={() => {
+                      void refetchCells();
+                      void refetchCellsWithDocs();
+                    }}
+                  />
+                </div>
+              </Show>
+            </div>
+          </Show>
+          {/* Workspace-Level Import/Export haben wir entfernt — Import +
             Export laufen ausschliesslich ueber das Sidebar-Kontextmenue
             jeder Ebene (Matrix, Board, Zelle, Feature). Fuer komplette
             Workspace-Operationen gibt es das `^reset -all`-Command. */}
 
-        <div class="ws-user-block">
-          <span class="ws-email">{user()?.email}</span>
-          <button type="button" onClick={onLogout}>
-            Abmelden
+          <div class="ws-user-block">
+            <span class="ws-email">{user()?.email}</span>
+            <button type="button" onClick={onLogout}>
+              Abmelden
+            </button>
+          </div>
+        </aside>
+
+        <Show when={sidebar.mode() === 'collapsed'}>
+          <button
+            type="button"
+            class="ws-sidebar-edge-toggle"
+            onClick={() => sidebar.open()}
+            title="Sidebar aufklappen (Shift+N)"
+            aria-label="Sidebar aufklappen"
+          >
+            ›
           </button>
-        </div>
-      </aside>
+        </Show>
 
-      <Show when={sidebar.mode() === 'collapsed'}>
-        <button
-          type="button"
-          class="ws-sidebar-edge-toggle"
-          onClick={() => sidebar.open()}
-          title="Sidebar aufklappen (Shift+N)"
-          aria-label="Sidebar aufklappen"
-        >
-          ›
-        </button>
-      </Show>
-
-      {/* Singleton-Dropdown fuer Alias-Autocomplete. Sichtbarkeit steuert
+        {/* Singleton-Dropdown fuer Alias-Autocomplete. Sichtbarkeit steuert
           lib/use-alias-autocomplete; Inputs binden sich per ref an den Hook. */}
-      <AliasAutocomplete />
+        <AliasAutocomplete />
 
-      {/* Singleton-Dropdown fuer Object-Suggestion (Phase 3 O.2b).
+        {/* Singleton-Dropdown fuer Object-Suggestion (Phase 3 O.2b).
           Wird beim Tippen einer Row/Col/KbCol-Header-Input geoeffnet —
           bietet existing Objects als Cross-Cut-Pick. Sichtbarkeit steuert
           lib/use-object-suggest. */}
-      <ObjectSuggestion />
+        <ObjectSuggestion />
 
-      {/* Singleton-Context-Menu fuer Alias-Chips (Click/+/Rechtsklick).
+        {/* Singleton-Context-Menu fuer Alias-Chips (Click/+/Rechtsklick).
           Jeder AliasChip triggert openAliasChipMenu — nur eine Instanz
           im DOM, egal wie viele Chips gerade gerendert sind. */}
-      <ContextMenu state={aliasChipMenuState()} onClose={closeAliasChipMenu} />
+        <ContextMenu state={aliasChipMenuState()} onClose={closeAliasChipMenu} />
 
-      <ModalTransition when={Boolean(showSearch() && params.workspaceId)}>
-        <GlobalSearch
-          workspaceId={params.workspaceId as string}
-          onClose={() => setShowSearch(false)}
-        />
-      </ModalTransition>
+        <ModalTransition when={Boolean(showSearch() && params.workspaceId)}>
+          <GlobalSearch
+            workspaceId={params.workspaceId as string}
+            onClose={() => setShowSearch(false)}
+          />
+        </ModalTransition>
 
-      <ModalTransition when={Boolean(showCommand() && params.workspaceId)}>
-        <CommandPalette
-          workspaceId={params.workspaceId as string}
-          currentNode={currentNode()}
-          currentCellId={params.cellId}
-          currentFeature={cellFeature()}
-          onClose={() => setShowCommand(false)}
-          onShowHelp={() => setShowHelp(true)}
-        />
-      </ModalTransition>
+        <ModalTransition when={Boolean(showCommand() && params.workspaceId)}>
+          <CommandPalette
+            workspaceId={params.workspaceId as string}
+            currentNode={currentNode()}
+            currentCellId={params.cellId}
+            currentFeature={cellFeature()}
+            onClose={() => setShowCommand(false)}
+            onShowHelp={() => setShowHelp(true)}
+          />
+        </ModalTransition>
 
-      <ModalTransition when={Boolean(showDocs() && params.workspaceId)}>
-        <DocsPopup
-          workspaceId={params.workspaceId as string}
-          request={docsRequest()}
-          realtimeVersion={rtDocs()}
-          atomPickerEntries={atomPickerEntries()}
-          onClose={() => {
-            setShowDocs(false);
-            clearDocsRequest();
-          }}
-        />
-      </ModalTransition>
+        <ModalTransition when={Boolean(showDocs() && params.workspaceId)}>
+          <DocsPopup
+            workspaceId={params.workspaceId as string}
+            request={docsRequest()}
+            realtimeVersion={rtDocs()}
+            atomPickerEntries={atomPickerEntries()}
+            onClose={() => {
+              setShowDocs(false);
+              clearDocsRequest();
+            }}
+          />
+        </ModalTransition>
 
-      <ModalTransition when={showHelp()}>
-        <KeyboardHelp onClose={() => setShowHelp(false)} />
-      </ModalTransition>
+        <ModalTransition when={showHelp()}>
+          <KeyboardHelp onClose={() => setShowHelp(false)} />
+        </ModalTransition>
 
-      <ModalTransition when={Boolean(manifestationModalRequest())}>
-        <Show when={manifestationModalRequest()}>
-          {(req) => (
-            <CreateManifestationModal
-              workspaceId={req().workspaceId}
-              atomType={req().atomType}
-              atomId={req().atomId}
-              atomLabel={req().atomLabel}
-              atomUrl={req().atomUrl}
-              defaultDate={req().defaultDate}
-              mode={req().mode}
-              manifId={req().manifId}
-              existingDisplayMeta={req().existingDisplayMeta}
-              onClose={closeManifestationModal}
-              onCreated={() => {
-                if (req().atomType === 'task') {
-                  void refetchWsTasks();
-                  void refetchWsManifestations();
-                } else {
-                  void refetchAtomManifs();
-                }
-              }}
-            />
-          )}
-        </Show>
-      </ModalTransition>
-
-      <ModalTransition when={Boolean(importedEventModalRequest())}>
-        <Show when={importedEventModalRequest()}>
-          {(req) => (
-            <ImportedEventDetailModal
-              workspaceId={req().workspaceId}
-              eventId={req().eventId}
-              snapshot={req().snapshot}
-              wsAtomPins={wsAtomPins() ?? []}
-              wsDocs={wsDocs() ?? []}
-              atomPickerEntries={atomPickerEntries()}
-              wsCells={cells() ?? []}
-              wsNodes={nodes() ?? []}
-              cellLabelById={cellLabelById()}
-              tagsRealtimeVersion={rtTags()}
-            />
-          )}
-        </Show>
-      </ModalTransition>
-
-      <main class="ws-main">
-        <Show when={currentWs()} fallback={<p class="hint">Workspace waehlen.</p>}>
-          <Show when={isViewer(myRole())}>
-            <output class="workspace-readonly-banner" aria-live="polite">
-              <Icon name="eye" size={16} />
-              <span>
-                Read-only: du bist Viewer in diesem Workspace. Owner und Admins koennen dich
-                jederzeit zum Editor heraufstufen.
-              </span>
-            </output>
+        <ModalTransition when={Boolean(manifestationModalRequest())}>
+          <Show when={manifestationModalRequest()}>
+            {(req) => (
+              <CreateManifestationModal
+                workspaceId={req().workspaceId}
+                atomType={req().atomType}
+                atomId={req().atomId}
+                atomLabel={req().atomLabel}
+                atomUrl={req().atomUrl}
+                defaultDate={req().defaultDate}
+                mode={req().mode}
+                manifId={req().manifId}
+                existingDisplayMeta={req().existingDisplayMeta}
+                onClose={closeManifestationModal}
+                onCreated={() => {
+                  if (req().atomType === 'task') {
+                    void refetchWsTasks();
+                    void refetchWsManifestations();
+                  } else {
+                    void refetchAtomManifs();
+                  }
+                }}
+              />
+            )}
           </Show>
-          <header class="ws-main-header">
-            <nav class="ws-breadcrumb" aria-label="Breadcrumb">
-              {/* Workspace-Ebene entfernt — der WorkspaceSwitcher-Chip
+        </ModalTransition>
+
+        <ModalTransition when={Boolean(importedEventModalRequest())}>
+          <Show when={importedEventModalRequest()}>
+            {(req) => (
+              <ImportedEventDetailModal
+                workspaceId={req().workspaceId}
+                eventId={req().eventId}
+                snapshot={req().snapshot}
+                wsAtomPins={wsAtomPins() ?? []}
+                wsDocs={wsDocs() ?? []}
+                atomPickerEntries={atomPickerEntries()}
+                wsCells={cells() ?? []}
+                wsNodes={nodes() ?? []}
+                cellLabelById={cellLabelById()}
+                tagsRealtimeVersion={rtTags()}
+              />
+            )}
+          </Show>
+        </ModalTransition>
+
+        <main class="ws-main">
+          <Show when={currentWs()} fallback={<p class="hint">Workspace waehlen.</p>}>
+            <Show when={isViewer(myRole())}>
+              <output class="workspace-readonly-banner" aria-live="polite">
+                <Icon name="eye" size={16} />
+                <span>
+                  Read-only: du bist Viewer in diesem Workspace. Owner und Admins koennen dich
+                  jederzeit zum Editor heraufstufen.
+                </span>
+              </output>
+            </Show>
+            <header class="ws-main-header">
+              <nav class="ws-breadcrumb" aria-label="Breadcrumb">
+                {/* Workspace-Ebene entfernt — der WorkspaceSwitcher-Chip
                   oben links in der Sidebar zeigt den Workspace-Namen
                   bereits auf gleicher Y-Linie. Doppelung raus. */}
-              <For each={breadcrumb()}>
-                {(crumb, i) => {
-                  // Wenn auf /c/:cellId — die Cell-Row/Col-Span folgt NACH
-                  // dem For-Loop und ist die eigentliche "current". Dann
-                  // duerfen alle Matrix/Board-Crumbs Links bleiben.
-                  const isLast = () => !currentCell() && i() === breadcrumb().length - 1;
-                  return (
-                    <>
-                      {/* Kein Separator vor dem ersten Crumb — der
+                <For each={breadcrumb()}>
+                  {(crumb, i) => {
+                    // Wenn auf /c/:cellId — die Cell-Row/Col-Span folgt NACH
+                    // dem For-Loop und ist die eigentliche "current". Dann
+                    // duerfen alle Matrix/Board-Crumbs Links bleiben.
+                    const isLast = () => !currentCell() && i() === breadcrumb().length - 1;
+                    return (
+                      <>
+                        {/* Kein Separator vor dem ersten Crumb — der
                           Workspace-Eintrag ist aus dem Breadcrumb raus,
                           der erste Matrix/Board-Eintrag startet sauber. */}
-                      <Show when={i() > 0}>
-                        <span class="ws-breadcrumb-sep" aria-hidden>
-                          <Icon name="chevron-right" size={14} />
-                        </span>
-                      </Show>
-                      <Show
-                        when={!isLast()}
-                        fallback={
-                          <span class="ws-breadcrumb-current" data-type={crumb.type}>
-                            {crumb.label}
+                        <Show when={i() > 0}>
+                          <span class="ws-breadcrumb-sep" aria-hidden>
+                            <Icon name="chevron-right" size={14} />
                           </span>
-                        }
-                      >
-                        <a
-                          class="ws-breadcrumb-link"
-                          data-type={crumb.type}
-                          href={`/w/${params.workspaceId}/n/${crumb.id}`}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            // Q.3.A.6 — Breadcrumb-Click ist Drill-Up:
-                            // wir navigieren zu einem Vorfahren der
-                            // aktuellen Route. View-Transitions API
-                            // animiert Pattern §2.7-inverse.
-                            drillNavigate(navigate, `/w/${params.workspaceId}/n/${crumb.id}`, 'up');
-                          }}
+                        </Show>
+                        <Show
+                          when={!isLast()}
+                          fallback={
+                            <span class="ws-breadcrumb-current" data-type={crumb.type}>
+                              {crumb.label}
+                            </span>
+                          }
                         >
-                          {crumb.label}
-                        </a>
-                      </Show>
-                    </>
-                  );
-                }}
-              </For>
-              <Show when={currentCell()}>
-                <span class="ws-breadcrumb-sep" aria-hidden>
-                  ›
-                </span>
-                <span class="ws-breadcrumb-current" data-type="cell">
-                  {cellRow()?.label || '(Zeile)'} × {cellCol()?.label || '(Spalte)'}
-                </span>
-              </Show>
-            </nav>
-            {/* Welle D.9 — NodeDocsButton: zeigt Doku-Count fuer den
+                          <a
+                            class="ws-breadcrumb-link"
+                            data-type={crumb.type}
+                            href={`/w/${params.workspaceId}/n/${crumb.id}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              // Q.3.A.6 — Breadcrumb-Click ist Drill-Up:
+                              // wir navigieren zu einem Vorfahren der
+                              // aktuellen Route. View-Transitions API
+                              // animiert Pattern §2.7-inverse.
+                              drillNavigate(
+                                navigate,
+                                `/w/${params.workspaceId}/n/${crumb.id}`,
+                                'up',
+                              );
+                            }}
+                          >
+                            {crumb.label}
+                          </a>
+                        </Show>
+                      </>
+                    );
+                  }}
+                </For>
+                <Show when={currentCell()}>
+                  <span class="ws-breadcrumb-sep" aria-hidden>
+                    ›
+                  </span>
+                  <span class="ws-breadcrumb-current" data-type="cell">
+                    {cellRow()?.label || '(Zeile)'} × {cellCol()?.label || '(Spalte)'}
+                  </span>
+                </Show>
+              </nav>
+              {/* Welle D.9 — NodeDocsButton: zeigt Doku-Count fuer den
                 aktuellen Matrix-/Board-Node + Popover mit Liste. Nur
                 sichtbar wenn currentNode existiert (also nicht in einer
                 Cell-Route — dort ist die Cell-Doku-Pill zustaendig). */}
-            <Show when={currentNode() && !currentCell()}>
-              <NodeDocsButton
-                nodeId={currentNode()!.id}
-                nodeKind={currentNode()!.type}
-                nodeAlias={currentNode()!.alias ?? null}
-                atomPins={wsAtomPins() ?? []}
-                docs={wsDocs() ?? []}
-              />
-            </Show>
-            <Show when={params.workspaceId}>
-              <HeaderSearchBar
-                workspaceId={params.workspaceId as string}
-                currentNode={currentNode()}
-                currentCellId={params.cellId}
-                currentFeature={cellFeature()}
-                onShowHelp={() => setShowHelp(true)}
-                registerFocus={(fn) => {
-                  focusHeaderSearch = fn;
-                }}
-              />
-            </Show>
-            <Show when={params.workspaceId ? user() : null}>
-              {(u) => (
-                <PresenceStack
-                  users={presenceUsers}
-                  selfUserId={u().id}
-                  resolveLabel={resolvePresenceLabel}
+              <Show when={!currentCell() ? currentNode() : undefined}>
+                {(node) => (
+                  <NodeDocsButton
+                    nodeId={node().id}
+                    nodeKind={node().type}
+                    nodeAlias={node().alias ?? null}
+                    atomPins={wsAtomPins() ?? []}
+                    docs={wsDocs() ?? []}
+                  />
+                )}
+              </Show>
+              <Show when={params.workspaceId}>
+                <HeaderSearchBar
+                  workspaceId={params.workspaceId as string}
+                  currentNode={currentNode()}
+                  currentCellId={params.cellId}
+                  currentFeature={cellFeature()}
+                  onShowHelp={() => setShowHelp(true)}
+                  registerFocus={(fn) => {
+                    focusHeaderSearch = fn;
+                  }}
                 />
-              )}
-            </Show>
-            <Show when={params.workspaceId}>
-              <button
-                type="button"
-                class="incognito-toggle"
-                classList={{ 'incognito-active': incognito() }}
-                title={
-                  incognito()
-                    ? 'Incognito aktiv — fuer andere unsichtbar. Klick beendet den Modus.'
-                    : 'Incognito an — fuer andere kurz unsichtbar werden.'
-                }
-                aria-pressed={incognito()}
-                aria-label="Incognito-Modus umschalten"
-                onClick={() => toggleIncognito()}
-              >
-                <Icon name={incognito() ? 'eye-slash' : 'eye'} size={14} />
-              </button>
-            </Show>
-            <Show when={offlineState()}>
-              <span
-                class="offline-badge"
-                title="Offline — Daten kommen aus dem lokalen Cache und sind evtl. nicht aktuell."
-              >
-                <Icon name="no-symbol" size={14} />
-                <span>Offline</span>
-              </span>
-            </Show>
-            <Show when={pendingMuts() > 0 && params.workspaceId}>
-              <button
-                type="button"
-                class="pending-badge"
-                title={`${pendingMuts()} Aenderungen warten auf Synchronisation. Klick: jetzt versuchen.`}
-                onClick={() => {
-                  void (async () => {
-                    const res = await replayQueue(params.workspaceId as string);
-                    if (res.skippedBusy) {
-                      showToast('Sync laeuft bereits.', 'info');
-                      return;
-                    }
-                    if (res.succeeded === 0 && res.staled === 0 && res.failed === 0) {
-                      showToast(
-                        'Keine Aenderungen synchronisierbar — wahrscheinlich offline.',
-                        'info',
-                      );
-                    } else if (res.succeeded > 0) {
-                      showToast(`${res.succeeded} Aenderungen synchronisiert.`, 'success');
-                    }
-                  })();
-                }}
-              >
-                <Icon name="arrow-path" size={14} />
-                <span>{pendingMuts()} pending</span>
-              </button>
-            </Show>
-            <button
-              type="button"
-              class="theme-toggle-btn"
-              onClick={() => setShowHelp(true)}
-              title="Tastatur-Shortcuts (?)"
-              aria-label="Tastatur-Shortcuts"
-            >
-              <Icon name="question-mark" size={18} />
-            </button>
-            <button
-              type="button"
-              class="theme-toggle-btn"
-              onClick={() => {
-                const wsId = params.workspaceId;
-                if (wsId) navigate(`/w/${wsId}/settings/account/visibility`);
-              }}
-              title="Einstellungen"
-              aria-label="Einstellungen"
-              disabled={!params.workspaceId}
-            >
-              <Icon name="cog" size={18} />
-            </button>
-            <Show when={deferredPrompt() && !installed()}>
+              </Show>
+              <Show when={params.workspaceId ? user() : null}>
+                {(u) => (
+                  <PresenceStack
+                    users={presenceUsers}
+                    selfUserId={u().id}
+                    resolveLabel={resolvePresenceLabel}
+                  />
+                )}
+              </Show>
+              <Show when={params.workspaceId}>
+                <button
+                  type="button"
+                  class="incognito-toggle"
+                  classList={{ 'incognito-active': incognito() }}
+                  title={
+                    incognito()
+                      ? 'Incognito aktiv — fuer andere unsichtbar. Klick beendet den Modus.'
+                      : 'Incognito an — fuer andere kurz unsichtbar werden.'
+                  }
+                  aria-pressed={incognito()}
+                  aria-label="Incognito-Modus umschalten"
+                  onClick={() => toggleIncognito()}
+                >
+                  <Icon name={incognito() ? 'eye-slash' : 'eye'} size={14} />
+                </button>
+              </Show>
+              <Show when={offlineState()}>
+                <span
+                  class="offline-badge"
+                  title="Offline — Daten kommen aus dem lokalen Cache und sind evtl. nicht aktuell."
+                >
+                  <Icon name="no-symbol" size={14} />
+                  <span>Offline</span>
+                </span>
+              </Show>
+              <Show when={pendingMuts() > 0 && params.workspaceId}>
+                <button
+                  type="button"
+                  class="pending-badge"
+                  title={`${pendingMuts()} Aenderungen warten auf Synchronisation. Klick: jetzt versuchen.`}
+                  onClick={() => {
+                    void (async () => {
+                      const res = await replayQueue(params.workspaceId as string);
+                      if (res.skippedBusy) {
+                        showToast('Sync laeuft bereits.', 'info');
+                        return;
+                      }
+                      if (res.succeeded === 0 && res.staled === 0 && res.failed === 0) {
+                        showToast(
+                          'Keine Aenderungen synchronisierbar — wahrscheinlich offline.',
+                          'info',
+                        );
+                      } else if (res.succeeded > 0) {
+                        showToast(`${res.succeeded} Aenderungen synchronisiert.`, 'success');
+                      }
+                    })();
+                  }}
+                >
+                  <Icon name="arrow-path" size={14} />
+                  <span>{pendingMuts()} pending</span>
+                </button>
+              </Show>
               <button
                 type="button"
                 class="theme-toggle-btn"
-                onClick={() => void triggerInstallPrompt()}
-                title="Als App installieren"
-                aria-label="Als App installieren"
+                onClick={() => setShowHelp(true)}
+                title="Tastatur-Shortcuts (?)"
+                aria-label="Tastatur-Shortcuts"
               >
-                <Icon name="arrow-down-tray" size={18} />
+                <Icon name="question-mark" size={18} />
               </button>
-            </Show>
-            <button
-              type="button"
-              class="theme-toggle-btn"
-              onClick={() => {
-                const wsId = params.workspaceId;
-                if (wsId) navigate(`/w/${wsId}/agenda`);
-              }}
-              title="Agenda"
-              aria-label="Agenda"
-              disabled={!params.workspaceId}
-            >
-              <Icon name="list-bullet" size={18} />
-            </button>
-            <button
-              type="button"
-              class="theme-toggle-btn"
-              onClick={() => {
-                const wsId = params.workspaceId;
-                if (wsId) navigate(`/w/${wsId}/calendar`);
-              }}
-              title="Kalender"
-              aria-label="Kalender"
-              disabled={!params.workspaceId}
-            >
-              <Icon name="calendar" size={18} />
-            </button>
-            <button
-              type="button"
-              class="theme-toggle-btn"
-              onClick={() => {
-                const wsId = params.workspaceId;
-                if (wsId) navigate(`/w/${wsId}/objects`);
-              }}
-              title="Objekte"
-              aria-label="Objekte"
-              disabled={!params.workspaceId}
-            >
-              <Icon name="tag" size={18} />
-            </button>
-            <NotificationBell workspaceId={params.workspaceId ?? ''} />
-            <button
-              type="button"
-              class="theme-toggle-btn"
-              onClick={() => toggleTheme()}
-              title={theme() === 'dark' ? 'Light-Mode' : 'Dark-Mode'}
-              aria-label={theme() === 'dark' ? 'Light-Mode' : 'Dark-Mode'}
-            >
-              <Icon name={theme() === 'dark' ? 'sun' : 'moon'} size={18} />
-            </button>
-            <Show when={canWrite(myRole())}>
               <button
                 type="button"
-                class="edit-mode-btn"
-                classList={{ active: editMode() }}
-                onClick={() => toggleEditMode()}
-                title="Edit-Mode (Shift+E)"
-                aria-pressed={editMode()}
+                class="theme-toggle-btn"
+                onClick={() => {
+                  const wsId = params.workspaceId;
+                  if (wsId) navigate(`/w/${wsId}/settings/account/visibility`);
+                }}
+                title="Einstellungen"
+                aria-label="Einstellungen"
+                disabled={!params.workspaceId}
               >
-                {editMode() ? 'Edit: an' : 'Edit: aus'}
+                <Icon name="cog" size={18} />
               </button>
-            </Show>
-          </header>
+              <Show when={deferredPrompt() && !installed()}>
+                <button
+                  type="button"
+                  class="theme-toggle-btn"
+                  onClick={() => void triggerInstallPrompt()}
+                  title="Als App installieren"
+                  aria-label="Als App installieren"
+                >
+                  <Icon name="arrow-down-tray" size={18} />
+                </button>
+              </Show>
+              <button
+                type="button"
+                class="theme-toggle-btn"
+                onClick={() => {
+                  const wsId = params.workspaceId;
+                  if (wsId) navigate(`/w/${wsId}/agenda`);
+                }}
+                title="Agenda"
+                aria-label="Agenda"
+                disabled={!params.workspaceId}
+              >
+                <Icon name="list-bullet" size={18} />
+              </button>
+              <button
+                type="button"
+                class="theme-toggle-btn"
+                onClick={() => {
+                  const wsId = params.workspaceId;
+                  if (wsId) navigate(`/w/${wsId}/calendar`);
+                }}
+                title="Kalender"
+                aria-label="Kalender"
+                disabled={!params.workspaceId}
+              >
+                <Icon name="calendar" size={18} />
+              </button>
+              <button
+                type="button"
+                class="theme-toggle-btn"
+                onClick={() => {
+                  const wsId = params.workspaceId;
+                  if (wsId) navigate(`/w/${wsId}/objects`);
+                }}
+                title="Objekte"
+                aria-label="Objekte"
+                disabled={!params.workspaceId}
+              >
+                <Icon name="tag" size={18} />
+              </button>
+              <NotificationBell workspaceId={params.workspaceId ?? ''} />
+              <button
+                type="button"
+                class="theme-toggle-btn"
+                onClick={() => toggleTheme()}
+                title={theme() === 'dark' ? 'Light-Mode' : 'Dark-Mode'}
+                aria-label={theme() === 'dark' ? 'Light-Mode' : 'Dark-Mode'}
+              >
+                <Icon name={theme() === 'dark' ? 'sun' : 'moon'} size={18} />
+              </button>
+              <Show when={canWrite(myRole())}>
+                <button
+                  type="button"
+                  class="edit-mode-btn"
+                  classList={{ active: editMode() }}
+                  onClick={() => toggleEditMode()}
+                  title="Edit-Mode (Shift+E)"
+                  aria-pressed={editMode()}
+                >
+                  {editMode() ? 'Edit: an' : 'Edit: aus'}
+                </button>
+              </Show>
+            </header>
 
-          <Show
-            when={currentCell() || currentNode()}
-            fallback={
-              <WorkspaceEmptyState
-                workspaceId={params.workspaceId ?? ''}
-                canCreate={canWrite(myRole())}
-                onCreated={(nodeId) => navigate(`/w/${params.workspaceId}/n/${nodeId}`)}
-              />
-            }
-          >
-            <Show when={currentCell()}>
-              {(cell) => (
-                <section class="node-view">
-                  <Show when={cellSection() === 'checklists'}>
-                    <CellChecklistsPage
-                      workspaceId={cell().workspace_id}
-                      cell={cell()}
-                      row={cellRow()}
-                      col={cellCol()}
-                      realtimeVersion={rtCellChecklists()}
-                      realtimeDocsVersion={rtDocs()}
-                      presence={presenceUsers}
-                      selfUserId={user()?.id}
-                      onItemHover={setHoverItemId}
-                      resolverMaps={resolverMaps}
-                      wsManifestations={wsManifestations() ?? []}
-                    />
-                  </Show>
-                  <Show when={cellSection() === 'info'}>
-                    <CellInfoPage
-                      workspaceId={cell().workspace_id}
-                      cell={cell()}
-                      row={cellRow()}
-                      col={cellCol()}
-                      realtimeDocsVersion={rtDocs()}
-                      presence={presenceUsers}
-                      selfUserId={user()?.id}
-                      onFieldHover={setHoverFieldId}
-                      resolverMaps={resolverMaps}
-                      onChanged={() => {
-                        void refetchCells();
-                      }}
-                    />
-                  </Show>
-                  <Show when={cellSection() === 'docs'}>
-                    <CellDocsPage
-                      workspaceId={cell().workspace_id}
-                      cell={cell()}
-                      row={cellRow()}
-                      col={cellCol()}
-                      realtimeDocsVersion={rtDocs()}
-                      resolverMaps={resolverMaps}
-                    />
-                  </Show>
-                  <Show when={cellSection() === 'summary'}>
-                    <CellSummaryPage
-                      workspaceId={cell().workspace_id}
-                      cell={cell()}
-                      row={cellRow()}
-                      col={cellCol()}
-                      wsNodes={nodes() ?? []}
-                      wsCells={cells() ?? []}
-                      wsChecklists={wsChecklists() ?? []}
-                      wsTasks={wsTasks() ?? []}
-                      wsManifestations={wsManifestations() ?? []}
-                    />
-                  </Show>
-                </section>
-              )}
-            </Show>
-
-            <Show when={!currentCell() && currentNode()}>
-              {(node) => (
-                <section class="node-view">
-                  <div class="node-view-head">
-                    <h2>{resolveNodeLabel(node(), resolverMaps()) || '(ohne Label)'}</h2>
-                    <Show when={node().alias}>
-                      {(alias) => <span class="node-alias">^{alias()}</span>}
+            <Show
+              when={currentCell() || currentNode()}
+              fallback={
+                <WorkspaceEmptyState
+                  workspaceId={params.workspaceId ?? ''}
+                  canCreate={canWrite(myRole())}
+                  onCreated={(nodeId) => navigate(`/w/${params.workspaceId}/n/${nodeId}`)}
+                />
+              }
+            >
+              <Show when={currentCell()}>
+                {(cell) => (
+                  <section class="node-view">
+                    <Show when={cellSection() === 'checklists'}>
+                      <CellChecklistsPage
+                        workspaceId={cell().workspace_id}
+                        cell={cell()}
+                        row={cellRow()}
+                        col={cellCol()}
+                        realtimeVersion={rtCellChecklists()}
+                        realtimeDocsVersion={rtDocs()}
+                        presence={presenceUsers}
+                        selfUserId={user()?.id}
+                        onItemHover={setHoverItemId}
+                        resolverMaps={resolverMaps}
+                        wsManifestations={wsManifestations() ?? []}
+                      />
                     </Show>
-                    <span class="node-type-badge" data-type={node().type}>
-                      {node().type}
-                    </span>
-                    <button
-                      type="button"
-                      class="btn-subtle node-view-head-doc-btn"
-                      onClick={() =>
-                        openDocsPopup({
-                          sourceAlias: node().alias ?? null,
-                        })
-                      }
-                      title="Neue Doku mit dieser Matrix/diesem Board als Quelle"
-                    >
-                      + In Doku erfassen
-                    </button>
-                  </div>
+                    <Show when={cellSection() === 'info'}>
+                      <CellInfoPage
+                        workspaceId={cell().workspace_id}
+                        cell={cell()}
+                        row={cellRow()}
+                        col={cellCol()}
+                        realtimeDocsVersion={rtDocs()}
+                        presence={presenceUsers}
+                        selfUserId={user()?.id}
+                        onFieldHover={setHoverFieldId}
+                        resolverMaps={resolverMaps}
+                        onChanged={() => {
+                          void refetchCells();
+                        }}
+                      />
+                    </Show>
+                    <Show when={cellSection() === 'docs'}>
+                      <CellDocsPage
+                        workspaceId={cell().workspace_id}
+                        cell={cell()}
+                        row={cellRow()}
+                        col={cellCol()}
+                        realtimeDocsVersion={rtDocs()}
+                        resolverMaps={resolverMaps}
+                      />
+                    </Show>
+                    <Show when={cellSection() === 'summary'}>
+                      <CellSummaryPage
+                        workspaceId={cell().workspace_id}
+                        cell={cell()}
+                        row={cellRow()}
+                        col={cellCol()}
+                        wsNodes={nodes() ?? []}
+                        wsCells={cells() ?? []}
+                        wsChecklists={wsChecklists() ?? []}
+                        wsTasks={wsTasks() ?? []}
+                        wsManifestations={wsManifestations() ?? []}
+                      />
+                    </Show>
+                  </section>
+                )}
+              </Show>
 
-                  <NodeDescription node={node()} onChanged={() => void refetchNodes()} />
+              <Show when={!currentCell() && currentNode()}>
+                {(node) => (
+                  <section class="node-view">
+                    <div class="node-view-head">
+                      <h2>{resolveNodeLabel(node(), resolverMaps()) || '(ohne Label)'}</h2>
+                      <Show when={node().alias}>
+                        {(alias) => <span class="node-alias">^{alias()}</span>}
+                      </Show>
+                      <span class="node-type-badge" data-type={node().type}>
+                        {node().type}
+                      </span>
+                      <button
+                        type="button"
+                        class="btn-subtle node-view-head-doc-btn"
+                        onClick={() =>
+                          openDocsPopup({
+                            sourceAlias: node().alias ?? null,
+                          })
+                        }
+                        title="Neue Doku mit dieser Matrix/diesem Board als Quelle"
+                      >
+                        + In Doku erfassen
+                      </button>
+                    </div>
 
-                  <Show when={node().type === 'matrix'}>
-                    <MatrixView
-                      workspaceId={node().workspace_id}
-                      matrixId={node().id}
-                      content={matrixContent()}
-                      cellsWithDocs={cellsWithDocs() ?? new Set<string>()}
-                      wsNodes={nodes() ?? []}
-                      wsCells={cells() ?? []}
-                      wsRows={rows() ?? []}
-                      wsCols={colsData() ?? []}
-                      wsTasks={wsTasks() ?? []}
-                      wsManifestations={wsManifestations() ?? []}
-                      wsChecklists={wsChecklists() ?? []}
-                      cardsRealtimeVersion={rtCards()}
-                      presence={presenceUsers}
-                      selfUserId={user()?.id}
-                      onCellHover={setHoverCellId}
-                      resolverMaps={resolverMaps}
-                      onChanged={() => {
-                        // Nach strukturellen Aenderungen koennen neue/entfernte Sub-Nodes
-                        // im Tree sichtbar werden, und cells.child_matrix_id/board_id
-                        // aendern sich. Daher: nodes+cells auch refetchen.
-                        // Phase 3 O.8.M.7: rows + cols auch — bei Row-/Col-Header-
-                        // Rename via MatrixView wuerden sonst Sidebar-Tree und
-                        // workspace-globale Listen veraltete Labels zeigen, bis
-                        // der Realtime-Bump (asynchron) ankommt.
-                        void refetchMatrix();
-                        void refetchNodes();
-                        void refetchCells();
-                        void refetchRows();
-                        void refetchCols();
-                      }}
-                    />
-                  </Show>
+                    <NodeDescription node={node()} onChanged={() => void refetchNodes()} />
 
-                  <Show when={node().type === 'board'}>
-                    <BoardView
-                      workspaceId={node().workspace_id}
-                      boardId={node().id}
-                      content={boardContent()}
-                      presence={presenceUsers}
-                      selfUserId={user()?.id}
-                      onCardHover={setHoverCardId}
-                      wsManifestations={wsManifestations() ?? []}
-                      wsAtomPins={wsAtomPins() ?? []}
-                      wsDocs={wsDocs() ?? []}
-                      wsAtomTagsEnriched={wsAtomTagsEnriched()}
-                      atomPickerEntries={atomPickerEntries()}
-                      wsCells={cells() ?? []}
-                      wsNodes={nodes() ?? []}
-                      cellLabelById={cellLabelById()}
-                      tagsRealtimeVersion={rtTags()}
-                      onChanged={() => {
-                        void refetchBoard();
-                      }}
-                    />
-                  </Show>
-                </section>
-              )}
+                    <Show when={node().type === 'matrix'}>
+                      <MatrixView
+                        workspaceId={node().workspace_id}
+                        matrixId={node().id}
+                        content={matrixContent()}
+                        cellsWithDocs={cellsWithDocs() ?? new Set<string>()}
+                        wsNodes={nodes() ?? []}
+                        wsCells={cells() ?? []}
+                        wsRows={rows() ?? []}
+                        wsCols={colsData() ?? []}
+                        wsTasks={wsTasks() ?? []}
+                        wsManifestations={wsManifestations() ?? []}
+                        wsChecklists={wsChecklists() ?? []}
+                        cardsRealtimeVersion={rtCards()}
+                        presence={presenceUsers}
+                        selfUserId={user()?.id}
+                        onCellHover={setHoverCellId}
+                        resolverMaps={resolverMaps}
+                        onChanged={() => {
+                          // Nach strukturellen Aenderungen koennen neue/entfernte Sub-Nodes
+                          // im Tree sichtbar werden, und cells.child_matrix_id/board_id
+                          // aendern sich. Daher: nodes+cells auch refetchen.
+                          // Phase 3 O.8.M.7: rows + cols auch — bei Row-/Col-Header-
+                          // Rename via MatrixView wuerden sonst Sidebar-Tree und
+                          // workspace-globale Listen veraltete Labels zeigen, bis
+                          // der Realtime-Bump (asynchron) ankommt.
+                          void refetchMatrix();
+                          void refetchNodes();
+                          void refetchCells();
+                          void refetchRows();
+                          void refetchCols();
+                        }}
+                      />
+                    </Show>
+
+                    <Show when={node().type === 'board'}>
+                      <BoardView
+                        workspaceId={node().workspace_id}
+                        boardId={node().id}
+                        content={boardContent()}
+                        presence={presenceUsers}
+                        selfUserId={user()?.id}
+                        onCardHover={setHoverCardId}
+                        wsManifestations={wsManifestations() ?? []}
+                        wsAtomPins={wsAtomPins() ?? []}
+                        wsDocs={wsDocs() ?? []}
+                        wsAtomTagsEnriched={wsAtomTagsEnriched()}
+                        atomPickerEntries={atomPickerEntries()}
+                        wsCells={cells() ?? []}
+                        wsNodes={nodes() ?? []}
+                        cellLabelById={cellLabelById()}
+                        tagsRealtimeVersion={rtTags()}
+                        onChanged={() => {
+                          void refetchBoard();
+                        }}
+                      />
+                    </Show>
+                  </section>
+                )}
+              </Show>
             </Show>
           </Show>
-        </Show>
-      </main>
-    </div>
+        </main>
+      </div>
     </>
   );
 };

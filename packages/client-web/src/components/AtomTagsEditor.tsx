@@ -8,15 +8,11 @@
 // Wraps TagInput + AtomPickerModal + ObjectPickerModal. Picker
 // onPick-Handler ruft addAtomTagAtomRef bzw. addAtomTagObjectRef.
 
-import { type Component, Show, createResource, createSignal, createEffect } from 'solid-js';
-import {
-  addAtomTagAtomRef,
-  addAtomTagObjectRef,
-  fetchAtomTagsForAtom,
-} from '../lib/atom-tags';
+import { type Component, Show, createEffect, createResource, createSignal } from 'solid-js';
+import type { AtomKind } from '../lib/atom-manifestations';
+import { addAtomTagAtomRef, addAtomTagObjectRef, fetchAtomTagsForAtom } from '../lib/atom-tags';
 import { translateDbError } from '../lib/errors';
 import { showToast } from '../lib/toasts';
-import type { AtomKind } from '../lib/atom-manifestations';
 import type { CellRow, NodeRow } from '../lib/types';
 import AtomPickerModal, { type AtomPickerEntry } from './AtomPickerModal';
 import ObjectPickerModal from './ObjectPickerModal';

@@ -22,7 +22,6 @@ import {
   createExternalCalendar,
   importIcsEvents,
 } from '../lib/calendar-inbound';
-import { installFocusRestore, installFocusTrap } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
 import { parseIcs } from '../lib/ics-parser';
 import { fetchMyWorkspaces } from '../lib/queries';
@@ -141,40 +140,36 @@ const AddExternalCalendarModal: Component<AddExternalCalendarModalProps> = (prop
     props.onClose();
   }
 
-  let containerEl: HTMLDivElement | undefined;
+  let dialogEl: HTMLDialogElement | undefined;
 
   onMount(() => {
-    const restoreFocus = installFocusRestore();
-    onCleanup(restoreFocus);
-    if (containerEl) {
-      const releaseTrap = installFocusTrap(containerEl);
-      onCleanup(releaseTrap);
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      e.stopImmediatePropagation();
-      close();
-    };
-    document.addEventListener('keydown', onKey, true);
-    onCleanup(() => document.removeEventListener('keydown', onKey, true));
+    // <dialog>.showModal() liefert nativen Modal-Backdrop, Focus-Trap
+    // und Focus-Restore — installFocusTrap/Restore entfaellt.
+    dialogEl?.showModal();
+  });
+
+  onCleanup(() => {
+    dialogEl?.close();
   });
 
   return (
-    <div
-      class="overlay-scrim"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) close();
+    <dialog
+      ref={dialogEl}
+      class="overlay-modal add-cal-modal"
+      aria-labelledby="add-cal-title"
+      onCancel={(e) => {
+        e.preventDefault();
+        close();
       }}
     >
-      <div
-        ref={(el) => {
-          containerEl = el;
-        }}
-        class="overlay-card add-cal-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="add-cal-title"
-      >
+      <button
+        type="button"
+        class="overlay-modal-backdrop-closer"
+        onClick={close}
+        aria-label="Schliessen"
+        tabIndex={-1}
+      />
+      <div class="overlay-card add-cal-modal-card">
         <header class="overlay-head">
           <h3 id="add-cal-title">Externen Kalender verbinden</h3>
           <button
@@ -189,163 +184,163 @@ const AddExternalCalendarModal: Component<AddExternalCalendarModalProps> = (prop
         </header>
 
         <nav class="add-cal-tabs" role="tablist">
-            <For
-              each={[
-                { key: 'ics' as TabKey, label: 'ICS-URL', hint: 'Subscribe' },
-                { key: 'upload' as TabKey, label: 'Datei hochladen', hint: 'One-Shot' },
-                { key: 'google' as TabKey, label: 'Google', hint: 'OAuth' },
-                { key: 'microsoft' as TabKey, label: 'Microsoft', hint: 'OAuth' },
-              ]}
-            >
-              {(t) => (
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={tab() === t.key}
-                  class="add-cal-tab"
-                  classList={{ active: tab() === t.key }}
-                  onClick={() => setTab(t.key)}
-                >
-                  <span>{t.label}</span>
-                  <span class="add-cal-tab-hint">{t.hint}</span>
-                </button>
-              )}
-            </For>
+          <For
+            each={[
+              { key: 'ics' as TabKey, label: 'ICS-URL', hint: 'Subscribe' },
+              { key: 'upload' as TabKey, label: 'Datei hochladen', hint: 'One-Shot' },
+              { key: 'google' as TabKey, label: 'Google', hint: 'OAuth' },
+              { key: 'microsoft' as TabKey, label: 'Microsoft', hint: 'OAuth' },
+            ]}
+          >
+            {(t) => (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab() === t.key}
+                class="add-cal-tab"
+                classList={{ active: tab() === t.key }}
+                onClick={() => setTab(t.key)}
+              >
+                <span>{t.label}</span>
+                <span class="add-cal-tab-hint">{t.hint}</span>
+              </button>
+            )}
+          </For>
         </nav>
 
         <div class="overlay-body">
-            <Show when={tab() === 'ics' || tab() === 'upload'}>
-              <label class="login-field">
-                <span>Workspace</span>
-                <select
-                  class="input"
-                  value={workspaceId()}
-                  onInput={(e) => setWorkspaceId(e.currentTarget.value)}
-                >
-                  <For each={workspaces() ?? []}>
-                    {(ws) => <option value={ws.id}>{ws.name}</option>}
-                  </For>
-                </select>
-              </label>
-              <label class="login-field">
-                <span>Label</span>
-                <input
-                  class="input"
-                  type="text"
-                  value={label()}
-                  onInput={(e) => setLabel(e.currentTarget.value)}
-                  placeholder="z.B. Outlook-Privat"
-                  maxlength={100}
-                />
-              </label>
-              <label class="login-field">
-                <span>Farbe</span>
-                <input
-                  type="color"
-                  class="add-cal-color"
-                  value={color()}
-                  onInput={(e) => setColor(e.currentTarget.value)}
-                />
-              </label>
-            </Show>
+          <Show when={tab() === 'ics' || tab() === 'upload'}>
+            <label class="login-field">
+              <span>Workspace</span>
+              <select
+                class="input"
+                value={workspaceId()}
+                onInput={(e) => setWorkspaceId(e.currentTarget.value)}
+              >
+                <For each={workspaces() ?? []}>
+                  {(ws) => <option value={ws.id}>{ws.name}</option>}
+                </For>
+              </select>
+            </label>
+            <label class="login-field">
+              <span>Label</span>
+              <input
+                class="input"
+                type="text"
+                value={label()}
+                onInput={(e) => setLabel(e.currentTarget.value)}
+                placeholder="z.B. Outlook-Privat"
+                maxlength={100}
+              />
+            </label>
+            <label class="login-field">
+              <span>Farbe</span>
+              <input
+                type="color"
+                class="add-cal-color"
+                value={color()}
+                onInput={(e) => setColor(e.currentTarget.value)}
+              />
+            </label>
+          </Show>
 
-            <Show when={tab() === 'ics'}>
-              <label class="login-field">
-                <span>ICS-URL</span>
-                <input
-                  class="input"
-                  type="url"
-                  value={icsUrl()}
-                  onInput={(e) => setIcsUrl(e.currentTarget.value)}
-                  placeholder="https://..."
-                />
-                <small class="hint">
-                  In Outlook → „Kalender veroeffentlichen", in Google → „Geheime Adresse im
-                  iCal-Format", in Apple → „Oeffentlicher Kalender" Toggle.
-                </small>
-              </label>
-              <label class="login-field">
-                <span>Sync-Intervall</span>
-                <select
-                  class="input"
-                  value={interval()}
-                  onInput={(e) => setInterval(Number(e.currentTarget.value))}
-                >
-                  <For each={SYNC_INTERVAL_OPTIONS}>
-                    {(o) => <option value={o.value}>{o.label}</option>}
-                  </For>
-                </select>
-              </label>
-            </Show>
+          <Show when={tab() === 'ics'}>
+            <label class="login-field">
+              <span>ICS-URL</span>
+              <input
+                class="input"
+                type="url"
+                value={icsUrl()}
+                onInput={(e) => setIcsUrl(e.currentTarget.value)}
+                placeholder="https://..."
+              />
+              <small class="hint">
+                In Outlook → „Kalender veroeffentlichen", in Google → „Geheime Adresse im
+                iCal-Format", in Apple → „Oeffentlicher Kalender" Toggle.
+              </small>
+            </label>
+            <label class="login-field">
+              <span>Sync-Intervall</span>
+              <select
+                class="input"
+                value={interval()}
+                onInput={(e) => setInterval(Number(e.currentTarget.value))}
+              >
+                <For each={SYNC_INTERVAL_OPTIONS}>
+                  {(o) => <option value={o.value}>{o.label}</option>}
+                </For>
+              </select>
+            </label>
+          </Show>
 
-            <Show when={tab() === 'upload'}>
-              <label class="login-field">
-                <span>.ics-Datei</span>
-                <input
-                  class="input"
-                  type="file"
-                  accept=".ics,text/calendar"
-                  onChange={(e) => void handleFileChange(e.currentTarget.files?.[0] ?? null)}
-                />
-                <Show when={uploadFile()}>
-                  {(f) => (
-                    <small class="hint">
-                      {f().name} · {(f().size / 1024).toFixed(1)} KB
-                    </small>
-                  )}
-                </Show>
-                <Show when={parseError()}>
-                  <small class="hint hint-danger">{parseError()}</small>
-                </Show>
-              </label>
-
-              <Show when={uploadPreview().length > 0}>
-                <section class="add-cal-preview">
-                  <h3>
-                    Vorschau ({uploadPreview().length} Eintraege —
-                    {uploadPreview().length > 5 ? ' erste 5' : ''})
-                  </h3>
-                  <ul class="add-cal-preview-list">
-                    <For each={uploadPreview().slice(0, 5)}>
-                      {(ev) => (
-                        <li>
-                          <span class="add-cal-preview-summary">{ev.summary}</span>
-                          <span class="add-cal-preview-date">
-                            {new Date(ev.start_at).toLocaleDateString('de-DE')}
-                            <Show when={ev.rrule}> · wiederholt</Show>
-                          </span>
-                        </li>
-                      )}
-                    </For>
-                  </ul>
-                </section>
+          <Show when={tab() === 'upload'}>
+            <label class="login-field">
+              <span>.ics-Datei</span>
+              <input
+                class="input"
+                type="file"
+                accept=".ics,text/calendar"
+                onChange={(e) => void handleFileChange(e.currentTarget.files?.[0] ?? null)}
+              />
+              <Show when={uploadFile()}>
+                {(f) => (
+                  <small class="hint">
+                    {f().name} · {(f().size / 1024).toFixed(1)} KB
+                  </small>
+                )}
               </Show>
-            </Show>
+              <Show when={parseError()}>
+                <small class="hint hint-danger">{parseError()}</small>
+              </Show>
+            </label>
 
-            <Show when={tab() === 'google'}>
-              <div class="add-cal-deferred">
-                <Icon name="sparkles" size={20} />
-                <p>
-                  <strong>Google-Calendar-OAuth</strong> kommt mit Welle I.10.
-                </p>
-                <p class="hint">
-                  Workaround: in Google Calendar „Geheime Adresse im iCal-Format" kopieren und in
-                  den ICS-URL-Tab einsetzen.
-                </p>
-              </div>
+            <Show when={uploadPreview().length > 0}>
+              <section class="add-cal-preview">
+                <h3>
+                  Vorschau ({uploadPreview().length} Eintraege —
+                  {uploadPreview().length > 5 ? ' erste 5' : ''})
+                </h3>
+                <ul class="add-cal-preview-list">
+                  <For each={uploadPreview().slice(0, 5)}>
+                    {(ev) => (
+                      <li>
+                        <span class="add-cal-preview-summary">{ev.summary}</span>
+                        <span class="add-cal-preview-date">
+                          {new Date(ev.start_at).toLocaleDateString('de-DE')}
+                          <Show when={ev.rrule}> · wiederholt</Show>
+                        </span>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+              </section>
             </Show>
-            <Show when={tab() === 'microsoft'}>
-              <div class="add-cal-deferred">
-                <Icon name="sparkles" size={20} />
-                <p>
-                  <strong>Microsoft-365-OAuth</strong> kommt mit Welle I.11.
-                </p>
-                <p class="hint">
-                  Workaround: in Outlook → Calendar veroeffentlichen → ICS-URL kopieren und in den
-                  ICS-URL-Tab einsetzen.
-                </p>
-              </div>
-            </Show>
+          </Show>
+
+          <Show when={tab() === 'google'}>
+            <div class="add-cal-deferred">
+              <Icon name="sparkles" size={20} />
+              <p>
+                <strong>Google-Calendar-OAuth</strong> kommt mit Welle I.10.
+              </p>
+              <p class="hint">
+                Workaround: in Google Calendar „Geheime Adresse im iCal-Format" kopieren und in den
+                ICS-URL-Tab einsetzen.
+              </p>
+            </div>
+          </Show>
+          <Show when={tab() === 'microsoft'}>
+            <div class="add-cal-deferred">
+              <Icon name="sparkles" size={20} />
+              <p>
+                <strong>Microsoft-365-OAuth</strong> kommt mit Welle I.11.
+              </p>
+              <p class="hint">
+                Workaround: in Outlook → Calendar veroeffentlichen → ICS-URL kopieren und in den
+                ICS-URL-Tab einsetzen.
+              </p>
+            </div>
+          </Show>
         </div>
 
         <footer class="overlay-foot">
@@ -374,7 +369,7 @@ const AddExternalCalendarModal: Component<AddExternalCalendarModalProps> = (prop
           </Show>
         </footer>
       </div>
-    </div>
+    </dialog>
   );
 };
 

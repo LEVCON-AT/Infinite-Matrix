@@ -89,11 +89,13 @@ const MobileTreeDrawer: Component<MobileTreeDrawerProps> = (props) => {
 
   return (
     <Show when={props.open()}>
-      <div
+      <button
+        type="button"
         class="mobile-tree-drawer-backdrop"
         data-open="true"
         onClick={props.onClose}
-        aria-hidden="true"
+        aria-label="Drawer schliessen"
+        tabIndex={-1}
       />
     </Show>
   );

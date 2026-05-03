@@ -95,9 +95,7 @@ const CellDocsSection: Component<Props> = (p) => {
                     <span class="cell-docs-item-title">
                       {(() => {
                         const maps = p.resolverMaps?.();
-                        const resolved = maps
-                          ? resolveDocTitle(d, maps, p.cell.id)
-                          : d.title;
+                        const resolved = maps ? resolveDocTitle(d, maps, p.cell.id) : d.title;
                         return resolved || '(ohne Titel)';
                       })()}
                     </span>

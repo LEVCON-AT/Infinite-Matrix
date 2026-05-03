@@ -12,7 +12,7 @@
 // Mention-Node wird als atomic inline-Node ins Schema gehaengt. HTML-
 // Roundtrip stabil ueber span[data-mention]+attribute-Set.
 
-import { type Node as PMNode, type NodeSpec, Schema } from 'prosemirror-model';
+import type { NodeSpec, Node as PMNode, Schema } from 'prosemirror-model';
 import { Plugin, PluginKey, type Transaction } from 'prosemirror-state';
 
 export type MentionTrigger = '@' | '#' | '^';
@@ -90,19 +90,17 @@ export function buildMentionPlugin(opts: {
         // (typische Tipp-Operation).
         const meta = tr.getMeta('mention-internal');
         if (meta) continue; // eigene Mention-Inserts nicht rekursiv triggern
-        let triggered = false;
-        tr.steps.forEach((step) => {
-          if (triggered) return;
+        // for-of statt forEach, weil wir nach dem ersten Treffer
+        // abbrechen muessen (Tipp-Operation = ein Step pro Frame).
+        for (const step of tr.steps) {
           const json = step.toJSON() as { stepType?: string; from?: number; slice?: unknown };
-          if (json.stepType !== 'replace') return;
-          const slice = (json.slice ?? null) as
-            | { content?: Array<{ text?: string }> }
-            | null;
+          if (json.stepType !== 'replace') continue;
+          const slice = (json.slice ?? null) as { content?: Array<{ text?: string }> } | null;
           const content = slice?.content;
-          if (!content || content.length !== 1) return;
+          if (!content || content.length !== 1) continue;
           const text = content[0]?.text;
-          if (!text || text.length !== 1) return;
-          if (text !== '@' && text !== '#' && text !== '^') return;
+          if (!text || text.length !== 1) continue;
+          if (text !== '@' && text !== '#' && text !== '^') continue;
           // Wort-Anfang-Check: Zeichen vor dem Trigger muss ein
           // Whitespace, Doc-Anfang oder Block-Anfang sein.
           const fromPos = (json.from ?? 0) + 1; // step.from ist position vor dem insert
@@ -113,15 +111,15 @@ export function buildMentionPlugin(opts: {
             ' ',
             ' ',
           );
-          if (before && /\S/.test(before)) return;
+          if (before && /\S/.test(before)) continue;
           // Wir setzen ein Meta-Flag auf der Transaction damit der
           // Plugin-View den Trigger handhaben kann ohne Loop.
           opts.onTrigger({
             trigger: text as MentionTrigger,
             triggerPos: fromPos - 1, // Position direkt vor dem Trigger-Char
           });
-          triggered = true;
-        });
+          break;
+        }
       }
       return null;
     },

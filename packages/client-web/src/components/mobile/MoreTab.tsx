@@ -6,7 +6,7 @@
 // V1-Inhalt: Edit-Mode-Toggle, Theme-Switch, Settings-Link, Logout.
 
 import { useNavigate } from '@solidjs/router';
-import { type Accessor, type Component } from 'solid-js';
+import type { Accessor, Component } from 'solid-js';
 import { signOut } from '../../lib/auth';
 import { toggleEditMode, useEditMode } from '../../lib/edit-mode';
 import { toggleTheme, useTheme } from '../../lib/theme';

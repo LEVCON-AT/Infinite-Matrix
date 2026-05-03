@@ -8,7 +8,6 @@
 // analog ImportedEventDetailModal — overlay-scrim + focus-trap + ESC.
 
 import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
-import { installFocusRestore, installFocusTrap } from '../lib/dialog';
 import type { AtomKind } from '../lib/atom-manifestations';
 import Icon from './Icon';
 
@@ -33,7 +32,7 @@ type FilterTab = 'all' | 'task' | 'link' | 'doc' | 'checklist' | 'imported_event
 const AtomPickerModal: Component<AtomPickerModalProps> = (p) => {
   const [filter, setFilter] = createSignal('');
   const [tab, setTab] = createSignal<FilterTab>('all');
-  let containerEl: HTMLDivElement | undefined;
+  let dialogEl: HTMLDialogElement | undefined;
   let inputEl: HTMLInputElement | undefined;
 
   const filtered = createMemo<AtomPickerEntry[]>(() => {
@@ -49,22 +48,14 @@ const AtomPickerModal: Component<AtomPickerModalProps> = (p) => {
   });
 
   onMount(() => {
-    const restoreFocus = installFocusRestore();
-    onCleanup(restoreFocus);
-    if (containerEl) {
-      const release = installFocusTrap(containerEl);
-      onCleanup(release);
-    }
+    // <dialog>.showModal() liefert nativen Modal-Backdrop, Focus-Trap
+    // und Focus-Restore. Daher entfaellt installFocusTrap/Restore.
+    dialogEl?.showModal();
     inputEl?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopImmediatePropagation();
-        e.preventDefault();
-        p.onClose();
-      }
-    };
-    document.addEventListener('keydown', onKey, true);
-    onCleanup(() => document.removeEventListener('keydown', onKey, true));
+  });
+
+  onCleanup(() => {
+    dialogEl?.close();
   });
 
   function tabLabel(t: FilterTab): string {
@@ -77,29 +68,28 @@ const AtomPickerModal: Component<AtomPickerModalProps> = (p) => {
   }
 
   return (
-    <div
-      class="overlay-scrim"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) p.onClose();
+    <dialog
+      ref={dialogEl}
+      class="overlay-modal atom-picker-modal"
+      aria-labelledby="atom-picker-title"
+      onCancel={(e) => {
+        // Native ESC feuert cancel-Event; wir fangen es ab und delegieren
+        // an onClose damit Solid-State + close() konsistent bleiben.
+        e.preventDefault();
+        p.onClose();
       }}
     >
-      <div
-        ref={(el) => {
-          containerEl = el;
-        }}
-        class="overlay-card atom-picker-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="atom-picker-title"
-      >
+      <button
+        type="button"
+        class="overlay-modal-backdrop-closer"
+        onClick={p.onClose}
+        aria-label="Schliessen"
+        tabIndex={-1}
+      />
+      <div class="overlay-card">
         <header class="overlay-head">
           <h3 id="atom-picker-title">Atom verlinken</h3>
-          <button
-            type="button"
-            class="overlay-close"
-            onClick={p.onClose}
-            aria-label="Schliessen"
-          >
+          <button type="button" class="overlay-close" onClick={p.onClose} aria-label="Schliessen">
             <Icon name="x" size={18} />
           </button>
         </header>
@@ -164,7 +154,7 @@ const AtomPickerModal: Component<AtomPickerModalProps> = (p) => {
           </Show>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 };
 

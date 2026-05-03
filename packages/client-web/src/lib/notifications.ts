@@ -6,13 +6,8 @@
 //
 // Mark-Read laeuft via SECURITY DEFINER-RPCs (Migration 062).
 
-import {
-  type CacheTable,
-  getByWorkspace,
-  mergeRows,
-  putOne,
-} from './offline-cache';
 import { isNetworkError } from './mutation-queue';
+import { type CacheTable, getByWorkspace, mergeRows, putOne } from './offline-cache';
 import { markCacheFallback, markLiveSuccess } from './offline-state';
 import { supabase } from './supabase';
 import type { WorkspaceEventKind } from './webhooks';
@@ -56,9 +51,7 @@ export async function fetchNotifications(
     if (workspaceId) {
       const cached = await getByWorkspace<Notification>(NOTIFICATIONS_TABLE, workspaceId);
       markCacheFallback();
-      return cached
-        .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
-        .slice(0, limit);
+      return cached.sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, limit);
     }
     markCacheFallback();
     return [];
@@ -83,11 +76,7 @@ export async function markNotificationRead(id: string): Promise<void> {
   const { error } = await supabase.rpc('mark_notification_read', { p_id: id });
   if (error) throw error;
   // Cache-Patch, damit der Drawer ohne Refetch das Read-Flag zeigt.
-  const { data: row } = await supabase
-    .from('notifications')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle();
+  const { data: row } = await supabase.from('notifications').select('*').eq('id', id).maybeSingle();
   if (row) void putOne(NOTIFICATIONS_TABLE, row as Notification);
 }
 
@@ -96,7 +85,7 @@ export async function markAllNotificationsRead(workspaceId?: string): Promise<nu
     p_workspace_id: workspaceId ?? null,
   });
   if (error) throw error;
-  return ((data as { marked_read?: number } | null)?.marked_read ?? 0);
+  return (data as { marked_read?: number } | null)?.marked_read ?? 0;
 }
 
 // ─── Realtime ──────────────────────────────────────────────────

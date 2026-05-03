@@ -150,8 +150,8 @@ const AccountCalendars: Component = () => {
         <h2>Externe Kalender</h2>
         <p class="hint">
           Outlook / Google / Apple / iCal Kalender abonnieren. Importierte Termine erscheinen im
-          Matrix-Calendar mit Provider-Farbe + Badge — aus jedem Termin kannst Du eine Task
-          ableiten (Snapshot oder live verbunden).
+          Matrix-Calendar mit Provider-Farbe + Badge — aus jedem Termin kannst Du eine Task ableiten
+          (Snapshot oder live verbunden).
         </p>
       </header>
 
@@ -213,19 +213,23 @@ const AccountCalendars: Component = () => {
                         </span>
                       </Show>
                       <Show when={cal.last_sync_at}>
-                        <span>Sync: {formatDateTimeDE(cal.last_sync_at!)}</span>
+                        {(syncAt) => <span>Sync: {formatDateTimeDE(syncAt())}</span>}
                       </Show>
                     </div>
                   </div>
 
                   <div class="ext-cal-actions">
-                    <Show when={cal.kind === 'ics_subscribe' || cal.kind === 'google' || cal.kind === 'microsoft'}>
+                    <Show
+                      when={
+                        cal.kind === 'ics_subscribe' ||
+                        cal.kind === 'google' ||
+                        cal.kind === 'microsoft'
+                      }
+                    >
                       <select
                         class="input ext-cal-interval"
                         value={cal.sync_interval_minutes}
-                        onChange={(e) =>
-                          void onChangeInterval(cal, Number(e.currentTarget.value))
-                        }
+                        onChange={(e) => void onChangeInterval(cal, Number(e.currentTarget.value))}
                         disabled={busyId() === cal.id}
                         aria-label="Sync-Intervall"
                       >

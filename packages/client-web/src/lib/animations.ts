@@ -522,10 +522,7 @@ export function bottomSheetClose(
 
 // Mobile-Variant — Bottom-Sheet-Snap. Wechselt zwischen 50vh / 90vh.
 // Nutzt dieselbe CSS-Variable, die das Stylesheet liest. 200ms-Slide.
-export function bottomSheetSnap(
-  sheet: HTMLElement | null,
-  target: 'default' | 'expanded',
-): void {
+export function bottomSheetSnap(sheet: HTMLElement | null, target: 'default' | 'expanded'): void {
   if (!sheet) return;
   const targetHeight =
     target === 'expanded'

@@ -1142,9 +1142,7 @@ export async function fetchDocsForCell(cellId: string, workspaceId: string): Pro
     }>('atom_pins', workspaceId);
     const docIds = new Set(
       pins
-        .filter(
-          (p) => p.parent_kind === 'cell' && p.parent_id === cellId && p.atom_type === 'doc',
-        )
+        .filter((p) => p.parent_kind === 'cell' && p.parent_id === cellId && p.atom_type === 'doc')
         .map((p) => p.atom_id),
     );
     const all = await getByWorkspace<DocRow>('docs', workspaceId);

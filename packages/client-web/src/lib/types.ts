@@ -643,7 +643,7 @@ export type ExternalEvent = {
   description: string | null;
   location: string | null;
   url: string | null;
-  start_at: string;          // ISO timestamp
+  start_at: string; // ISO timestamp
   end_at: string | null;
   all_day: boolean;
   rrule: string | null;

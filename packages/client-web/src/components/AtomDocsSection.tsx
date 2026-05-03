@@ -12,9 +12,9 @@
 // gekuerzt (read-only, kein dompurify-roundtrip noetig).
 
 import { type Component, For, Show } from 'solid-js';
+import type { AtomKind } from '../lib/atom-manifestations';
 import { openDokuForContext } from '../lib/docs-open';
 import { openDocsPopup } from '../lib/docs-ui';
-import type { AtomKind } from '../lib/atom-manifestations';
 import type { AtomPin, DocRow } from '../lib/types';
 import Icon from './Icon';
 
@@ -50,9 +50,7 @@ const AtomDocsSection: Component<AtomDocsSectionProps> = (p) => {
       p.atomPins
         .filter(
           (pin) =>
-            pin.atom_type === 'doc' &&
-            pin.parent_kind === 'atom' &&
-            pin.parent_id === p.atomId,
+            pin.atom_type === 'doc' && pin.parent_kind === 'atom' && pin.parent_id === p.atomId,
         )
         .map((pin) => pin.atom_id),
     );
@@ -100,9 +98,7 @@ const AtomDocsSection: Component<AtomDocsSectionProps> = (p) => {
                   onClick={() => openDocsPopup({ initialDocId: d.id })}
                 >
                   <div class="atom-docs-section-item-head">
-                    <span class="atom-docs-section-item-title">
-                      {d.title || '(ohne Titel)'}
-                    </span>
+                    <span class="atom-docs-section-item-title">{d.title || '(ohne Titel)'}</span>
                     <Show when={d.alias}>
                       <span class="atom-docs-section-item-alias">^{d.alias}</span>
                     </Show>

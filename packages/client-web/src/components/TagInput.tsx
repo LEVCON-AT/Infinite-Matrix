@@ -15,15 +15,11 @@
 // updaten.
 
 import { type Component, For, Show, createMemo, createSignal } from 'solid-js';
+import type { AtomKind } from '../lib/atom-manifestations';
+import { addAtomTagAlias, addAtomTagFreetext, removeAtomTag } from '../lib/atom-tags';
 import { translateDbError } from '../lib/errors';
-import {
-  addAtomTagAlias,
-  addAtomTagFreetext,
-  removeAtomTag,
-} from '../lib/atom-tags';
 import { showToast } from '../lib/toasts';
 import type { AtomTagWithTag } from '../lib/types';
-import type { AtomKind } from '../lib/atom-manifestations';
 import Icon from './Icon';
 
 export type TagInputProps = {
@@ -126,7 +122,8 @@ const TagInput: Component<TagInputProps> = (p) => {
   }
 
   return (
-    <div class="tag-input" role="group" aria-label="Tags bearbeiten">
+    <fieldset class="tag-input">
+      <legend class="visually-hidden">Tags bearbeiten</legend>
       <For each={p.tags}>
         {(t) => (
           <span class="tag-input-pill" classList={{ [`tag-pill-${t.tag_kind}`]: true }}>
@@ -182,7 +179,7 @@ const TagInput: Component<TagInputProps> = (p) => {
           Object
         </button>
       </Show>
-    </div>
+    </fieldset>
   );
 };
 

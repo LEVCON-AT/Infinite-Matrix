@@ -297,7 +297,7 @@
    Schwarz fuer Battery + maximale Schatten-Tiefe. Surface bleibt leicht
    abgesetzt fuer visuelle Hierarchie. data-theme sitzt auf <html>, der
    viewport-Tag auf body — Selector verbindet beide Vorfahren. */
-[data-theme='dark'] body[data-viewport='phone'] {
+[data-theme="dark"] body[data-viewport="phone"] {
   --canvas: #000000;
   --surface: #0f1115;
   --surface-hover: #1a1d23;
@@ -2928,10 +2928,18 @@ button[type="submit"]:hover:not(:disabled) {
   color: var(--text2);
   font-weight: 600;
 }
-.tag-pill-freetext { color: var(--blue); }
-.tag-pill-alias_ref { color: var(--violet, var(--blue)); }
-.tag-pill-atom_ref { color: var(--green, var(--blue)); }
-.tag-pill-object_ref { color: var(--amber, var(--blue)); }
+.tag-pill-freetext {
+  color: var(--blue);
+}
+.tag-pill-alias_ref {
+  color: var(--violet, var(--blue));
+}
+.tag-pill-atom_ref {
+  color: var(--green, var(--blue));
+}
+.tag-pill-object_ref {
+  color: var(--amber, var(--blue));
+}
 .tag-pill-overflow {
   color: var(--text2);
   font-style: italic;
@@ -2947,6 +2955,23 @@ button[type="submit"]:hover:not(:disabled) {
   border-radius: var(--rs);
   background: var(--bg);
   min-height: 2em;
+  /* Reset fieldset-Defaults (border/padding/margin); wir setzen oben
+     unsere eigenen Werte. */
+  margin: 0;
+  min-inline-size: 0;
+}
+
+/* Screen-Reader-only Label fuer fieldset/legend ohne visuellen Effekt. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 .tag-input:focus-within {
   border-color: var(--blue);
@@ -5968,6 +5993,51 @@ body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   z-index: 300;
   padding: var(--space-md);
   animation: overlayIn var(--tr-enter) var(--ease-smooth);
+}
+
+/* Native <dialog>-Migration: setzt Defaults zurueck damit der innere
+   .overlay-card unveraendert weiter rendert. Backdrop via ::backdrop-
+   Pseudo statt separater .overlay-scrim. */
+dialog.overlay-modal {
+  border: none;
+  padding: 0;
+  background: transparent;
+  max-width: 100vw;
+  max-height: 100vh;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inset: 0;
+}
+
+dialog.overlay-modal::backdrop {
+  background: var(--overlay-soft);
+  animation: overlayIn var(--tr-enter) var(--ease-smooth);
+}
+
+dialog.overlay-modal:not([open]) {
+  display: none;
+}
+
+/* Click-Outside-To-Close: ein unsichtbarer Button hinter der Card,
+   der den ganzen Dialog-Bereich abdeckt. Card sitzt mit z-index ueber
+   ihm, also faengt der Closer nur Click in den Backdrop-Bereich. */
+.overlay-modal-backdrop-closer {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: default;
+  z-index: 0;
+}
+
+dialog.overlay-modal .overlay-card {
+  position: relative;
+  z-index: 1;
 }
 
 @keyframes overlayIn {
@@ -15311,8 +15381,8 @@ html.view-transition-drill-up::view-transition-new(ws-main) {
   color: var(--text2);
   font-weight: 600;
   font-size: var(--text-sm);
-  transition: color var(--dur-fast) var(--ease-standard),
-    border-color var(--dur-fast) var(--ease-standard);
+  transition: color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast)
+    var(--ease-standard);
 }
 
 .add-cal-tab:hover {
@@ -15533,7 +15603,7 @@ html.view-transition-drill-up::view-transition-new(ws-main) {
   user-select: none;
 }
 
-.calendar-filter-toggle input[type='checkbox'] {
+.calendar-filter-toggle input[type="checkbox"] {
   accent-color: var(--accent);
   cursor: pointer;
 }
@@ -15645,7 +15715,7 @@ html.view-transition-drill-up::view-transition-new(ws-main) {
   cursor: pointer;
 }
 
-.derive-mode-option input[type='radio'] {
+.derive-mode-option input[type="radio"] {
   margin-top: 4px;
   cursor: pointer;
 }
@@ -15698,8 +15768,8 @@ html.view-transition-drill-up::view-transition-new(ws-main) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background var(--dur-fast) var(--ease-standard),
-    color var(--dur-fast) var(--ease-standard);
+  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast)
+    var(--ease-standard);
 }
 
 .notification-bell:hover {
@@ -15870,14 +15940,14 @@ html.view-transition-drill-up::view-transition-new(ws-main) {
 
 /* Workspace-Header verstecken auf Phone — Mobile-Header uebernimmt
    seine Funktion. */
-body[data-viewport='phone'] .ws-main-header {
+body[data-viewport="phone"] .ws-main-header {
   display: none;
 }
 
 /* Sidebar wird auf Phone zum Drawer. Standardmaessig nach links
    versteckt (translateX(-100%)). body[data-tree-drawer="open"] zieht
    sie rein. Animation via transform fuer GPU-Beschleunigung. */
-body[data-viewport='phone'] .ws-sidebar {
+body[data-viewport="phone"] .ws-sidebar {
   position: fixed;
   top: 0;
   bottom: 0;
@@ -15894,7 +15964,7 @@ body[data-viewport='phone'] .ws-sidebar {
   padding-bottom: var(--safe-bottom);
 }
 
-body[data-viewport='phone'][data-tree-drawer='open'] .ws-sidebar {
+body[data-viewport="phone"][data-tree-drawer="open"] .ws-sidebar {
   transform: translateX(0);
 }
 
@@ -15906,16 +15976,20 @@ body[data-viewport='phone'][data-tree-drawer='open'] .ws-sidebar {
   opacity: 0;
   z-index: var(--z-modal-backdrop);
   transition: opacity var(--tr-base) var(--ease-out);
+  /* Backdrop ist semantisch ein Schliess-Button. */
+  border: none;
+  padding: 0;
+  cursor: pointer;
 }
 
-.mobile-tree-drawer-backdrop[data-open='true'] {
+.mobile-tree-drawer-backdrop[data-open="true"] {
   opacity: 1;
 }
 
 /* Workspace-Main bekommt auf Phone Padding fuer Top-Header (3.5rem)
    und Bottom-Nav (3.5rem) plus Safe-Area. Damit scrollt der Content
    nicht hinter die Mobile-Chrome. */
-body[data-viewport='phone'] .ws-main {
+body[data-viewport="phone"] .ws-main {
   padding-top: calc(var(--mobile-header-h) + var(--safe-top));
   padding-bottom: calc(var(--mobile-bottom-nav-h) + var(--safe-bottom));
 }
@@ -15948,9 +16022,7 @@ body[data-viewport='phone'] .ws-main {
   color: var(--text);
   border-radius: var(--radius-lg);
   cursor: pointer;
-  transition:
-    background var(--tr-fast) var(--ease-out),
-    transform var(--tr-fast) var(--ease-out);
+  transition: background var(--tr-fast) var(--ease-out), transform var(--tr-fast) var(--ease-out);
 }
 
 .mobile-header-btn:hover,
@@ -16042,9 +16114,7 @@ body[data-viewport='phone'] .ws-main {
   font-weight: var(--weight-medium);
   cursor: pointer;
   position: relative;
-  transition:
-    color var(--tr-fast) var(--ease-out),
-    background var(--tr-fast) var(--ease-out);
+  transition: color var(--tr-fast) var(--ease-out), background var(--tr-fast) var(--ease-out);
 }
 
 .mobile-bottom-nav-tab:hover {
@@ -16062,7 +16132,7 @@ body[data-viewport='phone'] .ws-main {
 }
 
 .mobile-bottom-nav-tab-active::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 50%;
@@ -16091,9 +16161,7 @@ body[data-viewport='phone'] .ws-main {
   border-radius: var(--radius-full);
   box-shadow: var(--shadow-lg);
   cursor: pointer;
-  transition:
-    transform var(--tr-fast) var(--ease-spring),
-    box-shadow var(--tr-fast) var(--ease-out),
+  transition: transform var(--tr-fast) var(--ease-spring), box-shadow var(--tr-fast) var(--ease-out),
     background var(--tr-fast) var(--ease-out);
   position: relative;
   top: -0.5rem;
@@ -16124,9 +16192,13 @@ body[data-viewport='phone'] .ws-main {
   opacity: 0;
   z-index: var(--z-modal-backdrop);
   transition: opacity var(--tr-base) var(--ease-out);
+  /* Backdrop ist semantisch ein Schliess-Button, visuell aber neutral. */
+  border: none;
+  padding: 0;
+  cursor: pointer;
 }
 
-.bottom-sheet-backdrop[data-open='true'] {
+.bottom-sheet-backdrop[data-open="true"] {
   opacity: 1;
 }
 
@@ -16143,16 +16215,14 @@ body[data-viewport='phone'] .ws-main {
   border-top-right-radius: var(--radius-2xl);
   box-shadow: var(--shadow-2xl);
   transform: translateY(100%);
-  transition:
-    transform var(--tr-base) var(--ease-out),
-    max-height var(--tr-base) var(--ease-out);
+  transition: transform var(--tr-base) var(--ease-out), max-height var(--tr-base) var(--ease-out);
   z-index: var(--z-modal);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-.bottom-sheet[data-open='true'] {
+.bottom-sheet[data-open="true"] {
   transform: translateY(0);
 }
 
@@ -16165,9 +16235,7 @@ body[data-viewport='phone'] .ws-main {
   background: var(--border2);
   border-radius: var(--radius-full);
   cursor: pointer;
-  transition:
-    background var(--tr-fast) var(--ease-out),
-    transform var(--tr-fast) var(--ease-spring);
+  transition: background var(--tr-fast) var(--ease-out), transform var(--tr-fast) var(--ease-spring);
 }
 
 .bottom-sheet-handle:hover,
@@ -16198,9 +16266,7 @@ body[data-viewport='phone'] .ws-main {
   border-radius: var(--radius-lg);
   margin-bottom: var(--space-3);
   color: var(--text2);
-  transition:
-    border-color var(--tr-fast) var(--ease-out),
-    box-shadow var(--tr-fast) var(--ease-out);
+  transition: border-color var(--tr-fast) var(--ease-out), box-shadow var(--tr-fast) var(--ease-out);
 }
 
 .quick-action-search-wrap:focus-within {
@@ -16240,9 +16306,7 @@ body[data-viewport='phone'] .ws-main {
   font-size: var(--text-base);
   font-weight: var(--weight-medium);
   cursor: pointer;
-  transition:
-    background var(--tr-fast) var(--ease-out),
-    transform var(--tr-fast) var(--ease-spring),
+  transition: background var(--tr-fast) var(--ease-out), transform var(--tr-fast) var(--ease-spring),
     box-shadow var(--tr-fast) var(--ease-out);
 }
 
@@ -16286,9 +16350,7 @@ body[data-viewport='phone'] .ws-main {
   font-size: var(--text-base);
   font-weight: var(--weight-medium);
   cursor: pointer;
-  transition:
-    background var(--tr-fast) var(--ease-out),
-    transform var(--tr-fast) var(--ease-spring),
+  transition: background var(--tr-fast) var(--ease-out), transform var(--tr-fast) var(--ease-spring),
     box-shadow var(--tr-fast) var(--ease-out);
 }
 
@@ -16329,6 +16391,8 @@ body[data-viewport='phone'] .ws-main {
    ════════════════════════════════════════════════════════════════ */
 
 .matrix-linear-list {
+  list-style: none;
+  margin: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -16341,9 +16405,7 @@ body[data-viewport='phone'] .ws-main {
   border-radius: var(--radius-xl);
   overflow: hidden;
   box-shadow: var(--shadow-xs);
-  transition:
-    box-shadow var(--tr-fast) var(--ease-out),
-    border-color var(--tr-fast) var(--ease-out);
+  transition: box-shadow var(--tr-fast) var(--ease-out), border-color var(--tr-fast) var(--ease-out);
 }
 
 .matrix-linear-section:hover {
@@ -16378,6 +16440,8 @@ body[data-viewport='phone'] .ws-main {
    Spalte. scroll-snap-type sorgt dafuer, dass Wischen genau auf der
    naechsten Card endet. Padding-inline schafft Platz fuer Schatten. */
 .matrix-linear-section-rail {
+  list-style: none;
+  margin: 0;
   display: flex;
   flex-direction: row;
   gap: var(--space-3);
@@ -16411,9 +16475,7 @@ body[data-viewport='phone'] .ws-main {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xs);
   cursor: pointer;
-  transition:
-    transform var(--tr-fast) var(--ease-spring),
-    box-shadow var(--tr-fast) var(--ease-out),
+  transition: transform var(--tr-fast) var(--ease-spring), box-shadow var(--tr-fast) var(--ease-out),
     border-color var(--tr-fast) var(--ease-out);
 }
 
@@ -16508,35 +16570,33 @@ body[data-viewport='phone'] .ws-main {
   color: var(--text);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition:
-    background var(--tr-fast) var(--ease-out),
-    transform var(--tr-fast) var(--ease-spring),
+  transition: background var(--tr-fast) var(--ease-out), transform var(--tr-fast) var(--ease-spring),
     box-shadow var(--tr-fast) var(--ease-out);
 }
 
 /* Feature-Color-Coding (Single-Source: Desktop nutzt dieselben Farben
    ueber data-feat im .mx-feat-chip-Selektor). */
-.mobile-cell-card-chip[data-feat='matrix'] {
+.mobile-cell-card-chip[data-feat="matrix"] {
   color: var(--bluetxt);
   background: var(--bluebg);
   border-color: var(--bluebg);
 }
-.mobile-cell-card-chip[data-feat='board'] {
+.mobile-cell-card-chip[data-feat="board"] {
   color: var(--purpletxt);
   background: var(--purplebg);
   border-color: var(--purplebg);
 }
-.mobile-cell-card-chip[data-feat='info'] {
+.mobile-cell-card-chip[data-feat="info"] {
   color: var(--tealtxt);
   background: var(--tealbg);
   border-color: var(--tealbg);
 }
-.mobile-cell-card-chip[data-feat='checklists'] {
+.mobile-cell-card-chip[data-feat="checklists"] {
   color: var(--ambertxt);
   background: var(--amberbg);
   border-color: var(--amberbg);
 }
-.mobile-cell-card-chip[data-feat='doc'] {
+.mobile-cell-card-chip[data-feat="doc"] {
   color: var(--text2);
   background: var(--surface-hover);
 }
@@ -16558,13 +16618,13 @@ body[data-viewport='phone'] .ws-main {
 
 /* Phone-Layout-Korrekturen: matrix-wrap soll auf Phone keine Desktop-
    Polster haben — die Linear-List polstert selbst. */
-body[data-viewport='phone'] .matrix-wrap {
+body[data-viewport="phone"] .matrix-wrap {
   padding: 0;
 }
 
 /* Aggregat-Sektion auf Phone unter der Liste sichtbar lassen, aber
    Padding angleichen. */
-body[data-viewport='phone'] .matrix-aggregate {
+body[data-viewport="phone"] .matrix-aggregate {
   margin-top: var(--space-2);
   padding: 0 var(--space-3);
 }
@@ -16619,25 +16679,23 @@ body[data-viewport='phone'] .matrix-aggregate {
   border-radius: var(--radius-sm);
   cursor: pointer;
   padding: 0;
-  transition:
-    background var(--tr-fast) var(--ease-out),
-    border-color var(--tr-fast) var(--ease-out),
+  transition: background var(--tr-fast) var(--ease-out), border-color var(--tr-fast) var(--ease-out),
     transform var(--tr-fast) var(--ease-spring);
 }
 
-.mobile-cal-heatmap-cell[data-density='0'] {
+.mobile-cal-heatmap-cell[data-density="0"] {
   background: var(--surface-hover);
 }
-.mobile-cal-heatmap-cell[data-density='1'] {
+.mobile-cal-heatmap-cell[data-density="1"] {
   background: var(--bluebg);
   border-color: var(--bluebg);
 }
-.mobile-cal-heatmap-cell[data-density='2'] {
+.mobile-cal-heatmap-cell[data-density="2"] {
   background: var(--blue);
   border-color: var(--blue);
   opacity: 0.7;
 }
-.mobile-cal-heatmap-cell[data-density='3'] {
+.mobile-cal-heatmap-cell[data-density="3"] {
   background: var(--blue);
   border-color: var(--blue);
 }
@@ -16683,9 +16741,7 @@ body[data-viewport='phone'] .matrix-aggregate {
   border: 0.5px solid var(--border);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  transition:
-    border-color var(--tr-fast) var(--ease-out),
-    box-shadow var(--tr-fast) var(--ease-out);
+  transition: border-color var(--tr-fast) var(--ease-out), box-shadow var(--tr-fast) var(--ease-out);
 }
 
 .mobile-cal-agenda-day:hover {
@@ -16710,7 +16766,7 @@ body[data-viewport='phone'] .matrix-aggregate {
   font-size: var(--text-xl);
   font-weight: var(--weight-bold);
   color: var(--text);
-  font-feature-settings: 'tnum';
+  font-feature-settings: "tnum";
 }
 
 .mobile-cal-agenda-day-weekday {
@@ -16733,9 +16789,7 @@ body[data-viewport='phone'] .matrix-aggregate {
   color: var(--text3);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition:
-    background var(--tr-fast) var(--ease-out),
-    color var(--tr-fast) var(--ease-out);
+  transition: background var(--tr-fast) var(--ease-out), color var(--tr-fast) var(--ease-out);
 }
 
 .mobile-cal-agenda-day-open:hover {
@@ -16778,9 +16832,7 @@ body[data-viewport='phone'] .matrix-aggregate {
   text-align: left;
   font-size: var(--text-sm);
   color: var(--text);
-  transition:
-    background var(--tr-fast) var(--ease-out),
-    transform var(--tr-fast) var(--ease-spring),
+  transition: background var(--tr-fast) var(--ease-out), transform var(--tr-fast) var(--ease-spring),
     box-shadow var(--tr-fast) var(--ease-out);
 }
 
@@ -16833,7 +16885,7 @@ body[data-viewport='phone'] .matrix-aggregate {
   font-size: var(--text-xs);
   color: var(--text2);
   font-weight: var(--weight-medium);
-  font-feature-settings: 'tnum';
+  font-feature-settings: "tnum";
   flex-shrink: 0;
 }
 
@@ -16857,12 +16909,12 @@ body[data-viewport='phone'] .matrix-aggregate {
    ohne Component-Aenderung.
    ════════════════════════════════════════════════════════════════ */
 
-body[data-viewport='phone'] .overlay-scrim {
+body[data-viewport="phone"] .overlay-scrim {
   align-items: flex-end;
   padding: 0;
 }
 
-body[data-viewport='phone'] .overlay-card {
+body[data-viewport="phone"] .overlay-card {
   width: 100%;
   max-width: none;
   max-height: var(--mobile-sheet-snap-expanded);
@@ -16873,15 +16925,15 @@ body[data-viewport='phone'] .overlay-card {
   animation: mobileSheetEnter var(--tr-base) var(--ease-out) forwards;
 }
 
-body[data-viewport='phone'] .overlay-card[data-state='leaving'] {
+body[data-viewport="phone"] .overlay-card[data-state="leaving"] {
   animation: mobileSheetExit var(--tr-exit) var(--ease-in) forwards;
 }
 
 /* Drag-Handle-Pille als visueller Hint, dass dies ein Sheet ist.
    Nicht interaktiv — fuer Snap-Toggle bzw. Swipe-Down-Dismiss
    braucht es JS-Hooks (S10/Polish). */
-body[data-viewport='phone'] .overlay-card::before {
-  content: '';
+body[data-viewport="phone"] .overlay-card::before {
+  content: "";
   display: block;
   width: 2.5rem;
   height: 0.25rem;
@@ -16920,7 +16972,7 @@ body[data-viewport='phone'] .overlay-card::before {
    waehrend der User mit Drag-Pointer ueber dem Tab schwebt.
    ════════════════════════════════════════════════════════════════ */
 
-.mobile-bottom-nav-tab[data-drop-dwell='1'] {
+.mobile-bottom-nav-tab[data-drop-dwell="1"] {
   background: var(--accent-soft);
   color: var(--accent);
 }
@@ -16928,8 +16980,8 @@ body[data-viewport='phone'] .overlay-card::before {
 /* Dwell-Progress-Ring oben am Tab. Breite skaliert mit
    --dwell-progress (0..1) — bei 1 voll, bei 0 unsichtbar.
    transition entfaellt, weil tabHoverPulse pro Frame setzt. */
-.mobile-bottom-nav-tab[data-drop-dwell='1']::after {
-  content: '';
+.mobile-bottom-nav-tab[data-drop-dwell="1"]::after {
+  content: "";
   position: absolute;
   top: 0;
   left: 50%;
