@@ -1303,6 +1303,7 @@ const Workspace: Component = () => {
           workspaceId={params.workspaceId as string}
           request={docsRequest()}
           realtimeVersion={rtDocs()}
+          atomPickerEntries={atomPickerEntries()}
           onClose={() => {
             setShowDocs(false);
             clearDocsRequest();

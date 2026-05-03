@@ -46,12 +46,21 @@ import {
 } from 'prosemirror-schema-list';
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
+import {
+  buildMentionPlugin,
+  insertMentionTransaction,
+  mentionNodeSpec,
+  type MentionRefKind,
+  type MentionTrigger,
+  type MentionTriggerEvent,
+} from '../lib/pm-mention-plugin';
 
 // ─── Schema ─────────────────────────────────────────────────────
-// basicSchema + List-Nodes appended.
+// basicSchema + List-Nodes appended + Mention-Node (Welle D.8).
 const listEnabled = addListNodes(basicSchema.spec.nodes, 'paragraph block*', 'block');
+const nodesWithMention = listEnabled.addToEnd('mention', mentionNodeSpec);
 export const editorSchema = new Schema({
-  nodes: listEnabled,
+  nodes: nodesWithMention,
   marks: basicSchema.spec.marks,
 });
 
@@ -153,6 +162,20 @@ function buildLinkKeymap() {
 }
 
 // ─── Component ──────────────────────────────────────────────────
+export type RichTextEditorHandle = {
+  // Imperative API fuer Mention-Insert nach Picker-Auswahl. Caller ruft
+  // das nach dem onMentionTrigger + Picker-Pick.
+  insertMention: (args: {
+    triggerPos: number;
+    trigger: MentionTrigger;
+    refKind: MentionRefKind;
+    refId: string;
+    label: string;
+  }) => void;
+  // Editor wieder fokussieren (z.B. nach Picker-Close).
+  focus: () => void;
+};
+
 export type RichTextEditorProps = {
   value: string; // HTML
   onChange: (html: string) => void;
@@ -160,6 +183,11 @@ export type RichTextEditorProps = {
   placeholder?: string;
   readOnly?: boolean;
   ariaLabel?: string;
+  // Welle D.8: Mention-Trigger-Hook. Caller oeffnet Picker und ruft
+  // dann handle.insertMention zurueck.
+  onMentionTrigger?: (e: MentionTriggerEvent) => void;
+  // Imperative-Handle (Solid: prop-based ref).
+  ref?: (handle: RichTextEditorHandle) => void;
 };
 
 const RichTextEditor: Component<RichTextEditorProps> = (p) => {
@@ -170,26 +198,37 @@ const RichTextEditor: Component<RichTextEditorProps> = (p) => {
   let lastEmittedHtml = '';
 
   function buildState(html: string): EditorState {
+    const plugins = [
+      history(),
+      buildHistoryKeymap(),
+      buildListKeymap(),
+      buildLinkKeymap(),
+      buildKeymap(),
+      buildInputRules(),
+      keymap(baseKeymap),
+      // Save+Close-Hotkey (Cmd/Ctrl+Enter). Eigener Plugin-Layer damit
+      // die App ihn ueberschreiben/abklemmen kann ueber Props.
+      keymap({
+        'Mod-Enter': (_state, _dispatch) => {
+          p.onSaveCloseHotkey?.();
+          return true;
+        },
+      }),
+    ];
+    // Welle D.8: Mention-Plugin nur wenn Caller einen Trigger-Hook
+    // angibt — sonst uebernimmt das ProseMirror Standard-Verhalten und
+    // '@'/'#'/'^' bleiben Plain-Text.
+    if (p.onMentionTrigger) {
+      plugins.push(
+        buildMentionPlugin({
+          onTrigger: (e) => p.onMentionTrigger?.(e),
+        }),
+      );
+    }
     return EditorState.create({
       doc: htmlToDoc(html),
       schema: editorSchema,
-      plugins: [
-        history(),
-        buildHistoryKeymap(),
-        buildListKeymap(),
-        buildLinkKeymap(),
-        buildKeymap(),
-        buildInputRules(),
-        keymap(baseKeymap),
-        // Save+Close-Hotkey (Cmd/Ctrl+Enter). Eigener Plugin-Layer damit
-        // die App ihn ueberschreiben/abklemmen kann ueber Props.
-        keymap({
-          'Mod-Enter': (_state, _dispatch) => {
-            p.onSaveCloseHotkey?.();
-            return true;
-          },
-        }),
-      ],
+      plugins,
     });
   }
 
@@ -213,6 +252,16 @@ const RichTextEditor: Component<RichTextEditorProps> = (p) => {
           p.onChange(html);
         }
       },
+    });
+    // Welle D.8: imperative Handle exposen (Mention-Insert + Focus).
+    p.ref?.({
+      insertMention: (args) => {
+        if (!view) return;
+        const tr = insertMentionTransaction(editorSchema, view.state.tr, args);
+        view.dispatch(tr);
+        view.focus();
+      },
+      focus: () => view?.focus(),
     });
   });
 

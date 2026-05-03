@@ -50,7 +50,9 @@ import { showToast, showUndoToast } from '../lib/toasts';
 import type { DocRow } from '../lib/types';
 import DocTagsEditor from './DocTagsEditor';
 import Icon from './Icon';
-import RichTextEditor from './RichTextEditor';
+import AtomPickerModal from './AtomPickerModal';
+import RichTextEditor, { type RichTextEditorHandle } from './RichTextEditor';
+import type { MentionTriggerEvent } from '../lib/pm-mention-plugin';
 // Welle D: textarea + MarkdownLightView ersetzt durch ProseMirror-Editor.
 // bindAliasAutocomplete entfaellt — Mention-Plugin in D.8 uebernimmt das.
 
@@ -59,6 +61,9 @@ type Props = {
   request: OpenDocsRequest | null;
   realtimeVersion: number;
   onClose: () => void;
+  // Welle D.8: AtomPicker-Daten fuer @-Trigger im Editor-Body.
+  // Optional — ohne Daten zeigt sich kein Picker, '@' bleibt Plain-Text.
+  atomPickerEntries?: import('./AtomPickerModal').AtomPickerEntry[];
 };
 
 type TabMode = 'view' | 'edit';
@@ -194,6 +199,9 @@ const DocsPopup: Component<Props> = (p) => {
   let titleRef: HTMLInputElement | undefined;
   let aliasRef: HTMLInputElement | undefined;
   let attachRef: HTMLInputElement | undefined;
+  // Welle D.8: Editor-Handle fuer Mention-Insert + AtomPicker-State.
+  let editorHandle: RichTextEditorHandle | null = null;
+  const [pendingMention, setPendingMention] = createSignal<MentionTriggerEvent | null>(null);
 
   // Recent-Liste — kann nach Insert/Update/Delete der offenen Tabs
   // veraltet sein. Wir refetchen bei jeder Top-Level-Aktion.
@@ -1081,8 +1089,19 @@ const DocsPopup: Component<Props> = (p) => {
                     onSaveCloseHotkey={() => {
                       void onSaveAndClose();
                     }}
-                    placeholder="Markdown-Shortcuts moeglich (**bold**, *italic*, # Headline, > Zitat, * Liste)."
+                    placeholder="Markdown-Shortcuts moeglich (**bold**, *italic*, # Headline, > Zitat, * Liste). @ verlinkt ein Atom."
                     ariaLabel="Doku-Inhalt"
+                    ref={(handle) => {
+                      editorHandle = handle;
+                    }}
+                    onMentionTrigger={(e) => {
+                      // Welle D.8: Wir handeln derzeit nur '@' (Atom-Mention).
+                      // '#'/'^' bleiben Plain-Text — Tags + Aliases gehoeren
+                      // ins TagInput-Header, nicht in den Editor-Body.
+                      if (e.trigger !== '@') return;
+                      if (!p.atomPickerEntries || p.atomPickerEntries.length === 0) return;
+                      setPendingMention(e);
+                    }}
                   />
                 </Show>
               </div>
@@ -1171,6 +1190,30 @@ const DocsPopup: Component<Props> = (p) => {
           )}
         </Show>
       </div>
+      {/* Welle D.8: Atom-Picker fuer @-Mention im Editor-Body. */}
+      <Show when={pendingMention()}>
+        {(pm) => (
+          <AtomPickerModal
+            entries={p.atomPickerEntries ?? []}
+            onPick={(atomType, atomId, label) => {
+              const trigger = pm();
+              setPendingMention(null);
+              if (!editorHandle) return;
+              editorHandle.insertMention({
+                triggerPos: trigger.triggerPos,
+                trigger: trigger.trigger,
+                refKind: 'atom',
+                refId: `${atomType}:${atomId}`,
+                label,
+              });
+            }}
+            onClose={() => {
+              setPendingMention(null);
+              editorHandle?.focus();
+            }}
+          />
+        )}
+      </Show>
     </div>
   );
 };

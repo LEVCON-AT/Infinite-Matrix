@@ -2800,6 +2800,42 @@ button[type="submit"]:hover:not(:disabled) {
   text-decoration: underline;
 }
 
+/* Welle D.8 — Inline-Mention im Doc-Body. Atomic span mit
+   data-mention-Attributen, gerendert als Pill. */
+.pm-mention {
+  display: inline-block;
+  padding: 0 6px;
+  margin: 0 1px;
+  border-radius: var(--rs);
+  background: color-mix(in srgb, var(--accent, #3b82f6) 12%, transparent);
+  color: var(--accent, #3b82f6);
+  font-weight: 500;
+  font-size: 0.95em;
+  cursor: pointer;
+  user-select: all;
+  transition: background var(--tr-std);
+  white-space: nowrap;
+}
+
+.pm-mention:hover {
+  background: color-mix(in srgb, var(--accent, #3b82f6) 22%, transparent);
+}
+
+.pm-mention-atom {
+  background: color-mix(in srgb, var(--accent, #3b82f6) 12%, transparent);
+  color: var(--accent, #3b82f6);
+}
+
+.pm-mention-object {
+  background: color-mix(in srgb, var(--text2) 14%, transparent);
+  color: var(--text2);
+}
+
+.pm-mention-tag {
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
+  color: var(--amber);
+}
+
 /* Empty-State Placeholder via ::before, weil contentEditable kein
  * placeholder-Attribut kennt. Nur sichtbar wenn kein Inhalt. */
 .pm-editor-container:has(.pm-editor p:first-child:last-child:empty)::before {
