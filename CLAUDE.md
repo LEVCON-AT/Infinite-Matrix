@@ -1,5 +1,37 @@
 # Infinite Matrix
 
+---
+
+## ⚠️ SESSION-START — Foundation-Boot (PFLICHT, nicht optional)
+
+**BEVOR du auf den ersten User-Prompt antwortest**, lies aktiv und vollstaendig die folgenden 4 Foundation-Manifeste. Nicht "bei Bedarf" — IMMER. Manifeste aendern sich, Annahmen aus frueheren Sessions sind nicht aktuell.
+
+```
+1. docs/claude/animations.md   — Animation-Tokens, 20 Pflicht-Pattern, Helper-Library
+2. docs/claude/style.md        — rem-Pflicht, Token-System, WCAG, Komponenten-Standards
+3. docs/claude/architektur.md  — Atom-Zwiebel, Schema-Heptad, MCP, Multi-User, Import/Export, Bridge
+4. docs/claude/code-quality.md — Doublet-Verbot, Type-Safety, biome-Standards, §5.4 biome-ignore-Verbot
+```
+
+**Danach** mit GENAU diesem Format antworten — keine Variation, keine Marketing-Sprache:
+
+```
+Foundation klar:
+- Animations: [Token-Pflicht / Pattern-Anzahl / Reduced-Motion / Helper-Quelle]
+- Style: [rem-Pflicht / px-Ausnahmen / Token-Kategorien / Inline-Style-Verbot]
+- Architektur: [Atom-Zwiebel-Schichten / Schema-Heptad-Bestandteile / Multi-User-Modell / Offline-Pfad / MCP-Tool-Pattern / Import-Export-Pfad]
+- Code-Quality: [Doublet-Verbot / Type-Safety / biome-ignore-Status / Pre-Commit-Selbstcheck]
+- Was-NICHT-tun: [Top-3 Items aus dieser Datei mit kurzer Begruendung]
+
+Bereit fuer Auftrag.
+```
+
+**ERST DANN** den User-Auftrag bearbeiten. Wenn du eine Foundation-Datei nicht lesen kannst (Datei fehlt, Read-Error), MELDEN — nicht "schaetzen" oder "wahrscheinlich".
+
+Diese Pflicht gilt fuer JEDE neue Session — unabhaengig davon wie der erste User-Prompt aussieht. Bei `/clear` sind alle Annahmen weg. Lies neu.
+
+---
+
 ## Was das ist
 
 Ein persoenliches Organisations-System, aufgebaut auf einer **rekursiven Matrix-Struktur**. Jede Zelle einer Matrix kann selbst wieder eine Matrix sein — dazu Atome (Tasks / Links / Checklisten / Dokus) halten, die in beliebigen Sichten erscheinen (Kanban, Checkliste, Kalender). Beliebig tief strukturiert: vom groben Lebens-Layout bis zum einzelnen Task.
