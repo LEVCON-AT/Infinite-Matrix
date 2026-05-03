@@ -191,7 +191,7 @@ Kein Sub-Sprint gilt als done, wenn nicht alle sieben stehen. **Das ist die haeu
 
 - **Schema:** RLS (`is_workspace_member` SELECT, `can_write_workspace` WRITE) + Cascade-Trigger fuer alle Source-FKs (polymorph: pro atom_type ein Trigger) + `REPLICA IDENTITY FULL` wenn Realtime + Backfill bei Spalten-Drop + Header-Comment.
 - **Types:** Row-Type + Enriched-Type (wenn PostgREST-Embed) + AtomKind-Erweiterung wenn neuer atom_type.
-- **Mutations:** Schreiben durch `runOptimistic*`. Reads mit `mergeRows`/`putAll` + `getByWorkspace`/`getById`-Fallback. RPC-Wrapper bei `SECURITY DEFINER`.
+- **Mutations:** Schreiben durch `runOptimistic*` — **inklusive** `SECURITY DEFINER`-RPCs. Pattern: RPC im Live-Pfad (atomare server-side Checks), `buildOffline` baut die synthetische Row mit `crypto.randomUUID()` als Fallback, Replay laeuft als direkter `from(table).insert()` (RLS uebernimmt die Pruefung). Bei Multi-Step-RPCs (z.B. `pin_doc_with_create` = doc + atom_pins atomar): zwei Insert-Specs queuen, FIFO-Replay haelt die Reihenfolge — Atomicity-Verlust offline akzeptabel, FK-Violation ergibt stale-Marker. Reads mit `mergeRows`/`putAll` + `getByWorkspace`/`getById`-Fallback.
 - **Offline-Cache:** TABLES-Eintrag + DB_VERSION-Bump. **Vergessen heisst: Cache-Read crasht nach Reconnect.**
 - **Realtime-Subscribe:** RealtimeTable-Type-Erweiterung + DIRECT_TABLES + Workspace-refetch-Bump fuer alle Resources die die Tabelle lesen. **Vergessen heisst: Multi-User-Mutationen werden erst nach Reload sichtbar.**
 - **Export/Import:** WorkspaceExport-Field + alle 4 Export-Pfade (Workspace + Matrix-Subtree + Cell-Subtree + Feature-Variants) + Subtree-Filter via Owner-Sets + idempotenter Import (UNIQUE-Constraint-aware). **Vergessen heisst: Round-Trip verliert Daten unbemerkt.**
@@ -252,6 +252,33 @@ Wrapper-Verhalten:
 
 - **Sicherheitskritisch:** Auth-Mutations, Member-Roles, Invites — synchron-online, kein Offline-Replay (`feedback_saas_security_no_offline.md`).
 - **Bulk-Operations** mit dokumentiertem Catch-Fallback (z.B. `applyChecklistClose` in `mutations.ts` — Bulk-Online-Pfad mit Per-Item-Wrapper-Fallback bei Network-Loss).
+
+### 4.1.1 SECURITY DEFINER RPCs (Schleichpfad)
+
+`supabase.rpc('xyz')` umgeht die Direkterkennung "Direkter `from(...).insert/update/delete()`" — ist aber funktional aequivalent und gehoert ebenfalls in `runOptimistic*`. Welle D vergass das initial fuer 7 von 11 Atom-Pin-/Tag-Mutations und musste nachziehen (Welle D.X.O Commit).
+
+**Pattern: RPC im Live-Pfad, direkter Insert/Update im Replay.**
+
+```ts
+// Single-Step RPC (z.B. create_atom_pin)
+return runOptimisticInsert<AtomPin>({
+  table: 'atom_pins',
+  workspaceId,
+  label: 'Pin anlegen',
+  run: async () => {
+    const { data, error } = await supabase.rpc('create_atom_pin', { ... });
+    if (error) throw error;
+    return data as AtomPin;
+  },
+  buildOffline: (id) => ({ id, ...synthRow }),
+});
+```
+
+**Multi-Step RPC** (z.B. `pin_doc_with_create` = `docs` + `atom_pins` atomar): try-RPC-online + offline-Fallback der zwei Insert-Specs queued (FIFO-Replay haelt die Reihenfolge). Atomicity-Verlust offline akzeptabel, FK-Violation auf den zweiten Step ergibt stale-Marker.
+
+**Lookup-or-Create RPC** (z.B. `add_atom_tag_freetext` = workspace_tags-Lookup-or-Create + atom_tags-Insert): Offline-Fallback prueft den IDB-Cache nach existing workspace_tag mit (kind, value) — Hit ergibt einen Insert-Spec, Miss ergibt zwei. Beispiel: `lib/atom-tags.ts:offlineTagAdd`.
+
+**Online-only-RPCs** (gc_workspace_tags, Bulk-Sweeps): kein Offline-Pfad noetig wenn der RPC nur in Admin-Tools laeuft. Im Funktions-Header dokumentieren.
 
 ### 4.2 Read-Pfad (Pflicht)
 

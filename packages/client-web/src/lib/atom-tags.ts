@@ -9,11 +9,12 @@
 // macht das Bundling von register_workspace_tag + atom_tags.insert
 // in einer Transaktion + dekrementiert usage_count via Trigger.
 
-import { isNetworkError } from './mutation-queue';
-import { type CacheTable, getByWorkspace, mergeRows } from './offline-cache';
+import { enqueueMutation, isNetworkError } from './mutation-queue';
+import { type CacheTable, getByWorkspace, mergeRows, putOne } from './offline-cache';
 import { markCacheFallback, markLiveSuccess } from './offline-state';
 import { runOptimisticDelete } from './safe-mutation';
 import { supabase } from './supabase';
+import { showToast } from './toasts';
 import type { AtomTag, AtomTagWithTag, WorkspaceTag } from './types';
 import type { AtomKind } from './atom-manifestations';
 
@@ -124,20 +125,97 @@ export function filterTagsForAtom(
 }
 
 // ─── Write ─────────────────────────────────────────────────────
+// Welle D.X.O: Tag-Adds sind Multi-Step (workspace_tags-Lookup-or-Create
+// + atom_tags-Insert). Live-Pfad bleibt RPC (atomar). Offline-Fallback
+// schaut im IDB-Cache nach existing workspace_tag mit (kind,value):
+//   Hit  → ein Insert-Spec (atom_tags) reicht.
+//   Miss → zwei Insert-Specs (workspace_tags + atom_tags), FIFO-Replay
+//          haelt die Reihenfolge.
+// Bei UNIQUE-Conflict beim Replay (anderer Tab/User hat den gleichen Tag
+// inzwischen angelegt): stale-Marker → User entscheidet ueber pending-
+// Bar.
+async function offlineTagAdd(args: {
+  workspaceId: string;
+  atomType: AtomKind;
+  atomId: string;
+  kind: WorkspaceTag['kind'];
+  value: string;
+  displayLabel: string | null;
+}): Promise<AtomTagWithTag> {
+  const cachedRegistry = await getByWorkspace<WorkspaceTag>('workspace_tags', args.workspaceId);
+  let tag = cachedRegistry.find((t) => t.kind === args.kind && t.value === args.value);
+  const now = new Date().toISOString();
+  if (!tag) {
+    tag = {
+      id: crypto.randomUUID(),
+      workspace_id: args.workspaceId,
+      kind: args.kind,
+      value: args.value,
+      display_label: args.displayLabel,
+      usage_count: 1,
+      created_at: now,
+    };
+    await putOne('workspace_tags', tag);
+    await enqueueMutation({
+      spec: {
+        kind: 'insert',
+        table: 'workspace_tags',
+        values: tag as unknown as Record<string, unknown>,
+      },
+      workspaceId: args.workspaceId,
+      label: 'Tag anlegen',
+    });
+  }
+  const junction: AtomTag = {
+    id: crypto.randomUUID(),
+    workspace_id: args.workspaceId,
+    atom_type: args.atomType,
+    atom_id: args.atomId,
+    tag_id: tag.id,
+    position: 0,
+    created_at: now,
+  };
+  await putOne(TABLE, junction);
+  await enqueueMutation({
+    spec: { kind: 'insert', table: 'atom_tags', values: junction as unknown as Record<string, unknown> },
+    workspaceId: args.workspaceId,
+    label: 'Tag setzen',
+  });
+  showToast('Offline angelegt: Tag. Wird beim Reconnect synchronisiert.', 'info');
+  return {
+    ...junction,
+    tag_kind: tag.kind,
+    tag_value: tag.value,
+    tag_display_label: tag.display_label,
+  };
+}
+
 export async function addAtomTagFreetext(args: {
   workspaceId: string;
   atomType: AtomKind;
   atomId: string;
   value: string;
 }): Promise<AtomTagWithTag> {
-  const { data, error } = await supabase.rpc('add_atom_tag_freetext', {
-    p_workspace_id: args.workspaceId,
-    p_atom_type: args.atomType,
-    p_atom_id: args.atomId,
-    p_value: args.value,
-  });
-  if (error) throw error;
-  return data as AtomTagWithTag;
+  try {
+    const { data, error } = await supabase.rpc('add_atom_tag_freetext', {
+      p_workspace_id: args.workspaceId,
+      p_atom_type: args.atomType,
+      p_atom_id: args.atomId,
+      p_value: args.value,
+    });
+    if (error) throw error;
+    return data as AtomTagWithTag;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    return offlineTagAdd({
+      workspaceId: args.workspaceId,
+      atomType: args.atomType,
+      atomId: args.atomId,
+      kind: 'freetext',
+      value: args.value,
+      displayLabel: null,
+    });
+  }
 }
 
 export async function addAtomTagAlias(args: {
@@ -146,14 +224,28 @@ export async function addAtomTagAlias(args: {
   atomId: string;
   alias: string;
 }): Promise<AtomTagWithTag> {
-  const { data, error } = await supabase.rpc('add_atom_tag_alias', {
-    p_workspace_id: args.workspaceId,
-    p_atom_type: args.atomType,
-    p_atom_id: args.atomId,
-    p_alias: args.alias,
-  });
-  if (error) throw error;
-  return data as AtomTagWithTag;
+  try {
+    const { data, error } = await supabase.rpc('add_atom_tag_alias', {
+      p_workspace_id: args.workspaceId,
+      p_atom_type: args.atomType,
+      p_atom_id: args.atomId,
+      p_alias: args.alias,
+    });
+    if (error) throw error;
+    return data as AtomTagWithTag;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    // Offline alias_ref: value = alias-string, display_label = '^alias'.
+    // Server resolved den Alias bei Replay.
+    return offlineTagAdd({
+      workspaceId: args.workspaceId,
+      atomType: args.atomType,
+      atomId: args.atomId,
+      kind: 'alias_ref',
+      value: args.alias,
+      displayLabel: `^${args.alias}`,
+    });
+  }
 }
 
 export async function addAtomTagAtomRef(args: {
@@ -163,15 +255,28 @@ export async function addAtomTagAtomRef(args: {
   targetAtomType: AtomKind;
   targetAtomId: string;
 }): Promise<AtomTagWithTag> {
-  const { data, error } = await supabase.rpc('add_atom_tag_atomref', {
-    p_workspace_id: args.workspaceId,
-    p_atom_type: args.atomType,
-    p_atom_id: args.atomId,
-    p_target_atom_type: args.targetAtomType,
-    p_target_atom_id: args.targetAtomId,
-  });
-  if (error) throw error;
-  return data as AtomTagWithTag;
+  try {
+    const { data, error } = await supabase.rpc('add_atom_tag_atomref', {
+      p_workspace_id: args.workspaceId,
+      p_atom_type: args.atomType,
+      p_atom_id: args.atomId,
+      p_target_atom_type: args.targetAtomType,
+      p_target_atom_id: args.targetAtomId,
+    });
+    if (error) throw error;
+    return data as AtomTagWithTag;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    // value = "atom_type:atom_id" (parser-kompatibles Format).
+    return offlineTagAdd({
+      workspaceId: args.workspaceId,
+      atomType: args.atomType,
+      atomId: args.atomId,
+      kind: 'atom_ref',
+      value: `${args.targetAtomType}:${args.targetAtomId}`,
+      displayLabel: null,
+    });
+  }
 }
 
 export async function addAtomTagObjectRef(args: {
@@ -181,15 +286,27 @@ export async function addAtomTagObjectRef(args: {
   objectKind: 'cell' | 'node';
   objectId: string;
 }): Promise<AtomTagWithTag> {
-  const { data, error } = await supabase.rpc('add_atom_tag_objectref', {
-    p_workspace_id: args.workspaceId,
-    p_atom_type: args.atomType,
-    p_atom_id: args.atomId,
-    p_object_kind: args.objectKind,
-    p_object_id: args.objectId,
-  });
-  if (error) throw error;
-  return data as AtomTagWithTag;
+  try {
+    const { data, error } = await supabase.rpc('add_atom_tag_objectref', {
+      p_workspace_id: args.workspaceId,
+      p_atom_type: args.atomType,
+      p_atom_id: args.atomId,
+      p_object_kind: args.objectKind,
+      p_object_id: args.objectId,
+    });
+    if (error) throw error;
+    return data as AtomTagWithTag;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    return offlineTagAdd({
+      workspaceId: args.workspaceId,
+      atomType: args.atomType,
+      atomId: args.atomId,
+      kind: 'object_ref',
+      value: `${args.objectKind}:${args.objectId}`,
+      displayLabel: null,
+    });
+  }
 }
 
 export async function removeAtomTag(id: string): Promise<void> {
