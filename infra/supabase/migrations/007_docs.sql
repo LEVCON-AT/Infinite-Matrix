@@ -37,9 +37,19 @@ CREATE TABLE IF NOT EXISTS public.docs (
 -- Composite-FK auf cells (id, workspace_id) — dieselbe Konvention
 -- wie checklists. ON DELETE SET NULL: Zelle weg -> Doku bleibt
 -- freischwebend auffindbar (via Shift+D / Search). Kein Datenverlust.
+--
+-- Idempotenz mit Welle D: Migration 063 droppt attached_cell_id
+-- nachdem atom_pins backfilled ist. Bei Re-Apply von 007 nach 063
+-- existiert die Spalte nicht mehr — Constraint + Index nur setzen
+-- wenn Spalte noch da ist.
 DO $$
 BEGIN
-  IF NOT EXISTS (
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'docs'
+      AND column_name = 'attached_cell_id'
+  ) AND NOT EXISTS (
     SELECT 1 FROM pg_constraint WHERE conname = 'docs_attached_cell_fkey'
   ) THEN
     ALTER TABLE public.docs
@@ -53,9 +63,19 @@ END $$;
 CREATE INDEX IF NOT EXISTS docs_workspace_idx
   ON public.docs(workspace_id, updated_at DESC);
 
-CREATE INDEX IF NOT EXISTS docs_attached_cell_idx
-  ON public.docs(attached_cell_id, updated_at DESC)
-  WHERE attached_cell_id IS NOT NULL;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'docs'
+      AND column_name = 'attached_cell_id'
+  ) THEN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS docs_attached_cell_idx
+             ON public.docs(attached_cell_id, updated_at DESC)
+             WHERE attached_cell_id IS NOT NULL';
+  END IF;
+END $$;
 
 -- Alias case-insensitive unique pro Workspace. Analog zu kb_cards.
 CREATE UNIQUE INDEX IF NOT EXISTS docs_alias_uq
