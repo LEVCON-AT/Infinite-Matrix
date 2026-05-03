@@ -7,17 +7,13 @@
 // koennen. Beide Funktionen muessen genau einmal pro App-Boot gemountet
 // werden (idempotent, mehrfacher Aufruf ist safe).
 //
-// Breakpoint-Werte: --mobile-bp = 31.25rem (500px), --tablet-bp = 64rem
-// (1024px). matchMedia kann CSS-Custom-Properties NICHT aufloesen, daher
-// muessen die Werte hier dupliziert werden (siehe styles.css :root).
-// Wenn die Tokens dort sich aendern, hier mit-aendern.
-//
-// Browser-Verhalten: matchMedia interpretiert rem relativ zur Root-Font-
-// Size (Default 16px). Wenn der User die Browser-Schriftgroesse skaliert,
-// schiebt sich der Breakpoint analog mit — das ist ein Feature, kein Bug
-// (responsive zu User-Accessibility-Settings).
+// Breakpoint-Werte: 500px Phone-Cutoff, 1024px Tablet-Cutoff. Wir nutzen
+// hier bewusst PIXEL-Werte (statt rem) im matchMedia-Query, weil
+// Mobile-Browser rem-basierte MQs unterschiedlich aufloesen — pixel-
+// basiert ist universal kompatibel. Plus Fallback ueber window.innerWidth
+// fuer Browser, deren matchMedia-Implementierung Edge-Cases hat.
 
-import { type Accessor, createSignal, onCleanup } from 'solid-js';
+import { type Accessor, createSignal } from 'solid-js';
 
 type ViewportState = {
   phone: Accessor<boolean>;
@@ -25,37 +21,43 @@ type ViewportState = {
   desktop: Accessor<boolean>;
 };
 
+const PHONE_MAX_PX = 500;
+const TABLET_MAX_PX = 1024;
+
 const [phone, setPhone] = createSignal<boolean>(false);
 const [tablet, setTablet] = createSignal<boolean>(false);
 const [desktop, setDesktop] = createSignal<boolean>(true);
 
 let mqInitialized = false;
 
+function recompute(): void {
+  if (typeof window === 'undefined') return;
+  const w = window.innerWidth;
+  // Robust: pixel-basiert via window.innerWidth. matchMedia waere die
+  // saubere Loesung, aber manche Mobile-Browser (Samsung-Internet,
+  // aeltere Chrome-Android-Versionen) haben Bugs bei min-width-AND-
+  // max-width-Kombinationen.
+  const isPhone = w <= PHONE_MAX_PX;
+  const isTablet = w > PHONE_MAX_PX && w <= TABLET_MAX_PX;
+  setPhone(isPhone);
+  setTablet(isTablet);
+  setDesktop(!isPhone && !isTablet);
+}
+
 function ensureMq(): void {
   if (mqInitialized) return;
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+  if (typeof window === 'undefined') return;
   mqInitialized = true;
 
-  // Phone: < 31.25rem (500px). Wir nutzen 31.249rem als Obergrenze,
-  // damit der Tablet-Bereich exakt bei 31.25rem startet (kein
-  // Overlap, kein Gap).
-  const mqPhone = window.matchMedia('(max-width: 31.249rem)');
-  // Tablet: 31.25rem (500px) - 63.999rem (1023.984px).
-  const mqTablet = window.matchMedia(
-    '(min-width: 31.25rem) and (max-width: 63.999rem)',
-  );
+  // Initial-Compute synchron — body.dataset.viewport ist sofort gesetzt.
+  recompute();
 
-  const update = (): void => {
-    const isPhone = mqPhone.matches;
-    const isTablet = mqTablet.matches;
-    setPhone(isPhone);
-    setTablet(isTablet);
-    setDesktop(!isPhone && !isTablet);
-  };
-
-  mqPhone.addEventListener('change', update);
-  mqTablet.addEventListener('change', update);
-  update();
+  // Reaktiv: window-resize + orientationchange. resize feuert auf
+  // jedem Browser, orientationchange ist iOS-Safari-spezifisch und
+  // teils noetig wenn nur die Bildschirm-Drehung stattfindet ohne
+  // Resize-Event (alte iOS-Versionen).
+  window.addEventListener('resize', recompute, { passive: true });
+  window.addEventListener('orientationchange', recompute, { passive: true });
 }
 
 // Reaktiver Hook fuer JS-Komponenten. Mehrfach aufrufbar (gibt immer
@@ -94,23 +96,13 @@ export function useViewportClasses(): void {
     }
   };
 
-  // Initial + reaktiv via createEffect waere die saubere Solid-Loesung,
-  // aber dieser Hook wird sehr frueh in App() aufgerufen — bevor ein
-  // Owner-Context steht. Wir abonnieren manuell auf die Signals via
-  // matchMedia-Events (zweimal: einmal hier fuer body.dataset, einmal
-  // in ensureMq fuer setPhone/setTablet/setDesktop). Doppelt, aber
-  // entkoppelt.
-  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
-    const mqPhone = window.matchMedia('(max-width: 31.249rem)');
-    const mqTablet = window.matchMedia(
-      '(min-width: 31.25rem) and (max-width: 63.999rem)',
-    );
-    mqPhone.addEventListener('change', updateViewportClass);
-    mqTablet.addEventListener('change', updateViewportClass);
-    onCleanup(() => {
-      mqPhone.removeEventListener('change', updateViewportClass);
-      mqTablet.removeEventListener('change', updateViewportClass);
-    });
+  // Reaktiv via window-resize-Listener (recompute setzt die Signals,
+  // dieser Listener spiegelt sie nach body.dataset). KEIN onCleanup —
+  // dieser Hook wird genau einmal in App() gerufen, body lebt so lange
+  // wie das Document, also kein Leak.
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', updateViewportClass, { passive: true });
+    window.addEventListener('orientationchange', updateViewportClass, { passive: true });
   }
 
   // Platform: einmalig.
