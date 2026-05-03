@@ -6,6 +6,27 @@
 
 Konventionen beschreiben *was* gilt, Prüfroutinen *wann* was zu prüfen ist. Vor jedem Commit gehe ich (die AI) die zum Scope passende Checkliste mechanisch durch — nicht aus Bauchgefühl. Mindestens **ein** Trigger passt bei jeder Code-Änderung.
 
+## Trigger: Neue Tabelle / Migration mit `CREATE TABLE`
+
+**Schema-Heptad** — sieben Artefakte sind gleichzeitig zu pflegen. Welle D hat in der ersten Iteration drei davon vergessen (MCP-Tools, Realtime-Subscribe, Export/Import-fuer-Tags) — Nachzieh-Sprint kostete ca. 1h. Diese Checkliste bewahrt davor.
+
+- [ ] **(1) Schema** — `infra/supabase/migrations/NNN_*.sql`: `CREATE TABLE` mit `workspace_id`-FK + `ON DELETE CASCADE`, RLS-Policies (`is_workspace_member` SELECT, `can_write_workspace` WRITE), Indexes auf typischen Filter-Spalten, Cascade-Trigger fuer polymorphe FKs (pro `atom_type` ein Trigger), `ALTER PUBLICATION supabase_realtime ADD TABLE`, Header-Comment der die Tabelle erklärt.
+- [ ] **(2) Types** — `lib/types.ts`: Row-Type. Bei polymorpher Spalte: Discriminated Union. Bei Enums: TS-Enum oder `as const`-String-Union.
+- [ ] **(3) Mutations** — `lib/<domain>.ts`: CRUD-Funktionen durch `runOptimisticInsert`/`-Update`/`-Delete`. Reads mit `mergeRows`/`putAll` + `getByWorkspace`/`getById`-Fallback. SECURITY-DEFINER-RPCs als Wrapper-Funktion.
+- [ ] **(4) Offline-Cache** — `lib/offline-cache.ts`: Tabellenname in `TABLES` + `DB_VERSION + 1` + `onUpgradeNeeded`-Migration die den neuen Object-Store anlegt. **Vergessen → Cache-Read crasht nach dem ersten Reconnect.**
+- [ ] **(5) Realtime-Subscribe** — `lib/realtime.ts` + `routes/Workspace.tsx`: `RealtimeTable`-Type erweitern, `DIRECT_TABLES`-Array ergänzen, `subscribeWorkspace`-Bumps mit `refetch*`-Calls fuer alle Resources die die Tabelle lesen. **Vergessen → Multi-User-Mutationen werden erst nach Reload sichtbar.**
+- [ ] **(6) Export/Import** — `lib/export.ts` + `lib/subtree-import.ts`: `WorkspaceExport`-Field + alle 4 Export-Pfade (Workspace + Matrix-Subtree + Cell-Subtree + Feature-Variants) + Subtree-Filter via Owner-Sets + idempotenter Import (UNIQUE-Constraint-aware mit Pre-Lookup). **Vergessen → Round-Trip verliert Daten unbemerkt.**
+- [ ] **(7) MCP-Tools** — `packages/bridge/src/tools/<domain>.ts` + `tools/index.ts`: Tool-Bundle (CRUD + List), Zod-Schema, Registrierung in `registerAllTools`. Auch wenn der Bridge-Web-Connector noch nicht live ist — Schemas definieren die AI-API.
+
+**Auch zu prüfen (nicht im Heptad, aber häufige Mit-Vergessen):**
+- [ ] `lib/workspace-reset.ts` — wenn `^reset -all` die Tabelle nicht via Cascade trifft, manuell aufnehmen.
+- [ ] `lib/audit.ts` — wenn audit-relevant.
+- [ ] Sidebar-Tree (`useSidebarChips`/`buildSidebarTree`) — wenn die Tabelle Atom-Indicators braucht.
+- [ ] Smart-Summary / `task-aggregate.ts` — wenn die Felder in LLM-Prompts erscheinen.
+- [ ] **Standalone-Client** (`packages/client-standalone/matrix.html`) — **eingefroren, niemals nachziehen.**
+
+Detail in `architektur.md` §3 + §3.1-§3.4. Der Pre-Commit-Heptad-Selbstcheck dort kostet 30 Sekunden, spart 30 Minuten Nachzieh-Sprint.
+
 ## Trigger: Feature geändert / neues Feature
 
 - [ ] **MCP-Coverage**: existiert ein `MATRIX_TOOL` für die (neue/geänderte) Mutations-Aktion? Wenn nein: Schema in `packages/bridge/src/tools/<gruppe>.ts` + Client-Handler in `MATRIX_TOOLS` + Vitest + `tool-registry.test.ts`-Count erhöhen. *Selbst-Check: „Kann die AI das Feature headless aufrufen?"*

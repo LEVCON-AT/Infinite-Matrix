@@ -171,25 +171,55 @@ atom_pins (
 
 ---
 
-## 3. Schema-Quad-Regel
+## 3. Schema-Quad-Regel (de facto: Schema-Heptad)
 
-**Jede strukturelle Aenderung pflegt vier Artefakte gleichzeitig.** Kein Sub-Sprint gilt als done, wenn nur drei davon stehen.
+**Jede strukturelle Aenderung pflegt sieben Artefakte gleichzeitig.** Der Name "Quad" ist historisch — die Liste ist heute laenger weil Realtime/Cache/Types eigenstaendige Risiko-Stellen sind, an denen man Tabellen vergessen kann.
 
-| Artefakt | Wo | Was |
-|---|---|---|
-| **Schema** | `infra/supabase/migrations/NNN_*.sql` | DDL: `CREATE TABLE`, RLS-Policies, Indexes, Trigger, Realtime-Publication, Comments |
-| **Mutations** | `packages/client-web/src/lib/<domain>.ts` | CRUD-Funktionen durch `safe-mutation`-Wrapper, IDB-Cache-Fallback fuer Reads |
-| **MCP-Tools** | `packages/bridge/src/tools/<domain>.ts` + `packages/client-standalone/matrix.html` Handler | Add/Update/Delete/Move/Search-Tools, Zod-Schema, Vitest |
-| **Export/Import** | `packages/client-web/src/lib/export.ts` + `import-exec.ts` + `subtree-import.ts` | Roundtrip-Test, Field-Mapping, Lueckenexport-Verbot |
+Kein Sub-Sprint gilt als done, wenn nicht alle sieben stehen. **Das ist die haeufigste Lessons-Learned-Quelle:** in Welle D wurden initial 3 von 7 vergessen (MCP-Tools, Realtime-Subscribe, Export/Import-fuer-Tags) und mussten als Tool-Abhaengigkeiten-Sprint nachgezogen werden — siehe Welle-D-Memory.
 
-### 3.1 Pflicht-Konsequenzen pro Quad-Aenderung
+| # | Artefakt | Wo | Was |
+|---|---|---|---|
+| 1 | **Schema** | `infra/supabase/migrations/NNN_*.sql` | DDL: `CREATE TABLE`, RLS-Policies, Indexes, Trigger (Cascade!), `ALTER PUBLICATION supabase_realtime ADD TABLE`, Comments |
+| 2 | **Types** | `packages/client-web/src/lib/types.ts` | TS-Type pro Row + Enums fuer kind-Spalten + Discriminated Unions wo nötig |
+| 3 | **Mutations** | `packages/client-web/src/lib/<domain>.ts` | CRUD durch `safe-mutation`-Wrapper, IDB-Cache-Fallback fuer Reads |
+| 4 | **Offline-Cache** | `packages/client-web/src/lib/offline-cache.ts` | TABLES-Eintrag + DB_VERSION-Bump + onUpgradeNeeded-Migration |
+| 5 | **Realtime-Subscribe** | `packages/client-web/src/lib/realtime.ts` + `routes/Workspace.tsx` | RealtimeTable-Type erweitert, DIRECT_TABLES-Liste, refetch-Hook in subscribeWorkspace-Bumps |
+| 6 | **Export/Import** | `packages/client-web/src/lib/export.ts` + `subtree-import.ts` | WorkspaceExport-Field + Workspace-Export + Subtree-Filter (Matrix + Cell + Feature-Variants) + idempotenter Import-Pfad mit FK-Remap |
+| 7 | **MCP-Tools** | `packages/bridge/src/tools/<domain>.ts` + `tools/index.ts` | Add/Update/Delete/Move/List-Tools, Zod-Schema, Registrierung in `registerAllTools` |
 
-- **Schema:** RLS-Policy (`is_workspace_member` SELECT, `can_write_workspace` WRITE) + `REPLICA IDENTITY FULL` wenn Realtime + DB-Header-Comment der die Tabelle erklaert.
-- **Mutations:** alle Schreibe durch `runOptimisticInsert`/`Update`/`Delete`. Reads mit `mergeRows`/`putAll` + `getByWorkspace`/`getById`-Fallback. IDB-TABLES-Eintrag + DB_VERSION-Bump.
-- **MCP-Tools:** Tool-Trio (Schema + Handler + Vitest). `registerAllTools`-Count in `tool-registry.test.ts` aktualisiert.
-- **Export/Import:** Field im `WorkspaceExport`-Type, `fetchWorkspaceRowsForExport` ergaenzt, `import-exec.ts`-`insertBatch` ergaenzt, Cell-Subtree-Filter (`exportCellSubtree`) abgedeckt.
+### 3.1 Pflicht-Konsequenzen pro Heptad-Aenderung
 
-### 3.2 Lueckenexport-Verbot
+- **Schema:** RLS (`is_workspace_member` SELECT, `can_write_workspace` WRITE) + Cascade-Trigger fuer alle Source-FKs (polymorph: pro atom_type ein Trigger) + `REPLICA IDENTITY FULL` wenn Realtime + Backfill bei Spalten-Drop + Header-Comment.
+- **Types:** Row-Type + Enriched-Type (wenn PostgREST-Embed) + AtomKind-Erweiterung wenn neuer atom_type.
+- **Mutations:** Schreiben durch `runOptimistic*`. Reads mit `mergeRows`/`putAll` + `getByWorkspace`/`getById`-Fallback. RPC-Wrapper bei `SECURITY DEFINER`.
+- **Offline-Cache:** TABLES-Eintrag + DB_VERSION-Bump. **Vergessen heisst: Cache-Read crasht nach Reconnect.**
+- **Realtime-Subscribe:** RealtimeTable-Type-Erweiterung + DIRECT_TABLES + Workspace-refetch-Bump fuer alle Resources die die Tabelle lesen. **Vergessen heisst: Multi-User-Mutationen werden erst nach Reload sichtbar.**
+- **Export/Import:** WorkspaceExport-Field + alle 4 Export-Pfade (Workspace + Matrix-Subtree + Cell-Subtree + Feature-Variants) + Subtree-Filter via Owner-Sets + idempotenter Import (UNIQUE-Constraint-aware). **Vergessen heisst: Round-Trip verliert Daten unbemerkt.**
+- **MCP-Tools:** Tool-Bundle pro Tabelle + Registrierung in `registerAllTools`. Auch wenn der Bridge-Web-Connector noch nicht live ist — die Schemas definieren die AI-API.
+
+### 3.2 Auch zu pruefen (nicht im Heptad, aber haeufige Mit-Vergessen)
+
+- **Workspace-Reset** (`lib/workspace-reset.ts`): wenn `^reset -all` die Tabelle nicht via Cascade trifft, manuell aufnehmen.
+- **Audit-Log-Awareness** (Welle N.1+): wenn die Tabelle audit-relevant ist (sicherheitskritisch oder Compliance), in `lib/audit.ts` aufnehmen.
+- **Standalone-Client** (`packages/client-standalone/matrix.html`): **eingefroren** — irrelevant, niemals dort nachzuziehen. Nur erwaehnt damit der Reflex "alles parallel pflegen" hier explizit verneint wird.
+- **Smart-Summary / KI-Prompts**: wenn die neue Tabelle Atom-Eigenschaften traegt die in LLM-Prompts erscheinen, `task-aggregate.ts` o.ae. anpassen.
+- **Sidebar-Tree / Chip-Filter**: wenn die Tabelle einen Sidebar-Indicator brauchen sollte (z.B. Atom-Type-Pin), `useSidebarChips` + `buildSidebarTree` ergaenzen.
+
+### 3.3 Pre-Commit-Heptad-Selbstcheck
+
+Vor jedem Migration-Commit ankreuzen — kostet 30 Sekunden, spart 30 Minuten Nachzieh-Sprint:
+
+```
+[ ] Schema       → Migration mit RLS + Trigger + Realtime-Publication
+[ ] Types        → Row-Type + Enums in lib/types.ts
+[ ] Mutations    → CRUD durch safe-mutation-Wrapper
+[ ] Offline-Cache → TABLES + DB_VERSION-Bump in offline-cache.ts
+[ ] Realtime     → RealtimeTable + DIRECT_TABLES + Workspace-Bumps
+[ ] Export       → WorkspaceExport + alle 4 Export-Pfade + Import
+[ ] MCP-Tools    → Tool-Bundle + index.ts-Registrierung
+```
+
+### 3.4 Lueckenexport-Verbot
 
 Kein Export ist "fast vollstaendig". Vor jedem Export-Sprint **alle** Tabellen + FKs + JSONB-Felder + computed-Columns mit User abstimmen. Roundtrip-Test:
 1. Workspace mit allen Features bestuecken
