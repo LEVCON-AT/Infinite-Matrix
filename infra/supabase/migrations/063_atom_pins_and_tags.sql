@@ -442,26 +442,38 @@ CREATE TRIGGER workspace_tags_usage_bump
   FOR EACH ROW EXECUTE FUNCTION public._workspace_tags_bump_usage();
 
 -- ─── BACKFILL atom_pins aus docs.attached_cell_id ─────────────
--- Sauberer Cut, kein Dual-Write. ON CONFLICT DO NOTHING fuer
--- Idempotenz (Migration mehrfach apply-bar, aber attached_cell_id
--- wird gleich danach gedroppt — die Idempotenz greift nur fuer
--- mehrfache Apply-Versuche bevor DROP COLUMN durchlief).
-INSERT INTO public.atom_pins (
-  atom_type, atom_id, workspace_id, parent_kind, parent_id, position
-)
-SELECT
-  'doc'::public.atom_type,
-  d.id,
-  d.workspace_id,
-  'cell'::public.atom_parent_kind,
-  d.attached_cell_id,
-  0
-FROM public.docs d
-WHERE d.attached_cell_id IS NOT NULL
-ON CONFLICT (atom_type, atom_id, parent_kind, parent_id) DO NOTHING;
+-- Sauberer Cut, kein Dual-Write. Bei Re-Apply nach erstem Lauf ist
+-- die Spalte bereits gedroppt — Backfill nur ausfuehren wenn sie
+-- noch existiert. Idempotenz mit ON CONFLICT DO NOTHING.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'docs'
+      AND column_name = 'attached_cell_id'
+  ) THEN
+    EXECUTE $sql$
+      INSERT INTO public.atom_pins (
+        atom_type, atom_id, workspace_id, parent_kind, parent_id, position
+      )
+      SELECT
+        'doc'::public.atom_type,
+        d.id,
+        d.workspace_id,
+        'cell'::public.atom_parent_kind,
+        d.attached_cell_id,
+        0
+      FROM public.docs d
+      WHERE d.attached_cell_id IS NOT NULL
+      ON CONFLICT (atom_type, atom_id, parent_kind, parent_id) DO NOTHING
+    $sql$;
+  END IF;
+END $$;
 
 -- ─── docs.attached_cell_id direkt droppen ─────────────────────
 -- Keine Production-Daten → kein Dual-Write-Window noetig.
+-- IF EXISTS macht den DROP idempotent fuer Re-Apply.
 ALTER TABLE public.docs DROP COLUMN IF EXISTS attached_cell_id;
 
 -- ─── docs.content auf clean-slate HTML setzen ─────────────────
