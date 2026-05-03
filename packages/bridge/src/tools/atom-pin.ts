@@ -82,8 +82,7 @@ export const atomPinTools: ToolDef[] = [
   },
   {
     name: 'atom_pin.list',
-    description:
-      'Listet Pins im Workspace, optional gefiltert auf Atom-Typ/ID oder Parent-Typ/ID.',
+    description: 'Listet Pins im Workspace, optional gefiltert auf Atom-Typ/ID oder Parent-Typ/ID.',
     schema: atomPinListSchema,
     jsonSchema: zodToJsonSchema(atomPinListSchema),
   },
