@@ -249,6 +249,35 @@
   /* Legacy (Q.3.B): einzelnes z-popup-Token, jetzt Alias. */
   --z-popup: var(--z-popover);
 
+  /* Mobile — Touch-Targets (style.md §3, WCAG 2.5.5). */
+  --tap-min: 2.75rem; /* 44px @16px = WCAG-AA Touch-Min */
+  --touch-comfort: 3rem;
+
+  /* Mobile — Layout-Skala. */
+  --mobile-header-h: 3.5rem;
+  --mobile-bottom-nav-h: 3.5rem;
+  --mobile-fab-size: 3.5rem;
+  --mobile-drawer-w: 85vw;
+  --mobile-sheet-snap-default: 50vh;
+  --mobile-sheet-snap-expanded: 90vh;
+
+  /* Mobile — Geste-Timing (animations.md §1.1). */
+  --longpress-delay: 200ms;
+  --tab-hover-dwell: 600ms;
+
+  /* Mobile — Breakpoints. Diese Custom-Properties dienen NUR Doku-
+     Zwecken, da @media-Queries CSS-Variablen nicht aufloesen. Werte
+     muessen in Media-Queries hardcoded als rem dupliziert werden. */
+  --mobile-bp: 31.25rem; /* 500px = Phone-Cutoff */
+  --tablet-bp: 64rem; /* 1024px = Desktop-Min */
+
+  /* Mobile — Safe-Area-Insets fuer Notch / Home-Indicator. Fallback
+     `0rem` haelt Layout konsistent auf Browsern ohne env()-Support. */
+  --safe-top: env(safe-area-inset-top, 0rem);
+  --safe-bottom: env(safe-area-inset-bottom, 0rem);
+  --safe-left: env(safe-area-inset-left, 0rem);
+  --safe-right: env(safe-area-inset-right, 0rem);
+
   /* Basis-Font */
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, sans-serif;
   color-scheme: light;
@@ -262,6 +291,19 @@
   --canvas: #0f1115;
   --surface: #1a1d23;
   --surface-hover: #232730;
+}
+
+/* Mobile-Phase S12 — OLED-Black auf Phone-Dark: Canvas wird reines
+   Schwarz fuer Battery + maximale Schatten-Tiefe. Surface bleibt leicht
+   abgesetzt fuer visuelle Hierarchie. data-theme sitzt auf <html>, der
+   viewport-Tag auf body — Selector verbindet beide Vorfahren. */
+[data-theme='dark'] body[data-viewport='phone'] {
+  --canvas: #000000;
+  --surface: #0f1115;
+  --surface-hover: #1a1d23;
+}
+
+[data-theme="dark"] {
   --bg: var(--canvas);
   --bg2: var(--surface);
   --bg3: var(--surface-hover);
@@ -15818,4 +15860,1083 @@ html.view-transition-drill-up::view-transition-new(ws-main) {
   font-size: var(--text-xs);
   color: var(--text3);
   margin-top: 2px;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Mobile-Shell (S5) — Top-Header + Bottom-Nav + FAB.
+   Nur aktiv bei body[data-viewport="phone"]. Tablet und Desktop
+   bleiben unveraendert.
+   ════════════════════════════════════════════════════════════════ */
+
+/* Workspace-Header verstecken auf Phone — Mobile-Header uebernimmt
+   seine Funktion. */
+body[data-viewport='phone'] .ws-main-header {
+  display: none;
+}
+
+/* Sidebar wird auf Phone zum Drawer. Standardmaessig nach links
+   versteckt (translateX(-100%)). body[data-tree-drawer="open"] zieht
+   sie rein. Animation via transform fuer GPU-Beschleunigung. */
+body[data-viewport='phone'] .ws-sidebar {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--mobile-drawer-w);
+  max-width: 22rem;
+  height: 100dvh;
+  transform: translateX(-100%);
+  transition: transform var(--tr-base) var(--ease-out);
+  z-index: var(--z-modal);
+  box-shadow: var(--shadow-2xl);
+  overflow-y: auto;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+}
+
+body[data-viewport='phone'][data-tree-drawer='open'] .ws-sidebar {
+  transform: translateX(0);
+}
+
+.mobile-tree-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay-soft);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  z-index: var(--z-modal-backdrop);
+  transition: opacity var(--tr-base) var(--ease-out);
+}
+
+.mobile-tree-drawer-backdrop[data-open='true'] {
+  opacity: 1;
+}
+
+/* Workspace-Main bekommt auf Phone Padding fuer Top-Header (3.5rem)
+   und Bottom-Nav (3.5rem) plus Safe-Area. Damit scrollt der Content
+   nicht hinter die Mobile-Chrome. */
+body[data-viewport='phone'] .ws-main {
+  padding-top: calc(var(--mobile-header-h) + var(--safe-top));
+  padding-bottom: calc(var(--mobile-bottom-nav-h) + var(--safe-bottom));
+}
+
+/* ── Mobile-Header ───────────────────────────────────────────── */
+.mobile-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--mobile-header-h) + var(--safe-top));
+  padding: var(--safe-top) var(--space-3) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--border);
+  z-index: var(--z-sticky);
+  box-shadow: var(--shadow-xs);
+}
+
+.mobile-header-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border: none;
+  background: transparent;
+  color: var(--text);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition:
+    background var(--tr-fast) var(--ease-out),
+    transform var(--tr-fast) var(--ease-out);
+}
+
+.mobile-header-btn:hover,
+.mobile-header-btn:focus-visible {
+  background: var(--surface-hover);
+}
+
+.mobile-header-btn:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: -2px;
+}
+
+.mobile-header-btn:active {
+  transform: scale(var(--scale-press));
+}
+
+.mobile-header-btn-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.mobile-header-btn-active:hover {
+  background: var(--accent-soft);
+}
+
+.mobile-header-breadcrumb {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.mobile-header-breadcrumb-seg {
+  font-size: var(--text-sm);
+  color: var(--text);
+  text-overflow: ellipsis;
+  overflow: hidden;
+  font-weight: var(--weight-medium);
+  max-width: 12rem;
+}
+
+.mobile-header-breadcrumb-seg:last-child {
+  color: var(--text);
+  font-weight: var(--weight-semibold);
+}
+
+.mobile-header-breadcrumb-sep {
+  color: var(--text3);
+  font-size: var(--text-xs);
+}
+
+.mobile-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* ── Mobile-Bottom-Nav ──────────────────────────────────────── */
+.mobile-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--mobile-bottom-nav-h) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  display: grid;
+  grid-template-columns: 1fr 1fr auto 1fr 1fr;
+  align-items: center;
+  background: var(--surface);
+  border-top: 0.5px solid var(--border);
+  box-shadow: 0 -4px 12px -2px rgb(0 0 0 / 0.05);
+  z-index: var(--z-sticky);
+}
+
+.mobile-bottom-nav-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.125rem;
+  height: var(--mobile-bottom-nav-h);
+  border: none;
+  background: transparent;
+  color: var(--text3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  position: relative;
+  transition:
+    color var(--tr-fast) var(--ease-out),
+    background var(--tr-fast) var(--ease-out);
+}
+
+.mobile-bottom-nav-tab:hover {
+  background: var(--surface-hover);
+}
+
+.mobile-bottom-nav-tab:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: -2px;
+  border-radius: var(--radius-md);
+}
+
+.mobile-bottom-nav-tab-active {
+  color: var(--accent);
+}
+
+.mobile-bottom-nav-tab-active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1.5rem;
+  height: 0.125rem;
+  background: var(--accent);
+  border-radius: var(--radius-full);
+  transition: width var(--tr-base) var(--ease-spring);
+}
+
+.mobile-bottom-nav-tab:active {
+  transform: scale(var(--scale-press));
+}
+
+.mobile-bottom-nav-fab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--mobile-fab-size);
+  height: var(--mobile-fab-size);
+  margin: 0 var(--space-3);
+  border: none;
+  background: var(--accent);
+  color: var(--text-inverse);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-lg);
+  cursor: pointer;
+  transition:
+    transform var(--tr-fast) var(--ease-spring),
+    box-shadow var(--tr-fast) var(--ease-out),
+    background var(--tr-fast) var(--ease-out);
+  position: relative;
+  top: -0.5rem;
+}
+
+.mobile-bottom-nav-fab:hover {
+  background: var(--accent-hover);
+  box-shadow: var(--shadow-xl);
+  transform: translateY(var(--lift-xs));
+}
+
+.mobile-bottom-nav-fab:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+.mobile-bottom-nav-fab:active {
+  transform: scale(var(--scale-press));
+  box-shadow: var(--shadow-md);
+}
+
+/* ── Bottom-Sheet (BottomSheet.tsx) ─────────────────────────── */
+.bottom-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay-soft);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  z-index: var(--z-modal-backdrop);
+  transition: opacity var(--tr-base) var(--ease-out);
+}
+
+.bottom-sheet-backdrop[data-open='true'] {
+  opacity: 1;
+}
+
+.bottom-sheet {
+  --sheet-snap: var(--mobile-sheet-snap-default);
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-height: var(--sheet-snap);
+  padding-bottom: var(--safe-bottom);
+  background: var(--surface);
+  border-top-left-radius: var(--radius-2xl);
+  border-top-right-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-2xl);
+  transform: translateY(100%);
+  transition:
+    transform var(--tr-base) var(--ease-out),
+    max-height var(--tr-base) var(--ease-out);
+  z-index: var(--z-modal);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.bottom-sheet[data-open='true'] {
+  transform: translateY(0);
+}
+
+.bottom-sheet-handle {
+  align-self: center;
+  width: 2.5rem;
+  height: 0.25rem;
+  margin: var(--space-2) 0 var(--space-1);
+  border: none;
+  background: var(--border2);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition:
+    background var(--tr-fast) var(--ease-out),
+    transform var(--tr-fast) var(--ease-spring);
+}
+
+.bottom-sheet-handle:hover,
+.bottom-sheet-handle:focus-visible {
+  background: var(--text3);
+  transform: scaleY(1.4);
+}
+
+.bottom-sheet-handle:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+.bottom-sheet-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+/* ── QuickActionSheet (FAB-Sheet) ───────────────────────────── */
+.quick-action-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2_5) var(--space-3);
+  background: var(--surface-hover);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-3);
+  color: var(--text2);
+  transition:
+    border-color var(--tr-fast) var(--ease-out),
+    box-shadow var(--tr-fast) var(--ease-out);
+}
+
+.quick-action-search-wrap:focus-within {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-focus);
+}
+
+.quick-action-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--text-base);
+  outline: none;
+}
+
+.quick-action-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.quick-action-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-2_5) var(--space-3);
+  border: 0.5px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  color: var(--text);
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition:
+    background var(--tr-fast) var(--ease-out),
+    transform var(--tr-fast) var(--ease-spring),
+    box-shadow var(--tr-fast) var(--ease-out);
+}
+
+.quick-action-btn:hover {
+  background: var(--surface-hover);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(var(--lift-xs));
+}
+
+.quick-action-btn:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+.quick-action-btn:active {
+  transform: scale(var(--scale-press));
+  box-shadow: none;
+}
+
+/* ── MoreTab (Sheet mit globalen Aktionen) ──────────────────── */
+.more-tab-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.more-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-2_5) var(--space-3);
+  border: 0.5px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  color: var(--text);
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition:
+    background var(--tr-fast) var(--ease-out),
+    transform var(--tr-fast) var(--ease-spring),
+    box-shadow var(--tr-fast) var(--ease-out);
+}
+
+.more-tab-btn:hover {
+  background: var(--surface-hover);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(var(--lift-xs));
+}
+
+.more-tab-btn:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+.more-tab-btn:active {
+  transform: scale(var(--scale-press));
+}
+
+.more-tab-state {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--text2);
+  font-weight: var(--weight-normal);
+}
+
+.more-tab-btn-danger {
+  color: var(--danger);
+}
+
+.more-tab-btn-danger:hover {
+  background: var(--danger-soft);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   MatrixLinearList (S7) — Mobile-Variante des Matrix-Grids.
+   Spalten als vertikal gestapelte Sektionen mit horizontalem
+   Snap-Karusell der Cell-Cards.
+   ════════════════════════════════════════════════════════════════ */
+
+.matrix-linear-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.matrix-linear-section {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-xs);
+  transition:
+    box-shadow var(--tr-fast) var(--ease-out),
+    border-color var(--tr-fast) var(--ease-out);
+}
+
+.matrix-linear-section:hover {
+  box-shadow: var(--shadow-sm);
+  border-color: var(--border2);
+}
+
+.matrix-linear-section-head {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2_5) var(--space-3);
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--border);
+  z-index: var(--z-sticky);
+}
+
+.matrix-linear-section-title {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+  letter-spacing: var(--tracking-tight);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Snap-Rail: horizontal scrollender Container fuer die Cards einer
+   Spalte. scroll-snap-type sorgt dafuer, dass Wischen genau auf der
+   naechsten Card endet. Padding-inline schafft Platz fuer Schatten. */
+.matrix-linear-section-rail {
+  display: flex;
+  flex-direction: row;
+  gap: var(--space-3);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: var(--space-3);
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.matrix-linear-section-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.matrix-linear-cell-wrap {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+}
+
+/* ── MobileCellCard — Reichhaltige Cell-Karte ───────────────── */
+.mobile-cell-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 16rem;
+  min-height: 8.75rem;
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+  cursor: pointer;
+  transition:
+    transform var(--tr-fast) var(--ease-spring),
+    box-shadow var(--tr-fast) var(--ease-out),
+    border-color var(--tr-fast) var(--ease-out);
+}
+
+.mobile-cell-card:hover {
+  transform: translateY(var(--lift-xs));
+  box-shadow: var(--shadow-md);
+  border-color: var(--border2);
+}
+
+.mobile-cell-card:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+.mobile-cell-card:active {
+  transform: scale(var(--scale-press));
+  box-shadow: var(--shadow-xs);
+}
+
+.mobile-cell-card-empty {
+  background: var(--surface-hover);
+  border-style: dashed;
+  border-color: var(--border2);
+  box-shadow: none;
+}
+
+.mobile-cell-card-empty:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.mobile-cell-card-edit {
+  border-color: var(--accent);
+}
+
+.mobile-cell-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.mobile-cell-card-title {
+  flex: 1;
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobile-cell-card-alias {
+  font-size: var(--text-xs);
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 0.125rem var(--space-1_5);
+  border-radius: var(--radius-full);
+  font-weight: var(--weight-medium);
+  flex-shrink: 0;
+}
+
+.mobile-cell-card-summary {
+  display: flex;
+  align-items: center;
+  font-size: var(--text-sm);
+  color: var(--text2);
+}
+
+.mobile-cell-card-hint {
+  font-size: var(--text-sm);
+  color: var(--text3);
+  font-style: italic;
+}
+
+.mobile-cell-card-feats {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+
+.mobile-cell-card-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border: 0.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    background var(--tr-fast) var(--ease-out),
+    transform var(--tr-fast) var(--ease-spring),
+    box-shadow var(--tr-fast) var(--ease-out);
+}
+
+/* Feature-Color-Coding (Single-Source: Desktop nutzt dieselben Farben
+   ueber data-feat im .mx-feat-chip-Selektor). */
+.mobile-cell-card-chip[data-feat='matrix'] {
+  color: var(--bluetxt);
+  background: var(--bluebg);
+  border-color: var(--bluebg);
+}
+.mobile-cell-card-chip[data-feat='board'] {
+  color: var(--purpletxt);
+  background: var(--purplebg);
+  border-color: var(--purplebg);
+}
+.mobile-cell-card-chip[data-feat='info'] {
+  color: var(--tealtxt);
+  background: var(--tealbg);
+  border-color: var(--tealbg);
+}
+.mobile-cell-card-chip[data-feat='checklists'] {
+  color: var(--ambertxt);
+  background: var(--amberbg);
+  border-color: var(--amberbg);
+}
+.mobile-cell-card-chip[data-feat='doc'] {
+  color: var(--text2);
+  background: var(--surface-hover);
+}
+
+.mobile-cell-card-chip:hover {
+  transform: translateY(var(--lift-xs));
+  box-shadow: var(--shadow-sm);
+}
+
+.mobile-cell-card-chip:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+.mobile-cell-card-chip:active {
+  transform: scale(var(--scale-press));
+  box-shadow: none;
+}
+
+/* Phone-Layout-Korrekturen: matrix-wrap soll auf Phone keine Desktop-
+   Polster haben — die Linear-List polstert selbst. */
+body[data-viewport='phone'] .matrix-wrap {
+  padding: 0;
+}
+
+/* Aggregat-Sektion auf Phone unter der Liste sichtbar lassen, aber
+   Padding angleichen. */
+body[data-viewport='phone'] .matrix-aggregate {
+  margin-top: var(--space-2);
+  padding: 0 var(--space-3);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   MobileCalendar (S8) — Heatmap-Picker + Agenda-Liste.
+   ════════════════════════════════════════════════════════════════ */
+
+.mobile-calendar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-3);
+}
+
+/* ── Heatmap-Picker (12px-Mini-Grid) ────────────────────────── */
+.mobile-cal-heatmap-section {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-3);
+  box-shadow: var(--shadow-xs);
+}
+
+.mobile-cal-heatmap-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.125rem;
+  font-size: var(--text-xs);
+  color: var(--text3);
+  text-align: center;
+  margin-bottom: 0.25rem;
+  font-weight: var(--weight-medium);
+}
+
+.mobile-cal-heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.125rem;
+}
+
+/* style.md §1.1 dokumentierte px-Ausnahme: 12px ist die kleinstmoegliche
+   Heatmap-Cell-Groesse, die als Density-Punkt erkennbar bleibt. Cell-
+   Touch-Target via Padding-vergrosserung im Container. */
+.mobile-cal-heatmap-cell {
+  width: 100%;
+  aspect-ratio: 1;
+  min-width: 12px;
+  min-height: 12px;
+  border: 0.5px solid var(--border);
+  background: var(--surface-hover);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background var(--tr-fast) var(--ease-out),
+    border-color var(--tr-fast) var(--ease-out),
+    transform var(--tr-fast) var(--ease-spring);
+}
+
+.mobile-cal-heatmap-cell[data-density='0'] {
+  background: var(--surface-hover);
+}
+.mobile-cal-heatmap-cell[data-density='1'] {
+  background: var(--bluebg);
+  border-color: var(--bluebg);
+}
+.mobile-cal-heatmap-cell[data-density='2'] {
+  background: var(--blue);
+  border-color: var(--blue);
+  opacity: 0.7;
+}
+.mobile-cal-heatmap-cell[data-density='3'] {
+  background: var(--blue);
+  border-color: var(--blue);
+}
+
+.mobile-cal-heatmap-cell-out {
+  opacity: 0.35;
+}
+
+.mobile-cal-heatmap-cell-today {
+  outline: var(--focus-width) solid var(--accent);
+  outline-offset: -2px;
+}
+
+.mobile-cal-heatmap-cell-anchor {
+  transform: scale(1.1);
+  box-shadow: var(--shadow-sm);
+}
+
+.mobile-cal-heatmap-cell:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+.mobile-cal-heatmap-cell:active {
+  transform: scale(var(--scale-press));
+}
+
+/* ── Agenda-Liste ───────────────────────────────────────────── */
+.mobile-cal-agenda {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mobile-cal-agenda-empty {
+  text-align: center;
+  padding: var(--space-6);
+  color: var(--text3);
+}
+
+.mobile-cal-agenda-day {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition:
+    border-color var(--tr-fast) var(--ease-out),
+    box-shadow var(--tr-fast) var(--ease-out);
+}
+
+.mobile-cal-agenda-day:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.mobile-cal-agenda-day-today {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), var(--shadow-sm);
+}
+
+.mobile-cal-agenda-day-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2_5) var(--space-3);
+  border-bottom: 0.5px solid var(--border);
+  background: var(--surface);
+}
+
+.mobile-cal-agenda-day-date {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  color: var(--text);
+  font-feature-settings: 'tnum';
+}
+
+.mobile-cal-agenda-day-weekday {
+  font-size: var(--text-sm);
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  font-weight: var(--weight-medium);
+}
+
+.mobile-cal-agenda-day-open {
+  margin-left: auto;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text3);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    background var(--tr-fast) var(--ease-out),
+    color var(--tr-fast) var(--ease-out);
+}
+
+.mobile-cal-agenda-day-open:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.mobile-cal-agenda-day-open:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: -2px;
+}
+
+.mobile-cal-agenda-day-empty {
+  padding: var(--space-2_5) var(--space-3);
+  color: var(--text3);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.mobile-cal-agenda-day-events {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-1) var(--space-2) var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.mobile-cal-agenda-event {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-2) var(--space-2_5);
+  border: 0.5px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  font-size: var(--text-sm);
+  color: var(--text);
+  transition:
+    background var(--tr-fast) var(--ease-out),
+    transform var(--tr-fast) var(--ease-spring),
+    box-shadow var(--tr-fast) var(--ease-out);
+}
+
+.mobile-cal-agenda-event:hover {
+  background: var(--surface-hover);
+  transform: translateX(0.125rem);
+  box-shadow: var(--shadow-xs);
+}
+
+.mobile-cal-agenda-event:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+.mobile-cal-agenda-event:active {
+  transform: scale(var(--scale-press));
+}
+
+.mobile-cal-agenda-event-task {
+  border-left: 0.25rem solid var(--blue);
+}
+
+.mobile-cal-agenda-event-link {
+  border-left: 0.25rem solid var(--purple);
+}
+
+.mobile-cal-agenda-event-checklist {
+  border-left: 0.25rem solid var(--amber);
+}
+
+.mobile-cal-agenda-event-imported_event {
+  border-left: 0.25rem solid var(--text3);
+}
+
+.mobile-cal-agenda-event-done {
+  opacity: 0.5;
+}
+
+.mobile-cal-agenda-event-done .mobile-cal-agenda-event-label {
+  text-decoration: line-through;
+}
+
+.mobile-cal-agenda-event-check {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+}
+
+.mobile-cal-agenda-event-time {
+  font-size: var(--text-xs);
+  color: var(--text2);
+  font-weight: var(--weight-medium);
+  font-feature-settings: 'tnum';
+  flex-shrink: 0;
+}
+
+.mobile-cal-agenda-event-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Modal-zu-Bottom-Sheet-Aliasing (S9).
+
+   Bestehende .overlay-scrim / .overlay-card werden auf Phone zu
+   Bottom-Sheets — slide-from-bottom statt zentriert-bloom. Drag-
+   Handle-Pille wird via ::before-Pseudo realisiert (rein dekorativ;
+   echte Snap-Toggle-Geste folgt in S10/Polish wenn benoetigt).
+
+   Damit erbt JEDER bestehende Modal-Mount (NewCellWizard, Atom-
+   Picker, DocsPopup, NotificationBell, etc.) das Mobile-Pattern
+   ohne Component-Aenderung.
+   ════════════════════════════════════════════════════════════════ */
+
+body[data-viewport='phone'] .overlay-scrim {
+  align-items: flex-end;
+  padding: 0;
+}
+
+body[data-viewport='phone'] .overlay-card {
+  width: 100%;
+  max-width: none;
+  max-height: var(--mobile-sheet-snap-expanded);
+  margin: 0;
+  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+  padding-bottom: var(--safe-bottom);
+  position: relative;
+  animation: mobileSheetEnter var(--tr-base) var(--ease-out) forwards;
+}
+
+body[data-viewport='phone'] .overlay-card[data-state='leaving'] {
+  animation: mobileSheetExit var(--tr-exit) var(--ease-in) forwards;
+}
+
+/* Drag-Handle-Pille als visueller Hint, dass dies ein Sheet ist.
+   Nicht interaktiv — fuer Snap-Toggle bzw. Swipe-Down-Dismiss
+   braucht es JS-Hooks (S10/Polish). */
+body[data-viewport='phone'] .overlay-card::before {
+  content: '';
+  display: block;
+  width: 2.5rem;
+  height: 0.25rem;
+  margin: var(--space-2) auto var(--space-1);
+  background: var(--border2);
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+@keyframes mobileSheetEnter {
+  from {
+    transform: translateY(100%);
+    opacity: 0.85;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes mobileSheetExit {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100%);
+    opacity: 0.85;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Cross-View-Tab-Hover-Drop (S10) — Visualisierung des Dwell-Timers.
+   tabHoverPulse() in animations.ts setzt:
+     [data-drop-dwell="1"] + --dwell-progress (0..1)
+   waehrend der User mit Drag-Pointer ueber dem Tab schwebt.
+   ════════════════════════════════════════════════════════════════ */
+
+.mobile-bottom-nav-tab[data-drop-dwell='1'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Dwell-Progress-Ring oben am Tab. Breite skaliert mit
+   --dwell-progress (0..1) — bei 1 voll, bei 0 unsichtbar.
+   transition entfaellt, weil tabHoverPulse pro Frame setzt. */
+.mobile-bottom-nav-tab[data-drop-dwell='1']::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: calc(2.5rem * var(--dwell-progress, 0));
+  height: 0.1875rem;
+  background: var(--accent);
+  border-radius: var(--radius-full);
+  transform: translateX(-50%);
+  box-shadow: 0 0 0.5rem var(--accent);
 }

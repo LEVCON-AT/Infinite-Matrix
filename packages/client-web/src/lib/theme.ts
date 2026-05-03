@@ -18,8 +18,12 @@ function readInitialTheme(): Theme {
   } catch {
     // localStorage blockiert (private mode) — system fallback unten
   }
+  // Mobile-Phase S12: Phone defaultet auf dark (HyperUI-Schatten wirken
+  // in Dark eleganter, OLED-Battery, Eye-Strain-Reduktion). Tablet und
+  // Desktop folgen der System-Praeferenz wie bisher.
   if (typeof matchMedia === 'function') {
     try {
+      if (matchMedia('(max-width: 31.249rem)').matches) return 'dark';
       if (matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
     } catch {
       // egal

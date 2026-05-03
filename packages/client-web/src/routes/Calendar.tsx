@@ -32,6 +32,7 @@ import {
 } from 'solid-js';
 import Icon from '../components/Icon';
 import ImportedEventDetailModal from '../components/ImportedEventDetailModal';
+import MobileCalendar from '../components/mobile/MobileCalendar';
 import { ModalTransition } from '../components/ModalTransition';
 import { pageEnter, slideIn, slideOut } from '../lib/animations';
 import {
@@ -59,6 +60,7 @@ import { fetchAgendaTasks } from '../lib/queries';
 import { todayIso } from '../lib/task-aggregate';
 import { toggleTaskInstanceDone } from '../lib/tasks';
 import { showToast } from '../lib/toasts';
+import { useMobile } from '../lib/use-mobile';
 import type { TaskStatus } from '../lib/types';
 
 type RouteParams = { workspaceId: string };
@@ -74,6 +76,7 @@ function statusKey(s: TaskStatus | null): string {
 const MAX_PER_DAY = 4;
 
 const Calendar: Component = () => {
+  const mobile = useMobile();
   const params = useParams<RouteParams>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -405,6 +408,21 @@ const Calendar: Component = () => {
         </label>
       </div>
 
+      <Show
+        when={!mobile.phone()}
+        fallback={
+          <MobileCalendar
+            workspaceId={params.workspaceId}
+            anchorIso={anchorIso}
+            today={today}
+            grid={grid}
+            eventsByDay={eventsByDay}
+            onDayClick={onDayClick}
+            openEvent={openEvent}
+            onToggleInstance={(e, ev) => void onToggleInstance(e, ev)}
+          />
+        }
+      >
       <div
         class="calendar-grid"
         aria-label={`Kalender ${monthLabelDe(anchorIso())}`}
@@ -552,6 +570,7 @@ const Calendar: Component = () => {
           }}
         </For>
       </div>
+      </Show>
 
       <ModalTransition when={Boolean(importedEventModalRequest())}>
         <Show when={importedEventModalRequest()}>

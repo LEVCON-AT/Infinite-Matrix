@@ -35,6 +35,7 @@ import type { PresenceUser } from '../lib/presence';
 import { useVis } from '../lib/settings';
 import { buildCellTaskSummaries, todayIso } from '../lib/task-aggregate';
 import { showToast, showUndoToast } from '../lib/toasts';
+import { useMobile } from '../lib/use-mobile';
 import type {
   CellFeature,
   CellRow,
@@ -57,20 +58,21 @@ import BulkAddModal, { type BulkAddMode } from './BulkAddModal';
 import CellTaskSummary from './CellTaskSummary';
 import Icon, { type IconName } from './Icon';
 import MatrixAggregateSection from './MatrixAggregateSection';
+import MatrixLinearList from './mobile/MatrixLinearList';
 import { ModalTransition } from './ModalTransition';
 import NewCellWizard from './NewCellWizard';
 import PresenceMini from './PresenceMini';
 
-const FEATURE_ORDER: CellFeature[] = ['matrix', 'board', 'info', 'checklists'];
+export const FEATURE_ORDER: CellFeature[] = ['matrix', 'board', 'info', 'checklists'];
 
-const FEATURE_ICON: Record<CellFeature, IconName> = {
+export const FEATURE_ICON: Record<CellFeature, IconName> = {
   matrix: 'squares-2x2',
   board: 'view-columns',
   info: 'information-circle',
   checklists: 'check-circle',
 };
 
-const FEATURE_LABEL: Record<CellFeature, string> = {
+export const FEATURE_LABEL: Record<CellFeature, string> = {
   matrix: 'Sub-Matrix',
   board: 'Board',
   info: 'Info',
@@ -118,6 +120,7 @@ const MatrixView: Component<Props> = (p) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const editMode = useEditMode();
+  const mobile = useMobile();
 
   // Phase 4 T.1.E: Smart-Summary-Map pro Cell. Eine einzige Aggregation
   // ueber wsTasks + wsManifestations + wsChecklists, danach pro Cell
@@ -785,6 +788,36 @@ const MatrixView: Component<Props> = (p) => {
           };
 
           return (
+            <Show
+              when={!mobile.phone()}
+              fallback={
+                <MatrixLinearList
+                  workspaceId={p.workspaceId}
+                  rows={rows()}
+                  cols={cols()}
+                  cellMap={cellMap()}
+                  cellSummaries={cellSummaries()}
+                  cellsWithDocs={p.cellsWithDocs}
+                  presenceByCell={presenceByCell()}
+                  editMode={editMode()}
+                  onChipClick={(e, cell, feat, row, col) => {
+                    if (feat === 'doc') {
+                      if (cell) navigate(`/w/${p.workspaceId}/c/${cell.id}/docs`);
+                      return;
+                    }
+                    onChipClick(e, cell, feat, row, col);
+                  }}
+                  onCardTap={(row, col, cell) => {
+                    if (editMode()) {
+                      onCellEdit(row, col, cell);
+                    } else {
+                      void enterCellNonEdit(cell);
+                    }
+                  }}
+                  onCellHover={p.onCellHover}
+                />
+              }
+            >
             <div class="matrix-grid" style={gridStyle()}>
               {/* Header-Ecke */}
               <div class="mx-corner" />
@@ -1102,6 +1135,7 @@ const MatrixView: Component<Props> = (p) => {
                 <div class="mx-add-row-filler" />
               </Show>
             </div>
+            </Show>
           );
         }}
       </Show>

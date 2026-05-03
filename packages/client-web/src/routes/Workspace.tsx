@@ -28,6 +28,8 @@ import HeaderSearchBar from '../components/HeaderSearchBar';
 import Icon from '../components/Icon';
 import KeyboardHelp from '../components/KeyboardHelp';
 import MatrixView from '../components/MatrixView';
+import MobileShell from '../components/mobile/MobileShell';
+import MobileTreeDrawer from '../components/mobile/MobileTreeDrawer';
 import { ModalTransition } from '../components/ModalTransition';
 import NodeDescription from '../components/NodeDescription';
 import NodeTree from '../components/NodeTree';
@@ -37,6 +39,8 @@ import SidebarCalendarMini from '../components/SidebarCalendarMini';
 import SidebarDayView from '../components/SidebarDayView';
 import WorkspaceEmptyState from '../components/WorkspaceEmptyState';
 import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
+import { useMobile } from '../lib/use-mobile';
+import { installCrossViewTabDrop } from '../lib/cross-view-tab-drop';
 import { useAggregateView } from '../lib/aggregate-view';
 import { aliasChipMenuState, closeAliasChipMenu } from '../lib/alias-chip-menu';
 import { clearAliasIndex, fetchAliasIndex, scheduleAliasRefresh } from '../lib/alias-index';
@@ -117,6 +121,19 @@ const Workspace: Component = () => {
   const editMode = useEditMode();
   const incognito = useIncognito();
   const theme = useTheme();
+  // Mobile-Phase S5/S6: Viewport-Hook fuer MobileShell-Mount + Tree-
+  // Drawer-State. Drawer schliesst automatisch bei Route-Change, damit
+  // ein Tap auf einen Tree-Knoten den Inhalt zeigt statt vom Drawer
+  // verdeckt zu werden.
+  const mobileViewport = useMobile();
+  const [mobileTreeDrawerOpen, setMobileTreeDrawerOpen] = createSignal(false);
+  createEffect(() => {
+    location.pathname; // dependency tracker
+    setMobileTreeDrawerOpen(false);
+  });
+  // Mobile-Phase S10: Cross-View-Tab-Hover-Drop installieren. Idempotent —
+  // mehrfacher Workspace-Mount setzt keinen zweiten Listener.
+  installCrossViewTabDrop((href) => navigate(href));
   // PWA-Install: deferredPrompt ist nur gesetzt, wenn der Browser die
   // App fuer Install kandidiert (Chromium-/Edge-basierte Desktops +
   // Android). Safari-iOS feuert das Event nicht — dort bleibt der
@@ -1115,8 +1132,32 @@ const Workspace: Component = () => {
     });
   });
 
+  // Mobile-Phase S5: Breadcrumb fuer MobileHeader. Workspace-Name +
+  // (optional) Node-Name. Truncate-Logik macht die Komponente selber.
+  const mobileBreadcrumb = (): string[] => {
+    const segs: string[] = [];
+    const wsName = currentWs()?.name;
+    if (wsName) segs.push(wsName);
+    const nodeLabel = currentNode()?.label;
+    if (nodeLabel) segs.push(nodeLabel);
+    return segs.length ? segs : ['Matrix'];
+  };
+
   return (
-    <div class="ws-shell" data-sb-mode={sidebar.mode()}>
+    <>
+      <Show when={mobileViewport.phone() && params.workspaceId}>
+        <MobileShell
+          workspaceId={params.workspaceId as string}
+          onOpenTreeDrawer={() => setMobileTreeDrawerOpen(true)}
+          breadcrumb={mobileBreadcrumb}
+        />
+        <MobileTreeDrawer
+          open={mobileTreeDrawerOpen}
+          onOpen={() => setMobileTreeDrawerOpen(true)}
+          onClose={() => setMobileTreeDrawerOpen(false)}
+        />
+      </Show>
+      <div class="ws-shell" data-sb-mode={sidebar.mode()}>
       <aside class="ws-sidebar" data-sb-mode={sidebar.mode()}>
         {/* Schmale Top-Bar — Pendant zur ws-main-header. Workspace-
             Switcher-Chip links (flex:1), Collapse-Button rechts.
@@ -1775,6 +1816,7 @@ const Workspace: Component = () => {
         </Show>
       </main>
     </div>
+    </>
   );
 };
 

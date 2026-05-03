@@ -13,15 +13,18 @@ import { useIsPlatformAdmin } from './lib/admin';
 import { useDrawerHotkey } from './lib/ai-help-state';
 import { bootstrapAuth, useAccountInvalid, useAuthReady, useSession } from './lib/auth';
 import { checkMfaGate } from './lib/auth-mfa-gate';
+import { installPointerDragAdapter } from './lib/drag-context';
 import { useEditModeHotkey } from './lib/edit-mode';
 import { checkAndMaybeRedirectToOnboarding, resetOnboardingGate } from './lib/onboarding-gate';
 import { useUserPrefsSync } from './lib/settings';
 import { useThemeBootstrap } from './lib/theme';
 import { showToast } from './lib/toasts';
+import { useViewportClasses } from './lib/use-mobile';
 import { useWorkingHoursSync } from './lib/working-hours';
 import { PENDING_INVITE_KEY } from './routes/Invite';
 
 bootstrapAuth();
+installPointerDragAdapter();
 
 // Routen, die der globale Auth-Guard nicht zwingend redirecten soll.
 // /invite/:token bleibt aufrufbar — die Page selbst handhabt den
@@ -44,6 +47,7 @@ const App: ParentComponent = (props): JSX.Element => {
 
   useEditModeHotkey();
   useThemeBootstrap();
+  useViewportClasses();
   useUserPrefsSync();
   useWorkingHoursSync();
   useDrawerHotkey();

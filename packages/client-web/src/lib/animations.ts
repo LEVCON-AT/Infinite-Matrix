@@ -454,3 +454,226 @@ export function drillNavigate(
       root.classList.remove(cls);
     });
 }
+
+// ════════════════════════════════════════════════════════════════════
+// Mobile-Helper (S4)
+// ════════════════════════════════════════════════════════════════════
+
+// §2.9 (Mobile-Variant) — Bottom-Sheet-Open. Slide-from-bottom +
+// Backdrop-Bloom. `snap` waehlt die Ziel-Hoehe via CSS-Custom-Property
+// auf dem Sheet-Element, das Stylesheet liest sie aus
+// `--mobile-sheet-snap-default` (50vh) bzw. `--mobile-sheet-snap-expanded` (90vh).
+//
+// Pflicht-CSS auf dem Sheet:
+//   .bottom-sheet { transform: translateY(100%); }
+//   .bottom-sheet[data-open="true"] {
+//     transform: translateY(0);
+//     transition: transform var(--tr-base) var(--ease-out);
+//   }
+export function bottomSheetOpen(
+  sheet: HTMLElement | null,
+  backdrop: HTMLElement | null,
+  snap: 'default' | 'expanded' = 'default',
+): Promise<void> {
+  if (!sheet) return Promise.resolve();
+  const targetHeight =
+    snap === 'expanded' ? 'var(--mobile-sheet-snap-expanded)' : 'var(--mobile-sheet-snap-default)';
+  sheet.style.setProperty('--sheet-snap', targetHeight);
+  if (reducedMotion()) {
+    sheet.dataset.open = 'true';
+    if (backdrop) backdrop.dataset.open = 'true';
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        sheet.dataset.open = 'true';
+        if (backdrop) backdrop.dataset.open = 'true';
+        const onEnd = (e: TransitionEvent) => {
+          if (e.target !== sheet || e.propertyName !== 'transform') return;
+          sheet.removeEventListener('transitionend', onEnd);
+          resolve();
+        };
+        sheet.addEventListener('transitionend', onEnd);
+        setTimeout(() => {
+          sheet.removeEventListener('transitionend', onEnd);
+          resolve();
+        }, 480);
+      });
+    });
+  });
+}
+
+// Mobile-Variant — Bottom-Sheet-Close. Reverse von Open.
+export function bottomSheetClose(
+  sheet: HTMLElement | null,
+  backdrop: HTMLElement | null,
+): Promise<void> {
+  if (!sheet) return Promise.resolve();
+  if (reducedMotion()) {
+    delete sheet.dataset.open;
+    if (backdrop) delete backdrop.dataset.open;
+    return Promise.resolve();
+  }
+  delete sheet.dataset.open;
+  if (backdrop) delete backdrop.dataset.open;
+  return waitOnce(sheet, 'transitionend', 360);
+}
+
+// Mobile-Variant — Bottom-Sheet-Snap. Wechselt zwischen 50vh / 90vh.
+// Nutzt dieselbe CSS-Variable, die das Stylesheet liest. 200ms-Slide.
+export function bottomSheetSnap(
+  sheet: HTMLElement | null,
+  target: 'default' | 'expanded',
+): void {
+  if (!sheet) return;
+  const targetHeight =
+    target === 'expanded'
+      ? 'var(--mobile-sheet-snap-expanded)'
+      : 'var(--mobile-sheet-snap-default)';
+  sheet.style.setProperty('--sheet-snap', targetHeight);
+}
+
+// §2.7 (Mobile-Variant) — Native-Push horizontal slide. Drill-Down auf
+// Mobile, alternativ zum drillNavigate (View-Transitions API ist auf
+// iOS Safari 17 unzuverlaessig waehrend laufender Touch-Geste).
+//
+// Wenn `dir='forward'`: oldEl slidet 30% nach links + dim, newEl
+// slidet 100% → 0 von rechts. Wenn `dir='back'`: umgekehrt.
+//
+// Beide Elemente muessen vor dem Aufruf gemountet sein. CSS-Pflicht auf
+// beiden:
+//   .push-page { transition: transform var(--tr-slow) var(--ease-smooth),
+//                            opacity var(--tr-slow) var(--ease-smooth); }
+export function pushPage(
+  oldEl: HTMLElement | null,
+  newEl: HTMLElement | null,
+  dir: 'forward' | 'back' = 'forward',
+): Promise<void> {
+  if (!oldEl || !newEl) return Promise.resolve();
+  if (reducedMotion()) return Promise.resolve();
+  const oldStartX = '0';
+  const oldEndX = dir === 'forward' ? '-30%' : '100%';
+  const newStartX = dir === 'forward' ? '100%' : '-30%';
+  const newEndX = '0';
+  const oldStartOpacity = '1';
+  const oldEndOpacity = dir === 'forward' ? '0.4' : '1';
+  const newStartOpacity = dir === 'forward' ? '1' : '0.4';
+  const newEndOpacity = '1';
+  oldEl.style.transform = `translateX(${oldStartX})`;
+  oldEl.style.opacity = oldStartOpacity;
+  newEl.style.transform = `translateX(${newStartX})`;
+  newEl.style.opacity = newStartOpacity;
+  newEl.style.willChange = 'transform, opacity';
+  oldEl.style.willChange = 'transform, opacity';
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        oldEl.style.transition =
+          'transform var(--tr-slow) var(--ease-smooth), opacity var(--tr-slow) var(--ease-smooth)';
+        newEl.style.transition =
+          'transform var(--tr-slow) var(--ease-smooth), opacity var(--tr-slow) var(--ease-smooth)';
+        oldEl.style.transform = `translateX(${oldEndX})`;
+        oldEl.style.opacity = oldEndOpacity;
+        newEl.style.transform = `translateX(${newEndX})`;
+        newEl.style.opacity = newEndOpacity;
+        const onEnd = (e: TransitionEvent) => {
+          if (e.target !== newEl || e.propertyName !== 'transform') return;
+          newEl.removeEventListener('transitionend', onEnd);
+          oldEl.style.willChange = '';
+          newEl.style.willChange = '';
+          oldEl.style.transition = '';
+          newEl.style.transition = '';
+          resolve();
+        };
+        newEl.addEventListener('transitionend', onEnd);
+        setTimeout(() => {
+          newEl.removeEventListener('transitionend', onEnd);
+          resolve();
+        }, 600);
+      });
+    });
+  });
+}
+
+// §2.3 (Mobile-Variant) — Drawer-Open. Slide-from-left + Backdrop-Bloom.
+// CSS-Pflicht auf Drawer:
+//   .drawer { transform: translateX(-100%); }
+//   .drawer[data-open="true"] {
+//     transform: translateX(0);
+//     transition: transform var(--tr-base) var(--ease-out);
+//   }
+export function drawerOpen(
+  drawer: HTMLElement | null,
+  backdrop: HTMLElement | null,
+): Promise<void> {
+  if (!drawer) return Promise.resolve();
+  if (reducedMotion()) {
+    drawer.dataset.open = 'true';
+    if (backdrop) backdrop.dataset.open = 'true';
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        drawer.dataset.open = 'true';
+        if (backdrop) backdrop.dataset.open = 'true';
+        const onEnd = (e: TransitionEvent) => {
+          if (e.target !== drawer || e.propertyName !== 'transform') return;
+          drawer.removeEventListener('transitionend', onEnd);
+          resolve();
+        };
+        drawer.addEventListener('transitionend', onEnd);
+        setTimeout(() => {
+          drawer.removeEventListener('transitionend', onEnd);
+          resolve();
+        }, 480);
+      });
+    });
+  });
+}
+
+// Mobile-Variant — Drawer-Close. Reverse.
+export function drawerClose(
+  drawer: HTMLElement | null,
+  backdrop: HTMLElement | null,
+): Promise<void> {
+  if (!drawer) return Promise.resolve();
+  if (reducedMotion()) {
+    delete drawer.dataset.open;
+    if (backdrop) delete backdrop.dataset.open;
+    return Promise.resolve();
+  }
+  delete drawer.dataset.open;
+  if (backdrop) delete backdrop.dataset.open;
+  return waitOnce(drawer, 'transitionend', 360);
+}
+
+// Mobile-Variant — Tab-Hover-Pulse. Visualisierung waehrend Tab-Hover-
+// Drop-Dwell-Timer (S10). `progress` von 0 (gerade angekommen) bis 1
+// (Dwell-Timer voll). Wir setzen direkt Outline-Width (rem-Tokens) und
+// Outline-Opacity. Nicht via @keyframes, weil progress kontinuierlich
+// vom Caller gesteuert wird.
+//
+// Aufruf-Konvention: pro Frame einmal mit dem aktuellen progress.
+// Reduced-Motion: nur End-State, keine Zwischenwerte.
+export function tabHoverPulse(tabEl: HTMLElement | null, progress: number): void {
+  if (!tabEl) return;
+  const p = Math.max(0, Math.min(1, progress));
+  if (reducedMotion()) {
+    if (p > 0) {
+      tabEl.dataset.dropDwell = '1';
+      tabEl.style.removeProperty('--dwell-progress');
+    } else {
+      delete tabEl.dataset.dropDwell;
+    }
+    return;
+  }
+  if (p > 0) {
+    tabEl.dataset.dropDwell = '1';
+    tabEl.style.setProperty('--dwell-progress', String(p));
+  } else {
+    delete tabEl.dataset.dropDwell;
+    tabEl.style.removeProperty('--dwell-progress');
+  }
+}
