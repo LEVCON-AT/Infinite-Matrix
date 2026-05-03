@@ -15944,10 +15944,31 @@ body[data-viewport="phone"] .ws-main-header {
   display: none;
 }
 
+/* Phone: Workspace-Shell wird zu single-column. Default-Grid mit
+   Sidebar-Spalte + alle sb-mode-Varianten ueberschreiben — auf Phone
+   liegt die Sidebar absolut, nicht in der Grid-Flow. */
+body[data-viewport="phone"] .ws-shell,
+body[data-viewport="phone"] .ws-shell[data-sb-mode="full"],
+body[data-viewport="phone"] .ws-shell[data-sb-mode="rails"],
+body[data-viewport="phone"] .ws-shell[data-sb-mode="collapsed"] {
+  display: block;
+  grid-template-columns: none;
+}
+
+body[data-viewport="phone"] .ws-main {
+  width: 100%;
+  min-width: 0;
+}
+
 /* Sidebar wird auf Phone zum Drawer. Standardmaessig nach links
    versteckt (translateX(-100%)). body[data-tree-drawer="open"] zieht
-   sie rein. Animation via transform fuer GPU-Beschleunigung. */
-body[data-viewport="phone"] .ws-sidebar {
+   sie rein. Animation via transform fuer GPU-Beschleunigung. Alle
+   sb-mode-States werden auf Phone ueberschrieben — der Drawer hat
+   keine rails/collapsed-Variante, nur open/closed. */
+body[data-viewport="phone"] .ws-sidebar,
+body[data-viewport="phone"] .ws-sidebar[data-sb-mode="full"],
+body[data-viewport="phone"] .ws-sidebar[data-sb-mode="rails"],
+body[data-viewport="phone"] .ws-sidebar[data-sb-mode="collapsed"] {
   position: fixed;
   top: 0;
   bottom: 0;
@@ -15960,12 +15981,41 @@ body[data-viewport="phone"] .ws-sidebar {
   z-index: var(--z-modal);
   box-shadow: var(--shadow-2xl);
   overflow-y: auto;
-  padding-top: var(--safe-top);
-  padding-bottom: var(--safe-bottom);
+  padding: var(--safe-top) var(--space-sm) var(--safe-bottom);
+  border-right: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  visibility: hidden;
+}
+
+/* Rails/Collapsed verstecken Children — auf Phone soll der Drawer
+   immer alle Inhalte rendern. Override aufheben. */
+body[data-viewport="phone"] .ws-sidebar > *,
+body[data-viewport="phone"] .ws-sidebar .ws-actions,
+body[data-viewport="phone"] .ws-sidebar .ws-user-block,
+body[data-viewport="phone"] .ws-sidebar .node-tree-head,
+body[data-viewport="phone"] .ws-sidebar .ws-switcher,
+body[data-viewport="phone"] .ws-sidebar .tree-label,
+body[data-viewport="phone"] .ws-sidebar .tree-alias {
+  position: static;
+  display: revert;
+  width: auto;
+  height: auto;
+  opacity: 1;
+  pointer-events: auto;
+  overflow: visible;
 }
 
 body[data-viewport="phone"][data-tree-drawer="open"] .ws-sidebar {
   transform: translateX(0);
+  visibility: visible;
+}
+
+/* Cycle-Button (sb-mode-Toggle) ist Desktop-Logik — auf Phone
+   uebernimmt der Hamburger im Mobile-Header. */
+body[data-viewport="phone"] .ws-sidebar-mode-btn {
+  display: none;
 }
 
 .mobile-tree-drawer-backdrop {
