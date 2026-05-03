@@ -16947,72 +16947,24 @@ body[data-viewport="phone"] .matrix-aggregate {
 }
 
 /* ════════════════════════════════════════════════════════════════
-   Modal-zu-Bottom-Sheet-Aliasing (S9).
+   Phone-Modal-Verhalten:
 
-   Bestehende .overlay-scrim / .overlay-card werden auf Phone zu
-   Bottom-Sheets — slide-from-bottom statt zentriert-bloom. Drag-
-   Handle-Pille wird via ::before-Pseudo realisiert (rein dekorativ;
-   echte Snap-Toggle-Geste folgt in S10/Polish wenn benoetigt).
+   S9-Aliasing (.overlay-card → Bottom-Sheet) wurde revertiert weil
+   die translateY(100%)-Animation auf manchen Mobile-Browsern nicht
+   zuverlaessig startet und das Modal vom Viewport gepusht hat.
+   Stattdessen bleiben Modals auf Phone zentriert wie auf Desktop
+   (overlay-scrim mit align-items:center). Layout nur geringfuegig
+   angepasst: max-width auf 95vw damit der Card nicht den Bildschirm-
+   Rand kuesst, kleinere Padding.
 
-   Damit erbt JEDER bestehende Modal-Mount (NewCellWizard, Atom-
-   Picker, DocsPopup, NotificationBell, etc.) das Mobile-Pattern
-   ohne Component-Aenderung.
+   Saubere Bottom-Sheet-Migration (mit echten <dialog>-Elementen
+   und Snap-Geste) ist eigener Sprint.
    ════════════════════════════════════════════════════════════════ */
 
-body[data-viewport="phone"] .overlay-scrim {
-  align-items: flex-end;
-  padding: 0;
-}
-
 body[data-viewport="phone"] .overlay-card {
+  max-width: 95vw;
   width: 100%;
-  max-width: none;
-  max-height: var(--mobile-sheet-snap-expanded);
-  margin: 0;
-  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
-  padding-bottom: var(--safe-bottom);
-  position: relative;
-  animation: mobileSheetEnter var(--tr-base) var(--ease-out) forwards;
-}
-
-body[data-viewport="phone"] .overlay-card[data-state="leaving"] {
-  animation: mobileSheetExit var(--tr-exit) var(--ease-in) forwards;
-}
-
-/* Drag-Handle-Pille als visueller Hint, dass dies ein Sheet ist.
-   Nicht interaktiv — fuer Snap-Toggle bzw. Swipe-Down-Dismiss
-   braucht es JS-Hooks (S10/Polish). */
-body[data-viewport="phone"] .overlay-card::before {
-  content: "";
-  display: block;
-  width: 2.5rem;
-  height: 0.25rem;
-  margin: var(--space-2) auto var(--space-1);
-  background: var(--border2);
-  border-radius: var(--radius-full);
-  flex-shrink: 0;
-}
-
-@keyframes mobileSheetEnter {
-  from {
-    transform: translateY(100%);
-    opacity: 0.85;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes mobileSheetExit {
-  from {
-    transform: translateY(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateY(100%);
-    opacity: 0.85;
-  }
+  max-height: 90vh;
 }
 
 /* ════════════════════════════════════════════════════════════════
