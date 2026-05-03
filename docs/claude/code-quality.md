@@ -264,6 +264,21 @@ npx tsc --noEmit
 
 `{/* biome-ignore */}` zwischen JSX-Siblings funktioniert NICHT. Inline `// biome-ignore` direkt vor Element/Attribut. Vor jedem Commit `npm run lint` — `biome check --write` reicht nicht, CI braucht `--unsafe` fuer @keyframes/CSS-Quotes/imports + manuelle Fixes fuer a11y. Memory `feedback_biome_jsx_suppression.md`.
 
+### 5.4 biome-ignore-Verbot
+
+**`biome-ignore` ist KEIN Workaround fuer schlechten Code.** Wenn die Pruefung anschlaegt, ist die richtige Antwort der Refactor — nicht die Suppression.
+
+Konkret:
+- `useSemanticElements`-Verstoss → Element migrieren (`<dialog>` statt `<div role="dialog">`, `<ul>/<li>` statt `<div role="list">`, `<aside>` fuer non-modale Drawer, `<fieldset>/<legend class="visually-hidden">` fuer Form-Gruppen).
+- `useKeyWithClickEvents`-Verstoss auf Backdrop-Click → `<button type="button" tabIndex={-1}>` statt `<div onClick>`. Native ESC kommt vom `<dialog onCancel>`.
+- `noNonNullAssertion` (`!`) → Solid `<Show when={x}>{(narrowed) => ...}` mit Render-Function-Pattern.
+- `noForEach` → `for ... of` mit `break/continue` (saubere Early-Exit-Semantik).
+- Stale `biome-ignore` (suppressions/unused) → ersatzlos entfernen.
+
+`biome-ignore` ist NUR zulaessig wenn es eine **dokumentierte Library-Limitation** gibt, die im Code nicht aufloesbar ist (Beispiel: `@supabase/supabase-js` postgres_changes-Event-Type-Cast). Begruendung muss in der Suppression-Zeile stehen.
+
+Niemals `biome-ignore` benutzen weil "Refactor zu aufwendig" oder "Pattern ist etabliert". Das ist Umgehen der Pruefung. Wenn 5 Files denselben Workaround brauchen, ist der Refactor 5× mehr Aufwand — aber er ist trotzdem die richtige Antwort.
+
 ### 5.4 Test-Pflicht-Mapping
 
 | Aenderungs-Trigger | Test-Pflicht |
