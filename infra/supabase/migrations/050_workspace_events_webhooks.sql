@@ -83,7 +83,7 @@ DROP POLICY IF EXISTS workspace_events_admin_select ON public.workspace_events;
 CREATE POLICY workspace_events_admin_select ON public.workspace_events
   FOR SELECT USING (
     EXISTS (
-      SELECT 1 FROM public.workspace_memberships m
+      SELECT 1 FROM public.memberships m
        WHERE m.workspace_id = workspace_events.workspace_id
          AND m.user_id = auth.uid()
          AND m.role IN ('owner', 'admin')
@@ -153,7 +153,7 @@ DROP POLICY IF EXISTS workspace_webhooks_admin_select ON public.workspace_webhoo
 CREATE POLICY workspace_webhooks_admin_select ON public.workspace_webhooks
   FOR SELECT USING (
     EXISTS (
-      SELECT 1 FROM public.workspace_memberships m
+      SELECT 1 FROM public.memberships m
        WHERE m.workspace_id = workspace_webhooks.workspace_id
          AND m.user_id = auth.uid()
          AND m.role IN ('owner', 'admin')
@@ -188,7 +188,7 @@ GRANT SELECT ON public.workspace_webhooks_safe TO authenticated;
 CREATE OR REPLACE FUNCTION public._is_workspace_admin(p_workspace_id uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT EXISTS (
-    SELECT 1 FROM public.workspace_memberships m
+    SELECT 1 FROM public.memberships m
      WHERE m.workspace_id = p_workspace_id
        AND m.user_id = auth.uid()
        AND m.role IN ('owner', 'admin')

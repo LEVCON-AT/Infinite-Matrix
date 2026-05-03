@@ -55,7 +55,7 @@ BEGIN
   END IF;
   -- Caller muss owner/admin in der Workspace sein.
   IF NOT EXISTS (
-    SELECT 1 FROM public.workspace_memberships
+    SELECT 1 FROM public.memberships
     WHERE workspace_id = p_workspace_id
       AND user_id = v_actor
       AND role IN ('owner', 'admin')
@@ -103,7 +103,7 @@ GRANT EXECUTE ON FUNCTION public.create_invite(uuid, text, text) TO authenticate
 -- Vollkopie und nutze stattdessen einen TRIGGER auf workspace_memberships
 -- als sicheren Indikator dass ein Member dazukam.
 
-DROP TRIGGER IF EXISTS workspace_membership_insert_emit_event ON public.workspace_memberships;
+DROP TRIGGER IF EXISTS workspace_membership_insert_emit_event ON public.memberships;
 CREATE OR REPLACE FUNCTION public._membership_insert_emit_event()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
@@ -121,13 +121,13 @@ EXCEPTION WHEN OTHERS THEN
 END $$;
 
 CREATE TRIGGER workspace_membership_insert_emit_event
-  AFTER INSERT ON public.workspace_memberships
+  AFTER INSERT ON public.memberships
   FOR EACH ROW EXECUTE FUNCTION public._membership_insert_emit_event();
 
 -- ─── 3) change_member_role (Migration 014) ──────────────────────
 -- Auch hier: existing RPC ist umfangreich (Last-Owner-Demote-Schutz).
 -- Statt Vollkopie: TRIGGER AFTER UPDATE OF role.
-DROP TRIGGER IF EXISTS workspace_membership_role_emit_event ON public.workspace_memberships;
+DROP TRIGGER IF EXISTS workspace_membership_role_emit_event ON public.memberships;
 CREATE OR REPLACE FUNCTION public._membership_role_emit_event()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
@@ -145,13 +145,13 @@ EXCEPTION WHEN OTHERS THEN
 END $$;
 
 CREATE TRIGGER workspace_membership_role_emit_event
-  AFTER UPDATE OF role ON public.workspace_memberships
+  AFTER UPDATE OF role ON public.memberships
   FOR EACH ROW EXECUTE FUNCTION public._membership_role_emit_event();
 
 -- ─── 4) member.left (deactivated_at gesetzt ODER Row-Delete) ───
 -- Wir nutzen einen UPDATE-Trigger fuer deactivated_at (soft-delete)
 -- + DELETE-Trigger fuer hard-remove.
-DROP TRIGGER IF EXISTS workspace_membership_deactivate_emit_event ON public.workspace_memberships;
+DROP TRIGGER IF EXISTS workspace_membership_deactivate_emit_event ON public.memberships;
 CREATE OR REPLACE FUNCTION public._membership_deactivate_emit_event()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
@@ -165,10 +165,10 @@ EXCEPTION WHEN OTHERS THEN
 END $$;
 
 CREATE TRIGGER workspace_membership_deactivate_emit_event
-  AFTER UPDATE OF deactivated_at ON public.workspace_memberships
+  AFTER UPDATE OF deactivated_at ON public.memberships
   FOR EACH ROW EXECUTE FUNCTION public._membership_deactivate_emit_event();
 
-DROP TRIGGER IF EXISTS workspace_membership_delete_emit_event ON public.workspace_memberships;
+DROP TRIGGER IF EXISTS workspace_membership_delete_emit_event ON public.memberships;
 CREATE OR REPLACE FUNCTION public._membership_delete_emit_event()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
@@ -180,7 +180,7 @@ EXCEPTION WHEN OTHERS THEN
 END $$;
 
 CREATE TRIGGER workspace_membership_delete_emit_event
-  AFTER DELETE ON public.workspace_memberships
+  AFTER DELETE ON public.memberships
   FOR EACH ROW EXECUTE FUNCTION public._membership_delete_emit_event();
 
 -- ─── 5) workspace.created (Migration 023) ──────────────────────
