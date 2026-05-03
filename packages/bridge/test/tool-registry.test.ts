@@ -12,10 +12,15 @@ describe('registerAllTools() Integration', () => {
     const tools = getTools();
     const names = [...tools.keys()].sort();
 
-    // Vollständige Liste aller Tools (Phase 4 + V2.1 + V2.2)
+    // Vollständige Liste aller Tools (Phase 4 + V2.1 + V2.2 + Welle D
+    // atom_pin / tag / doc.pin)
     const expected = [
       'alias.resolve',
       'alias.set',
+      'atom_pin.create',
+      'atom_pin.delete',
+      'atom_pin.list',
+      'atom_pin.move',
       'card.checklist.link_ref',
       'card.checklist.unlink_ref',
       'card.create',
@@ -43,6 +48,7 @@ describe('registerAllTools() Integration', () => {
       'checklist.to_card',
       'col.add',
       'col.delete',
+      'doc.pin',
       'info.field.add',
       'info.field.delete',
       'info.field.update',
@@ -61,13 +67,20 @@ describe('registerAllTools() Integration', () => {
       'settings.get',
       'settings.set',
       'status',
+      'tag.add.alias',
+      'tag.add.atomref',
+      'tag.add.freetext',
+      'tag.add.objectref',
+      'tag.gc',
+      'tag.list',
+      'tag.remove',
       'template.instantiate',
       'template.list',
       'undo.last',
     ];
 
     expect(names).toEqual(expected);
-    expect(tools.size).toBe(50); // +3 aus V2.4: checklist.to_card, card.checklist.link_ref, card.checklist.unlink_ref
+    expect(tools.size).toBe(62);
   });
 
   it('jedes registrierte Tool hat schema + jsonSchema', () => {
