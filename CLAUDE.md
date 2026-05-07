@@ -24,11 +24,25 @@ Foundation klar:
 - Was-NICHT-tun: [Top-3 Items aus dieser Datei mit kurzer Begruendung]
 
 Bereit fuer Auftrag.
+
+Modus-Frage:
+- Klassifizierung: [klein / mittel / gross / strategisch]
+- Empfehlung: [klassisch / sophisticated]
+- Begruendung: [warum — z.B. „beruehrt > 3 Komponenten", „neues Pattern", „Wellen-Plan", „strategisches User-Signal", „Aufwand > 1 Tag"]
+
+Soll diese Planung / Umsetzung klassisch oder sophisticated abgehandelt werden?
 ```
 
-**ERST DANN** den User-Auftrag bearbeiten. Wenn du eine Foundation-Datei nicht lesen kannst (Datei fehlt, Read-Error), MELDEN — nicht "schaetzen" oder "wahrscheinlich".
+**ERST DANN** den User-Auftrag bearbeiten — und zwar **erst nach** User-Antwort auf die Modus-Frage. Wenn du eine Foundation-Datei nicht lesen kannst (Datei fehlt, Read-Error), MELDEN — nicht "schaetzen" oder "wahrscheinlich".
 
 Diese Pflicht gilt fuer JEDE neue Session — unabhaengig davon wie der erste User-Prompt aussieht. Bei `/clear` sind alle Annahmen weg. Lies neu.
+
+User-Antworten auf die Modus-Frage:
+- „klassisch" → direkt umsetzen mit Foundation-Bewusstsein.
+- „sophisticated" → `docs/claude/sophisticated-workflow.md` lesen + Lifecycle-Phasen abarbeiten.
+- „du entscheidest" → Empfehlung folgen, Begruendung dokumentieren.
+
+Bei trivialen Anfragen (klare „mach kurz", reine Status-Frage, einzeiliger Fix) darf die Modus-Frage entfallen — Empfehlung dann implizit „klassisch", weiter mit Auftrag.
 
 ---
 
@@ -140,6 +154,8 @@ Plus **`packages/bridge/`** — Node + WebSocket + MCP fuer AI-Steuerung. Self-h
 - **Kein "V1-pragmatisch"-Banner fuer Code-Shortcuts.** Pragmatik = UX-Scope, nicht Code-Tiefe.
 - **Kein `biome-ignore` als Workaround.** Wenn der Linter anschlaegt → Refactor (Element migrieren / Pattern aendern / Render-Function nutzen / for-of statt forEach), NIE die Suppression. Einzige Ausnahme: dokumentierte Library-Limitation mit Begruendung. Detail `code-quality.md` §5.4.
 - **Kein `git clean -fd` im Deploy-Mirror** (`/opt/matrix-repo` auf VPS). Bind-Mount-Volumes wuerden gewischt. Memory `feedback_no_pauschal_git_clean.md`.
+- **Keine ad-hoc UI-Komponente ohne `code-quality.md` §6.5-Workflow.** Audit existing (Glob/Grep) → Naming → Globalitaet (lib/ vs components/) → Token → `style.md`-Eintrag bei Pattern → Animation-Helper → Memory-Verweis bei Querschnitt. Doublet-Schutz ueber Sessions hinweg. Detail `code-quality.md` §6.5 + Memory `feedback_neue_komponente_vorgangsweise.md`.
+- **Kein Layout-Shift beim Edit-Mode-Toggle (Zero-Shift-Pflicht, eng gefasst).** Edit-Affordances (X-Buttons, Toolbars, Verschiebepfeile, Drag-Handles, Selection-Outlines, Slot-Hint-Toolbar) erscheinen beim **Edit-Mode-Toggle (View↔Edit)** als **Overlay** (`position: absolute|fixed`), nicht via Flex/Grid-Push. Outline statt Border bei Edit-Mode-Selektion. Animation `expand-fade`, kein `expand-slide`. Cell-Position bleibt identisch **beim Toggle**. **Content-Aktionen** (Card-Expand, neue Items, neue Karten/Spalten) duerfen Layout schieben — kein Verstoss. Detail `style.md` §6.4 + `animations.md` §3 + Memory `feedback_zero_shift_edit_mode.md`.
 
 ---
 

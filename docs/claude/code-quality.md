@@ -306,6 +306,65 @@ Detail in `architektur.md` §8 + `style.md` §3. Hier nur die Konsequenzen:
 
 ---
 
+## 6.5 Neue UI-Komponente anlegen — Vorgangsweise (Pflicht)
+
+**Top-Level-Standard.** Verbindlich fuer jede neue UI-Komponente in `packages/client-web/src/components/` und jedes neue Helper-Library-File in `packages/client-web/src/lib/`. Ziel: **Doublet-Praevention ueber Sessions hinweg** — wenn in einer kuenftigen Session (anderer Modell-Snapshot, neuer Conversation-Thread) das Pattern noetig wird, wird die Vorgangsweise hier gefunden und keine Doublette gebaut.
+
+### 6.5.1 Pflicht-Schritte
+
+1. **Audit existing.** Bevor ein Komponenten-File angelegt wird:
+   ```bash
+   # Aehnliche Komponenten suchen
+   Glob: "packages/client-web/src/components/**/*.tsx"
+   Grep: <Pattern-Keyword>  # z.B. "Picker", "Modal", "Bulk", "Confirm"
+   # Aehnliche Helper suchen
+   Glob: "packages/client-web/src/lib/**/*.ts"
+   Grep: <Function-Keyword>
+   ```
+   Wenn ein vergleichbares Pattern existiert: **reuse** statt neu bauen. Doublet-Verbot §1.
+2. **Naming.** PascalCase fuer Komponenten (`BulkScalarInput.tsx`), kebab-case fuer Helper (`cell-selection.ts`). Reuse-faehig benennen — generischer Domain-Name, kein Caller-spezifischer.
+3. **Globalitaet — Layer-Trennung.** Logik gehoert in `lib/`, Render in `components/`. Komponente konsumiert Logik via Helper-Import, niemals re-implementiert. Bei 2+ absehbaren Callern: Logik **muss** in `lib/`.
+4. **Token-Pflicht.** `var(--token)` fuer Color/Spacing/Radius/Shadow/Duration/Easing — gemaess `style.md` §1+§2. Keine Hex-Codes, keine `px` ausser Border/Outline/Shadow/Icon-Anker.
+5. **`style.md`-Eintrag (Pflicht bei wiederverwendbarem Pattern).** Wenn die Komponente ein **Pattern** etabliert (Modal-Form, Input-Form, Listen-Form, Toolbar-Form) — Eintrag in `style.md` Komponenten-Standards-Sektion mit:
+   - Pattern-Name + Kurzbeschreibung
+   - Reuse-Faelle (welche Caller heute / welche absehbar)
+   - Komponenten-Path
+   - Mindest-Beispiel (Props + Render)
+   - Verbindliches Verhalten (Animation, Focus-Trap, Hotkeys, A11y)
+6. **Animation-Pflicht.** Sichtbare State-Aenderungen via Helper aus `lib/animations.ts`. Kein direkter `transition:`-Hack, kein `setTimeout`-Choreographie. Detail `animations.md`.
+7. **Memory-Verweis bei Querschnitts-Pattern.** Wenn das Pattern UX-praegende Wirkung hat (z.B. „Loesch-Modal mit Export-Doppelboden", „Bulk-Scalar-Input"), Eintrag in MEMORY.md unter `feedback_*.md` als Single-Source-Sicherung. Manifest und Memory referenzieren sich gegenseitig.
+
+### 6.5.2 Wann ein neues Pattern manifestiert werden MUSS
+
+- Neue Komponente hat **2+ absehbare Reuse-Faelle** (heute oder in dokumentierten kommenden Wellen).
+- Neue Komponente etabliert eine **UX-Konvention** (Tastenkombination, Drilldown-Behavior, Confirm-Form, Empty-State-Form).
+- Neue Komponente loest ein **Pattern-Problem**, das im Manifest noch nicht abgebildet ist.
+
+### 6.5.3 Wann KEIN Manifest-Eintrag noetig
+
+- Page-spezifische Wrapper ohne Reuse-Anspruch (`SettingsTabContent`, `WizardStep3Layout`).
+- Triviale Komposition aus existing Komponenten ohne neue Konvention.
+- Internes Helper-File mit Single-Caller (aber: dann auch nicht als Komponente, sondern inline).
+
+### 6.5.4 Pre-Commit-Probe
+
+Vor Commit pruefen:
+- [ ] Audit existing erfolgt (Glob/Grep dokumentiert in PR-Beschreibung wenn Querschnitts-Pattern).
+- [ ] Token statt Hex/px durchgehend.
+- [ ] Animation via `lib/animations.ts`-Helper, nicht inline.
+- [ ] `style.md`-Eintrag bei wiederverwendbarem Pattern erfolgt.
+- [ ] Memory-File angelegt bei Querschnitts-Pattern.
+- [ ] Komponente in `__tests__` mit Reuse-Beispiel abgedeckt (mindestens Render + Standard-Interaction).
+
+### 6.5.5 Querverweise
+
+- `style.md` §Komponenten — wo neue Patterns eingetragen werden.
+- `architektur.md` §8 Globalitaet — Layer-Trennung lib/ vs components/.
+- `animations.md` — Pflicht-Helper.
+- `feedback_neue_komponente_vorgangsweise.md` (Memory) — Single-Source-Sicherung.
+
+---
+
 ## 7. Kommentare (Pflicht-Hygiene)
 
 ### 7.1 Wann kommentieren

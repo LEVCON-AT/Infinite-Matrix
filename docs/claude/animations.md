@@ -463,6 +463,7 @@ Helper: `routeTransition(oldEl, newEl)` mit `--tr-slow`.
 - **Animation-Dauer > 320 ms** ohne Code-Kommentar mit Begruendung.
 - **Animation-Dauer < 75 ms** ohne Begruendung. Unter Wahrnehmungsschwelle — entweder instant ohne Animation oder min `--tr-instant`.
 - **Globaler `*:focus { outline: none }`.** Verboten — Accessibility-Killer. Scope nur auf konkrete UI-Elemente, immer mit `:focus-visible`-Pendant.
+- **Layout-Shift-Animation bei Edit-Mode-Toggle (eng gefasst).** Edit-Affordances (X-Buttons, Toolbars, Verschiebepfeile, Drag-Handles, Selection-Outlines, Slot-Hint-Toolbar) duerfen den Canvas-Inhalt **nicht verschieben beim Edit-Mode-Toggle (View↔Edit)**. Pflicht: `expand-fade` als Overlay (`position: absolute|fixed`), kein `expand-slide` / `accordion-down` der Container **beim Toggle**. Outline statt Border bei Selektion. **Content-Aktionen** (Card-Expand, neue Items, neue Karten/Spalten) duerfen Layout schieben — kein Verstoss. Detail in `style.md` §6.4 + Memory `feedback_zero_shift_edit_mode.md`.
 - **Fehlender `prefers-reduced-motion`-Override.** Pflicht-Block am Ende der CSS:
   ```css
   @media (prefers-reduced-motion: reduce) {

@@ -94,6 +94,8 @@ atom_manifestations (
 
 `atom_comments`, `atom_attachments` (Supabase-Storage), `atom_doc_notes`. Alle 1:N an `(atom_type, atom_id)`. Realtime fuer Comments.
 
+**Foundation-Direktive (§14):** native `atom_comments` + `atom_attachments` sind **Fallback, nicht Default.** Primaer-Pfad ist die Channel-Bridge zu User-eigenen Drittsystemen (Mail-Thread, Messenger, Slack/Teams, Cloud-Drive). Native-Tabellen werden nur fuer Single-User-/Offline-Use-Cases oder auf expliziten User-Wunsch gebaut. Vor dem Native-Schema muss das Bridge-Konzept stehen — siehe §14.
+
 ### 1.5b Layer 2 — Pins + Tags (Welle D)
 
 **`atom_pins`** ist die generische "Atom A ist an Parent P gepinnt"-Relation. Loest `docs.attached_cell_id` ab und macht das Pin-Konzept symmetrisch ueber alle 5 Atom-Typen + 4 Parent-Kinds:
@@ -408,17 +410,62 @@ Vor Production-Cutover muessen alle Auth-Pfade durch Step-Up-Auth fuer destrukti
 - TOKEN_REFRESHED-Fail → automatischer Logout in `lib/auth.ts`.
 - Account-Health: `validateUserExists()` nach jedem Sign-In/Token-Refresh. Geloeschter Account → local-only signOut + accountInvalid-Flag.
 
+### 5.8 Realtime-Konsistenz-Direktive (User 2026-05-06)
+
+> Realtime ist **Default** fuer alle user-relevanten Mutationen. Sekunden-Verzoegerung ist erlaubt, aber **kein Funktion-weiser Mix** (manche Mutation live, andere nur nach Reload).
+
+**User-relevant** = jede Mutation, die andere Workspace-Member sichtbar betrifft. Beispiele:
+- Atom-CRUD (tasks, links, docs, checklists, info_field, imported_event)
+- Manifestation-CRUD (atom_manifestations)
+- Cell/Row/Col/Matrix-Layout-Aenderungen
+- Vorlagen-CRUD + Cell-Template-Instances + Overrides
+- Marker-Toggle (Workspace-shared Marker wie `star`)
+- Comments, Pins, Tags
+- Member-Aktionen (Beitritt, Rollen-Aenderung)
+- Provider-Verknuepfungen (widget_external_channels)
+
+**NICHT user-relevant** (Realtime nicht noetig):
+- User-private Settings (Theme, Sidebar-State, Filter-Lokal, Fokus-Cell)
+- Token-Refreshes
+- User-private Marker (`eye`-Marker — gehoert nur diesem User, andere Member sollen das gar nicht sehen)
+- Audit-Log-Inserts (kein UI-Listener)
+
+**Pflicht-Heptad-Check** bei jeder Schema-Aenderung:
+1. Tabelle user-relevant? → JA: Realtime-Slot (5) gefuellt. NEIN: Begruendung im Migration-Header.
+2. `ALTER PUBLICATION supabase_realtime ADD TABLE public.x` + `REPLICA IDENTITY FULL`.
+3. `realtime.ts`-Subscriber-Eintrag.
+4. Workspace-Bumps in `routes/Workspace.tsx`.
+
+**Throttle/Debounce-Erlaubnis:**
+- Hochfrequenz-Events (Marker-Toggle-Spam, Counter-Bumps, Presence-Pings) duerfen 1-3 Sekunden gepuffert werden — **nie** ganz weglassen.
+- Pro Throttle-Pfad: dokumentierter Debounce-Wert + Begruendung im Subscriber-Code.
+
+**Anti-Pattern (sofort durchfallen):**
+- Mutation an einer User-relevanten Tabelle ohne Realtime-Subscribe.
+- „Performance-Optimierung" durch selektives Realtime-Weglassen.
+- Stiller Reload-Pfad fuer eine Mutation („User muss F5 druecken um das zu sehen") — User-relevante Tabelle = Live, Punkt.
+
+**Adjacent-Cleanup-Pflicht:** wenn beim Bearbeiten eines Files eine User-relevante Mutation ohne Realtime-Pfad entdeckt wird, ansprechen und nach Approval mitziehen. Memory `feedback_realtime_konsistenz.md`.
+
 ---
 
 ## 6. MCP-Layer (Bridge + Tools)
 
-### 6.1 Tool-Trio-Regel (Pflicht-Wiederholung)
+### 6.1 Tool-Trio-Regel + Realtime-Garantie (Pflicht-Wiederholung)
 
-Jedes MATRIX_TOOL hat **drei Artefakte** — fehlt eins, ist es nicht merge-ready:
+Jedes MATRIX_TOOL hat **drei Artefakte plus eine Realtime-Garantie** — fehlt eins, ist es nicht merge-ready:
 
 1. **Bridge-Schema** in `packages/bridge/src/tools/<gruppe>.ts`: Zod-Objekt + `zodToJsonSchema()`, registriert in `tools/index.ts`.
 2. **Client-Handler** in `packages/client-standalone/matrix.html` (`MATRIX_TOOLS`-Registry) bzw. SaaS-Pendant.
 3. **Vitest** in `packages/bridge/test/<gruppe>.test.ts` plus Integration via `tool-registry.test.ts` (Gesamtzahl).
+4. **Realtime-Garantie** (User 2026-05-06): wenn das Tool eine **Mutation** an einer user-relevanten Tabelle macht (siehe §5.8), MUSS sie ueber den `safe-mutation`-Wrapper laufen ODER direkt eine Postgres-Insert/Update/Delete-Aktion sein, die Logical-Replication triggert. Direkter `supabase.from(...)` ohne Wrapper UND ohne Publication = Review-Stop. Read-only-Tools (`query.*`) sind ausgenommen. Pruef-Frage am Tool-Handler-Ende: „Sehen alle anderen Workspace-Member das Ergebnis dieses Tool-Aufrufs in Echtzeit, ohne Reload?" Nein → Realtime-Garantie ist gebrochen → Fix.
+
+**Anti-Pattern bei Tool-Handlern:**
+- Direkter `supabase.from(table).insert()` ohne `runOptimisticInsert`-Wrapper.
+- Tool fuehrt Side-Effect ueber Edge-Function aus, die kein Publication-Update triggert (z.B. Edge-Function setzt Cache-Spalte direkt) — Frontend sieht erst nach Reload.
+- Tool, das `service_role`-Key benutzt, um RLS zu umgehen, ohne dass die Tabelle in `supabase_realtime` Publication ist.
+
+**Adjacent-Cleanup-Pflicht beim Tool-Sprint:** wenn ich auf einen existierenden Tool-Handler stosse, der die Realtime-Garantie verletzt, ansprechen + Fix mitziehen (Memory `feedback_realtime_konsistenz.md`).
 
 ### 6.2 Feature → MCP-Mapping-Pflicht
 
@@ -687,6 +734,69 @@ Postgres-Dumps enthalten die `bytea`-Spalte verschluesselt — nutzlos ohne Mast
 
 ---
 
-## 13. Aenderungen am Manifest
+## 14. Foundation-Direktive: Integration-First, Native-Fallback
+
+**Verbindlich. Strategische Leitlinie, der jede Welle folgt.** Eingefuehrt 2026-05-04 nach User-Direktive im Konzept-Sprint Widget+Vorlagen-Modell.
+
+### 14.1 Leitsatz
+
+> Das Tool ist **Organisations-Layer ueber existing User-Infrastruktur**, nicht Konkurrenz dazu. Keine native Dateiablage. Kein eigener Chat. Maximal eigene Doku — und die idealerweise mit Sync zu Drittsystemen. Native Features sind **Fallback**, nicht Default. Maximale Flexibilitaet kommt aus Aliasen + Hyperlinks im Text + strukturellen Aggregationen, nicht aus eigenem Storage.
+
+User-Erleben-Ziel: top-notch Organisations-Ebene, die das taegliche „pfff was gibts da alles und wo hab ich das wohl" ausschaltet — **ohne** dass der User seine bisherige Mail/Cloud/Messenger/Notiz-Infrastruktur aufgeben oder duplizieren muss.
+
+### 14.2 Konsequenzen pro Domain
+
+| Domain | Primaer-Pfad (Default) | Native-Fallback (opt-in) |
+|---|---|---|
+| **Comments / Chat** | Bridge zu Mail-Thread, Messenger-Thread, Slack-/Teams-Channel, WhatsApp-Business-Channel | `atom_comments`-Tabelle (Layer 4) — Single-User-/Offline-Use-Case |
+| **Attachments** | Verknuepfung zu User-Cloud (OneDrive, Google Drive, Dropbox, Box) oder Bridge-Pfad zu lokalem Filesystem | Supabase-Storage-Bucket — explizit gewaehlt, Quota-limitiert |
+| **Doc** | OneNote/Notion-Sync (V1-Anker; Workspace ↔ Notebook, Cell ↔ Section, Doc-Atom ↔ Page) | ProseMirror-Atom-Doc (heute live) — wenn User keinen externen Provider angebunden hat |
+| **Calendar** | Google/Outlook/ICS Inbound (Welle I live) + Outbound-Sync (V1-Backlog) | Native Calendar-Manifestation (heute live) bleibt als Anker fuer App-interne Termine |
+| **Sharing** | Drag-Drop nach extern (Mail-Compose, Messenger-Window, AI-Chat) mit Alias-Aufloesung zu absoluter URL | n/a (Sharing ist immer extern) |
+| **Notifications** | Bridge zu Push-Provider / Mail / Slack-DM | In-App-Inbox als minimaler Fallback |
+
+### 14.3 Pflicht-Konsequenz beim Schema-Heptad
+
+Jede neue Tabelle, die Daten haelt, **die User extern halten koennten**, hat ein Channel-Verknuepfungs-Modell **bevor** der Native-Pfad gebaut wird. Der Heptad bekommt damit faktisch einen achten Slot:
+
+```
+[ ] 8. Channel-Bridge → externe Provider (mind. 1 Provider als V1-Anker)
+```
+
+Pruef-Frage vor Schema-Entwurf: „Koennte ein User diese Daten heute schon irgendwo anders halten? Wenn ja: Bridge-Konzept zuerst." Antwort „ja" trifft auf Comments, Files, Doc, Chat zu. Antwort „nein" trifft auf Aliase, Atom-Manifestations, Pins, Tags, Audit-Log zu.
+
+### 14.4 Bestandskode-Behandlung
+
+- Heutige native Implementations (ProseMirror-Doc, atom_manifestations(kind=calendar)) bleiben — werden aber unter §14.2 als „Fallback" reklassifiziert.
+- Geplante native Implementations (Layer 4 Comments/Attachments per BACKLOG T.2) werden vor Implementierung durch ein Bridge-Konzept ersetzt oder ergaenzt.
+- Migrationen, die Native-Spalten anlegen, ohne Bridge-Plan: Review-Stop.
+
+### 14.5 Anti-Pattern (sofort durchfallen)
+
+- Native-First-Implementierung ohne Bridge-Konzept im Plan-File.
+- Schema-Migration fuer Comments/Files/Notes/Chat-Tabelle ohne Verknuepfungs-Tabelle (`<atom>_external_channels` oder aequivalent).
+- UI-Toggle „Comments aktivieren" ohne Provider-Wahl im selben Toggle.
+- Annahme „User wird unsere App fuer X benutzen" ohne Drittsystem-Bridge.
+- AI-Pipe-Tools, die User-Daten via Native zwingen, statt durch Aliase + Hyperlinks zu transportieren.
+
+### 14.6 Verhaeltnis zu §1.5 (Layer 4) und §3 (Schema-Heptad)
+
+- **§1.5** beschreibt die Layer-4-Tabellen — diese sind ab 2026-05-04 als Fallback-Pfad reklassifiziert.
+- **§3 Schema-Heptad** kriegt den achten Slot „Channel-Bridge", aber nur fuer Tabellen, die unter §14.3 fallen. Aliase/Atom-Manifestations/Pins/Tags bleiben rein nativ — sie sind die Organisations-Foundation, nicht User-Inhalt.
+
+### 14.7 Verifikation
+
+Vor jedem Welle-Start, der eine der Domains aus §14.2 betrifft:
+
+1. Plan-File enthaelt einen Bridge-Konzept-Abschnitt mit mind. 1 V1-Provider.
+2. Native-Pfad ist explizit als „Fallback" benannt, nicht als Default.
+3. UI-Toggles haben „extern / native / off" als Optionen, Default `extern`.
+4. Schema-Heptad-Slot 8 (Channel-Bridge) ist gefuellt oder explizit „n/a (kein User-Inhalt)".
+
+Wenn **eine** Antwort nein: Welle ist nicht startbereit.
+
+---
+
+## 15. Aenderungen am Manifest
 
 Nicht ohne Plan-Eintrag und User-Freigabe. Wenn ein neues Architektur-Pattern auftaucht (z.B. neue Atom-Domain, neuer Manifestation-Kind, neuer Realtime-Pattern), Manifest erweitern, niemals inline anders machen.

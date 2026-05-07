@@ -508,6 +508,115 @@ Bevorzugt Grid fuer 2D-Layouts, Flex fuer 1D. Beide Token-getrieben:
 .flex-col { display: flex; flex-direction: column; gap: var(--space-2); }
 ```
 
+### 6.4 Zero-Shift-Edit-Mode (Pflicht — eng gefasst)
+
+**Direktive (eng gefasst, User-Praezisierung 2026-05-07):** Beim Aktivieren oder Deaktivieren des **Edit-Modes** (View↔Edit-Toggle) **duerfen die Edit-Affordances Cell/Card/Item-Positionen nicht verruecken**. Gilt **ausschliesslich** fuer den Edit-Mode-Toggle.
+
+**Content-Updates duerfen Layout schieben** — neue Karten in einer Spalte, Card-Inline-Expand, neue Items in einer Checkliste, Spalten-Wachstum bei mehr Inhalt sind erwartete UX. **KEIN** Zero-Shift-Verstoss.
+
+#### 6.4.1 Geltungsbereich
+
+| Aktion | Zero-Shift-Pflicht | Begruendung |
+|---|---|---|
+| Edit-Mode aktivieren (Strukturen-Bearbeitung) | **JA** | User klickt Toggle, will nur Symbole sehen — Layout-Verschiebung verwirrt. |
+| Card-Expand (Mini → Inline-Expanded) | nein | Content-Update, User klickt Expand — Layout-Wachstum erwartet. |
+| Item-Add in Spalte / Checkliste | nein | Content-Update, Container waechst erwartet. |
+| Spalten-Add (Edit-Mode-Aktion) | nein | Content-Aktion innerhalb des Edit-Modes — Layout waechst erwartet. |
+| Atom-Inline-Edit (Edit-Felder erscheinen) | nein | Content-Aktion auf Atom-Ebene. |
+| Modal-Open / Sidebar-Open | nein | Eigene Layer, kein Edit-Mode-Toggle. |
+
+#### 6.4.2 Pflicht-Patterns (Edit-Mode-Toggle)
+
+- **Affordances als Overlay**: X-Buttons, Verschiebepfeile, Drag-Handles, Slot-Hint-Toolbar via `position: absolute|fixed`. Edit-Mode-Toggle laesst die Cell/Card/Item-Positionen unangetastet.
+- **Outline statt Border** bei Edit-Mode-Selektion (Cell-Hover, Selektions-Outline). Outline lebt ausserhalb der Box, Border verschiebt Inhalt.
+- **Toolbars als Floating-Bar**: Edit-Mode-Workspace-Toolbar via `position: fixed`, nicht in Document-Flow eingefuegt.
+- **Buttons als Overlay-Layer**: Mit `expand-fade` / `opacity`-Animation einblenden, keine Slide-In-Animation der umgebenden Container beim Toggle.
+- **Drag-Handles als Pseudo-Elements**: `::before` / `::after` mit absolute-Position.
+
+#### 6.4.3 Anti-Patterns (Review-Stop bei Edit-Mode-Toggle)
+
+```css
+/* FALSCH — Layout-Shift beim Edit-Mode-Toggle */
+.cell.edit-mode { border: 0.125rem solid var(--accent-500); }
+.cell.edit-mode .toolbar { display: block; }  /* push-down beim Toggle */
+
+/* RICHTIG — Zero-Shift fuer Edit-Mode-Toggle */
+.cell.edit-mode { outline: 0.125rem solid var(--accent-500); }
+.cell.edit-mode .toolbar {
+  position: absolute;
+  inset-block-start: var(--space-2);
+  inset-inline-end: var(--space-2);
+  /* + animations.ts expand-fade Helper */
+}
+```
+
+**Content-Update-Beispiel — kein Verstoss, weil kein Edit-Mode-Toggle:**
+
+```css
+/* OK — Content-Update lass schieben */
+.checklist-card { display: flex; flex-direction: column; }
+.checklist-card.expanded { /* zeigt Inline-Items */ }
+/* Spalte waechst, andere Karten ruecken — ist erwartet */
+```
+
+#### 6.4.4 Pre-Commit-Probe (nur Edit-Mode-Toggle)
+
+Vor Commit fuer jedes **Edit-Mode-Toggle**-Affordance:
+- [ ] Cell-Position bleibt identisch beim Edit-Mode-**Toggle** (DOM-Coordinate-Test). Toleranz < 1px durch Sub-Pixel-Rendering OK.
+- [ ] Outline statt Border bei Edit-Mode-Selektion / Hover-Edit.
+- [ ] Toolbar positioniert via `position: absolute|fixed`, nicht via Flex/Grid-Insertion beim Toggle.
+- [ ] Animation via `expand-fade` (nicht `expand-slide` / `accordion-down`) **fuer das Toggle-Affordance**.
+- [ ] Reduced-Motion respektiert (`prefers-reduced-motion`).
+
+**NICHT** zu pruefen bei Content-Aktionen (Card-Expand, neue Items, neue Spalten — diese sind erlaubt zu schieben).
+
+#### 6.4.5 Querverweise
+
+- `animations.md` §3 — Layout-Shift bei Edit-Mode-Toggle als Anti-Pattern.
+- `feedback_zero_shift_edit_mode.md` (Memory) — eng gefasste Top-Level-Sicherung.
+- `widget-vorlagen-foundation.md` §8a — Querschnitt-Verankerung (eng gefasst).
+
+### 6.5 Drag-Hover-Navigation (Pattern, Pflicht-Reuse)
+
+**Direktive:** Wenn ein User ein Atom drag-t und ein Drop-Target nicht im aktuellen Viewport sichtbar ist, oeffnet das **Drag-Hover-Navigation-Pattern** den NavTree als Overlay-Layer und laesst den User zur Ziel-Cell navigieren — ohne den Drag zu unterbrechen.
+
+#### 6.5.1 Pattern-Verhalten
+
+1. Drag aktiv + Hover ueber NavTree-Trigger (Sidebar-Edge oder expliziter Trigger): **NavTree-Sidebar expandiert** (falls collapsed) mit Puls-Animation.
+2. Canvas-Bereich (alles ausserhalb NavTree) wird **gedimmt + gaussian-blurred** via `backdrop-filter: blur(0.25rem)`.
+3. **Drag-State bleibt aktiv** — `activeDrag()`-Signal aus `lib/drag-context.ts` haelt durch.
+4. User navigiert per Hover (Drill-Down auf Hover, Drill-Up nach Verlassen).
+5. Hover ueber Cell mit kompatiblem Feature → Cell expandiert visuell, zeigt Drop-Targets.
+6. Drop landet im aktuell gehoverten Widget; Canvas + NavTree kehren in Pre-Drag-Zustand zurueck.
+
+#### 6.5.2 Komponente
+
+`DragHoverNavigator` (Anlage gemaess `code-quality.md` §6.5). Generisch fuer:
+- Drag aus Sidebar-Liste, Drop in fernen Cell-Widgets
+- Drag aus Doc-Editor (Liste markieren → „Als Checkliste" → NavTree-Wahl, mit Modal-Variante ohne aktiven Drag)
+- Drag aus Calendar-Event, Drop in Kanban einer anderen Cell
+- jede zukuenftige „Drag-Source-A → Drop-Target-Y-jenseits-Viewport"-UX
+
+#### 6.5.3 Pflicht-Patterns
+
+- **Backdrop-Blur** via `backdrop-filter: blur(0.25rem)` mit Token (kein Inline-Hardcode). GPU-effizient.
+- **Pulse-Animation** auf NavTree-Sidebar beim Auf-Klappen via `lib/animations.ts`-Helper.
+- **Zero-Shift-Pflicht (§6.4):** Canvas-Inhalte verschieben sich nicht — NavTree expandiert als Overlay, Backdrop-Blur ueberlagert.
+- **Drag-State-Persistenz:** `activeDrag()` darf nicht durch NavTree-Re-Render verloren gehen — Solid-Effekte mit `untrack()` wo noetig.
+
+#### 6.5.4 Anti-Patterns (Review-Stop)
+
+- NavTree expandiert via `width`-Animation mit Layout-Push → Zero-Shift-Verstoss.
+- Drag wird beim Hovern auf NavTree gecancelt (HTML5-Drag dragleave-Edge-Case nicht abgefangen).
+- Backdrop-Dimming ohne Animation (harter Swap).
+- Drop-Target-Erkennung im NavTree ohne Drag-Source-Filter (`accepts:`-Logik).
+
+#### 6.5.5 Querverweise
+
+- `animations.md` — Puls + Backdrop-Blur als Helper-Calls.
+- `feedback_drag_hover_navigation.md` (Memory) — Top-Level-Sicherung.
+- `widget-vorlagen-foundation.md` §9.B — Querschnitt-Verankerung im Vorlagen-Konzept.
+
 ---
 
 ## 7. Accessibility (WCAG 2.2 AA)
