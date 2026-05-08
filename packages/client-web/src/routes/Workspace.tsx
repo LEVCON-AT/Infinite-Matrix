@@ -52,8 +52,8 @@ import {
   fetchAtomCalendarManifestations,
   fetchAtomManifestationsByWorkspace,
 } from '../lib/atom-manifestations';
-import { fetchAutoCalendarSuppressedCellIds } from '../lib/auto-calendar-toggle';
 import { signOut, useUser } from '../lib/auth';
+import { fetchAutoCalendarSuppressedCellIds } from '../lib/auto-calendar-toggle';
 import { installBulkHotkeys } from '../lib/bulk-hotkeys';
 import { openBulkWizard, openDangerousDelete } from '../lib/bulk-wizard-state';
 import { buildEvents, isoDate } from '../lib/calendar';

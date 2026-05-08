@@ -35,12 +35,12 @@ import ImportedEventDetailModal from '../components/ImportedEventDetailModal';
 import { ModalTransition } from '../components/ModalTransition';
 import MobileCalendar from '../components/mobile/MobileCalendar';
 import { pageEnter, slideIn, slideOut } from '../lib/animations';
-import { fetchAutoCalendarSuppressedCellIds } from '../lib/auto-calendar-toggle';
 import {
   fetchAtomCalendarManifestations,
   removeAtomManifestation,
 } from '../lib/atom-manifestations';
 import { navigateToAtomEvent } from '../lib/atom-routing';
+import { fetchAutoCalendarSuppressedCellIds } from '../lib/auto-calendar-toggle';
 import {
   type CalendarEvent,
   addMonths,
