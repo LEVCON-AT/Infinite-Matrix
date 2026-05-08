@@ -1530,6 +1530,156 @@ Heute hat Welle I nur **Inbound** (ICS/Google/Outlook → atom_manifestations). 
 
 **Sprint-Verankerung:** Welle **WV.E** „Cross-View-Komplettierung" im BACKLOG. Gleicher Provider-Cluster wie §13.1 Comments + Welle I Inbound.
 
+#### 10.1.1 Schema-Architektur (Konzept-Pass 2026-05-08)
+
+**Zwei neue Tabellen** + bestehende Welle-I-Inbound-Tabellen werden bidirektional gekoppelt:
+
+| Tabelle | Status | Rolle |
+|---|---|---|
+| `external_events` (Migration 059) | bestehend | Inbound — Provider→Matrix Mirror, Source-of-Truth fuer importierte Termine |
+| `outbound_calendar_targets` | **NEU** | User-bound: pro User pro Provider-Calendar das Outbound-Ziel + Sync-State |
+| `outbound_event_links` | **NEU** | Junction: atom_manifestations.id ↔ Provider-Event-ID + last_synced_at + last_external_update |
+
+`outbound_calendar_targets`:
+
+```sql
+CREATE TABLE outbound_calendar_targets (
+  id              uuid pk default gen_random_uuid(),
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  workspace_id    uuid not null references workspaces(id) on delete cascade,
+  provider        text not null check (provider in ('google','outlook','m365')),
+  external_cal_id text not null,                -- z.B. 'primary' bei Google
+  external_cal_name text,                       -- Display-Label fuer UI
+  enabled         boolean not null default true,
+  last_full_sync_at timestamptz,
+  last_sync_token text,                         -- Provider-Sync-Token (Google syncToken / Graph deltaToken)
+  scope_granted   text not null,                -- 'read' | 'write' — write nach Re-Auth
+  created_at      timestamptz not null default now(),
+  UNIQUE (user_id, workspace_id, provider, external_cal_id)
+);
+```
+
+`outbound_event_links`:
+
+```sql
+CREATE TABLE outbound_event_links (
+  id                 uuid pk default gen_random_uuid(),
+  manifestation_id   uuid not null references atom_manifestations(id) on delete cascade,
+  target_id          uuid not null references outbound_calendar_targets(id) on delete cascade,
+  external_event_id  text not null,             -- Provider-Event-ID (Google eventId / Graph id)
+  external_etag      text,                      -- fuer If-Match-Check bei Updates
+  last_synced_at     timestamptz not null default now(),
+  last_external_update timestamptz,             -- aus External-Pull → Conflict-Resolution
+  sync_state         text not null check (sync_state in ('clean','dirty_local','dirty_remote','conflict','deleted_remote')),
+  UNIQUE (manifestation_id, target_id),         -- ein Mirror pro Manifestation pro Target
+  UNIQUE (target_id, external_event_id)         -- ein Mirror pro External-Event pro Target
+);
+```
+
+`atom_manifestations` (kind='calendar') bleibt unangetastet — `outbound_event_links` ist die Junction.
+
+#### 10.1.2 Sync-Flow Outbound (atom_manifestations → Provider)
+
+**Trigger statt Polling:** Postgres-Trigger auf `atom_manifestations` (AFTER INSERT/UPDATE/DELETE WHERE kind='calendar') schreibt einen Eintrag in `outbound_sync_queue` (eigene Tabelle, FIFO, claimable).
+
+```sql
+CREATE TABLE outbound_sync_queue (
+  id                uuid pk default gen_random_uuid(),
+  manifestation_id  uuid not null,               -- ohne FK — Cascade-Delete-tolerant
+  op                text not null check (op in ('upsert','delete')),
+  enqueued_at       timestamptz not null default now(),
+  claimed_at        timestamptz,
+  claimed_by        text,                        -- worker-id
+  attempts          int not null default 0,
+  last_error        text
+);
+```
+
+**Worker (`outbound-sync-bridge`-Service)** — analog `mail-bridge` / `oauth-bridge` (Welle WV.D):
+- Pollt `outbound_sync_queue` alle 30s (claim mit `UPDATE … RETURNING`-Pattern).
+- Pro Job: liest `atom_manifestations` + alle `outbound_calendar_targets` des `workspace_id` + `user_id` mit `enabled=true` + `scope_granted='write'`.
+- Pro Target: Upsert-Call zur Provider-API (Google: events.insert/patch/delete; Graph: events POST/PATCH/DELETE).
+- Persistiert `outbound_event_links` mit external_event_id + last_synced_at + sync_state='clean'.
+- Bei Provider-Error (Network, 5xx, Rate-Limit): attempts++, retry mit exponential backoff. Bei 4xx (Auth-Fail, Calendar-not-found): sync_state='conflict', User-Notification.
+
+**Service-Foundation:** `infra/services/outbound-sync-bridge` mit eigener systemd-Unit + .env (DATABASE_URL, SUPABASE_JWT_SECRET, fuer Provider-Calls Service-User-Tokens aus user_oauth_tokens).
+
+#### 10.1.3 Sync-Flow Inbound-Bidirektional (Provider → atom_manifestations)
+
+Bestehender Welle-I-Inbound-Pfad (calendar-inbound-sync) ergaenzt um:
+- **Sync-Token-Tracking** in `outbound_calendar_targets.last_sync_token` (Google sync-token / Graph delta-token) — incremental sync statt full-refresh.
+- **External-Last-Write-Wins-Logik:** wenn ein external_event in `outbound_event_links` referenziert ist (= wir haben ihn outbound geschrieben) und der External-`updated`-Zeitstempel > `last_synced_at`: External-Update ueberschreibt die Matrix-`atom_manifestations.display_meta` (Datum, Time, Recur).
+- **Conflict-Detection:** wenn external `updated` > `last_synced_at` UND lokal in Matrix in derselben Zeit eine Mutation erfolgte (atom_manifestations.updated_at > last_synced_at): sync_state='conflict', User-Notification mit Choice-Dialog (Local-keep / Remote-keep / Both-as-separate).
+
+#### 10.1.4 OAuth-Re-Auth-Flow (Scope-Upgrade)
+
+Bestehender `lib/oauth-flow.ts` (Welle WV.D.3.f) nutzt PKCE oder Server-Side-Bridge. Outbound-Aktivierung erfordert **Calendar-Write-Scope** zusaetzlich zum Welle-I-Read-Scope:
+
+| Provider | Read-Scope (heute) | Write-Scope (NEU) |
+|---|---|---|
+| Google | `https://www.googleapis.com/auth/calendar.readonly` | `https://www.googleapis.com/auth/calendar.events` |
+| Microsoft Graph (Outlook/M365) | `Calendars.Read` | `Calendars.ReadWrite` |
+
+**UX:**
+1. User klickt „Outbound aktivieren" pro `outbound_calendar_target`.
+2. Frontend prueft `user_oauth_tokens.scopes_granted` — wenn write-Scope fehlt: redirect zu OAuth-Re-Authorize mit erweitertem Scope-Set.
+3. User sieht Provider-Consent-Screen mit „neue Permission: Kalender bearbeiten".
+4. Nach Consent: Token wird geupdated (`user_oauth_tokens.scopes_granted` += write-scope), `outbound_calendar_targets.scope_granted='write'` gesetzt.
+5. Auto-Initial-Sync: alle existing `atom_manifestations(kind='calendar')` werden in `outbound_sync_queue` als `op='upsert'` enqueued.
+
+**Stille Scope-Upgrades sind verboten** — User muss aktiv re-konsentieren (Memory `feedback_admin_dashboard_config_gate.md`).
+
+#### 10.1.5 Edge-Cases
+
+| Fall | Verhalten |
+|---|---|
+| User loescht Outbound-Target | `outbound_event_links`-CASCADE entfernt Junctions. Provider-Events bleiben — User kann sie manuell loeschen oder Tool bietet „Aufraeumen"-Bulk-Aktion. |
+| User loescht atom_manifestation | CASCADE auf outbound_event_links → Trigger enqueued `op='delete'` mit external_event_id-Snapshot. Worker macht DELETE-Call zum Provider. |
+| External-Event geloescht (Google: status=cancelled) | sync_state='deleted_remote', User-Notification. Tool-seitig bleibt das atom_manifestations bestehen — User entscheidet ob er es auch loescht. |
+| Multi-Day-Event (start_date != end_date) | Direkt mappable: Google-Event + Graph-Event unterstuetzen Range natuerlich. |
+| Recur-Event (display_meta.recur) | RRULE-Mapping: Welle T.AC.D-Recur-Format → iCalendar-RRULE (RFC 5545). Provider-API akzeptiert RRULE-Strings direkt. |
+| Time-Zone | atom_manifestations.display_meta.time ist Workspace-Local-Time (kein TZ-Modell heute). Outbound-Sync schreibt mit `timeZone=workspace.tz` (neues Feld in `workspaces` — V2-Defer, V1 verwendet UTC + User-Browser-TZ). |
+| User hat 2+ Outbound-Targets fuer denselben Workspace | Jede Manifestation wird in jedes Target gespiegelt — pro Target eine `outbound_event_links`-Row. Beispiel: User hat Privat-Google-Cal + Arbeit-Outlook-Cal beide aktiv → jeder Termin landet in beiden. |
+| Provider-Rate-Limit | exponential backoff im Worker. Max-Attempts=10, danach sync_state='conflict' + User-Notification. |
+| Provider-Token-Expiry waehrend Sync | Worker triggert Token-Refresh via `lib/oauth-tokens.ts`-RPC. Bei Refresh-Fail: attempts erhalten, retry beim naechsten Worker-Run. |
+
+#### 10.1.6 Schema-Heptad-Pflege
+
+| Slot | Aenderung |
+|---|---|
+| Schema | Migration `083_calendar_outbound.sql` — 3 neue Tabellen + RLS + Trigger + Realtime. |
+| Types | `lib/types.ts` — `OutboundCalendarTargetRow`, `OutboundEventLinkRow`, `OutboundSyncQueueRow`. |
+| Mutations | `lib/calendar-outbound.ts` — CRUD fuer `outbound_calendar_targets` (User-bound). `outbound_event_links` ist System-gepflegt — Frontend nur Read. |
+| Cache | `outbound_calendar_targets` als IDB-Store (User-private, Workspace-scoped). `outbound_event_links` nicht im Cache (read-on-demand fuer Settings-UI). |
+| Realtime | `outbound_calendar_targets` + `outbound_event_links` in `supabase_realtime`-Publication, REPLICA IDENTITY FULL. Subscribe in `realtime.ts`. UI-Bumps: Settings-Page (Target-Liste) + Calendar-Render (Sync-Status-Indicator). |
+| Export | `outbound_calendar_targets` ist **user-private** (analog `user_oauth_tokens`) — NICHT im Export. `outbound_event_links` ebenfalls nicht (re-creates beim ersten Worker-Run nach Import). |
+| MCP | `calendar_outbound.target.list` / `.set` / `.disable` — User-API fuer Targets. `calendar_outbound.queue.status` als Read-only-Diagnose (analog `manif.calendar.auto.list`). |
+| Channel-Bridge (§14.3 8. Slot) | n/a — Outbound-Sync IST der Channel-Pfad. Native Calendar-Manifs sind die Source. |
+
+#### 10.1.7 Sprint-Verankerung
+
+Welle **WV.E** Item #38: „Calendar-Outbound-Sync (Google + Outlook + Microsoft365, bidirektional mit External-Last-Write-Wins, OAuth-Re-Auth mit Calendar-Write-Scope)." Aufwand-Schaetzung: ~5-6d.
+
+**Reihenfolge:**
+
+1. Migration 083: Schema + RLS + Trigger fuer `outbound_sync_queue`-Enqueue.
+2. `lib/calendar-outbound.ts` + `lib/types.ts`-Erweiterung + Realtime-Subscribe.
+3. `lib/oauth-flow.ts` Scope-Upgrade-Pfad + Settings-UI „Outbound aktivieren" pro Provider-Target.
+4. `infra/services/outbound-sync-bridge` Service: Worker-Loop + Provider-API-Adapter (Google + Graph).
+5. systemd-Unit + nginx-Config + One-Time-Bootstrap-Doku.
+6. Settings-UI „Outbound-Targets verwalten" (Liste + Aktivieren/Deaktivieren + Sync-Status pro Target).
+7. Calendar-Render-Pfad: Sync-Status-Indicator pro Event („synced ✓ / dirty ⏵ / conflict ⚠").
+8. Conflict-Resolution-Dialog (External-Last-Write-Wins-Default + Override-Optionen).
+9. MCP-Tools (Read-only-Diagnose).
+10. Smoke-Tests + 2-Tab-Realtime-Tests + Cross-Provider-Roundtrip.
+
+**V2-Defer:**
+- ICS-Outbound (statt Provider-API) — niche, ICS ist Read-only-Format, Outbound waere ein eigenes File-Sharing-Setup.
+- Time-Zone-Modell auf Workspace-Ebene (`workspaces.tz` + tz-aware atom_manifestations).
+- Recur-Edge-Cases (Exception-Dates, Modified-Instances) — V1 syncs nur regulaere Recur-Events.
+
+**Manifest-Verankerung:** `architektur.md` §3 Schema-Heptad bekommt 3 neue Tabellen-Eintraege. `architektur.md` §7 Bridge bekommt Hinweis auf den 4. Self-hosted-Service `outbound-sync-bridge` (analog `alias-resolve`/`oauth-bridge`/`mail-bridge`).
+
 ### 10.2 Cross-Reference-Tabelle (alle anderen 10.x-Items)
 
 10.1 link → calendar = §9.6 final.  
