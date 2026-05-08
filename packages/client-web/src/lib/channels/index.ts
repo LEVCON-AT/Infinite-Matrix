@@ -9,6 +9,8 @@
 // Operationen sind anders geformt (File-Pick / Download / Upload).
 
 import type { ChannelProvider } from '../types';
+import { gmailProvider } from './gmail';
+import { outlookProvider } from './outlook';
 import { slackProvider } from './slack';
 import { teamsProvider } from './teams';
 import type { ChannelProviderImpl } from './types';
@@ -20,6 +22,8 @@ const REGISTRY = new Map<ChannelProvider, ChannelProviderImpl>();
 
 REGISTRY.set('slack', slackProvider);
 REGISTRY.set('teams', teamsProvider);
+REGISTRY.set('outlook', outlookProvider);
+REGISTRY.set('gmail', gmailProvider);
 
 export function getChannelImpl(provider: ChannelProvider): ChannelProviderImpl {
   const impl = REGISTRY.get(provider);
