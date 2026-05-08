@@ -76,6 +76,7 @@ describe('registerAllTools() Integration', () => {
       'info_field.update',
       'link.add',
       'link.delete',
+      'manif.calendar.auto.list',
       'matrix.create',
       'matrix.delete',
       'matrix.edit_mode.set',
@@ -110,7 +111,7 @@ describe('registerAllTools() Integration', () => {
     ];
 
     expect(names).toEqual(expected);
-    expect(tools.size).toBe(92);
+    expect(tools.size).toBe(93);
   });
 
   it('jedes registrierte Tool hat schema + jsonSchema', () => {

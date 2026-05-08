@@ -11,6 +11,7 @@ import { featureTemplateTools } from './feature-templates.js';
 import { hotkeySlotTools } from './hotkey-slots.js';
 import { infoFieldTools } from './info-fields.js';
 import { infoLinkTools } from './info-link.js';
+import { manifCalendarAutoTools } from './manif-calendar-auto.js';
 import { matrixCrudTools } from './matrix-crud.js';
 import { matrixTools } from './matrix.js';
 import { metaTools } from './meta.js';
@@ -47,6 +48,8 @@ export function registerAllTools(): void {
     // Welle WV.D Heptad-Pflege — Channel-Bridges + OAuth-Tokens.
     ...widgetChannelTools,
     ...oauthTokenTools,
+    // Welle WV.E #40 Heptad-Pflege — Auto-Calendar-Manifestation-Diagnose.
+    ...manifCalendarAutoTools,
   ]) {
     registerTool(tool);
   }

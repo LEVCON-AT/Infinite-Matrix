@@ -143,6 +143,10 @@ export type WorkspaceExport = {
   // Optional fuer V0-Parser-Kompat. user_oauth_tokens explizit NICHT im
   // Export — User-private Zugangsdaten verlassen den Workspace nie.
   widget_external_channels?: Record<string, unknown>[];
+  // Welle WV.B.1 — info_fields (Migration 072). Heptad-Pflege-Slot war
+  // beim Anlegen vergessen, von WV.E #40 nachgezogen. Workspace-scope.
+  // Optional fuer V0-Parser-Kompat.
+  info_fields?: Record<string, unknown>[];
   // Nur bei Cell-Subtree-Exports gesetzt: Meta-Info zur Quell-Zelle,
   // damit der Importer ihre info-Felder/Links und Feature-Flags in
   // die Ziel-Zelle mergen kann — ohne die Zelle selbst in cells[]
@@ -164,7 +168,12 @@ export type ExportStats = {
   checklists: number;
   checklistItems: number;
   links: number;
+  // Inline-Info-Felder im cell.data.infoFields-jsonb (Legacy-Pfad).
   infoFields: number;
+  // WV.B.1 atom info_fields (Migration 072) — typed Atome.
+  // Getrennt gezaehlt, damit der User Drift zwischen den zwei
+  // Datenmodellen sieht.
+  infoFieldAtoms: number;
   infoLinks: number;
   docs: number;
   // AU-B1 K11c.2: Object-Layer-Counts.
@@ -200,6 +209,7 @@ function statsOf(e: WorkspaceExport): ExportStats {
     checklistItems: e.checklist_items.length,
     links: e.links.length,
     infoFields,
+    infoFieldAtoms: (e.info_fields ?? []).length,
     infoLinks,
     docs: e.docs.length,
     objects: (e.objects ?? []).length,
@@ -222,6 +232,10 @@ export function formatExportStats(s: ExportStats): string {
   if (s.links) parts.push(`${s.links} Board-Links`);
   if (s.infoFields)
     parts.push(`${s.infoFields} ${s.infoFields === 1 ? 'Info-Feld' : 'Info-Felder'}`);
+  if (s.infoFieldAtoms)
+    parts.push(
+      `${s.infoFieldAtoms} ${s.infoFieldAtoms === 1 ? 'Info-Feld-Atom' : 'Info-Feld-Atome'}`,
+    );
   if (s.infoLinks) parts.push(`${s.infoLinks} ${s.infoLinks === 1 ? 'Info-Link' : 'Info-Links'}`);
   if (s.docs) parts.push(`${s.docs} ${s.docs === 1 ? 'Doku' : 'Dokus'}`);
   if (s.objects) parts.push(`${s.objects} ${s.objects === 1 ? 'Object' : 'Objects'}`);
@@ -266,6 +280,7 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     workspaceHotkeySlotsRes,
     savedFiltersRes,
     widgetExternalChannelsRes,
+    infoFieldsRes,
   ] = await Promise.all([
     supabase.from('nodes').select('*').eq('workspace_id', workspaceId),
     supabase.from('rows').select('*').eq('workspace_id', workspaceId),
@@ -308,6 +323,11 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
       .from('widget_external_channels')
       .select('*')
       .eq('workspace_id', workspaceId),
+    // WV.E #40 — info_fields Heptad-Pflege.
+    supabase
+      .from('info_fields')
+      .select('*')
+      .eq('workspace_id', workspaceId),
   ]);
 
   for (const res of [
@@ -333,6 +353,7 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     workspaceHotkeySlotsRes,
     savedFiltersRes,
     widgetExternalChannelsRes,
+    infoFieldsRes,
   ]) {
     if (res.error) throw res.error;
   }
@@ -368,6 +389,7 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     workspace_hotkey_slots: (workspaceHotkeySlotsRes.data ?? []) as Record<string, unknown>[],
     saved_filters: (savedFiltersRes.data ?? []) as Record<string, unknown>[],
     widget_external_channels: (widgetExternalChannelsRes.data ?? []) as Record<string, unknown>[],
+    info_fields: (infoFieldsRes.data ?? []) as Record<string, unknown>[],
   };
 }
 
@@ -443,6 +465,7 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     groupsRes,
     groupMembersRes,
     wsRes,
+    infoFieldsRes,
   ] = await Promise.all([
     supabase.from('nodes').select('*').eq('workspace_id', workspaceId),
     supabase.from('rows').select('*').eq('workspace_id', workspaceId),
@@ -460,6 +483,11 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     supabase.from('groups').select('*').eq('workspace_id', workspaceId),
     supabase.from('group_members').select('*').eq('workspace_id', workspaceId),
     supabase.from('workspaces').select('*').eq('id', workspaceId).single(),
+    // WV.E #40 — info_fields Heptad-Pflege fuer Subtree-Filter.
+    supabase
+      .from('info_fields')
+      .select('*')
+      .eq('workspace_id', workspaceId),
   ]);
   for (const res of [
     nodesRes,
@@ -477,6 +505,7 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     groupsRes,
     groupMembersRes,
     wsRes,
+    infoFieldsRes,
   ]) {
     if (res.error) throw res.error;
   }
@@ -550,6 +579,7 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
       group_id: string;
       object_id: string;
     }>,
+    info_fields: (infoFieldsRes.data ?? []) as Array<{ id: string; workspace_id: string }>,
   };
 }
 
