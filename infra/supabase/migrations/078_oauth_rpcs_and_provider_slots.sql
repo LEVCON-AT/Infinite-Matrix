@@ -98,14 +98,17 @@ CREATE POLICY oauth_provider_slots_block_direct_deletes ON public.oauth_provider
 -- Wir ersetzen INSERT/UPDATE/DELETE durch Block-Policies, damit alle
 -- Schreibvorgaenge ueber RPCs laufen (Encryption-Garantie).
 DROP POLICY IF EXISTS user_oauth_tokens_insert ON public.user_oauth_tokens;
+DROP POLICY IF EXISTS user_oauth_tokens_block_direct_inserts ON public.user_oauth_tokens;
 CREATE POLICY user_oauth_tokens_block_direct_inserts ON public.user_oauth_tokens
   FOR INSERT WITH CHECK (false);
 
 DROP POLICY IF EXISTS user_oauth_tokens_update ON public.user_oauth_tokens;
+DROP POLICY IF EXISTS user_oauth_tokens_block_direct_updates ON public.user_oauth_tokens;
 CREATE POLICY user_oauth_tokens_block_direct_updates ON public.user_oauth_tokens
   FOR UPDATE USING (false) WITH CHECK (false);
 
 DROP POLICY IF EXISTS user_oauth_tokens_delete ON public.user_oauth_tokens;
+DROP POLICY IF EXISTS user_oauth_tokens_block_direct_deletes ON public.user_oauth_tokens;
 CREATE POLICY user_oauth_tokens_block_direct_deletes ON public.user_oauth_tokens
   FOR DELETE USING (false);
 
