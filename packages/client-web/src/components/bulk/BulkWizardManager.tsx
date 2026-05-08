@@ -22,6 +22,8 @@ import {
 } from '../../lib/bulk-wizard-state';
 import { clearSelection, selectedCellIds } from '../../lib/cell-selection';
 import { fetchCellTemplateInstancesForWorkspace } from '../../lib/cell-templates';
+import { downloadSubtreeExport, exportCellSubtree } from '../../lib/export';
+import type { WorkspaceExport } from '../../lib/export';
 import {
   fetchUserHotkeySlots,
   fetchWorkspaceHotkeySlots,
@@ -44,6 +46,65 @@ export type BulkWizardManagerProps = {
   // aber manchmal schneller per Polling).
   onApplied?: () => void;
 };
+
+// Welle WV.C — exportFirst-Doppelboden (Konzept §8.2.3).
+// Mehrere Cell-Subtrees in EINE WorkspaceExport-Payload mergen, damit
+// der User vor dem Bulk-Loeschen einen einzigen JSON-Snapshot zum
+// Download bekommt. Dedup pro Tabelle via Map<id, row>.
+async function mergeCellSubtreeExports(
+  cellIds: ReadonlyArray<string>,
+  workspaceId: string,
+): Promise<WorkspaceExport> {
+  if (cellIds.length === 0) {
+    throw new Error('Keine Cells zum Exportieren.');
+  }
+  const exports = await Promise.all(cellIds.map((id) => exportCellSubtree(id, workspaceId)));
+  const first = exports[0];
+  if (!first) throw new Error('Export-Pipeline lieferte keine Daten.');
+
+  // Pro Tabelle Merge-Map (id-dedupliziert). WorkspaceExport-Tabellen
+  // sind typisiert als Record<string, unknown>[] — wir lesen `id`
+  // dynamisch und cast'en pro Iteration.
+  type AnyRow = Record<string, unknown>;
+  const dedupTables: ReadonlyArray<keyof WorkspaceExport> = [
+    'nodes',
+    'cells',
+    'rows',
+    'cols',
+    'kb_cols',
+    'kb_cards',
+    'checklists',
+    'checklist_items',
+    'links',
+    'atom_manifestations',
+  ];
+
+  const merged: Record<string, Map<string, AnyRow>> = {};
+  for (const tbl of dedupTables) {
+    merged[tbl as string] = new Map();
+  }
+
+  for (const ex of exports) {
+    if (!ex) continue;
+    for (const tbl of dedupTables) {
+      const arr = (ex as unknown as Record<string, AnyRow[] | undefined>)[tbl as string] ?? [];
+      const m = merged[tbl as string];
+      if (!m) continue;
+      for (const row of arr) {
+        const id = typeof row.id === 'string' ? row.id : null;
+        if (id) m.set(id, row);
+      }
+    }
+  }
+
+  const out: WorkspaceExport = { ...first };
+  for (const tbl of dedupTables) {
+    (out as unknown as Record<string, AnyRow[]>)[tbl as string] = [
+      ...(merged[tbl as string]?.values() ?? []),
+    ];
+  }
+  return out;
+}
 
 const BulkWizardManager: Component<BulkWizardManagerProps> = (p) => {
   // Lazy-Load der Workspace-weiten Templates + Instances + Overrides
@@ -140,12 +201,26 @@ const BulkWizardManager: Component<BulkWizardManagerProps> = (p) => {
               : `${selectedCells().length} Cells komplett leeren — alle Vorlagen + Cell-Inhalte werden geloescht.`;
           const title = r.kind === 'remove-template' ? 'Vorlage entfernen' : 'Cells leeren';
 
-          async function handleConfirm(_input: { exportFirst: boolean }): Promise<void> {
-            // _input.exportFirst V1 ohne Action — Konzept §8.2.3 sieht
-            // einen JSON-Snapshot-Download vor. Der haengt am
-            // workspace-export-Pfad und wird in spaeterem Sub-Sprint
-            // verdrahtet (mit selectiver Cell-Subtree-Variante).
+          async function handleConfirm(input: { exportFirst: boolean }): Promise<void> {
             try {
+              // Doppelter Boden (Konzept §8.2.3): vor dem Loeschen einen
+              // Cell-Subtree-Snapshot als JSON downloaden. Pro selektierter
+              // Cell ein Subtree, aber gemerged in EINE Datei damit der
+              // User nicht 12 Downloads zwischen sich hat.
+              if (input.exportFirst) {
+                try {
+                  const merged = await mergeCellSubtreeExports(
+                    selectedCells().map((c) => c.id),
+                    p.workspaceId,
+                  );
+                  await downloadSubtreeExport(merged, `bulk-${selectedCells().length}-cells`);
+                } catch (err) {
+                  console.error('exportFirst:', err);
+                  showToast('Export-Snapshot fehlgeschlagen — Loeschen wird abgebrochen.', 'error');
+                  closeDangerousDelete();
+                  return;
+                }
+              }
               if (r.kind === 'remove-template') {
                 const tplId = slotTemplateId();
                 if (!tplId) {
