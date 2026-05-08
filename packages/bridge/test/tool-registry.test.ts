@@ -36,6 +36,7 @@ describe('registerAllTools() Integration', () => {
       'cell.feature.add',
       'cell.get',
       'cell_template.apply',
+      'cell_template.bulk_apply',
       'cell_template.list',
       'cell_template.override.reset',
       'cell_template.override.set',
@@ -103,7 +104,7 @@ describe('registerAllTools() Integration', () => {
     ];
 
     expect(names).toEqual(expected);
-    expect(tools.size).toBe(85);
+    expect(tools.size).toBe(86);
   });
 
   it('jedes registrierte Tool hat schema + jsonSchema', () => {

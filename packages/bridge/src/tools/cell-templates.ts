@@ -50,6 +50,31 @@ const cellTemplateOverrideResetSchema = z.object({
     .describe('cell_widget_overrides.id. DELETE → Widget rendert wieder Vorlagen-Default.'),
 });
 
+// ─── cell_template.bulk_apply ─────────────────────────────────
+// Welle WV.C.4 — Bulk-Apply analog zum Client-BulkWizard.
+// Sequenziell pro Cell: applyTemplateToCell + optional Alias setzen.
+// Fehler pro Cell stoppen den Run nicht (Bulk-Pflicht); Caller bekommt
+// applied/failed-Zaehler im Result.
+const cellTemplateBulkApplySchema = z.object({
+  templateId: z.string().describe('feature_templates.id — auf alle Cells anwenden.'),
+  cellRefs: z
+    .array(z.string())
+    .min(1)
+    .describe('Cell-Alias (^kuerzel) oder UUID-Array. Reihenfolge bestimmt Konflikt-Suffix.'),
+  aliasPattern: z
+    .string()
+    .optional()
+    .describe(
+      'Optional: Auto-Alias-Pattern mit Tokens {vorlage}/{row}/{col}. Wenn nicht gesetzt: Cell-Aliase bleiben unveraendert.',
+    ),
+  skipExisting: z
+    .boolean()
+    .default(true)
+    .describe(
+      'true (Default): Cells mit existing Vorlagen-Instance werden uebersprungen. false: Reset-to-Template laeuft pro Cell.',
+    ),
+});
+
 export const cellTemplateTools: ToolDef[] = [
   {
     name: 'cell_template.apply',
@@ -83,5 +108,12 @@ export const cellTemplateTools: ToolDef[] = [
     description: 'Setzt ein Widget zurueck auf Vorlagen-Default — DELETE der Override-Row.',
     schema: cellTemplateOverrideResetSchema,
     jsonSchema: zodToJsonSchema(cellTemplateOverrideResetSchema),
+  },
+  {
+    name: 'cell_template.bulk_apply',
+    description:
+      'Wendet eine Vorlage auf mehrere Cells an. Sequenziell pro Cell. Aliase optional via aliasPattern (Tokens {vorlage}/{row}/{col}). Pro-Cell-Fehler stoppen den Run nicht — Result-Zaehler applied/failed.',
+    schema: cellTemplateBulkApplySchema,
+    jsonSchema: zodToJsonSchema(cellTemplateBulkApplySchema),
   },
 ];

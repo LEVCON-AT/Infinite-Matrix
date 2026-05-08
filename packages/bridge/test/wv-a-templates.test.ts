@@ -78,9 +78,10 @@ describe('feature_template Tools', () => {
 });
 
 describe('cell_template Tools', () => {
-  it('exportiert 5 Tools', () => {
+  it('exportiert 6 Tools', () => {
     expect(cellTemplateTools.map((t) => t.name).sort()).toEqual([
       'cell_template.apply',
+      'cell_template.bulk_apply',
       'cell_template.list',
       'cell_template.override.reset',
       'cell_template.override.set',
@@ -94,6 +95,30 @@ describe('cell_template Tools', () => {
     expect(
       (tool.schema.safeParse({ cellRef: '^c', templateId: 't' }) as { success: boolean }).success,
     ).toBe(true);
+  });
+
+  it('cell_template.bulk_apply verlangt cellRefs nicht-leer', () => {
+    const tool = get(cellTemplateTools, 'cell_template.bulk_apply');
+    expect(
+      (tool.schema.safeParse({ templateId: 't', cellRefs: [] }) as { success: boolean }).success,
+    ).toBe(false);
+    expect(
+      (
+        tool.schema.safeParse({ templateId: 't', cellRefs: ['^c1', '^c2'] }) as {
+          success: boolean;
+        }
+      ).success,
+    ).toBe(true);
+  });
+
+  it('cell_template.bulk_apply Default skipExisting=true', () => {
+    const tool = get(cellTemplateTools, 'cell_template.bulk_apply');
+    const parsed = tool.schema.safeParse({ templateId: 't', cellRefs: ['^c'] }) as {
+      success: boolean;
+      data: { skipExisting: boolean };
+    };
+    expect(parsed.success).toBe(true);
+    expect(parsed.data.skipExisting).toBe(true);
   });
 
   it('cell_template.override.set verlangt overrideData', () => {
