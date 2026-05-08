@@ -18,6 +18,7 @@ import Templates from './routes/Templates';
 import Workspace from './routes/Workspace';
 import AccountAi from './routes/settings/AccountAi';
 import AccountCalendars from './routes/settings/AccountCalendars';
+import AccountChannels from './routes/settings/AccountChannels';
 import AccountProfile from './routes/settings/AccountProfile';
 import AccountSecurity from './routes/settings/AccountSecurity';
 import AccountVisibility from './routes/settings/AccountVisibility';
@@ -78,6 +79,7 @@ render(
         <Route path="/account/visibility" component={AccountVisibility} />
         <Route path="/account/ai" component={AccountAi} />
         <Route path="/account/calendars" component={AccountCalendars} />
+        <Route path="/account/channels" component={AccountChannels} />
         <Route path="/account/working-hours" component={AccountWorkingHours} />
         <Route path="/workspace/general" component={WorkspaceGeneral} />
         <Route path="/workspace/members" component={WorkspaceMembers} />

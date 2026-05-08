@@ -105,6 +105,12 @@ const Settings: ParentComponent = (props) => {
       hint: 'Outlook / Google / iCal abonnieren',
     },
     {
+      to: `${wsBase()}/account/channels`,
+      label: 'Channel-Anbindungen',
+      icon: 'chat-bubble',
+      hint: 'Slack / Teams / Mail / Drive verbinden',
+    },
+    {
       to: `${wsBase()}/account/working-hours`,
       label: 'Arbeitszeiten',
       icon: 'clock',

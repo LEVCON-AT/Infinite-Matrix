@@ -19137,3 +19137,104 @@ body[data-viewport="phone"] .overlay-card {
   font-weight: 600;
   font-size: 0.85rem;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Channel-Anbindungen (Welle WV.D.3.c — AccountChannels-Page)
+   ═══════════════════════════════════════════════════════════════ */
+.channel-provider-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--space-sm);
+}
+.channel-provider-card {
+  display: grid;
+  grid-template-areas:
+    "head head"
+    "doc actions";
+  grid-template-columns: 1fr auto;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg2);
+  border: 0.0625rem solid var(--border);
+  border-radius: var(--rs);
+}
+.channel-provider-card-head {
+  grid-area: head;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.channel-provider-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: var(--surface-hover);
+  color: var(--text2);
+  flex-shrink: 0;
+}
+.channel-provider-card-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.channel-provider-card-title h4 {
+  margin: 0;
+  font-size: var(--fs-small);
+  font-weight: 500;
+  color: var(--text);
+}
+.channel-provider-card-doc {
+  grid-area: doc;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text3);
+  text-decoration: none;
+}
+.channel-provider-card-doc:hover {
+  color: var(--text2);
+}
+.channel-provider-card-actions {
+  grid-area: actions;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.channel-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 500;
+  background: var(--surface-hover);
+  color: var(--text3);
+}
+.channel-status-valid {
+  background: var(--tealbg);
+  color: var(--teal);
+}
+.channel-status-expired {
+  background: var(--amberbg);
+  color: var(--amber);
+}
+.channel-token-modal {
+  max-width: 32rem;
+  width: 90vw;
+}
+.channel-token-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.channel-token-form .form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}

@@ -21,6 +21,7 @@ export type SearchTab =
   | 'account/visibility'
   | 'account/ai'
   | 'account/calendars'
+  | 'account/channels'
   | 'account/working-hours'
   | 'workspace/general'
   | 'workspace/members'
@@ -96,6 +97,12 @@ export const SETTINGS_SEARCH_INDEX: ReadonlyArray<SearchEntry> = [
     hint: 'Hinzufuegen ICS-URL OAuth Datei hochladen Upload',
     anchorId: 'add-calendar-head',
   },
+  {
+    tab: 'account/channels',
+    label: 'Channel-Anbindungen',
+    hint: 'Slack Teams Outlook Gmail Mail IMAP Drive OneDrive Dropbox Nextcloud Discord WhatsApp Telegram OAuth Token verbinden',
+    anchorId: null,
+  },
 
   // ── Workspace ────────────────────────────────────────────────
   {
@@ -167,6 +174,7 @@ const TAB_LABELS: Record<SearchTab, string> = {
   'account/visibility': 'Konto · Sichtbarkeit',
   'account/ai': 'Konto · AI-Anbindung',
   'account/calendars': 'Konto · Externe Kalender',
+  'account/channels': 'Konto · Channel-Anbindungen',
   'account/working-hours': 'Konto · Arbeitszeiten',
   'workspace/general': 'Workspace · Allgemein',
   'workspace/members': 'Workspace · Mitglieder',
@@ -188,6 +196,7 @@ const TAB_ICONS: Record<SearchTab, IconName> = {
   'account/visibility': 'eye',
   'account/ai': 'sparkles',
   'account/calendars': 'arrow-top-right-on-square',
+  'account/channels': 'chat-bubble',
   'account/working-hours': 'clock',
   'workspace/general': 'cog',
   'workspace/members': 'users',
