@@ -8,6 +8,7 @@
 // external_event bleibt aktiv beim naechsten Sync).
 
 import { type Component, Show, createResource, createSignal, onCleanup, onMount } from 'solid-js';
+import type { AtomManifestationRow } from '../lib/atom-manifestations';
 import { fetchExternalEventById } from '../lib/calendar-inbound';
 import { openDokuForContext, shouldIgnoreDKey } from '../lib/docs-open';
 import {
@@ -15,7 +16,7 @@ import {
   closeImportedEventModal,
 } from '../lib/imported-event-modal-state';
 import { showToast } from '../lib/toasts';
-import type { AtomPin, CellRow, DocRow, NodeRow } from '../lib/types';
+import type { CellRow, DocRow, NodeRow } from '../lib/types';
 import AtomDocsSection from './AtomDocsSection';
 import AtomTagsEditor from './AtomTagsEditor';
 import DeriveTaskModal from './DeriveTaskModal';
@@ -33,7 +34,7 @@ export type ImportedEventDetailModalProps = {
   eventId: string;
   snapshot: ImportedEventModalSnapshot;
   // Welle D.9: optional fuer AtomDocsSection.
-  wsAtomPins?: AtomPin[];
+  wsAtomPins?: AtomManifestationRow[];
   wsDocs?: DocRow[];
   // Welle D.7c: AtomTagsEditor-Resources. Optional — Calendar-Route
   // ohne Workspace-Resources blendet die Sektion aus.

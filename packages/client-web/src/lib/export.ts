@@ -8,6 +8,7 @@
 // RLS kuemmert sich um die Authorization: der anonym-JWT sieht nur
 // Rows in Workspaces, in denen der User Mitglied ist.
 
+import type { AtomManifestationRow } from './atom-manifestations';
 import { encryptPayload } from './crypto';
 import { supabase } from './supabase';
 import { taskAndManifToCard, taskAndManifToItem } from './task-projections';
@@ -24,32 +25,38 @@ import type { TaskManifestationRow, TaskRow } from './types';
 // Sicht den Round-Trip — die Legacy-Projection allein traegt das nicht.
 async function fetchTaskShapesForWorkspace(workspaceId: string): Promise<{
   tasks: TaskRow[];
-  manifestations: TaskManifestationRow[];
+  manifestations: AtomManifestationRow[];
   kb_cards: Record<string, unknown>[];
   checklist_items: Record<string, unknown>[];
 }> {
+  // WV.WV.1: atom_manifestations laed alle Atom-Typen (inkl. pinned-
+  // Manifestations). Legacy-Shapes (kb_cards / checklist_items) werden
+  // weiterhin nur aus task-Manifestations gebaut.
   const [tasksRes, manifsRes] = await Promise.all([
     supabase.from('tasks').select('*').eq('workspace_id', workspaceId),
-    supabase
-      .from('atom_manifestations')
-      .select('*')
-      .eq('workspace_id', workspaceId)
-      .eq('atom_type', 'task'),
+    supabase.from('atom_manifestations').select('*').eq('workspace_id', workspaceId),
   ]);
   if (tasksRes.error) throw tasksRes.error;
   if (manifsRes.error) throw manifsRes.error;
   const tasks = (tasksRes.data ?? []) as TaskRow[];
-  const manifs = (manifsRes.data ?? []) as TaskManifestationRow[];
+  const manifs = (manifsRes.data ?? []) as AtomManifestationRow[];
   const taskById = new Map(tasks.map((t) => [t.id, t]));
   const kb_cards: Record<string, unknown>[] = [];
   const checklist_items: Record<string, unknown>[] = [];
   for (const m of manifs) {
+    if (m.atom_type !== 'task') continue;
     const t = taskById.get(m.atom_id);
     if (!t) continue;
     if (m.kind === 'kanban') {
-      kb_cards.push(taskAndManifToCard(t, m) as unknown as Record<string, unknown>);
+      // taskAndManifToCard erwartet TaskManifestationRow (atom_type='task',
+      // kind='kanban' garantiert) — Subtype-Cast nach Filter ist safe.
+      kb_cards.push(
+        taskAndManifToCard(t, m as TaskManifestationRow) as unknown as Record<string, unknown>,
+      );
     } else if (m.kind === 'checklist') {
-      checklist_items.push(taskAndManifToItem(t, m) as unknown as Record<string, unknown>);
+      checklist_items.push(
+        taskAndManifToItem(t, m as TaskManifestationRow) as unknown as Record<string, unknown>,
+      );
     }
   }
   return { tasks, manifestations: manifs, kb_cards, checklist_items };
@@ -78,13 +85,14 @@ export type WorkspaceExport = {
   checklists: Record<string, unknown>[];
   checklist_items: Record<string, unknown>[];
   links: Record<string, unknown>[];
-  // Dokumente die ueber atom_pins (parent_kind='cell') an Subtree-Cells
-  // gepinnt sind. Workspace-freie Docs (ohne Cell-Pin) werden nur vom
-  // Full-Workspace-Export erfasst. Default leer, damit alte Parser
-  // nichts brechen.
+  // Dokumente die ueber Pinned-Manifestation (container_kind='cell')
+  // an Subtree-Cells gepinnt sind. Workspace-freie Docs (ohne Cell-Pin)
+  // werden nur vom Full-Workspace-Export erfasst. Default leer, damit
+  // alte Parser nichts brechen.
   docs: Record<string, unknown>[];
-  // Welle D — atom_pins (Doc→Cell-Verknuepfungen + V2 atom→atom etc.).
-  // Optional damit V0-Parser ohne Pin-Awareness alte Exports lesen.
+  // WV.WV.1: atom_pins ist konsolidiert in atom_manifestations
+  // (kind='pinned'). Field bleibt optional fuer Backward-Compat-Read
+  // alter Export-Files (subtree-import V1-Pfad).
   atom_pins?: Record<string, unknown>[];
   // Welle D — globales Tag-System. workspace_tags ist die Registry pro
   // Workspace (UNIQUE auf workspace_id+kind+value), atom_tags die
@@ -211,7 +219,8 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
   if (wsRes.error) throw wsRes.error;
 
   // Alle Kind-Tabellen parallel laden. workspace_id-Filter zusaetzlich
-  // zur RLS als Guard.
+  // zur RLS als Guard. atom_pins ist seit WV.WV.1 konsolidiert in
+  // atom_manifestations(kind='pinned') — kein separater Fetch.
   const [
     nodesRes,
     rowsRes,
@@ -222,7 +231,6 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     checklistsRes,
     linksRes,
     docsRes,
-    atomPinsRes,
     workspaceTagsRes,
     atomTagsRes,
     objectsRes,
@@ -239,7 +247,6 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     supabase.from('checklists').select('*').eq('workspace_id', workspaceId),
     supabase.from('links').select('*').eq('workspace_id', workspaceId),
     supabase.from('docs').select('*').eq('workspace_id', workspaceId),
-    supabase.from('atom_pins').select('*').eq('workspace_id', workspaceId),
     supabase.from('workspace_tags').select('*').eq('workspace_id', workspaceId),
     supabase.from('atom_tags').select('*').eq('workspace_id', workspaceId),
     supabase.from('objects').select('*').eq('workspace_id', workspaceId),
@@ -257,7 +264,6 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     checklistsRes,
     linksRes,
     docsRes,
-    atomPinsRes,
     workspaceTagsRes,
     atomTagsRes,
     objectsRes,
@@ -283,7 +289,6 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     checklist_items: legacyShapes.checklist_items,
     links: (linksRes.data ?? []) as Record<string, unknown>[],
     docs: (docsRes.data ?? []) as Record<string, unknown>[],
-    atom_pins: (atomPinsRes.data ?? []) as Record<string, unknown>[],
     workspace_tags: (workspaceTagsRes.data ?? []) as Record<string, unknown>[],
     atom_tags: (atomTagsRes.data ?? []) as Record<string, unknown>[],
     objects: (objectsRes.data ?? []) as Record<string, unknown>[],
@@ -360,7 +365,6 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     checklistsRes,
     linksRes,
     docsRes,
-    atomPinsRes,
     workspaceTagsRes,
     atomTagsRes,
     objectsRes,
@@ -378,7 +382,6 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     supabase.from('checklists').select('*').eq('workspace_id', workspaceId),
     supabase.from('links').select('*').eq('workspace_id', workspaceId),
     supabase.from('docs').select('*').eq('workspace_id', workspaceId),
-    supabase.from('atom_pins').select('*').eq('workspace_id', workspaceId),
     supabase.from('workspace_tags').select('*').eq('workspace_id', workspaceId),
     supabase.from('atom_tags').select('*').eq('workspace_id', workspaceId),
     supabase.from('objects').select('*').eq('workspace_id', workspaceId),
@@ -396,7 +399,6 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
     checklistsRes,
     linksRes,
     docsRes,
-    atomPinsRes,
     workspaceTagsRes,
     atomTagsRes,
     objectsRes,
@@ -453,16 +455,9 @@ async function fetchWorkspaceRowsForExport(workspaceId: string) {
       checklist_id: string;
     }>,
     links: (linksRes.data ?? []) as Array<{ id: string; board_id: string }>,
-    // Welle D: docs.attached_cell_id existiert nicht mehr. Subtree-
-    // Filter nutzt atom_pins (siehe Aufrufer).
+    // WV.WV.1: docs.attached_cell_id existiert nicht mehr. Subtree-
+    // Filter nutzt atom_manifestations(kind='pinned') (siehe Aufrufer).
     docs: (docsRes.data ?? []) as Array<{ id: string }>,
-    atom_pins: (atomPinsRes.data ?? []) as Array<{
-      id: string;
-      atom_type: string;
-      atom_id: string;
-      parent_kind: string;
-      parent_id: string;
-    }>,
     workspace_tags: (workspaceTagsRes.data ?? []) as Array<{
       id: string;
       kind: string;
@@ -576,8 +571,17 @@ export async function exportSubtree(
   // im Subtree referenziert (oder sie kanban/checklist-projiziert auf
   // einen subtree-Card/Item ist). Standalone-Tasks (keine Manif) sind
   // workspace-global — Subtree-Export traegt sie nicht mit.
+  // WV.WV.1: pinned-Manifestations am Subtree (container_kind='cell'
+  // mit cell im Subtree, container_kind='node' mit node im Subtree)
+  // wandern mit. atom-Pins (container_kind='atom') bleiben workspace-
+  // global; Subtree-Export traegt sie nicht automatisch mit.
   const filteredKbColIds = new Set(filteredKbCols.map((k) => k.id));
   const filteredManifestations = all.atom_manifestations.filter((m) => {
+    if (m.kind === 'pinned') {
+      if (m.container_kind === 'cell') return m.container_id != null && inCells(m.container_id);
+      if (m.container_kind === 'node') return m.container_id != null && inNodes(m.container_id);
+      return false;
+    }
     if (m.atom_type !== 'task') return false;
     if (m.kind === 'kanban') return m.container_id != null && filteredKbColIds.has(m.container_id);
     if (m.kind === 'checklist')
@@ -587,25 +591,20 @@ export async function exportSubtree(
     // den Kalender.
     return false;
   });
-  const filteredTaskIds = new Set(filteredManifestations.map((m) => m.atom_id));
+  const filteredTaskIds = new Set(
+    filteredManifestations.filter((m) => m.atom_type === 'task').map((m) => m.atom_id),
+  );
   const filteredTasks = all.tasks.filter((t) => filteredTaskIds.has(t.id));
   const filteredLinks = all.links.filter((l) => inNodes(l.board_id));
-  // Welle D: Doc-Subtree-Filter via atom_pins. Doc wandert mit, wenn
-  // mind. ein cell-Pin im Subtree liegt.
+  // WV.WV.1: Doc-Subtree-Filter aus den pinned-Manifestations ableiten.
+  // Eine Doku wandert mit, wenn mind. ein cell-Pin im Subtree liegt.
   const docIdsInSubtree = new Set<string>();
-  for (const pin of all.atom_pins) {
-    if (pin.atom_type === 'doc' && pin.parent_kind === 'cell' && inCells(pin.parent_id)) {
-      docIdsInSubtree.add(pin.atom_id);
+  for (const m of filteredManifestations) {
+    if (m.kind === 'pinned' && m.atom_type === 'doc' && m.container_kind === 'cell') {
+      docIdsInSubtree.add(m.atom_id);
     }
   }
   const filteredDocs = all.docs.filter((d) => docIdsInSubtree.has(d.id));
-  const filteredAtomPins = all.atom_pins.filter(
-    (pin) =>
-      pin.atom_type === 'doc' &&
-      pin.parent_kind === 'cell' &&
-      docIdsInSubtree.has(pin.atom_id) &&
-      inCells(pin.parent_id),
-  );
 
   // Welle D — atom_tags-Subtree-Filter. Tag-Owner = Atom; ein Tag
   // wandert nur mit, wenn der Owner-Atom im Subtree liegt. Owner-Atome:
@@ -665,7 +664,6 @@ export async function exportSubtree(
     checklist_items: filteredChecklistItems as unknown as Record<string, unknown>[],
     links: filteredLinks as unknown as Record<string, unknown>[],
     docs: filteredDocs as unknown as Record<string, unknown>[],
-    atom_pins: filteredAtomPins as unknown as Record<string, unknown>[],
     workspace_tags: filteredWorkspaceTags as unknown as Record<string, unknown>[],
     atom_tags: filteredAtomTags as unknown as Record<string, unknown>[],
     objects: filteredObjects as unknown as Record<string, unknown>[],
@@ -745,30 +743,21 @@ export async function exportCellSubtree(
     filteredChecklistIds.has(it.checklist_id),
   );
   const filteredLinks = all.links.filter((l) => inNodes(l.board_id));
-  // Welle D: Doc-Subtree-Filter via atom_pins. Doc wandert mit, wenn
-  // mind. ein cell-Pin auf cellId selbst ODER auf eine Cell im Sub-
-  // baum zeigt.
-  const docIdsInSubtreeCell = new Set<string>();
-  for (const pin of all.atom_pins) {
-    if (
-      pin.atom_type === 'doc' &&
-      pin.parent_kind === 'cell' &&
-      (pin.parent_id === cellId || inCells(pin.parent_id))
-    ) {
-      docIdsInSubtreeCell.add(pin.atom_id);
-    }
-  }
-  const filteredDocs = all.docs.filter((d) => docIdsInSubtreeCell.has(d.id));
-  const filteredAtomPinsCell = all.atom_pins.filter(
-    (pin) =>
-      pin.atom_type === 'doc' &&
-      pin.parent_kind === 'cell' &&
-      (pin.parent_id === cellId || inCells(pin.parent_id)),
-  );
 
   // Phase 4 T.1.I + Q.2: Task-Layer-Subtree-Filter (analog exportSubtree).
+  // WV.WV.1: pinned-Manifestations am Subtree (container_kind='cell' mit
+  // cellId selbst oder Cell im Subtree, container_kind='node' mit node
+  // im Subtree) wandern mit. atom-Pins (container_kind='atom') bleiben
+  // workspace-global.
   const filteredKbColIdsCell = new Set(filteredKbCols.map((k) => k.id));
   const filteredManifestationsCell = all.atom_manifestations.filter((m) => {
+    if (m.kind === 'pinned') {
+      if (m.container_kind === 'cell') {
+        return m.container_id != null && (m.container_id === cellId || inCells(m.container_id));
+      }
+      if (m.container_kind === 'node') return m.container_id != null && inNodes(m.container_id);
+      return false;
+    }
     if (m.atom_type !== 'task') return false;
     if (m.kind === 'kanban')
       return m.container_id != null && filteredKbColIdsCell.has(m.container_id);
@@ -776,8 +765,18 @@ export async function exportCellSubtree(
       return m.container_id != null && filteredChecklistIds.has(m.container_id);
     return false;
   });
-  const filteredTaskIdsCell = new Set(filteredManifestationsCell.map((m) => m.atom_id));
+  const filteredTaskIdsCell = new Set(
+    filteredManifestationsCell.filter((m) => m.atom_type === 'task').map((m) => m.atom_id),
+  );
   const filteredTasksCell = all.tasks.filter((t) => filteredTaskIdsCell.has(t.id));
+  // WV.WV.1: Doc-Subtree-Filter aus pinned-Manifestations.
+  const docIdsInSubtreeCell = new Set<string>();
+  for (const m of filteredManifestationsCell) {
+    if (m.kind === 'pinned' && m.atom_type === 'doc' && m.container_kind === 'cell') {
+      docIdsInSubtreeCell.add(m.atom_id);
+    }
+  }
+  const filteredDocs = all.docs.filter((d) => docIdsInSubtreeCell.has(d.id));
 
   // Welle D — atom_tags + workspace_tags fuer Cell-Subtree (analog
   // exportSubtree, aber mit den Cell-Subtree-Owner-Sets).
@@ -809,7 +808,6 @@ export async function exportCellSubtree(
     checklist_items: filteredChecklistItems as unknown as Record<string, unknown>[],
     links: filteredLinks as unknown as Record<string, unknown>[],
     docs: filteredDocs as unknown as Record<string, unknown>[],
-    atom_pins: filteredAtomPinsCell as unknown as Record<string, unknown>[],
     workspace_tags: filteredWorkspaceTagsCell as unknown as Record<string, unknown>[],
     atom_tags: filteredAtomTagsCell as unknown as Record<string, unknown>[],
     tasks: filteredTasksCell as unknown as Record<string, unknown>[],

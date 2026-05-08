@@ -8,6 +8,7 @@ import {
   createSignal,
   onCleanup,
 } from 'solid-js';
+import type { AtomManifestationRow } from '../lib/atom-manifestations';
 import { useBoardUi } from '../lib/board-ui-state';
 import { showConfirm, showPrompt } from '../lib/dialog';
 import { openDokuForContext, shouldIgnoreDKey } from '../lib/docs-open';
@@ -46,7 +47,6 @@ import { isCardDone, isRecurCard, todayIso, toggleOccurrence } from '../lib/recu
 import { useVis } from '../lib/settings';
 import { showToast, showUndoToast } from '../lib/toasts';
 import type {
-  AtomPin,
   AtomTagWithTag,
   BoardContent,
   CellRow,
@@ -88,10 +88,11 @@ type Props = {
   // Phase 4 T.1.G.2.C: Workspace-weite Manifestations fuer Cross-View-
   // Drop-Idempotenz (Move-vs-Add-Detect).
   wsManifestations?: TaskManifestationRow[];
-  // Welle D.9: Atom-Pins fuer DocsIndicator-Render auf Kanban-Cards.
-  // Liest atom_pins WHERE atom_type='doc' AND parent_kind='atom' AND
-  // parent_id=card.atom_id (Task-Atoms sind die Karten selbst).
-  wsAtomPins?: AtomPin[];
+  // Welle D.9 + WV.WV.1: Pinned-Manifestations fuer DocsIndicator-Render
+  // auf Kanban-Cards. Liest atom_manifestations WHERE kind='pinned' AND
+  // atom_type='doc' AND container_kind='atom' AND container_id=card.atom_id
+  // (Task-Atoms sind die Karten selbst).
+  wsAtomPins?: AtomManifestationRow[];
   // Welle D.9: Doc-Rows fuer AtomDocsSection im CardOverlay (Title +
   // Vorschau-Snippet). Pure Daten; werden ueber Workspace-Resource gefuettert.
   wsDocs?: DocRow[];
@@ -194,28 +195,31 @@ function sortComparator(
 const BoardView: Component<Props> = (p) => {
   const viewerActive = useViewerActive();
 
-  // Welle D.9: doc-Pin-Count pro Task-Atom (card.id = task.id). Card-Map
-  // einmal aus atom_pins berechnen, dann in der Render-Schleife O(1)-Lookup.
+  // Welle D.9 + WV.WV.1: doc-Pin-Count pro Task-Atom (card.id = task.id).
+  // Card-Map einmal aus pinned-Manifestations berechnen, dann in der
+  // Render-Schleife O(1)-Lookup.
   const docPinCountByCard = createMemo<Map<string, number>>(() => {
     const map = new Map<string, number>();
     for (const pin of p.wsAtomPins ?? []) {
       if (pin.atom_type !== 'doc') continue;
-      if (pin.parent_kind !== 'atom') continue;
-      map.set(pin.parent_id, (map.get(pin.parent_id) ?? 0) + 1);
+      if (pin.container_kind !== 'atom') continue;
+      if (pin.container_id == null) continue;
+      map.set(pin.container_id, (map.get(pin.container_id) ?? 0) + 1);
     }
     return map;
   });
 
-  // Welle D.9: Erste gepinnte Doc-ID pro Task — wird beim DocsIndicator-
-  // Click direkt geoeffnet (statt Detail-Modal-Umweg). Mehrere Docs
-  // werden im Doc-Popup-Tab-Switcher sichtbar.
+  // Welle D.9 + WV.WV.1: Erste gepinnte Doc-ID pro Task — wird beim
+  // DocsIndicator-Click direkt geoeffnet (statt Detail-Modal-Umweg).
+  // Mehrere Docs werden im Doc-Popup-Tab-Switcher sichtbar.
   const firstDocIdByCard = createMemo<Map<string, string>>(() => {
     const map = new Map<string, string>();
     for (const pin of p.wsAtomPins ?? []) {
       if (pin.atom_type !== 'doc') continue;
-      if (pin.parent_kind !== 'atom') continue;
-      if (map.has(pin.parent_id)) continue;
-      map.set(pin.parent_id, pin.atom_id);
+      if (pin.container_kind !== 'atom') continue;
+      if (pin.container_id == null) continue;
+      if (map.has(pin.container_id)) continue;
+      map.set(pin.container_id, pin.atom_id);
     }
     return map;
   });

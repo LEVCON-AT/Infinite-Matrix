@@ -1,3 +1,4 @@
+import type { AtomManifestationRow } from './atom-manifestations';
 import { isNetworkError } from './mutation-queue';
 import { getById, getByWorkspace, mergeRows, withCache } from './offline-cache';
 import { markCacheFallback, markLiveSuccess } from './offline-state';
@@ -693,18 +694,20 @@ export async function fetchCellExistingTemplates(
       })(),
     );
   }
-  // Doku: prueft NICHT cell.features (Doku haengt ueber atom_pins, kein
-  // Feature-Flag in cells.features). Welle D: Lookup geht ueber
-  // atom_pins(parent_kind='cell',parent_id=cell.id,atom_type='doc') →
+  // Doku: prueft NICHT cell.features (Doku haengt ueber Pinned-
+  // Manifestation, kein Feature-Flag in cells.features). WV.WV.1:
+  // Lookup geht ueber atom_manifestations(kind='pinned',
+  // container_kind='cell',container_id=cell.id,atom_type='doc') →
   // docs.id-Set, dann juengstes Doc.
   tasks.push(
     (async () => {
       const pinsRes = await supabase
-        .from('atom_pins')
+        .from('atom_manifestations')
         .select('atom_id')
         .eq('workspace_id', workspaceId)
-        .eq('parent_kind', 'cell')
-        .eq('parent_id', cell.id)
+        .eq('kind', 'pinned')
+        .eq('container_kind', 'cell')
+        .eq('container_id', cell.id)
         .eq('atom_type', 'doc');
       const docIds = ((pinsRes.data ?? []) as Array<{ atom_id: string }>).map((p) => p.atom_id);
       if (docIds.length === 0) return;
@@ -1100,17 +1103,18 @@ export async function fetchDocById(docId: string, workspaceId: string): Promise<
 
 // Alle Dokus, die an eine bestimmte Zelle angeheftet sind. Fuer die
 // Cell-Info/Checklists-Pages — zeigt dem User "welche Dokus liegen
-// hier". Welle D: Lookup ueber atom_pins (parent_kind='cell',
-// parent_id=cellId, atom_type='doc'). Sort nach updated_at DESC
-// (zuletzt geaenderte zuerst).
+// hier". WV.WV.1: Lookup ueber atom_manifestations(kind='pinned',
+// container_kind='cell', container_id=cellId, atom_type='doc'). Sort
+// nach updated_at DESC (zuletzt geaenderte zuerst).
 export async function fetchDocsForCell(cellId: string, workspaceId: string): Promise<DocRow[]> {
   try {
     const pinsRes = await supabase
-      .from('atom_pins')
+      .from('atom_manifestations')
       .select('atom_id')
       .eq('workspace_id', workspaceId)
-      .eq('parent_kind', 'cell')
-      .eq('parent_id', cellId)
+      .eq('kind', 'pinned')
+      .eq('container_kind', 'cell')
+      .eq('container_id', cellId)
       .eq('atom_type', 'doc');
     if (pinsRes.error) throw pinsRes.error;
     const docIds = (pinsRes.data ?? []).map((p: { atom_id: string }) => p.atom_id);
@@ -1131,19 +1135,18 @@ export async function fetchDocsForCell(cellId: string, workspaceId: string): Pro
     return rows;
   } catch (err) {
     if (!isNetworkError(err)) throw err;
-    // Offline-Fallback: aus IDB-Cache atom_pins lesen + docs joinen.
-    const pins = await getByWorkspace<{
-      id: string;
-      workspace_id: string;
-      atom_type: string;
-      atom_id: string;
-      parent_kind: string;
-      parent_id: string;
-    }>('atom_pins', workspaceId);
+    // Offline-Fallback: aus IDB-Cache atom_manifestations lesen + docs joinen.
+    const manifs = await getByWorkspace<AtomManifestationRow>('atom_manifestations', workspaceId);
     const docIds = new Set(
-      pins
-        .filter((p) => p.parent_kind === 'cell' && p.parent_id === cellId && p.atom_type === 'doc')
-        .map((p) => p.atom_id),
+      manifs
+        .filter(
+          (m) =>
+            m.kind === 'pinned' &&
+            m.container_kind === 'cell' &&
+            m.container_id === cellId &&
+            m.atom_type === 'doc',
+        )
+        .map((m) => m.atom_id),
     );
     const all = await getByWorkspace<DocRow>('docs', workspaceId);
     markCacheFallback();
@@ -1318,17 +1321,18 @@ export async function fetchWorkspaceLinks(workspaceId: string): Promise<LinkRow[
   });
 }
 
-// Alle Dokus, die irgendwo gepinnt sind (parent_kind='cell'|'atom'|'node').
-// Welle D.9 — vorher cell-only, jetzt alle Pin-Kinds, weil Sidebar-Tree
-// (cell-pin), NodeDocsButton (node-pin) und AtomDocsSection (atom-pin)
-// den gleichen Doc-Cache teilen. Filterung pro Konsument client-seitig
-// via wsAtomPins.
+// Alle Dokus, die irgendwo gepinnt sind (container_kind='cell'|'atom'|
+// 'node'). Welle D.9 — vorher cell-only, jetzt alle Pin-Kinds, weil
+// Sidebar-Tree (cell-pin), NodeDocsButton (node-pin) und
+// AtomDocsSection (atom-pin) den gleichen Doc-Cache teilen. Filterung
+// pro Konsument client-seitig via wsAtomManifestations.
 export async function fetchWorkspacePinnedDocs(workspaceId: string): Promise<DocRow[]> {
   try {
     const pinsRes = await supabase
-      .from('atom_pins')
+      .from('atom_manifestations')
       .select('atom_id')
       .eq('workspace_id', workspaceId)
+      .eq('kind', 'pinned')
       .eq('atom_type', 'doc');
     if (pinsRes.error) throw pinsRes.error;
     const docIds = Array.from(
@@ -1351,14 +1355,10 @@ export async function fetchWorkspacePinnedDocs(workspaceId: string): Promise<Doc
     return rows;
   } catch (err) {
     if (!isNetworkError(err)) throw err;
-    const pins = await getByWorkspace<{
-      id: string;
-      workspace_id: string;
-      atom_type: string;
-      atom_id: string;
-      parent_kind: string;
-    }>('atom_pins', workspaceId);
-    const docIds = new Set(pins.filter((p) => p.atom_type === 'doc').map((p) => p.atom_id));
+    const manifs = await getByWorkspace<AtomManifestationRow>('atom_manifestations', workspaceId);
+    const docIds = new Set(
+      manifs.filter((m) => m.kind === 'pinned' && m.atom_type === 'doc').map((m) => m.atom_id),
+    );
     const all = await getByWorkspace<DocRow>('docs', workspaceId);
     markCacheFallback();
     return all
@@ -1376,64 +1376,66 @@ export async function fetchAttachedCellIdForDoc(
 ): Promise<string | null> {
   try {
     const { data, error } = await supabase
-      .from('atom_pins')
-      .select('parent_id')
+      .from('atom_manifestations')
+      .select('container_id')
       .eq('workspace_id', workspaceId)
+      .eq('kind', 'pinned')
       .eq('atom_type', 'doc')
       .eq('atom_id', docId)
-      .eq('parent_kind', 'cell')
+      .eq('container_kind', 'cell')
       .limit(1)
       .maybeSingle();
     if (error) throw error;
     markLiveSuccess();
-    return ((data as { parent_id?: string } | null) ?? null)?.parent_id ?? null;
+    return ((data as { container_id?: string } | null) ?? null)?.container_id ?? null;
   } catch (err) {
     if (!isNetworkError(err)) throw err;
-    const pins = await getByWorkspace<{
-      id: string;
-      workspace_id: string;
-      atom_type: string;
-      atom_id: string;
-      parent_kind: string;
-      parent_id: string;
-    }>('atom_pins', workspaceId);
+    const manifs = await getByWorkspace<AtomManifestationRow>('atom_manifestations', workspaceId);
     markCacheFallback();
-    const hit = pins.find(
-      (p) => p.atom_type === 'doc' && p.atom_id === docId && p.parent_kind === 'cell',
+    const hit = manifs.find(
+      (m) =>
+        m.kind === 'pinned' &&
+        m.atom_type === 'doc' &&
+        m.atom_id === docId &&
+        m.container_kind === 'cell',
     );
-    return hit?.parent_id ?? null;
+    return hit?.container_id ?? null;
   }
 }
 
 // Set der cell_ids, an denen mindestens eine Doku gepinnt ist. Fuer die
-// lazy Doku-Pill in der Matrix-Ansicht. Welle D: Lookup ueber atom_pins.
+// lazy Doku-Pill in der Matrix-Ansicht. WV.WV.1: Lookup ueber
+// atom_manifestations(kind='pinned', container_kind='cell',
+// atom_type='doc').
 export async function fetchCellIdsWithDocs(workspaceId: string): Promise<Set<string>> {
   try {
     const { data, error } = await supabase
-      .from('atom_pins')
-      .select('parent_id')
+      .from('atom_manifestations')
+      .select('container_id')
       .eq('workspace_id', workspaceId)
-      .eq('parent_kind', 'cell')
+      .eq('kind', 'pinned')
+      .eq('container_kind', 'cell')
       .eq('atom_type', 'doc');
     if (error) throw error;
     const set = new Set<string>();
-    for (const row of (data ?? []) as Array<{ parent_id: string }>) {
-      if (row.parent_id) set.add(row.parent_id);
+    for (const row of (data ?? []) as Array<{ container_id: string }>) {
+      if (row.container_id) set.add(row.container_id);
     }
     markLiveSuccess();
     return set;
   } catch (err) {
     if (!isNetworkError(err)) throw err;
-    const pins = await getByWorkspace<{
-      id: string;
-      workspace_id: string;
-      atom_type: string;
-      parent_kind: string;
-      parent_id: string;
-    }>('atom_pins', workspaceId);
+    const manifs = await getByWorkspace<AtomManifestationRow>('atom_manifestations', workspaceId);
     const set = new Set<string>();
-    for (const p of pins) {
-      if (p.atom_type === 'doc' && p.parent_kind === 'cell') set.add(p.parent_id);
+    for (const m of manifs) {
+      if (
+        m.kind === 'pinned' &&
+        m.atom_type === 'doc' &&
+        m.container_kind === 'cell' &&
+        m.container_id
+      ) {
+        set.add(m.container_id);
+      }
     }
     markCacheFallback();
     return set;

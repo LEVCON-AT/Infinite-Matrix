@@ -78,10 +78,9 @@ const TABLES = [
   'external_events',
   // Welle N — In-App-Notifications. Self-only RLS, workspace_id-Index.
   'notifications',
-  // Welle D — Atom-Pin + Tag-System. atom_pins ist die generische
-  // Atom→Parent-Pin-Relation (loest docs.attached_cell_id ab).
-  // workspace_tags ist die Tag-Registry; atom_tags die Junction.
-  'atom_pins',
+  // Welle D — Tag-System. workspace_tags ist die Tag-Registry;
+  // atom_tags die Junction. (atom_pins seit WV.WV.1 in
+  // atom_manifestations(kind='pinned') konsolidiert — Migration 066.)
   'workspace_tags',
   'atom_tags',
 ] as const;
@@ -113,7 +112,6 @@ interface MatrixCacheSchema extends DBSchema {
   external_calendars: StoreDef;
   external_events: StoreDef;
   notifications: StoreDef;
-  atom_pins: StoreDef;
   workspace_tags: StoreDef;
   atom_tags: StoreDef;
 }
@@ -136,8 +134,17 @@ const DB_NAME = 'matrix-cache';
 // Relation + globales Tag-System. docs.attached_cell_id wurde dabei
 // gedroppt (Migration 063), aber der `docs`-Store traegt das eh nicht
 // strukturell — die Spalte verschwindet einfach aus den Row-Keys.
-const DB_VERSION = 11;
-const OBSOLETE_STORES = ['kb_cards', 'checklist_items', 'task_manifestations'] as const;
+// V12 (WV.WV.1): atom_pins-Konsolidierung in atom_manifestations
+// (Migration 066). atom_pins-Store wird obsolet — atom_manifestations
+// haelt jetzt auch kind='pinned'-Rows mit container_kind ∈ {cell, atom,
+// node}. workspace_tags + atom_tags bleiben unveraendert.
+const DB_VERSION = 12;
+const OBSOLETE_STORES = [
+  'kb_cards',
+  'checklist_items',
+  'task_manifestations',
+  'atom_pins',
+] as const;
 
 let dbPromise: Promise<IDBPDatabase<MatrixCacheSchema>> | null = null;
 

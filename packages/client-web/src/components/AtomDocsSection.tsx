@@ -12,17 +12,17 @@
 // gekuerzt (read-only, kein dompurify-roundtrip noetig).
 
 import { type Component, For, Show } from 'solid-js';
-import type { AtomKind } from '../lib/atom-manifestations';
+import type { AtomKind, AtomManifestationRow } from '../lib/atom-manifestations';
 import { openDokuForContext } from '../lib/docs-open';
 import { openDocsPopup } from '../lib/docs-ui';
-import type { AtomPin, DocRow } from '../lib/types';
+import type { DocRow } from '../lib/types';
 import Icon from './Icon';
 
 export type AtomDocsSectionProps = {
   atomType: AtomKind;
   atomId: string;
   atomTitle: string | null;
-  atomPins: AtomPin[];
+  atomPins: AtomManifestationRow[];
   docs: DocRow[];
 };
 
@@ -50,7 +50,10 @@ const AtomDocsSection: Component<AtomDocsSectionProps> = (p) => {
       p.atomPins
         .filter(
           (pin) =>
-            pin.atom_type === 'doc' && pin.parent_kind === 'atom' && pin.parent_id === p.atomId,
+            pin.kind === 'pinned' &&
+            pin.atom_type === 'doc' &&
+            pin.container_kind === 'atom' &&
+            pin.container_id === p.atomId,
         )
         .map((pin) => pin.atom_id),
     );

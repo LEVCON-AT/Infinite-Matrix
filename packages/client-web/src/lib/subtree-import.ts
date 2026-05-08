@@ -564,29 +564,32 @@ export async function clearCellChecklistsData(cellId: string): Promise<void> {
   }
 }
 
-// Loescht Docs die an cellId gepinnt sind. Welle D: Lookup ueber
-// atom_pins (parent_kind='cell',atom_type='doc'), dann Doc-Delete.
-// Multi-Pin: ein Doc das auch an andere Cells haengt verschwindet
-// nicht — nur sein Pin auf cellId. Das passiert automatisch beim
-// Cell-Delete via Cascade-Trigger auf atom_pins, hier brauchen wir
-// nur den Doc-Delete fuer Single-Cell-Docs.
+// Loescht Docs die an cellId gepinnt sind. WV.WV.1: Lookup ueber
+// atom_manifestations (kind='pinned', container_kind='cell',
+// atom_type='doc'), dann Doc-Delete. Multi-Pin: ein Doc das auch an
+// andere Cells haengt verschwindet nicht — nur sein Pin auf cellId.
+// Das passiert automatisch beim Cell-Delete via Cascade-Trigger auf
+// atom_manifestations (Migration 066:_atom_manif_purge_for_cell),
+// hier brauchen wir nur den Doc-Delete fuer Single-Cell-Docs.
 async function clearCellDocs(cellId: string): Promise<void> {
   // Pins finden
   const { data: pins, error: pinsErr } = await supabase
-    .from('atom_pins')
+    .from('atom_manifestations')
     .select('atom_id')
-    .eq('parent_kind', 'cell')
-    .eq('parent_id', cellId)
+    .eq('kind', 'pinned')
+    .eq('container_kind', 'cell')
+    .eq('container_id', cellId)
     .eq('atom_type', 'doc');
   if (pinsErr) throw pinsErr;
   const docIds = ((pins ?? []) as Array<{ atom_id: string }>).map((p) => p.atom_id);
   if (docIds.length === 0) return;
   // Pins purgen
   const { error: delPinErr } = await supabase
-    .from('atom_pins')
+    .from('atom_manifestations')
     .delete()
-    .eq('parent_kind', 'cell')
-    .eq('parent_id', cellId)
+    .eq('kind', 'pinned')
+    .eq('container_kind', 'cell')
+    .eq('container_id', cellId)
     .eq('atom_type', 'doc');
   if (delPinErr) throw delPinErr;
   // Docs purgen
@@ -747,28 +750,34 @@ export async function clearMatrixContents(matrixId: string): Promise<void> {
   await cleanupTasksForCellIds(cellIds);
 
   if (cellIds.length > 0) {
-    // Welle D: Doc-an-Cell-Pin lebt in atom_pins. Erst Pin-Lookup,
-    // dann Pins+Docs purgen. Multi-Pin-Docs verlieren nur ihre Cell-
-    // Pins, die Doc bleibt erhalten wenn weitere Pins existieren.
+    // WV.WV.1: Doc-an-Cell-Pin lebt in atom_manifestations(kind='pinned').
+    // Erst Pin-Lookup, dann Pins+Docs purgen. Multi-Pin-Docs verlieren
+    // nur ihre Cell-Pins, die Doc bleibt erhalten wenn weitere Pins
+    // existieren.
     const { data: pinsToDel, error: pinsErr } = await supabase
-      .from('atom_pins')
+      .from('atom_manifestations')
       .select('id, atom_id')
-      .eq('parent_kind', 'cell')
+      .eq('kind', 'pinned')
+      .eq('container_kind', 'cell')
       .eq('atom_type', 'doc')
-      .in('parent_id', cellIds);
+      .in('container_id', cellIds);
     if (pinsErr) throw pinsErr;
     const pinRows = (pinsToDel ?? []) as Array<{ id: string; atom_id: string }>;
     if (pinRows.length > 0) {
       const docIds = pinRows.map((p) => p.atom_id);
       const pinIds = pinRows.map((p) => p.id);
-      const { error: delPinErr } = await supabase.from('atom_pins').delete().in('id', pinIds);
+      const { error: delPinErr } = await supabase
+        .from('atom_manifestations')
+        .delete()
+        .in('id', pinIds);
       if (delPinErr) throw delPinErr;
-      // Welle D: Single-Pin-Docs purgen wir vollstaendig (Behavior wie
-      // pre-Welle-D). Multi-Pin-Docs (die auch an anderen Cells haengen)
-      // wollen wir nicht killen — pruefen via verbleibende atom_pins.
+      // Single-Pin-Docs purgen wir vollstaendig. Multi-Pin-Docs (die
+      // auch an anderen Containern haengen) wollen wir nicht killen —
+      // pruefen via verbleibende kind='pinned'-Manifestations.
       const { data: remaining, error: remErr } = await supabase
-        .from('atom_pins')
+        .from('atom_manifestations')
         .select('atom_id')
+        .eq('kind', 'pinned')
         .eq('atom_type', 'doc')
         .in('atom_id', docIds);
       if (remErr) throw remErr;
@@ -1130,23 +1139,29 @@ export async function executeSubtreeImportIntoCell(args: {
     );
   });
 
-  // Welle D: atom_pins aus payload (V1-Exporte) plus legacy-rekonstruierte
-  // Pins (V0-Exporte). Wir filtern auf doc-Pins; Tag-Junctions kommen
-  // mit eigenem Schema spaeter (V3 import-Erweiterung).
+  // WV.WV.1: Doc-Pins werden als atom_manifestations(kind='pinned')
+  // angelegt. Drei Quellen: legacy-rekonstruierte Pins aus
+  // docs.attached_cell_id (V0), payload.atom_pins (V1, atom_pins-Tabelle
+  // war Welle D), payload.atom_manifestations mit kind='pinned' (V2,
+  // post-Migration 066). Backward-Compat-Read fuer alle Pfade.
   const atomPinsOut: Array<Record<string, unknown>> = [];
-  // Legacy-Pfad: Doc→Cell-Pins aus docPinTargets.
+  // V0/V1 Legacy: Doc→Cell-Pins aus docPinTargets (rekonstruiert aus
+  // docs.attached_cell_id oder aus payload.atom_pins V1-Block).
   for (const [docId, cellId] of docPinTargets.entries()) {
     atomPinsOut.push({
       id: newUuid(),
       atom_type: 'doc',
       atom_id: docId,
       workspace_id: workspaceId,
-      parent_kind: 'cell',
-      parent_id: cellId,
+      kind: 'pinned',
+      container_kind: 'cell',
+      container_id: cellId,
       position: 0,
+      level: null,
+      display_meta: {},
     });
   }
-  // V1-Pfad: payload.atom_pins remappen falls vorhanden.
+  // V1-Pfad: payload.atom_pins remappen falls vorhanden (alte Exports).
   if (Array.isArray((payload as Record<string, unknown>).atom_pins)) {
     for (const raw of (payload as { atom_pins: Array<Record<string, unknown>> }).atom_pins) {
       const r = raw as {
@@ -1174,9 +1189,12 @@ export async function executeSubtreeImportIntoCell(args: {
         atom_type: 'doc',
         atom_id: newDocId,
         workspace_id: workspaceId,
-        parent_kind: 'cell',
-        parent_id: newCellId,
+        kind: 'pinned',
+        container_kind: 'cell',
+        container_id: newCellId,
         position: r.position ?? 0,
+        level: null,
+        display_meta: {},
       });
     }
   }
@@ -1317,7 +1335,7 @@ export async function executeSubtreeImportIntoCell(args: {
     await insertBatch('docs', docsOut);
     if (atomPinsOut.length > 0) {
       step('Doku-Pins einfuegen…');
-      await insertBatch('atom_pins', atomPinsOut);
+      await insertBatch('atom_manifestations', atomPinsOut);
     }
     if (workspaceTagsOut.length > 0) {
       step('Tag-Registry einfuegen…');
@@ -1577,9 +1595,10 @@ async function executeCellContainerMerge(args: {
     }
   }
 
-  // 3. Docs aus dem Payload auf die Ziel-Zelle umhaengen. Welle D:
-  // Doc-Row + atom_pin getrennt — Doc-Row hat keine attached_cell_id
-  // mehr, der Pin lebt in atom_pins(parent_kind='cell').
+  // 3. Docs aus dem Payload auf die Ziel-Zelle umhaengen. WV.WV.1:
+  // Doc-Row + atom_manifestations(kind='pinned') getrennt — Doc-Row
+  // hat keine attached_cell_id mehr, der Pin lebt in
+  // atom_manifestations(kind='pinned', container_kind='cell').
   step?.('Dokus mergen…');
   if (payload.docs.length > 0) {
     const aliasMap = await reserveAliases(
@@ -1606,9 +1625,12 @@ async function executeCellContainerMerge(args: {
         atom_type: 'doc',
         atom_id: newDocId,
         workspace_id: workspaceId,
-        parent_kind: 'cell',
-        parent_id: targetCellId,
+        kind: 'pinned',
+        container_kind: 'cell',
+        container_id: targetCellId,
         position: 0,
+        level: null,
+        display_meta: {},
       };
       return { doc, pin };
     });
@@ -1617,7 +1639,7 @@ async function executeCellContainerMerge(args: {
       pairs.map((p) => p.doc),
     );
     await insertBatch(
-      'atom_pins',
+      'atom_manifestations',
       pairs.map((p) => p.pin),
     );
   }
@@ -2139,9 +2161,12 @@ export async function executeSubtreeImportIntoMatrix(args: {
       atom_type: 'doc',
       atom_id: docId,
       workspace_id: workspaceId,
-      parent_kind: 'cell',
-      parent_id: cellId,
+      kind: 'pinned',
+      container_kind: 'cell',
+      container_id: cellId,
       position: 0,
+      level: null,
+      display_meta: {},
     });
   }
   // V1-Pfad: payload.atom_pins remappen falls vorhanden.
@@ -2167,9 +2192,12 @@ export async function executeSubtreeImportIntoMatrix(args: {
         atom_type: 'doc',
         atom_id: newDocId,
         workspace_id: workspaceId,
-        parent_kind: 'cell',
-        parent_id: newCellId,
+        kind: 'pinned',
+        container_kind: 'cell',
+        container_id: newCellId,
         position: r.position ?? 0,
+        level: null,
+        display_meta: {},
       });
     }
   }
@@ -2280,7 +2308,7 @@ export async function executeSubtreeImportIntoMatrix(args: {
     await insertBatch('docs', docsOut);
     if (atomPinsOutMatrix.length > 0) {
       step('Doku-Pins einfuegen…');
-      await insertBatch('atom_pins', atomPinsOutMatrix);
+      await insertBatch('atom_manifestations', atomPinsOutMatrix);
     }
     if (workspaceTagsOutMatrix.length > 0) {
       step('Tag-Registry einfuegen…');

@@ -361,24 +361,11 @@ export type DocRow = {
   updated_at: string;
 };
 
-// ─── Welle D — Atom-Pin + Tag-System ──────────────────────────
-// atom_pins ist die generische Atom→Parent-Pin-Relation. Loest
-// docs.attached_cell_id ab und erweitert auf alle Atom-Typen +
-// Parent-Kinds. Eine Doku kann an Cell, Atom oder Node (matrix/board)
-// gepinnt sein. parent_kind='manifestation' ist V2-deferred.
-export type AtomParentKind = 'cell' | 'atom' | 'node' | 'manifestation';
-
-export type AtomPin = {
-  id: string;
-  atom_type: 'task' | 'link' | 'doc' | 'checklist' | 'imported_event';
-  atom_id: string;
-  workspace_id: string;
-  parent_kind: AtomParentKind;
-  parent_id: string;
-  position: number;
-  created_at: string;
-};
-
+// ─── Welle D — Tag-System ─────────────────────────────────────
+// (Atom-Pins sind seit WV.WV.1 in atom_manifestations(kind='pinned')
+// konsolidiert — siehe lib/atom-manifestations.ts AtomContainerKind +
+// createAtomPin/deleteAtomPin/moveAtomPin/pinDocWithCreate.)
+//
 // Vier Tag-Kinds:
 // - freetext: User tippt `#design`, value = canonical-string.
 // - atom_ref: Tag verweist auf konkretes Atom, value = atom_id::text,

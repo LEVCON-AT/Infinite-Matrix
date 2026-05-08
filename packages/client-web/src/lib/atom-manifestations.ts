@@ -18,7 +18,7 @@
 
 import { translateDbError } from './errors';
 import { isNetworkError } from './mutation-queue';
-import { type CacheTable, getById, getByWorkspace, mergeRows } from './offline-cache';
+import { type CacheTable, getById, getByWorkspace, mergeRows, putOne } from './offline-cache';
 import { markCacheFallback, markLiveSuccess } from './offline-state';
 import { runOptimisticDelete, runOptimisticInsert, runOptimisticUpdate } from './safe-mutation';
 import { supabase } from './supabase';
@@ -26,7 +26,13 @@ import { showToast, showUndoToast } from './toasts';
 
 // Welle I: 'imported_event' als 5. atom_type. Source-Tabelle external_events.
 export type AtomKind = 'task' | 'link' | 'doc' | 'checklist' | 'imported_event';
-export type AtomManifestationKind = 'kanban' | 'checklist' | 'calendar' | 'standalone';
+// WV.WV.1: 'pinned' als 5. kind (atom_pins-Konsolidierung, Migration 066).
+export type AtomManifestationKind = 'kanban' | 'checklist' | 'calendar' | 'standalone' | 'pinned';
+
+// WV.WV.1: container_kind fuer kind='pinned' diskriminiert das Container-Target.
+// 'manifestation' war als parent_kind in atom_pins V2-deferred (Migration 064:62-64
+// raised feature_not_supported); im atom_manifestations-Modell faellt es ersatzlos weg.
+export type AtomContainerKind = 'cell' | 'atom' | 'node';
 
 export type AtomManifestationRow = {
   id: string;
@@ -35,6 +41,10 @@ export type AtomManifestationRow = {
   workspace_id: string;
   kind: AtomManifestationKind;
   container_id: string | null;
+  // WV.WV.1: 'cell' | 'atom' | 'node' bei kind='pinned'; NULL sonst (kanban/
+  // checklist haben Container implizit aus kind ableitbar; calendar/standalone
+  // haben keinen Container).
+  container_kind: AtomContainerKind | null;
   position: number;
   level: number | null;
   display_meta: Record<string, unknown>;
@@ -193,23 +203,47 @@ type AddAtomManifInput = {
   atomId: string;
   kind: AtomManifestationKind;
   containerId?: string | null;
+  containerKind?: AtomContainerKind | null;
   position?: number;
   level?: number | null;
   displayMeta?: Record<string, unknown>;
 };
 
 // Container-/Level-Constraint enforced auch hier (Defense-in-Depth vor
-// dem DB-CHECK aus Migration 044): kanban/checklist brauchen
-// container_id, calendar/standalone duerfen keinen haben; level ist
-// strikt an kind='checklist' gebunden.
+// dem DB-CHECK aus Migration 044 + 066): kanban/checklist brauchen
+// container_id (container_kind NULL — implizit aus kind);
+// calendar/standalone keinen Container; pinned braucht container_id +
+// container_kind ∈ {cell, atom, node}. Level ist strikt an
+// kind='checklist' gebunden.
 function validateAtomManifInput(input: AddAtomManifInput): void {
   if (input.kind === 'kanban' || input.kind === 'checklist') {
     if (!input.containerId) {
       throw new Error(`atom_manifestation kind='${input.kind}' braucht containerId`);
     }
+    if (input.containerKind != null) {
+      throw new Error(
+        `atom_manifestation kind='${input.kind}' darf kein containerKind haben (implizit aus kind)`,
+      );
+    }
   } else if (input.kind === 'calendar' || input.kind === 'standalone') {
     if (input.containerId) {
       throw new Error(`atom_manifestation kind='${input.kind}' darf keinen containerId haben`);
+    }
+    if (input.containerKind != null) {
+      throw new Error(`atom_manifestation kind='${input.kind}' darf kein containerKind haben`);
+    }
+  } else if (input.kind === 'pinned') {
+    if (!input.containerId) {
+      throw new Error("atom_manifestation kind='pinned' braucht containerId");
+    }
+    if (
+      input.containerKind !== 'cell' &&
+      input.containerKind !== 'atom' &&
+      input.containerKind !== 'node'
+    ) {
+      throw new Error(
+        "atom_manifestation kind='pinned' braucht containerKind ∈ {cell, atom, node}",
+      );
     }
   }
   if (input.kind === 'checklist') {
@@ -226,6 +260,7 @@ export async function addAtomManifestation(
 ): Promise<AtomManifestationRow> {
   validateAtomManifInput(input);
   const containerId = input.containerId ?? null;
+  const containerKind = input.containerKind ?? null;
   const level = input.level ?? null;
   const displayMeta = input.displayMeta ?? {};
   const position = input.position ?? 0;
@@ -243,6 +278,7 @@ export async function addAtomManifestation(
           workspace_id: input.workspaceId,
           kind: input.kind,
           container_id: containerId,
+          container_kind: containerKind,
           position,
           level,
           display_meta: displayMeta,
@@ -259,6 +295,7 @@ export async function addAtomManifestation(
       workspace_id: input.workspaceId,
       kind: input.kind,
       container_id: containerId,
+      container_kind: containerKind,
       position,
       level,
       display_meta: displayMeta,
@@ -270,6 +307,7 @@ export async function addAtomManifestation(
 export type AtomManifPatch = Partial<{
   display_meta: Record<string, unknown>;
   container_id: string | null;
+  container_kind: AtomContainerKind | null;
   position: number;
   level: number | null;
 }>;
@@ -388,4 +426,301 @@ export async function dropAtomOnDate(args: DropAtomOnDateArgs): Promise<void> {
     console.error('dropAtomOnDate (add):', err);
     showToast(translateDbError(err, 'Eintragen fehlgeschlagen.'), 'error');
   }
+}
+
+// ─── Pinned-Manifestations (WV.WV.1 — atom_pins-Konsolidierung) ──
+// Migration 066 hat atom_pins in atom_manifestations(kind='pinned')
+// ueberfuehrt. Die RPCs (create_atom_pin / delete_atom_pin /
+// move_atom_pin / pin_doc_with_create) bleiben Tool-stable
+// (Bridge-Schema unveraendert). Ihr jsonb-Output traegt die alten
+// parent_kind/parent_id-Keys; das Frontend mappt sie hier auf
+// AtomManifestationRow.container_kind/container_id.
+
+// RPC-Response-Shape (Migration 066:357-365 / :487-495 / :577-585).
+type PinnedRpcRow = {
+  id: string;
+  atom_type: AtomKind;
+  atom_id: string;
+  workspace_id: string;
+  parent_kind: AtomContainerKind;
+  parent_id: string;
+  position: number;
+  created_at: string;
+};
+
+function pinnedRpcToManifestation(row: PinnedRpcRow): AtomManifestationRow {
+  return {
+    id: row.id,
+    atom_type: row.atom_type,
+    atom_id: row.atom_id,
+    workspace_id: row.workspace_id,
+    kind: 'pinned',
+    container_id: row.parent_id,
+    container_kind: row.parent_kind,
+    position: row.position,
+    level: null,
+    display_meta: {},
+    created_at: row.created_at,
+  };
+}
+
+// Filter-Helper auf einer atom_manifestations-Liste (typisch der
+// IDB-Cache aus Workspace.tsx). Pendant zu den vormaligen
+// filterPinsForParent / filterPinsForAtom aus dem urspruenglichen
+// lib/atom-pins.ts (entfaellt mit WV.WV.1).
+export function filterPinnedForContainer(
+  manifs: AtomManifestationRow[],
+  containerKind: AtomContainerKind,
+  containerId: string,
+): AtomManifestationRow[] {
+  return manifs.filter(
+    (m) =>
+      m.kind === 'pinned' && m.container_kind === containerKind && m.container_id === containerId,
+  );
+}
+
+export function filterPinnedForAtom(
+  manifs: AtomManifestationRow[],
+  atomType: AtomKind,
+  atomId: string,
+): AtomManifestationRow[] {
+  return manifs.filter(
+    (m) => m.kind === 'pinned' && m.atom_type === atomType && m.atom_id === atomId,
+  );
+}
+
+// ─── Pin-CRUD ─────────────────────────────────────────────────
+// RPC im Live-Pfad (atomare parent-existence + can_write_workspace-
+// Checks); direkter atom_manifestations-INSERT im Replay-Pfad (RLS
+// uebernimmt die Pruefung). Pattern aus lib/safe-mutation.ts.
+
+export async function createAtomPin(args: {
+  workspaceId: string;
+  atomType: AtomKind;
+  atomId: string;
+  containerKind: AtomContainerKind;
+  containerId: string;
+  position?: number;
+}): Promise<AtomManifestationRow> {
+  return runOptimisticInsert<AtomManifestationRow>({
+    table: ATOM_MANIF_TABLE,
+    workspaceId: args.workspaceId,
+    label: 'Pin anlegen',
+    run: async () => {
+      const { data, error } = await supabase.rpc('create_atom_pin', {
+        p_workspace_id: args.workspaceId,
+        p_atom_type: args.atomType,
+        p_atom_id: args.atomId,
+        p_parent_kind: args.containerKind,
+        p_parent_id: args.containerId,
+        p_position: args.position ?? 0,
+      });
+      if (error) throw error;
+      return pinnedRpcToManifestation(data as PinnedRpcRow);
+    },
+    buildOffline: (id) => ({
+      id,
+      atom_type: args.atomType,
+      atom_id: args.atomId,
+      workspace_id: args.workspaceId,
+      kind: 'pinned',
+      container_id: args.containerId,
+      container_kind: args.containerKind,
+      position: args.position ?? 0,
+      level: null,
+      display_meta: {},
+      created_at: new Date().toISOString(),
+    }),
+  });
+}
+
+export async function deleteAtomPin(id: string): Promise<void> {
+  await runOptimisticDelete({
+    table: ATOM_MANIF_TABLE,
+    id,
+    label: 'Pin entfernen',
+    run: async () => {
+      const { error } = await supabase.rpc('delete_atom_pin', { p_id: id });
+      if (error) throw error;
+    },
+  });
+}
+
+export async function moveAtomPin(args: {
+  id: string;
+  newContainerKind: AtomContainerKind;
+  newContainerId: string;
+  newPosition?: number;
+}): Promise<AtomManifestationRow> {
+  const patch: AtomManifPatch = {
+    container_kind: args.newContainerKind,
+    container_id: args.newContainerId,
+    position: args.newPosition ?? 0,
+  };
+  return runOptimisticUpdate<AtomManifestationRow>({
+    table: ATOM_MANIF_TABLE,
+    id: args.id,
+    patch: patch as Record<string, unknown>,
+    label: 'Pin verschieben',
+    run: async () => {
+      const { data, error } = await supabase.rpc('move_atom_pin', {
+        p_id: args.id,
+        p_new_parent_kind: args.newContainerKind,
+        p_new_parent_id: args.newContainerId,
+        p_new_position: args.newPosition ?? 0,
+      });
+      if (error) throw error;
+      return pinnedRpcToManifestation(data as PinnedRpcRow);
+    },
+  });
+}
+
+// ─── Compat: single-Cell-Attach (Bridge zu existing DocsPopup-UX) ─
+// Existing UX: ein Doc hat hoechstens eine angeheftete Zelle.
+// Multi-Pin per Pin-Row kommt spaeter. Bis dahin: alte Cell-Pins
+// fuer diesen Doc loeschen, dann optional einen neuen anlegen.
+//
+// Multi-Step (delete + insert) durch deleteAtomPin + createAtomPin
+// (beide bereits offline-tauglich). Der initial select laeuft online —
+// bei NetworkError wird auf den IDB-Cache gefiltert.
+export async function setDocSingleCellPin(args: {
+  workspaceId: string;
+  docId: string;
+  cellId: string | null;
+}): Promise<AtomManifestationRow | null> {
+  let existing: Array<{ id: string }> = [];
+  try {
+    const { data, error } = await supabase
+      .from('atom_manifestations')
+      .select('id')
+      .eq('workspace_id', args.workspaceId)
+      .eq('atom_type', 'doc')
+      .eq('atom_id', args.docId)
+      .eq('kind', 'pinned')
+      .eq('container_kind', 'cell');
+    if (error) throw error;
+    existing = (data ?? []) as Array<{ id: string }>;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const cached = await getByWorkspace<AtomManifestationRow>(ATOM_MANIF_TABLE, args.workspaceId);
+    existing = cached
+      .filter(
+        (m) =>
+          m.kind === 'pinned' &&
+          m.atom_type === 'doc' &&
+          m.atom_id === args.docId &&
+          m.container_kind === 'cell',
+      )
+      .map((m) => ({ id: m.id }));
+  }
+  for (const row of existing) {
+    await deleteAtomPin(row.id);
+  }
+  if (args.cellId == null) return null;
+  return await createAtomPin({
+    workspaceId: args.workspaceId,
+    atomType: 'doc',
+    atomId: args.docId,
+    containerKind: 'cell',
+    containerId: args.cellId,
+  });
+}
+
+// ─── Bundled RPC: pin_doc_with_create ──────────────────────────
+// Atomic: erstellt Doc-Row + atom_manifestations(kind='pinned')-Eintrag
+// in einer Transaktion. Frontend ruft das im DocsPopup-Pending-Tab
+// beim ersten Save.
+//
+// Multi-Step Live-RPC + offline-Fallback ueber zwei Insert-Specs
+// (docs + atom_manifestations). Atomicity-Verlust offline akzeptabel —
+// der Replay-FIFO behaelt die Reihenfolge, FK-Violation auf
+// atom_manifestations (Doc nicht angelegt) ergibt stale-Marker.
+//
+// Returns das vollstaendige doc-Object plus optional pin (NULL wenn
+// kein Parent angegeben — Standalone-Doku).
+export async function pinDocWithCreate(args: {
+  workspaceId: string;
+  title: string;
+  content?: string;
+  alias?: string | null;
+  sourceAlias?: string | null;
+  containerKind?: AtomContainerKind | null;
+  containerId?: string | null;
+}): Promise<{
+  doc: Record<string, unknown>;
+  pin: AtomManifestationRow | null;
+}> {
+  try {
+    const { data, error } = await supabase.rpc('pin_doc_with_create', {
+      p_workspace_id: args.workspaceId,
+      p_title: args.title,
+      p_content: args.content ?? '<p></p>',
+      p_alias: args.alias ?? null,
+      p_source_alias: args.sourceAlias ?? null,
+      p_parent_kind: args.containerKind ?? null,
+      p_parent_id: args.containerId ?? null,
+    });
+    if (error) throw error;
+    const result = data as { doc: Record<string, unknown>; pin: PinnedRpcRow | null };
+    const pin = result.pin ? pinnedRpcToManifestation(result.pin) : null;
+    if (pin) {
+      void putOne(ATOM_MANIF_TABLE, pin).catch(() => {});
+    }
+    if (result.doc) {
+      void putOne('docs', result.doc as { id: string; workspace_id: string }).catch(() => {});
+    }
+    return { doc: result.doc, pin };
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    // Offline-Fallback: synth Doc + synth Pin separat queueen. Replay-
+    // FIFO garantiert Doc-vor-Pin-Reihenfolge.
+    const docId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const docRow = {
+      id: docId,
+      workspace_id: args.workspaceId,
+      title: args.title,
+      title_template: args.title,
+      content: args.content ?? '<p></p>',
+      alias: args.alias ?? null,
+      source_alias: args.sourceAlias ?? null,
+      created_at: now,
+      updated_at: now,
+    } as Record<string, unknown>;
+    await putOne('docs', docRow as { id: string; workspace_id: string });
+    const { enqueueMutation } = await import('./mutation-queue');
+    await enqueueMutation({
+      spec: { kind: 'insert', table: 'docs', values: docRow },
+      workspaceId: args.workspaceId,
+      label: 'Doku anlegen',
+    });
+    showToast('Offline angelegt: Doku. Wird beim Reconnect synchronisiert.', 'info');
+    let pin: AtomManifestationRow | null = null;
+    if (args.containerKind && args.containerId) {
+      pin = await createAtomPin({
+        workspaceId: args.workspaceId,
+        atomType: 'doc',
+        atomId: docId,
+        containerKind: args.containerKind,
+        containerId: args.containerId,
+      });
+    }
+    return { doc: docRow, pin };
+  }
+}
+
+// ─── Hilfs-Toast bei Pin-RPC-Errors ───────────────────────────
+export function reportPinError(err: unknown, contextLabel: string): void {
+  if (err && typeof err === 'object' && 'message' in err) {
+    const msg = String((err as { message: unknown }).message);
+    if (msg.includes('parent_not_found')) {
+      showToast('Doku konnte nicht angeheftet werden — Ziel existiert nicht.', 'error');
+      return;
+    }
+    if (msg.includes('forbidden')) {
+      showToast('Du hast keine Schreib-Rechte fuer diesen Workspace.', 'error');
+      return;
+    }
+  }
+  showToast(`${contextLabel} fehlgeschlagen.`, 'error');
 }

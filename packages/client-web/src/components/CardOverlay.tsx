@@ -1,5 +1,6 @@
 import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
 import { validateAlias } from '../lib/alias';
+import type { AtomManifestationRow } from '../lib/atom-manifestations';
 import { formatDateDE } from '../lib/dates';
 import { installFocusRestore, showConfirm } from '../lib/dialog';
 import { openDokuForContext, shouldIgnoreDKey } from '../lib/docs-open';
@@ -39,7 +40,6 @@ import {
 } from '../lib/recur';
 import { showToast } from '../lib/toasts';
 import type {
-  AtomPin,
   AtomTagWithTag,
   BoardContent,
   CardRecur,
@@ -65,7 +65,7 @@ type Props = {
   // Welle D.9: Pin-/Doc-Daten fuer AtomDocsSection. Bewusst optional —
   // legacy Caller (z.B. TaskOverview) reichen nichts durch und sehen
   // dann auch keine Doku-Sektion.
-  wsAtomPins?: AtomPin[];
+  wsAtomPins?: AtomManifestationRow[];
   wsDocs?: DocRow[];
   // Welle D.9: TagPills (read-only) zur Anzeige der workspace_tags des
   // Tasks.

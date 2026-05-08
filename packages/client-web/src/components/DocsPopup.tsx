@@ -29,7 +29,7 @@ import {
 import { validateAlias } from '../lib/alias';
 import { dispatchAliasResult } from '../lib/alias-dispatch';
 import { resolveAlias } from '../lib/alias-resolve';
-import { pinDocWithCreate, setDocSingleCellPin } from '../lib/atom-pins';
+import { pinDocWithCreate, setDocSingleCellPin } from '../lib/atom-manifestations';
 import { installFocusRestore, showConfirm } from '../lib/dialog';
 import { type Draft, getDrafts, newClientId, persistDrafts, removeDraft } from '../lib/docs-drafts';
 import { getPersistedTabIds, persistTabIds } from '../lib/docs-tab-restore';
@@ -85,14 +85,15 @@ type Tab = {
   // Tab-Load oder nach Attach-Blur. Leer wenn nicht attached oder die
   // Zelle hat keinen Alias (dann sieht der User "(Zelle)" als Hinweis).
   attachedCellAlias: string | null;
-  // Welle D: zusaetzliches Pin-Target fuer parent_kind=atom|node. Wird
-  // vom openDokuForContext-Hook gesetzt; pin_doc_with_create wird beim
-  // Save mit diesen Args gerufen. Cell-Pins laufen weiterhin ueber
-  // attachedCellId fuer Backwaerts-Kompat des Attach-Inputs.
+  // Welle D + WV.WV.1: zusaetzliches Pin-Target fuer container_kind=
+  // atom|node. Wird vom openDokuForContext-Hook gesetzt;
+  // pin_doc_with_create wird beim Save mit diesen Args gerufen.
+  // Cell-Pins laufen weiterhin ueber attachedCellId fuer Backwaerts-
+  // Kompat des Attach-Inputs.
   pinTarget: {
-    parentKind: 'atom' | 'node';
-    parentId: string;
-    parentLabel: string;
+    containerKind: 'atom' | 'node';
+    containerId: string;
+    containerLabel: string;
   } | null;
   // View/Edit-Umschaltung pro Tab. Default: 'edit' bei leerem Content,
   // 'view' wenn Content beim Tab-Oeffnen vorhanden. Klick auf den
@@ -579,12 +580,12 @@ const DocsPopup: Component<Props> = (p) => {
         // (atom/node), Cell-Pin ueber attachedCellId (Compat-Pfad).
         // Standalone (kein Pin) → createDoc ohne Pin.
         const pinKind: 'atom' | 'node' | 'cell' | null = t.pinTarget
-          ? t.pinTarget.parentKind
+          ? t.pinTarget.containerKind
           : t.attachedCellId
             ? 'cell'
             : null;
         const pinId: string | null = t.pinTarget
-          ? t.pinTarget.parentId
+          ? t.pinTarget.containerId
           : (t.attachedCellId ?? null);
         const created: DocRow =
           pinKind && pinId
@@ -595,8 +596,8 @@ const DocsPopup: Component<Props> = (p) => {
                   content: contentValue || '<p></p>',
                   alias: aliasValue,
                   sourceAlias: t.sourceAlias,
-                  parentKind: pinKind,
-                  parentId: pinId,
+                  containerKind: pinKind,
+                  containerId: pinId,
                 })
               ).doc as DocRow)
             : await createDoc({

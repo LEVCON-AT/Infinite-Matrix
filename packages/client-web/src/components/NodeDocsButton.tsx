@@ -5,24 +5,26 @@
 // neue Doku am Node an. Click mit Pins -> Popover mit Liste der
 // gepinnten Dokus; Eintrag-Click oeffnet bestehende Doc im DocsPopup.
 //
-// Render-Quelle: atom_pins gefiltert auf parent_kind='node' AND
-// parent_id=nodeId AND atom_type='doc', plus Doc-Rows fuer Title-
-// Anzeige. Beide stammen aus den Workspace-Resources (props).
+// Render-Quelle: atom_manifestations gefiltert auf kind='pinned' AND
+// container_kind='node' AND container_id=nodeId AND atom_type='doc'
+// (WV.WV.1: atom_pins-Konsolidierung), plus Doc-Rows fuer Title-Anzeige.
+// Beide stammen aus den Workspace-Resources (props).
 //
 // Outside-Click + ESC schliessen den Popover (Pattern aus
 // NotificationBell.tsx).
 
 import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
+import type { AtomManifestationRow } from '../lib/atom-manifestations';
 import { openDokuForContext } from '../lib/docs-open';
 import { openDocsPopup } from '../lib/docs-ui';
-import type { AtomPin, DocRow } from '../lib/types';
+import type { DocRow } from '../lib/types';
 import Icon from './Icon';
 
 export type NodeDocsButtonProps = {
   nodeId: string;
   nodeKind: 'matrix' | 'board';
   nodeAlias: string | null;
-  atomPins: AtomPin[];
+  atomPins: AtomManifestationRow[];
   docs: DocRow[];
 };
 
@@ -36,7 +38,10 @@ const NodeDocsButton: Component<NodeDocsButtonProps> = (p) => {
       p.atomPins
         .filter(
           (pin) =>
-            pin.atom_type === 'doc' && pin.parent_kind === 'node' && pin.parent_id === p.nodeId,
+            pin.kind === 'pinned' &&
+            pin.atom_type === 'doc' &&
+            pin.container_kind === 'node' &&
+            pin.container_id === p.nodeId,
         )
         .map((pin) => pin.atom_id),
     );

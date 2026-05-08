@@ -53,9 +53,9 @@ export function openDokuForContext(ctx: DocsContext): void {
     openDocsPopup({
       sourceAlias: null,
       pinTarget: {
-        parentKind: 'atom',
-        parentId: ctx.atomId,
-        parentLabel: ctx.atomTitle ?? '(Atom)',
+        containerKind: 'atom',
+        containerId: ctx.atomId,
+        containerLabel: ctx.atomTitle ?? '(Atom)',
       },
     });
     return;
@@ -64,9 +64,9 @@ export function openDokuForContext(ctx: DocsContext): void {
     openDocsPopup({
       sourceAlias: ctx.nodeAlias,
       pinTarget: {
-        parentKind: 'node',
-        parentId: ctx.nodeId,
-        parentLabel: ctx.nodeAlias ? `^${ctx.nodeAlias}` : `(${ctx.nodeKind})`,
+        containerKind: 'node',
+        containerId: ctx.nodeId,
+        containerLabel: ctx.nodeAlias ? `^${ctx.nodeAlias}` : `(${ctx.nodeKind})`,
       },
     });
     return;

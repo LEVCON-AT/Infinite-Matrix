@@ -2289,9 +2289,11 @@ export async function restoreChecklistItem(snap: ChecklistItemRow): Promise<void
 }
 
 // ─── Docs ────────────────────────────────────────────────────────
-// Welle D: Docs sind Atome ohne Parent-Spalte. "Doku gehoert zu Cell"
-// lebt jetzt in atom_pins (siehe lib/atom-pins.ts). Mutations hier
-// touchen nur die docs-Source-Tabelle (Title/Content/Alias/Source-Alias).
+// Welle D + WV.WV.1: Docs sind Atome ohne Parent-Spalte. "Doku gehoert
+// zu Cell" lebt in atom_manifestations(kind='pinned') — siehe Pin-CRUD
+// in lib/atom-manifestations.ts (createAtomPin / pinDocWithCreate /
+// setDocSingleCellPin). Mutations hier touchen nur die docs-Source-
+// Tabelle (Title/Content/Alias/Source-Alias).
 export async function createDoc(args: {
   workspaceId: string;
   title?: string;

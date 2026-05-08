@@ -47,9 +47,10 @@ export type RealtimeTable =
   // atom_manifestations). Bumps refetchen wsAtomManifestations in
   // Workspace.tsx.
   | 'atom_manifestations'
-  // Welle D.9: Multi-User-Sync fuer Pins + Tag-System. Andere User
-  // pinnen Doku, taggen Atome → Sicht muss live ohne Refresh updaten.
-  | 'atom_pins'
+  // Welle D.9: Multi-User-Sync fuer Tag-System. Andere User taggen
+  // Atome → Sicht muss live ohne Refresh updaten. (Pins seit WV.WV.1
+  // unter atom_manifestations(kind='pinned') — werden ueber den
+  // atom_manifestations-Slot geroutet.)
   | 'workspace_tags'
   | 'atom_tags';
 
@@ -66,7 +67,6 @@ const DIRECT_TABLES: Array<Exclude<RealtimeTable, 'kb_cards' | 'checklist_items'
   'links',
   'docs',
   'objects',
-  'atom_pins',
   'workspace_tags',
   'atom_tags',
 ];
@@ -118,6 +118,8 @@ export function subscribeWorkspace(workspaceId: string, bumps: RealtimeBumps): v
 
   // atom_manifestations: Q.2 Single-Source. Wir routen anhand atom_type
   // + kind:
+  //   - kind='pinned'                       → atom_manifestations-Slot
+  //     (WV.WV.1 — Pins fuer alle atom_types ueber atom_manifestations).
   //   - atom_type='task' + kind='kanban'    → kb_cards-Slot
   //   - atom_type='task' + kind='checklist' → checklist_items-Slot
   //   - atom_type='task' + kind='calendar'  → kein Legacy-Slot (Workspace.tsx
@@ -136,7 +138,9 @@ export function subscribeWorkspace(workspaceId: string, bumps: RealtimeBumps): v
     (payload: AtomManifPayload) => {
       const atomType = payload.new?.atom_type ?? payload.old?.atom_type;
       const kind = payload.new?.kind ?? payload.old?.kind;
-      if (atomType === 'task') {
+      if (kind === 'pinned') {
+        bumps.atom_manifestations?.();
+      } else if (atomType === 'task') {
         if (kind === 'kanban') bumps.kb_cards?.();
         else if (kind === 'checklist') bumps.checklist_items?.();
         // calendar-Manifestations werden ueber den tasks-Subscribe

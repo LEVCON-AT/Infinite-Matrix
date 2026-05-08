@@ -21,15 +21,16 @@ export type OpenDocsRequest = {
   // Welle D Compat: cell-Pin laeuft ueber diesen Pfad weiter (DocsPopup
   // setzt pin_doc_with_create mit parent_kind='cell' beim Save).
   attachedCellId?: string | null;
-  // Welle D: generisches Pin-Ziel (atom/node). Wird vom DocsPopup beim
-  // Pending-Tab-Save in pin_doc_with_create umgesetzt. attachedCellId
-  // bleibt als Spezialfall fuer parent_kind='cell' erhalten —
-  // pinTarget wird benutzt fuer parent_kind='atom' bzw. 'node'.
+  // Welle D + WV.WV.1: generisches Pin-Ziel (atom/node). Wird vom
+  // DocsPopup beim Pending-Tab-Save in pin_doc_with_create umgesetzt.
+  // attachedCellId bleibt als Spezialfall fuer container_kind='cell'
+  // erhalten — pinTarget wird benutzt fuer container_kind='atom' bzw.
+  // 'node'.
   pinTarget?: {
-    parentKind: 'atom' | 'node';
-    parentId: string;
+    containerKind: 'atom' | 'node';
+    containerId: string;
     // User-sichtbare Label-Vorschau (z.B. Task-Title oder Node-Alias).
-    parentLabel: string;
+    containerLabel: string;
   } | null;
   // Monoton steigender Counter — erlaubt dem Workspace-Effect, auf
   // "jede neue Request reagieren", auch wenn die Payload identisch ist.

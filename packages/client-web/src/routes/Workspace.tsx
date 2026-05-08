@@ -46,6 +46,7 @@ import { drillNavigate } from '../lib/animations';
 import {
   type AtomManifestationRow,
   fetchAtomCalendarManifestations,
+  fetchAtomManifestationsByWorkspace,
 } from '../lib/atom-manifestations';
 import { signOut, useUser } from '../lib/auth';
 import { buildEvents, isoDate } from '../lib/calendar';
@@ -59,7 +60,6 @@ function addMonthsToDate(d: Date, months: number): Date {
   next.setMonth(next.getMonth() + months);
   return next;
 }
-import { fetchAtomPinsByWorkspace } from '../lib/atom-pins';
 import { fetchAtomTagsByWorkspace, joinAtomTagsWithRegistry } from '../lib/atom-tags';
 import { openDokuForContext } from '../lib/docs-open';
 import { clearDocsRequest, openDocsPopup, useDocsRequest } from '../lib/docs-ui';
@@ -411,18 +411,24 @@ const Workspace: Component = () => {
     () => params.workspaceId,
     async (wid) => (wid ? fetchAtomCalendarManifestations(wid) : []),
   );
-  // Welle D.9: wsDocs + wsAtomPins werden immer geladen (nicht mehr an
-  // chips.isOn('docs') gekoppelt), damit NodeDocsButton + DocsIndicator +
-  // AtomDocsSection auch dann Counts/Listen rendern, wenn der Sidebar-
-  // Doku-Chip ausgeschaltet ist. Daten sind klein (typisch <100 Rows pro
-  // Workspace) und werden eh per Realtime synchron gehalten.
+  // Welle D.9 + WV.WV.1: wsDocs wird immer geladen (nicht mehr an
+  // chips.isOn('docs') gekoppelt), damit NodeDocsButton + DocsIndicator
+  // + AtomDocsSection auch dann Counts/Listen rendern, wenn der
+  // Sidebar-Doku-Chip ausgeschaltet ist. wsAtomPins ist ein Subset von
+  // atom_manifestations(kind='pinned') — eigene Resource statt Memo
+  // aus wsAtomManifestations, weil letztere nur kind='calendar' laedt
+  // (enriched mit Label/URL-Snapshots).
   const [wsDocs, { refetch: refetchWsDocs }] = createResource(
     () => params.workspaceId ?? null,
     async (wid) => (wid ? fetchWorkspacePinnedDocs(wid) : []),
   );
   const [wsAtomPins, { refetch: refetchWsAtomPins }] = createResource(
     () => params.workspaceId ?? null,
-    async (wid) => (wid ? fetchAtomPinsByWorkspace(wid) : []),
+    async (wid) => {
+      if (!wid) return [];
+      const all = await fetchAtomManifestationsByWorkspace(wid);
+      return all.filter((m) => m.kind === 'pinned');
+    },
   );
   // Welle D.9: Tag-System fuer TagPills-Render auf Atom-Chips. atom_tags
   // (Junction) + workspace_tags (Registry) werden in einem Memo gejoint
@@ -512,14 +518,14 @@ const Workspace: Component = () => {
       arr.push(l);
       linksByBoardId.set(l.board_id, arr);
     }
-    // Welle D: Doc-an-Cell-Pin lebt in atom_pins; wsDocs liefert die
-    // Doc-Rows die irgendwo gepinnt sind (server-seitig via atom_pins
-    // gefiltert), wsAtomPins haelt die Cell-Zuordnung.
+    // WV.WV.1: Doc-an-Cell-Pin lebt in atom_manifestations(kind='pinned',
+    // container_kind='cell'); wsDocs liefert die Doc-Rows die irgendwo
+    // gepinnt sind, wsAtomPins haelt die Cell-Zuordnung.
     const docsByCellId = new Map<string, DocRow[]>();
     const docToCellMap = new Map<string, string>();
     for (const pin of wsAtomPins() ?? []) {
-      if (pin.atom_type === 'doc' && pin.parent_kind === 'cell') {
-        docToCellMap.set(pin.atom_id, pin.parent_id);
+      if (pin.atom_type === 'doc' && pin.container_kind === 'cell' && pin.container_id != null) {
+        docToCellMap.set(pin.atom_id, pin.container_id);
       }
     }
     for (const d of wsDocs() ?? []) {
@@ -1101,15 +1107,6 @@ const Workspace: Component = () => {
         void refetchWsDocs();
         scheduleAliasRefresh(wid);
       },
-      // Welle D.9 — Pin-Mutationen anderer User triggern Pill-/Indicator-
-      // /NodeDocsButton-Refresh sofort. setRtDocs bumpt auch DocsPopup-
-      // realtimeVersion damit ein offener Tab mit-aktualisiert.
-      atom_pins: () => {
-        setRtDocs((v) => v + 1);
-        void refetchWsAtomPins();
-        void refetchCellsWithDocs();
-        void refetchWsDocs();
-      },
       workspace_tags: () => {
         void refetchWsWorkspaceTags();
         setRtTags((v) => v + 1);
@@ -1120,13 +1117,20 @@ const Workspace: Component = () => {
         // DocTagsEditor im offenen DocsPopup haengt an rtDocs.
         setRtDocs((v) => v + 1);
       },
-      // T.AC.A.5 + Q.2: atom_manifestations ist Single-Source. Der
-      // realtime-Subscriber (lib/realtime.ts) routet task-Atoms in
+      // T.AC.A.5 + Q.2 + WV.WV.1: atom_manifestations ist Single-Source.
+      // Der realtime-Subscriber (lib/realtime.ts) routet task-Atoms in
       // den kb_cards/checklist_items-Slot — dieser Slot hier feuert
-      // nur fuer non-task Atoms (Link/Checklist im Calendar) und
-      // refetcht den Mini-Calendar/DayView/Calendar-Render.
+      // fuer non-task-Calendar-Manifestations (Link/Checklist im
+      // Calendar) und fuer alle pinned-Manifestations (Pins anderer
+      // User triggern Pill-/Indicator-/NodeDocsButton-Refresh).
+      // setRtDocs bumpt auch DocsPopup-realtimeVersion damit ein
+      // offener Tab mit-aktualisiert.
       atom_manifestations: () => {
         void refetchAtomManifs();
+        void refetchWsAtomPins();
+        setRtDocs((v) => v + 1);
+        void refetchCellsWithDocs();
+        void refetchWsDocs();
       },
       // Phase 3 O.8: Object-Rename → Templates re-resolven. Refetch
       // triggert die Solid-Resource, deren Memo-Konsumenten in
