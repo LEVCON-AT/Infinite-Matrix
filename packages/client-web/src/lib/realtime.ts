@@ -77,7 +77,11 @@ export type RealtimeTable =
   // (alle sehen Counter+User-Liste live), kind=eye User-privat
   // (RLS filtert Subscribe).
   | 'info_fields'
-  | 'atom_markers';
+  | 'atom_markers'
+  // Welle WV.D.1 — Widget zu externem Provider-Ref. Cross-User-Live
+  // wenn ein Member ein Widget mit Channel verknuepft. user_oauth_tokens
+  // bewusst NICHT in Realtime (sensible Daten, nur Mutation-Refresh).
+  | 'widget_external_channels';
 
 export type RealtimeBumps = Partial<Record<RealtimeTable, () => void>>;
 
@@ -104,6 +108,7 @@ const DIRECT_TABLES: Array<Exclude<RealtimeTable, 'kb_cards' | 'checklist_items'
   'saved_filters',
   'info_fields',
   'atom_markers',
+  'widget_external_channels',
 ];
 
 type AtomManifPayload = {

@@ -874,3 +874,78 @@ export type TemplateWidgetRow = {
   config: Record<string, unknown>;
   created_at: string;
 };
+
+// ─── Welle WV.D — Channel-Bridges (Migration 077 + 078) ────────
+// Konzept §13 + plan-welle-d.md.
+
+export type ChannelProvider =
+  | 'outlook'
+  | 'gmail'
+  | 'mail-generic'
+  | 'onenote'
+  | 'onedrive'
+  | 'drive'
+  | 'dropbox'
+  | 'nextcloud'
+  | 'slack'
+  | 'teams'
+  | 'discord'
+  | 'whatsapp'
+  | 'telegram';
+
+// Frontend liest user_oauth_tokens IMMER ueber die Safe-View (ohne
+// *_encrypted-Spalten). Plaintext landet nur Bridge-side via
+// get_oauth_token_decrypted-RPC.
+export type UserOAuthTokenSafe = {
+  id: string;
+  user_id: string;
+  provider: ChannelProvider;
+  expires_at: string | null;
+  scopes: string[] | null;
+  has_refresh_token: boolean;
+  has_generic_credentials: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+// Status-Werte aus oauth_provider_slots_status_chk.
+export type OAuthProviderSlotStatus =
+  | 'fehlt' // weder Client-ID noch Secret konfiguriert
+  | 'konfiguriert' // Client-ID + Secret gesetzt, noch nicht verifiziert
+  | 'verifiziert' // Test-Connect erfolgreich
+  | 'ungueltig'; // Test-Fail (Message in status_message)
+
+export type OAuthProviderSlotSafe = {
+  id: string;
+  provider: ChannelProvider;
+  client_id: string;
+  auth_url: string | null;
+  token_url: string | null;
+  scopes_default: string[] | null;
+  extra_config: Record<string, unknown>;
+  status: OAuthProviderSlotStatus;
+  status_checked_at: string | null;
+  status_message: string | null;
+  has_client_secret: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WidgetExternalChannelRow = {
+  id: string;
+  widget_id: string;
+  workspace_id: string;
+  provider: ChannelProvider;
+  external_ref: Record<string, unknown>;
+  created_at: string;
+};
+
+// Mail-generic-Credentials-Format (verschluesselt als JSON).
+export type GenericMailCredentials = {
+  imap_host: string;
+  imap_port?: number;
+  smtp_host: string;
+  smtp_port?: number;
+  username: string;
+  app_password: string;
+};

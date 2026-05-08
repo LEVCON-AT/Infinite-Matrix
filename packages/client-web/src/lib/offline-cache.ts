@@ -105,6 +105,10 @@ const TABLES = [
   'info_fields',
   // Welle WV.B.3 — User-Markierungen an Atomen (Migration 074).
   'atom_markers',
+  // Welle WV.D.1 — Widget zu externem Provider-Ref (Migration 077).
+  // user_oauth_tokens cachen wir NICHT (sensible Daten, sollen nicht
+  // in IDB liegen).
+  'widget_external_channels',
 ] as const;
 
 export type CacheTable = (typeof TABLES)[number];
@@ -146,6 +150,7 @@ interface MatrixCacheSchema extends DBSchema {
   saved_filters: StoreDef;
   info_fields: StoreDef;
   atom_markers: StoreDef;
+  widget_external_channels: StoreDef;
 }
 
 const DB_NAME = 'matrix-cache';
@@ -183,7 +188,9 @@ const DB_NAME = 'matrix-cache';
 // Format aus lib/atom-filter-attrs.ts (WV.Y).
 // V17 (WV.B.1+B.3): info_fields + atom_markers (Migrations 072 + 074)
 // — typed Cell-Info-Felder + User-Markierungen.
-const DB_VERSION = 17;
+// V18 (WV.D.1): widget_external_channels (Migration 077) — Widget zu
+// externem Provider-Ref. user_oauth_tokens bleibt OUT-OF-CACHE (sensibel).
+const DB_VERSION = 18;
 const OBSOLETE_STORES = [
   'kb_cards',
   'checklist_items',
