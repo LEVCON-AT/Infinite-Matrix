@@ -1345,6 +1345,153 @@ WV.WV-Output-Erweiterung um `AdapterDialog`-Komponente (7. Output) — generisch
 
 ---
 
+<a id="9-14"></a>
+## §9.14 Auto-Calendar-Manifestation aus `info_field(value_type='date')`
+
+User-Direktive (Konzept-Pass 2026-05-08): *„wenn ein info_field als Datum getypt ist, soll das automatisch im Kalender erscheinen — ohne dass der User extra droppen muss."*
+
+Querschnitt zu §9.C (Cross-Type-Drop-Adapter) — der **Auto-Adapter ohne Dialog**-Fall: Date-Typed Info-Felder bekommen automatisch eine Calendar-Manifestation, mit Vorlage-Toggle als Off-Switch (§13.10 `date_field_auto_calendar`).
+
+### 9.14.1 Architektur-Entscheidung — Auto-Manifestation pro Info-Manifestation
+
+**Problem:** `info_fields` sind **workspace-scoped** (Migration 072), nicht cell-scoped. Eine direkte `info_field(value_type='date')` → `atom_manifestations(kind='calendar')`-Auto-Erzeugung haette **keinen Cell-Container** — Calendar-Renderer wuesste nicht, in welchem Cell-Kontext der Termin erscheint.
+
+**Loesung — Mirror per Info-Manifestation:** Die Calendar-Manifestation wird **gespiegelt** zu jeder existing `atom_manifestations(atom_type='info_field', kind='info', container_kind='cell')`-Row. Eine Info-Manifestation in Cell C → eine Calendar-Manifestation in Cell C.
+
+```
+info_fields(id=F1, value_type='date', value='2026-05-15')
+  ↓
+atom_manifestations(atom_id=F1, kind='info', container_kind='cell', container_id=C1)
+atom_manifestations(atom_id=F1, kind='info', container_kind='cell', container_id=C2)
+  ↓ (Auto-Trigger)
+atom_manifestations(atom_id=F1, kind='calendar', container_kind='cell', container_id=C1, display_meta={date:'2026-05-15', auto:true})
+atom_manifestations(atom_id=F1, kind='calendar', container_kind='cell', container_id=C2, display_meta={date:'2026-05-15', auto:true})
+```
+
+`display_meta.auto = true` markiert die Auto-Manifestation — User kann sie nicht direkt deleten (re-creates beim naechsten Trigger), nur via Vorlage-Toggle abschalten.
+
+### 9.14.2 Trigger-Logik (Postgres)
+
+Ein Postgres-Trigger pflegt die Auto-Manifestations-Liste. Drei Eintritts-Punkte:
+
+| Trigger | Auf | Aktion |
+|---|---|---|
+| `T1: info_field-update` | `AFTER UPDATE OF value, value_type ON info_fields` | re-sync alle Calendar-Auto-Manifs der Info-Manifs des Atoms |
+| `T2: info_manif-insert` | `AFTER INSERT ON atom_manifestations WHERE kind='info' AND atom_type='info_field'` | wenn `info_fields.value_type='date'`: Calendar-Auto-Manif erzeugen |
+| `T3: info_manif-delete` | `AFTER DELETE ON atom_manifestations WHERE kind='info' AND atom_type='info_field'` | korrespondierende Calendar-Auto-Manif (gleiche cell + atom_id) loeschen |
+
+**Re-Sync-Flow (T1):**
+
+```sql
+CREATE OR REPLACE FUNCTION public._info_field_auto_calendar_sync()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+DECLARE
+  v_date date;
+BEGIN
+  -- value_type-Wechsel weg von 'date' → alle Auto-Manifs purgen.
+  IF NEW.value_type <> 'date' THEN
+    DELETE FROM public.atom_manifestations
+    WHERE atom_type = 'info_field' AND atom_id = NEW.id
+      AND kind = 'calendar' AND (display_meta ->> 'auto')::boolean = true;
+    RETURN NEW;
+  END IF;
+
+  -- value-Parse (ISO 8601 'YYYY-MM-DD' oder Postgres-date-castable).
+  -- Bei NULL/leer/parse-fail → keine Calendar-Manif (silent skip).
+  BEGIN
+    v_date := NEW.value::date;
+  EXCEPTION WHEN others THEN
+    DELETE FROM public.atom_manifestations
+    WHERE atom_type = 'info_field' AND atom_id = NEW.id
+      AND kind = 'calendar' AND (display_meta ->> 'auto')::boolean = true;
+    RETURN NEW;
+  END;
+
+  -- UPSERT pro existing Info-Manifestation. Spiegelt nur cell-scoped
+  -- Info-Manifs (container_kind='cell') — workspace-globale Info-
+  -- Manifestations bekommen keine Calendar-Auto-Manif (kein Cell-
+  -- Kontext fuer Calendar-Render).
+  INSERT INTO public.atom_manifestations (
+    atom_type, atom_id, workspace_id, kind, container_id, container_kind,
+    position, level, display_meta
+  )
+  SELECT
+    'info_field', NEW.id, m.workspace_id, 'calendar', m.container_id, 'cell',
+    0, NULL,
+    jsonb_build_object('date', v_date::text, 'auto', true, 'source', 'info_field')
+  FROM public.atom_manifestations m
+  WHERE m.atom_type = 'info_field' AND m.atom_id = NEW.id
+    AND m.kind = 'info' AND m.container_kind = 'cell'
+  ON CONFLICT (atom_type, atom_id, kind, container_kind, container_id)
+  DO UPDATE SET display_meta = EXCLUDED.display_meta;
+
+  RETURN NEW;
+END;
+$$;
+```
+
+`UNIQUE(atom_type, atom_id, kind, container_kind, container_id)` muss als Constraint auf `atom_manifestations` existieren — falls nicht, Migration ergaenzt.
+
+### 9.14.3 Vorlage-Toggle (§13.10 `date_field_auto_calendar`)
+
+Per Vorlage-Toggle in `template_widgets.config.toggles.date_field_auto_calendar` kann der User Auto-Calendar **pro Vorlage** abschalten:
+
+| Toggle-Wert | Verhalten |
+|---|---|
+| `true` (Default) | Auto-Trigger laeuft, Calendar-Manif wird erzeugt |
+| `false` | Trigger-Function checkt vor INSERT die Vorlage der Cell-Info-Section, bei `false` wird **keine** Auto-Manif erzeugt |
+
+**Konsequenz fuer Trigger:** ein zweiter Filter nach Cell-Info-Manif-Lookup — JOIN auf `cell_template_instances` + `template_widgets.config.toggles.date_field_auto_calendar`. Bei `false`: skip.
+
+### 9.14.4 Edge-Cases
+
+| Fall | Verhalten |
+|---|---|
+| `value` ist NULL oder leer | keine Auto-Manif (silent skip in Trigger) |
+| `value` parse-Fail (kein gueltiges Datum) | bestehende Auto-Manifs purgen, neue nicht erzeugen |
+| `value_type` wechselt von `date` → `text` | alle Auto-Manifs des Atoms purgen |
+| `value_type` wechselt von `text` → `date` | Trigger T1 feuert → Auto-Manifs erzeugen fuer alle existing Info-Manifs |
+| User loescht eine `kind='calendar'`-Auto-Manif manuell | re-creates beim naechsten T1/T2-Feuer (Auto-Marker = Source-of-Truth) |
+| Cell-Info-Manifestation per Drag entfernt | T3 feuert → korrespondierende Calendar-Auto-Manif loeschen |
+| `display_meta.date` muss von Calendar-Renderer gelesen werden | `lib/calendar.ts` ergaenzen — auto-info-field-Pfad analog `task` |
+| User editiert Calendar-Auto-Manif `display_meta.time` (z.B. 14:30) | erlaubt — `time` ist nicht im Trigger-Diff, bleibt persistent. Zeitslot-Manif-Teil ist User-Daten. Re-Sync ueberschreibt nur `date` + `auto` + `source` |
+
+### 9.14.5 Schema-Heptad-Pflege
+
+| Slot | Aenderung |
+|---|---|
+| Schema | Migration `082_info_field_auto_calendar_trigger.sql` — Trigger T1+T2+T3 + ggf. UNIQUE-Constraint |
+| Types | n/a — `display_meta.auto` ist im JSONB, keine TS-Type-Aenderung noetig |
+| Mutations | `lib/atom-manifestations.ts` — `auto`-Marker bei Manual-Delete-Versuch toasten („wird vom System gepflegt") |
+| Cache | n/a — Realtime-Subscribe deckt es ab |
+| Realtime | n/a — `atom_manifestations` ist schon im publication |
+| Export | `display_meta.auto`-Manifs muessen beim Import **idempotent** behandelt werden (re-creates beim ersten Trigger-Feuer; Direkt-Import erzeugt kein Duplikat dank UNIQUE-Constraint) |
+| MCP | `manif.calendar.auto.list` (Read-only) — Liste der Auto-Manifs eines Atoms fuer Diagnose |
+| Channel-Bridge | n/a |
+
+### 9.14.6 V2-Erweiterung — `date_range`-Feldtyp
+
+Konzept §12.1 V2-Kandidat `date_range` (zwei Datumsfelder mit Start/End). Auto-Calendar-Manifestation wuerde dann eine `display_meta.range = {start, end}` setzen statt `display_meta.date`. Trigger-Logik bleibt strukturell gleich, nur die Parse-Logik unterscheidet.
+
+**V2-Defer:** kein `date_range`-Type in V1 — siehe §12.1.
+
+### 9.14.7 Sprint-Verankerung
+
+Welle **WV.E** Item #37: „Auto-Calendar-Manifestation aus info_field(value_type='date') via Postgres-Trigger." Aufwand-Schaetzung: ~1.5d (Migration + Trigger + Calendar-Renderer-Pfad + Vorlage-Toggle-Filter + Tests).
+
+**Reihenfolge:**
+
+1. Migration 082 mit T1+T2+T3 + UNIQUE-Constraint-Check.
+2. `lib/calendar.ts` — `auto`-Source erkennen + rendern.
+3. `lib/atom-manifestations.ts` — Manual-Delete-Block fuer `auto`-Manifs.
+4. `template_widgets.config.toggles.date_field_auto_calendar` Default `true` in Migration 071-Vorlagen-Seed.
+5. `template-config.ts` Toggle-UI in Designer.
+6. Smoke + Realtime-Test.
+
+**Manifest-Verankerung:** `architektur.md` §3 (Schema-Heptad) bleibt unveraendert. `widget-vorlagen-foundation.md` §10.4 wird von „TBD" auf „§9.14 final 2026-05-08" aktualisiert.
+
+---
+
 <a id="10"></a>
 ## 10. Kalender als Universal-Linse (final 2026-05-07)
 
@@ -1388,7 +1535,7 @@ Heute hat Welle I nur **Inbound** (ICS/Google/Outlook → atom_manifestations). 
 10.1 link → calendar = §9.6 final.  
 10.2 checklist → calendar = §9.8 final.  
 10.3 doc → calendar = §9.11 final.  
-10.4 Auto-Calendar aus Date-Field = §9.14 + §13.10 final.
+10.4 Auto-Calendar aus Date-Field = §9.14 final 2026-05-08 + §13.10 final.
 
 ---
 
