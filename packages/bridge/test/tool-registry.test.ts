@@ -17,6 +17,9 @@ describe('registerAllTools() Integration', () => {
     const expected = [
       'alias.resolve',
       'alias.set',
+      'atom_marker.list',
+      'atom_marker.set',
+      'atom_marker.unset',
       'atom_pin.create',
       'atom_pin.delete',
       'atom_pin.list',
@@ -64,6 +67,11 @@ describe('registerAllTools() Integration', () => {
       'info.field.add',
       'info.field.delete',
       'info.field.update',
+      'info_field.add',
+      'info_field.delete',
+      'info_field.list',
+      'info_field.move',
+      'info_field.update',
       'link.add',
       'link.delete',
       'matrix.create',
@@ -95,7 +103,7 @@ describe('registerAllTools() Integration', () => {
     ];
 
     expect(names).toEqual(expected);
-    expect(tools.size).toBe(77);
+    expect(tools.size).toBe(85);
   });
 
   it('jedes registrierte Tool hat schema + jsonSchema', () => {

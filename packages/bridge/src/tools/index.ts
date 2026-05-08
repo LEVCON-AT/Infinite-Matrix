@@ -1,5 +1,6 @@
 import { registerTool } from '../dispatcher.js';
 import { aliasTools } from './alias.js';
+import { atomMarkerTools } from './atom-markers.js';
 import { atomPinTools } from './atom-pin.js';
 import { atomTagTools } from './atom-tag.js';
 import { cardTools } from './card.js';
@@ -8,6 +9,7 @@ import { cellTools } from './cell.js';
 import { checklistTools } from './checklist.js';
 import { featureTemplateTools } from './feature-templates.js';
 import { hotkeySlotTools } from './hotkey-slots.js';
+import { infoFieldTools } from './info-fields.js';
 import { infoLinkTools } from './info-link.js';
 import { matrixCrudTools } from './matrix-crud.js';
 import { matrixTools } from './matrix.js';
@@ -37,6 +39,9 @@ export function registerAllTools(): void {
     ...cellTemplateTools,
     ...hotkeySlotTools,
     ...savedFilterTools,
+    // Welle WV.B — info_fields + atom_markers.
+    ...infoFieldTools,
+    ...atomMarkerTools,
   ]) {
     registerTool(tool);
   }
