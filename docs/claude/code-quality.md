@@ -310,12 +310,19 @@ curl -s "https://api.github.com/repos/LEVCON-AT/Infinite-Matrix/actions/runs?per
 
 **Cadence:**
 
-- Erste Pruefung: ~30 Sekunden nach Push (Run muss registriert sein).
-- Bei `in_progress`: One-Shot-Check ~2 Minuten spaeter, **kein**
-  Polling-Loop in Bash (haengt!). Lieber `run_in_background: true`
-  oder zwei separate Reads.
-- Wenn Run noch laeuft + es gibt Folge-Arbeit: parallel weiter
-  arbeiten, vor naechstem Push erneut pruefen.
+- Erste Pruefung: ~15-30 Sekunden nach Push (Run muss registriert
+  sein, einmal-curl).
+- Bei `in_progress`: **`ScheduleWakeup` mit 240-270 Sekunden** — eine
+  Anthropic-Cache-Window-Laenge (TTL 300s). Workflow laeuft typisch
+  2-3 Minuten, der Wakeup faengt das Ergebnis im warmen Cache ein.
+  Wakeup-Prompt enthaelt die Run-URL + Erwartung („bei failure: Steps
+  holen, lokal reproduzieren, fixen + pushen"). Kein Polling-Loop
+  in Bash (`until ...; do sleep`-Pattern ist runtime-blockiert).
+- Bei mehreren Pushes hintereinander: pro Push ein Wakeup, wenn das
+  vorherige Wakeup schon gefeuert ist; sonst ein Wakeup verlaengert
+  bis zum letzten Push.
+- Wenn Run noch laeuft + es gibt Folge-Arbeit (Konzept-Pass, Memory-
+  Pflege): parallel weiter arbeiten, der Wakeup checkt im Hintergrund.
 
 **Failure-Handling:**
 
