@@ -18623,6 +18623,159 @@ body[data-viewport="phone"] .overlay-card {
   flex-wrap: wrap;
 }
 
+/* ─── IconPicker (WV.B fortgesetzt) ────────────────────────── */
+.icon-picker-card {
+  max-width: 38rem;
+  width: 100%;
+}
+.icon-picker-body {
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.icon-picker-search {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 0.4rem 0.65rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 6px);
+}
+.icon-picker-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 0.9rem;
+  color: var(--text);
+  outline: none;
+}
+.icon-picker-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.65rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md, 6px);
+  background: var(--surface);
+  cursor: pointer;
+  color: var(--text2);
+  font-size: 0.85rem;
+}
+.icon-picker-clear-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.icon-picker-clear-btn.active {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong, var(--accent));
+}
+.icon-picker-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.icon-picker-group-h {
+  margin: 0 0 0.4rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text3);
+  font-weight: 600;
+}
+.icon-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(5rem, 1fr));
+  gap: 0.4rem;
+}
+.icon-picker-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.4rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 6px);
+  cursor: pointer;
+  color: var(--text);
+  transition: background var(--tr-std), border-color var(--tr-std);
+}
+.icon-picker-cell:hover {
+  border-color: var(--accent);
+  background: var(--surface-hover);
+}
+.icon-picker-cell.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong, var(--accent));
+}
+.icon-picker-cell-label {
+  font-size: 0.65rem;
+  font-family: var(--mono, ui-monospace, monospace);
+  color: var(--text3);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.icon-picker-cell.active .icon-picker-cell-label {
+  color: var(--accent-strong, var(--accent));
+}
+.icon-picker-empty {
+  margin: 0;
+  padding: var(--space-md);
+  text-align: center;
+  color: var(--text3);
+  font-size: 0.9rem;
+}
+
+/* Symbol-Trigger-Button — fuer Forms die statt Text-Input klickbar
+   das Symbol anzeigen. Reuse in NewTemplateModal + SaveAsTemplateModal. */
+.symbol-picker-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0.4rem 0.6rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 6px);
+  cursor: pointer;
+  color: var(--text);
+  font-size: 0.9rem;
+  text-align: left;
+  width: 100%;
+}
+.symbol-picker-trigger:hover {
+  border-color: var(--accent);
+  background: var(--surface-hover);
+}
+.symbol-picker-trigger-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--accent-strong, var(--accent));
+}
+.symbol-picker-trigger-label {
+  flex: 1;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.85rem;
+  color: var(--text2);
+}
+.symbol-picker-trigger-empty {
+  color: var(--text3);
+  font-style: italic;
+}
+
 /* ─── Multi-Select Visual-Feedback (WV.C — MatrixView) ───── */
 /* Zero-Shift: Outline statt Border (Memory `feedback_zero_shift_edit_mode.md`).
    Nur sichtbar im Edit-Mode + bei aktiver Selektion. */

@@ -6,7 +6,8 @@
 // (§7.2, Sub-Sprint C.2 Save-as-Template Edit-Mode-Action).
 
 import { type Component, Show, createSignal, onCleanup, onMount } from 'solid-js';
-import Icon from '../Icon';
+import Icon, { type IconName } from '../Icon';
+import IconPicker from '../IconPicker';
 
 export type NewTemplateInput = {
   name: string;
@@ -26,7 +27,8 @@ const NewTemplateModal: Component<NewTemplateModalProps> = (p) => {
   let dialogEl: HTMLDialogElement | undefined;
 
   const [name, setName] = createSignal('');
-  const [symbol, setSymbol] = createSignal('');
+  const [symbol, setSymbol] = createSignal<IconName | null>(null);
+  const [pickerOpen, setPickerOpen] = createSignal(false);
   const [description, setDescription] = createSignal('');
   const [visibility, setVisibility] = createSignal<'workspace' | 'user'>(
     p.canChooseVisibility ? 'workspace' : 'user',
@@ -53,7 +55,7 @@ const NewTemplateModal: Component<NewTemplateModalProps> = (p) => {
       const slot = slotRaw ? Number(slotRaw) : Number.NaN;
       await p.onSubmit({
         name: name().trim(),
-        symbol: symbol().trim() || null,
+        symbol: symbol(),
         description: description().trim() || null,
         visibility: visibility(),
         hotkeySlot: Number.isInteger(slot) && slot >= 1 && slot <= 9 ? slot : null,
@@ -108,21 +110,29 @@ const NewTemplateModal: Component<NewTemplateModalProps> = (p) => {
           </div>
 
           <div class="adapter-dialog-field">
-            <label class="adapter-dialog-field-label" for="new-template-symbol">
-              Symbol
-            </label>
-            <input
-              id="new-template-symbol"
-              type="text"
-              class="adapter-dialog-input"
-              value={symbol()}
-              placeholder="Heroicon-Name (z.B. document-text, view-columns)"
-              onInput={(e) => setSymbol(e.currentTarget.value)}
-            />
-            <span class="adapter-dialog-field-hint">
-              Bekannte Heroicons: view-columns, list-bullet, information-circle, sparkles,
-              document-text, calendar, link, tag, eye, envelope.
-            </span>
+            <span class="adapter-dialog-field-label">Symbol</span>
+            <button
+              type="button"
+              class="symbol-picker-trigger"
+              onClick={() => setPickerOpen(true)}
+              aria-label="Symbol waehlen"
+            >
+              <span class="symbol-picker-trigger-icon">
+                <Show when={symbol()} fallback={<Icon name="no-symbol" size={16} />}>
+                  {(s) => <Icon name={s()} size={18} />}
+                </Show>
+              </span>
+              <Show
+                when={symbol()}
+                fallback={
+                  <span class="symbol-picker-trigger-label symbol-picker-trigger-empty">
+                    Kein Symbol — klicken zum Waehlen
+                  </span>
+                }
+              >
+                {(s) => <span class="symbol-picker-trigger-label">{s()}</span>}
+              </Show>
+            </button>
           </div>
 
           <div class="adapter-dialog-field">
@@ -196,6 +206,16 @@ const NewTemplateModal: Component<NewTemplateModalProps> = (p) => {
           </footer>
         </form>
       </div>
+      <Show when={pickerOpen()}>
+        <IconPicker
+          value={symbol()}
+          onSelect={(icon) => {
+            setSymbol(icon);
+            setPickerOpen(false);
+          }}
+          onClose={() => setPickerOpen(false)}
+        />
+      </Show>
     </dialog>
   );
 };

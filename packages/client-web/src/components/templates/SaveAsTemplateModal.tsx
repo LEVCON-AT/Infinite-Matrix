@@ -17,7 +17,8 @@ import { translateDbError } from '../../lib/errors';
 import { saveAsTemplate } from '../../lib/save-as-template';
 import { showToast } from '../../lib/toasts';
 import type { CellRow, FeatureTemplateRow } from '../../lib/types';
-import Icon from '../Icon';
+import Icon, { type IconName } from '../Icon';
+import IconPicker from '../IconPicker';
 
 export type SaveAsTemplateModalProps = {
   workspaceId: string;
@@ -34,7 +35,8 @@ const SaveAsTemplateModal: Component<SaveAsTemplateModalProps> = (p) => {
   let dialogEl: HTMLDialogElement | undefined;
 
   const [name, setName] = createSignal(p.defaultName ?? '');
-  const [symbol, setSymbol] = createSignal('');
+  const [symbol, setSymbol] = createSignal<IconName | null>(null);
+  const [pickerOpen, setPickerOpen] = createSignal(false);
   const [description, setDescription] = createSignal('');
   const [visibility, setVisibility] = createSignal<'workspace' | 'user'>(
     p.canChooseVisibility ? 'workspace' : 'user',
@@ -63,7 +65,7 @@ const SaveAsTemplateModal: Component<SaveAsTemplateModalProps> = (p) => {
         ownerUserId: p.ownerUserId,
         cell: p.cell,
         name: name().trim(),
-        symbol: symbol().trim() || null,
+        symbol: symbol(),
         description: description().trim() || null,
         visibility: visibility(),
         hotkeySlot: Number.isInteger(slot) && slot >= 1 && slot <= 9 ? slot : null,
@@ -134,20 +136,29 @@ const SaveAsTemplateModal: Component<SaveAsTemplateModalProps> = (p) => {
           </div>
 
           <div class="adapter-dialog-field">
-            <label class="adapter-dialog-field-label" for="save-template-symbol">
-              Symbol
-            </label>
-            <input
-              id="save-template-symbol"
-              type="text"
-              class="adapter-dialog-input"
-              value={symbol()}
-              placeholder="Heroicon-Name (auto wenn leer)"
-              onInput={(e) => setSymbol(e.currentTarget.value)}
-            />
-            <span class="adapter-dialog-field-hint">
-              Auto-Symbol leitet sich aus dem ersten Cell-Feature ab.
-            </span>
+            <span class="adapter-dialog-field-label">Symbol</span>
+            <button
+              type="button"
+              class="symbol-picker-trigger"
+              onClick={() => setPickerOpen(true)}
+              aria-label="Symbol waehlen"
+            >
+              <span class="symbol-picker-trigger-icon">
+                <Show when={symbol()} fallback={<Icon name="sparkles" size={16} />}>
+                  {(s) => <Icon name={s()} size={18} />}
+                </Show>
+              </span>
+              <Show
+                when={symbol()}
+                fallback={
+                  <span class="symbol-picker-trigger-label symbol-picker-trigger-empty">
+                    Auto (aus erstem Cell-Feature) — klicken zum Ueberschreiben
+                  </span>
+                }
+              >
+                {(s) => <span class="symbol-picker-trigger-label">{s()}</span>}
+              </Show>
+            </button>
           </div>
 
           <div class="adapter-dialog-field">
@@ -225,6 +236,16 @@ const SaveAsTemplateModal: Component<SaveAsTemplateModalProps> = (p) => {
           </footer>
         </form>
       </div>
+      <Show when={pickerOpen()}>
+        <IconPicker
+          value={symbol()}
+          onSelect={(icon) => {
+            setSymbol(icon);
+            setPickerOpen(false);
+          }}
+          onClose={() => setPickerOpen(false)}
+        />
+      </Show>
     </dialog>
   );
 };
