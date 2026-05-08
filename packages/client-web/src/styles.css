@@ -19348,3 +19348,43 @@ body[data-viewport="phone"] .overlay-card {
   margin: 0;
   color: var(--amber);
 }
+
+/* ─── OAuthCallback (Welle WV.D.3.f V1) ───────────────────── */
+.oauth-callback-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--space-lg);
+  background: var(--bg);
+  color: var(--text);
+}
+.oauth-callback-msg {
+  font-size: var(--fs-small);
+  color: var(--text2);
+}
+.oauth-callback-success {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.oauth-callback-success h2 {
+  margin: 0;
+  color: var(--teal);
+}
+.oauth-callback-error {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: 0.0625rem solid var(--red, #c0392b);
+  border-radius: var(--rs);
+  background: var(--bg2);
+  max-width: 28rem;
+}
+.oauth-callback-error h2 {
+  margin: 0;
+  color: var(--red, #c0392b);
+}

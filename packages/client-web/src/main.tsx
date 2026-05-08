@@ -6,6 +6,7 @@ import Agenda from './routes/Agenda';
 import Calendar from './routes/Calendar';
 import Invite from './routes/Invite';
 import Login from './routes/Login';
+import OAuthCallback from './routes/OAuthCallback';
 import ObjectDetail from './routes/ObjectDetail';
 import ObjectsList from './routes/ObjectsList';
 import Onboarding from './routes/Onboarding';
@@ -58,6 +59,7 @@ render(
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/invite/:token" component={Invite} />
       <Route path="/onboarding" component={Onboarding} />
+      <Route path="/oauth/callback" component={OAuthCallback} />
       <Route path="/admin" component={Admin} />
       <Route path="/w/:workspaceId" component={Workspace} />
       <Route path="/w/:workspaceId/n/:nodeId" component={Workspace} />

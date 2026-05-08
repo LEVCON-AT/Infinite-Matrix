@@ -17,9 +17,15 @@ import {
 } from '../../lib/channels-meta';
 import { showConfirm } from '../../lib/dialog';
 import { translateDbError } from '../../lib/errors';
-import { deleteOAuthToken, fetchOAuthTokens, tokenStatusFor } from '../../lib/oauth-tokens';
+import { startOAuthFlow, supportsBrowserPkce } from '../../lib/oauth-flow';
+import {
+  deleteOAuthToken,
+  fetchOAuthProviderSlots,
+  fetchOAuthTokens,
+  tokenStatusFor,
+} from '../../lib/oauth-tokens';
 import { showToast } from '../../lib/toasts';
-import type { ChannelProvider, UserOAuthTokenSafe } from '../../lib/types';
+import type { ChannelProvider, OAuthProviderSlotSafe, UserOAuthTokenSafe } from '../../lib/types';
 
 const AccountChannels: Component = () => {
   const user = useUser();
@@ -39,6 +45,53 @@ const AccountChannels: Component = () => {
       }
     },
   );
+
+  // Provider-Slots (admin-konfigurierbar, RLS platform_admin-only).
+  // Frontend rendert „OAuth verbinden"-Button nur wenn Slot fuer den
+  // Provider configured ist. Nicht-Admin-User bekommen leere Liste,
+  // dann fallback auf Manual-Paste.
+  const [slots] = createResource<OAuthProviderSlotSafe[]>(async () => {
+    try {
+      return await fetchOAuthProviderSlots();
+    } catch {
+      return [];
+    }
+  });
+
+  const slotFor = (provider: ChannelProvider): OAuthProviderSlotSafe | null => {
+    return slots()?.find((s) => s.provider === provider) ?? null;
+  };
+
+  const canUseBrowserOauth = (provider: ChannelProvider): boolean => {
+    if (!supportsBrowserPkce(provider)) return false;
+    const slot = slotFor(provider);
+    if (!slot) return false;
+    return Boolean(slot.client_id && slot.auth_url && slot.token_url);
+  };
+
+  const handleConnectOAuth = async (provider: ChannelProvider) => {
+    const slot = slotFor(provider);
+    if (!slot) {
+      showToast('Provider-Slot nicht konfiguriert (Admin).', 'error');
+      return;
+    }
+    setBusyProvider(provider);
+    try {
+      const flow = await startOAuthFlow({ provider, slot });
+      const result = await flow.done;
+      if (result.ok) {
+        showToast(`${CHANNEL_PROVIDER_LABEL[provider]} verbunden.`, 'success');
+        void refetch();
+      } else if (result.reason !== 'popup_closed') {
+        showToast(`${CHANNEL_PROVIDER_LABEL[provider]}: ${result.reason}`, 'error');
+      }
+    } catch (err) {
+      console.error('startOAuthFlow:', err);
+      showToast(err instanceof Error ? err.message : 'OAuth-Flow fehlgeschlagen.', 'error');
+    } finally {
+      setBusyProvider(null);
+    }
+  };
 
   const handleDisconnect = async (provider: ChannelProvider) => {
     const ok = await showConfirm({
@@ -144,14 +197,39 @@ const AccountChannels: Component = () => {
               </>
             }
           >
-            <button
-              type="button"
-              class="btn-primary btn-small"
-              onClick={() => setSetupProvider(provider)}
-              disabled={busyProvider() === provider}
+            <Show
+              when={canUseBrowserOauth(provider)}
+              fallback={
+                <button
+                  type="button"
+                  class="btn-primary btn-small"
+                  onClick={() => setSetupProvider(provider)}
+                  disabled={busyProvider() === provider}
+                  title="Manuell Token einfuegen"
+                >
+                  Verbinden
+                </button>
+              }
             >
-              Verbinden
-            </button>
+              <button
+                type="button"
+                class="btn-primary btn-small"
+                onClick={() => void handleConnectOAuth(provider)}
+                disabled={busyProvider() === provider}
+                title="OAuth-Flow im Popup oeffnen"
+              >
+                {busyProvider() === provider ? 'OAuth…' : 'OAuth-Verbinden'}
+              </button>
+              <button
+                type="button"
+                class="btn-subtle btn-small"
+                onClick={() => setSetupProvider(provider)}
+                disabled={busyProvider() === provider}
+                title="Manuell Token einfuegen (Fallback)"
+              >
+                Manuell
+              </button>
+            </Show>
           </Show>
         </div>
       </article>
