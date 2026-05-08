@@ -174,6 +174,13 @@ const SidebarDayView: Component<Props> = (p) => {
       );
       return;
     }
+    if (e.atomType === 'info_field') {
+      showToast(
+        'Datums-Termine aus Info-Feldern werden automatisch erzeugt. Aendere das Feld direkt in der Cell.',
+        'info',
+      );
+      return;
+    }
     openManifestationModal({
       workspaceId: p.workspaceId,
       atomType: e.atomType === 'doc' ? 'task' : e.atomType,

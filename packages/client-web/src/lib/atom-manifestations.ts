@@ -233,12 +233,37 @@ function validateAtomManifInput(input: AddAtomManifInput): void {
         `atom_manifestation kind='${input.kind}' darf kein containerKind haben (implizit aus kind)`,
       );
     }
-  } else if (input.kind === 'calendar' || input.kind === 'standalone') {
+  } else if (input.kind === 'calendar') {
+    // Standalone-Calendar: kein Container. Auto-Mirror aus
+    // info_field(value_type='date') (WV.E #37): container_id + cell.
+    if (input.containerId && input.containerKind !== 'cell') {
+      throw new Error(
+        "atom_manifestation kind='calendar' mit containerId braucht containerKind='cell'",
+      );
+    }
+    if (!input.containerId && input.containerKind != null) {
+      throw new Error(
+        "atom_manifestation kind='calendar' ohne containerId darf kein containerKind haben",
+      );
+    }
+  } else if (input.kind === 'standalone') {
     if (input.containerId) {
-      throw new Error(`atom_manifestation kind='${input.kind}' darf keinen containerId haben`);
+      throw new Error("atom_manifestation kind='standalone' darf keinen containerId haben");
     }
     if (input.containerKind != null) {
-      throw new Error(`atom_manifestation kind='${input.kind}' darf kein containerKind haben`);
+      throw new Error("atom_manifestation kind='standalone' darf kein containerKind haben");
+    }
+  } else if (input.kind === 'info') {
+    // WV.B.1 + WV.E #37: Cell-Info-Section-Manifestation.
+    if (!input.containerId) {
+      throw new Error("atom_manifestation kind='info' braucht containerId");
+    }
+    if (
+      input.containerKind !== 'cell' &&
+      input.containerKind !== 'atom' &&
+      input.containerKind !== 'node'
+    ) {
+      throw new Error("atom_manifestation kind='info' braucht containerKind ∈ {cell, atom, node}");
     }
   } else if (input.kind === 'pinned') {
     if (!input.containerId) {
@@ -343,6 +368,20 @@ export async function updateAtomManifestation(
 }
 
 export async function removeAtomManifestation(id: string): Promise<void> {
+  // WV.E #37: Auto-Manifestations (display_meta.auto=true) sind System-
+  // gepflegt — Manual-Delete waere wirkungslos (Trigger re-creates beim
+  // naechsten info_field-Update). Wir blocken den Delete und toasten
+  // dem User stattdessen den richtigen Pfad: info_field aendern oder
+  // Vorlage-Toggle.
+  const cached = await getById<AtomManifestationRow>(ATOM_MANIF_TABLE, id);
+  if (cached?.display_meta && (cached.display_meta as Record<string, unknown>).auto === true) {
+    showToast(
+      'Diese Calendar-Anzeige wird automatisch aus dem Datums-Feld erzeugt. Aendere das Feld direkt oder schalte den Auto-Calendar-Toggle in der Vorlage aus.',
+      'info',
+    );
+    return;
+  }
+
   // workspace_id wird aus dem Cache gezogen (runOptimisticDelete-API);
   // fuer Replay-Korrektheit bei Offline-Delete koennten wir explizit
   // vorher den Row laden, aber der Cache-Lookup deckt das ab.

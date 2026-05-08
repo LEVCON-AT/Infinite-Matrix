@@ -791,6 +791,41 @@ const WidgetInspector = (p: {
         </span>
       </fieldset>
 
+      {/* Welle WV.E #37 — Auto-Calendar-Toggle fuer Form-Widgets.
+          Wenn ein info_field mit value_type='date' im Widget liegt,
+          erzeugt Migration 082 automatisch eine Calendar-Manifestation
+          pro Cell. Default true. V1 expose-only — der Calendar-Renderer
+          honoriert den Toggle in der Folge-Welle (V1.5: cell -> template_widget
+          -> toggle-Filter). Bis dahin: Trigger immer aktiv, Manual-Delete
+          per Toast geblockt (lib/atom-manifestations.ts). */}
+      <Show when={p.widget.type === 'info'}>
+        <div class="designer-inspector-field">
+          <label class="designer-inspector-label">
+            <input
+              type="checkbox"
+              checked={
+                ((p.widget.toggles as { date_field_auto_calendar?: boolean })
+                  ?.date_field_auto_calendar ?? true) === true
+              }
+              disabled={p.disabled}
+              onChange={(e) =>
+                void p.onPatch({
+                  toggles: {
+                    ...(p.widget.toggles ?? {}),
+                    date_field_auto_calendar: e.currentTarget.checked,
+                  },
+                })
+              }
+            />
+            <span>Datums-Felder automatisch im Kalender</span>
+          </label>
+          <span class="adapter-dialog-field-hint">
+            Date-Info-Felder erzeugen automatisch einen Kalender-Eintrag in der Cell. (Renderer-
+            Filter folgt — V1 schreibt nur die User-Praeferenz, Trigger laufen unabhaengig.)
+          </span>
+        </div>
+      </Show>
+
       <details class="designer-inspector-toggles">
         <summary>Toggles ({Object.keys(p.widget.toggles).length})</summary>
         <p class="adapter-dialog-field-hint">

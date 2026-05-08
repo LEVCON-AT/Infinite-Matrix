@@ -231,6 +231,16 @@ const Calendar: Component = () => {
       });
       return;
     }
+    // WV.E #37: info_field-Auto-Manifs sind System-gepflegt. Edit
+    // zielt auf das info_field selbst (Cell-Info-Section), nicht das
+    // Manif. Toast verlinkt den richtigen Pfad.
+    if (e.atomType === 'info_field') {
+      showToast(
+        'Datums-Termine aus Info-Feldern werden automatisch erzeugt. Aendere das Feld direkt in der Cell.',
+        'info',
+      );
+      return;
+    }
     openManifestationModal({
       workspaceId: params.workspaceId,
       atomType: e.atomType,

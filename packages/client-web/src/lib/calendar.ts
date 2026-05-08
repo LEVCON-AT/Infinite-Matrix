@@ -136,7 +136,8 @@ export type CalendarEvent = {
   // wir fuer Backward-Compat in Render-Komponenten, die schon taskId
   // lesen — dort fungiert der Wert als generischer Atom-Key.
   // Welle I: 'imported_event' als 5. Type — Source-Tabelle external_events.
-  atomType: 'task' | 'link' | 'checklist' | 'doc' | 'imported_event';
+  // WV.E #37: 'info_field' als 6. Type — Auto-Mirror aus info_fields(value_type='date').
+  atomType: 'task' | 'link' | 'checklist' | 'doc' | 'imported_event' | 'info_field';
   atomId: string;
   taskId: string; // = atomId; bleibt drin damit bestehender Render-Code unveraendert bleibt
   manifId: string | null; // null = virtual aus tasks.deadline
@@ -177,7 +178,7 @@ export function buildEvents(args: {
   // Optional — alte Aufrufer geben das Feld nicht mit, dann nur task-Events.
   atomManifestations?: Array<{
     id: string;
-    atom_type: 'link' | 'checklist' | 'doc' | 'imported_event';
+    atom_type: 'link' | 'checklist' | 'doc' | 'imported_event' | 'info_field';
     atom_id: string;
     label: string;
     display_meta: Record<string, unknown>;
