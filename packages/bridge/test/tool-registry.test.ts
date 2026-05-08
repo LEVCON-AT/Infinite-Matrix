@@ -13,7 +13,7 @@ describe('registerAllTools() Integration', () => {
     const names = [...tools.keys()].sort();
 
     // Vollständige Liste aller Tools (Phase 4 + V2.1 + V2.2 + Welle D
-    // atom_pin / tag / doc.pin)
+    // atom_pin / tag / doc.pin + Welle WV.A Vorlagen-Foundation)
     const expected = [
       'alias.resolve',
       'alias.set',
@@ -32,6 +32,11 @@ describe('registerAllTools() Integration', () => {
       'cell.alias.set',
       'cell.feature.add',
       'cell.get',
+      'cell_template.apply',
+      'cell_template.list',
+      'cell_template.override.reset',
+      'cell_template.override.set',
+      'cell_template.remove',
       'checklist.add',
       'checklist.clone',
       'checklist.close',
@@ -49,6 +54,13 @@ describe('registerAllTools() Integration', () => {
       'col.add',
       'col.delete',
       'doc.pin',
+      'feature_template.create',
+      'feature_template.delete',
+      'feature_template.list',
+      'hotkey_slot.clear',
+      'hotkey_slot.list',
+      'hotkey_slot.set.user',
+      'hotkey_slot.set.workspace',
       'info.field.add',
       'info.field.delete',
       'info.field.update',
@@ -64,6 +76,9 @@ describe('registerAllTools() Integration', () => {
       'query.cards',
       'row.add',
       'row.delete',
+      'saved_filter.create',
+      'saved_filter.delete',
+      'saved_filter.list',
       'settings.get',
       'settings.set',
       'status',
@@ -80,7 +95,7 @@ describe('registerAllTools() Integration', () => {
     ];
 
     expect(names).toEqual(expected);
-    expect(tools.size).toBe(62);
+    expect(tools.size).toBe(77);
   });
 
   it('jedes registrierte Tool hat schema + jsonSchema', () => {
