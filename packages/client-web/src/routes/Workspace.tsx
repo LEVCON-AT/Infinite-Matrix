@@ -16,6 +16,7 @@ import CellChecklistsPage from '../components/CellChecklistsPage';
 import CellDocsPage from '../components/CellDocsPage';
 import CellInfoPage from '../components/CellInfoPage';
 import CellSummaryPage from '../components/CellSummaryPage';
+import CellTemplateRenderer from '../components/CellTemplateRenderer';
 import CommandPalette from '../components/CommandPalette';
 import ContextMenu from '../components/ContextMenu';
 import CreateManifestationModal from '../components/CreateManifestationModal';
@@ -56,14 +57,23 @@ import { installBulkHotkeys } from '../lib/bulk-hotkeys';
 import { openBulkWizard, openDangerousDelete } from '../lib/bulk-wizard-state';
 import { buildEvents, isoDate } from '../lib/calendar';
 import { installCellSelectionAutoClear, selectionCount } from '../lib/cell-selection';
+import {
+  fetchCellTemplateInstancesForWorkspace,
+  fetchCellWidgetOverridesForWorkspace,
+} from '../lib/cell-templates';
 import { installCrossViewTabDrop } from '../lib/cross-view-tab-drop';
 import {
   fetchUserHotkeySlots,
   fetchWorkspaceHotkeySlots,
   resolveSlotTemplateId,
 } from '../lib/hotkey-slots';
-import { fetchFeatureTemplatesForWorkspace } from '../lib/templates';
+import {
+  fetchFeatureTemplatesForWorkspace,
+  fetchTemplateSectionsForWorkspace,
+  fetchTemplateWidgetsForWorkspace,
+} from '../lib/templates';
 import { useMobile } from '../lib/use-mobile';
+import { fetchWidgetChannels } from '../lib/widget-channels';
 
 // addMonthsToDate: lokale Monatsverschiebung ohne UTC-Drift. Nicht in
 // lib/calendar.ts weil dort addMonths nur ISO-Strings nimmt.
@@ -212,15 +222,18 @@ const Workspace: Component = () => {
 
   // Zell-Page-Section: der letzte URL-Segment hinter /c/:cellId/ entscheidet,
   // welches Feature-Panel gerendert wird.
-  const cellSection = createMemo<'checklists' | 'info' | 'docs' | 'summary' | null>(() => {
-    const p = location.pathname;
-    if (!params.cellId) return null;
-    if (p.endsWith('/checklists')) return 'checklists';
-    if (p.endsWith('/info')) return 'info';
-    if (p.endsWith('/docs')) return 'docs';
-    if (p.endsWith('/summary')) return 'summary';
-    return null;
-  });
+  const cellSection = createMemo<'checklists' | 'info' | 'docs' | 'summary' | 'templates' | null>(
+    () => {
+      const p = location.pathname;
+      if (!params.cellId) return null;
+      if (p.endsWith('/checklists')) return 'checklists';
+      if (p.endsWith('/info')) return 'info';
+      if (p.endsWith('/docs')) return 'docs';
+      if (p.endsWith('/summary')) return 'summary';
+      if (p.endsWith('/templates')) return 'templates';
+      return null;
+    },
+  );
 
   // Abgeleitetes Feature-Signal fuer NodeTree-Highlight + Presence-Payload.
   // Nur die klassischen Cell-Features (info/checklists/docs) werden hier
@@ -917,6 +930,48 @@ const Workspace: Component = () => {
     async (wsId) => (wsId ? await fetchFeatureTemplatesForWorkspace(wsId) : []),
   );
 
+  // ─── Welle WV.D.3.h — Wiring CellTemplateRenderer ─────────────
+  // Pro Workspace einmal die Sub-Tabellen laden — CellTemplateRenderer
+  // bekommt sie als WidgetFoundationSources. Refetch-Trigger nach
+  // Channel-Pick / Vorlage-Apply per onChannelChanged.
+  const [wsTemplateSections, { refetch: refetchTemplateSections }] = createResource(
+    () => params.workspaceId ?? null,
+    async (wsId) => (wsId ? await fetchTemplateSectionsForWorkspace(wsId) : []),
+  );
+  const [wsTemplateWidgets, { refetch: refetchTemplateWidgets }] = createResource(
+    () => params.workspaceId ?? null,
+    async (wsId) => (wsId ? await fetchTemplateWidgetsForWorkspace(wsId) : []),
+  );
+  const [wsCellTemplateInstances, { refetch: refetchCellTemplateInstances }] = createResource(
+    () => params.workspaceId ?? null,
+    async (wsId) => (wsId ? await fetchCellTemplateInstancesForWorkspace(wsId) : []),
+  );
+  const [wsCellWidgetOverrides, { refetch: refetchCellWidgetOverrides }] = createResource(
+    () => params.workspaceId ?? null,
+    async (wsId) => (wsId ? await fetchCellWidgetOverridesForWorkspace(wsId) : []),
+  );
+  const [wsWidgetChannels, { refetch: refetchWidgetChannels }] = createResource(
+    () => params.workspaceId ?? null,
+    async (wsId) => (wsId ? await fetchWidgetChannels(wsId) : []),
+  );
+
+  const widgetFoundationSources = createMemo(() => ({
+    templates: featureTemplates() ?? [],
+    sections: wsTemplateSections() ?? [],
+    widgets: wsTemplateWidgets() ?? [],
+    cellInstances: wsCellTemplateInstances() ?? [],
+    overrides: wsCellWidgetOverrides() ?? [],
+    widgetChannels: wsWidgetChannels() ?? [],
+  }));
+
+  // Set der cells mit cell_template_instances — fuer die derived
+  // „Vorlagen"-Pill in MatrixView. Pendant zu cellsWithDocs.
+  const cellsWithTemplates = createMemo<Set<string>>(() => {
+    const out = new Set<string>();
+    for (const i of wsCellTemplateInstances() ?? []) out.add(i.cell_id);
+    return out;
+  });
+
   installCellSelectionAutoClear({
     isEditMode: editMode,
     workspaceId: () => params.workspaceId ?? null,
@@ -1195,6 +1250,17 @@ const Workspace: Component = () => {
       objects: () => {
         void refetchObjects();
       },
+      // Welle WV.A.6 / WV.D.3.h — Templates-Sub-Tabellen. Andere User
+      // editieren Vorlagen-Sections/Widgets/Instances/Overrides → Cells
+      // re-rendern automatisch. cell_template_instances + cell_widget_overrides
+      // brauchen Refetch wenn Bulk-Wizard auf einer anderen Tab Cells
+      // mit Vorlagen versorgt. widget_external_channels triggert
+      // ChannelWidget-Refresh nach Channel-Pick eines anderen Members.
+      template_sections: () => void refetchTemplateSections(),
+      template_widgets: () => void refetchTemplateWidgets(),
+      cell_template_instances: () => void refetchCellTemplateInstances(),
+      cell_widget_overrides: () => void refetchCellWidgetOverrides(),
+      widget_external_channels: () => void refetchWidgetChannels(),
     });
   });
 
@@ -1841,6 +1907,15 @@ const Workspace: Component = () => {
                         wsManifestations={wsManifestations() ?? []}
                       />
                     </Show>
+                    <Show when={cellSection() === 'templates'}>
+                      <CellTemplateRenderer
+                        cellId={cell().id}
+                        workspaceId={cell().workspace_id}
+                        sources={widgetFoundationSources()}
+                        editMode={editMode()}
+                        onChannelChanged={() => void refetchWidgetChannels()}
+                      />
+                    </Show>
                   </section>
                 )}
               </Show>
@@ -1878,6 +1953,7 @@ const Workspace: Component = () => {
                         matrixId={node().id}
                         content={matrixContent()}
                         cellsWithDocs={cellsWithDocs() ?? new Set<string>()}
+                        cellsWithTemplates={cellsWithTemplates()}
                         wsNodes={nodes() ?? []}
                         wsCells={cells() ?? []}
                         wsRows={rows() ?? []}

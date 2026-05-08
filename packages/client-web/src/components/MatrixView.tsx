@@ -94,6 +94,9 @@ type Props = {
   // Set der cell_ids mit angehaengten Docs — fuer die derived
   // Doku-Pill. Workspace-weit; Matrix filtert clientseitig.
   cellsWithDocs: Set<string>;
+  // Welle WV.D.3.h — Set der cell_ids mit cell_template_instances.
+  // Pill „Vorlagen" navigiert zu /c/<id>/templates → CellTemplateRenderer.
+  cellsWithTemplates: Set<string>;
   // Workspace-weite Daten fuer die Aggregat-Sektion unter der
   // Matrix (Intervallmatrix / Aufgabenuebersicht). Koennen
   // undefined sein, wenn die Resources noch laden — die Sektion
@@ -1089,7 +1092,9 @@ const MatrixView: Component<Props> = (p) => {
                                   when={(() => {
                                     const c = cell();
                                     return (
-                                      features().length > 0 || (c && p.cellsWithDocs.has(c.id))
+                                      features().length > 0 ||
+                                      (c && p.cellsWithDocs.has(c.id)) ||
+                                      (c && p.cellsWithTemplates.has(c.id))
                                     );
                                   })()}
                                 >
@@ -1118,6 +1123,27 @@ const MatrixView: Component<Props> = (p) => {
                                         );
                                       }}
                                     </For>
+                                    <Show
+                                      when={(() => {
+                                        const c = cell();
+                                        return c ? p.cellsWithTemplates.has(c.id) : false;
+                                      })()}
+                                    >
+                                      {/* biome-ignore lint/a11y/useKeyWithClickEvents: Chip-Klick oeffnet Vorlagen-Section; Tastatur via Matrix-Navigation. */}
+                                      <span
+                                        class="mx-feat-chip mx-feat-chip-link"
+                                        data-feat="templates"
+                                        title="Vorlagen dieser Zelle oeffnen"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const c = cell();
+                                          if (!c) return;
+                                          navigate(`/w/${p.workspaceId}/c/${c.id}/templates`);
+                                        }}
+                                      >
+                                        <Icon name="squares-2x2" size={14} />
+                                      </span>
+                                    </Show>
                                     <Show
                                       when={(() => {
                                         const c = cell();
