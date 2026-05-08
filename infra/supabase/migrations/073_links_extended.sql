@@ -48,7 +48,19 @@ ALTER TABLE public.links ADD COLUMN IF NOT EXISTS click_count integer NOT NULL D
 -- type='url' → 'url'. Andere Werte gibt es nicht (Enum link_type).
 -- Heuristik fuer Brand-Provider (onenote/notion/...) entfaellt —
 -- User hat keine Bestandsdaten (Clean-Cut, §12.3.2 Hinweis).
-UPDATE public.links SET provider = type::text WHERE provider IS NULL;
+-- Idempotent: nur wenn type-Spalte noch existiert. Bei Re-Apply auf
+-- bereits migrierten Stand uebersprungen.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'links'
+      AND column_name = 'type'
+  ) THEN
+    EXECUTE 'UPDATE public.links SET provider = type::text WHERE provider IS NULL';
+  END IF;
+END $$;
 
 -- Stage 3: provider NOT NULL + CHECK (15 Werte aus §12.3.2).
 ALTER TABLE public.links ALTER COLUMN provider SET NOT NULL;
