@@ -59,9 +59,9 @@ export type KbLinkCardModel = {
   label: string; // LinkRow.label
   url: string; // LinkRow.url
   alias: string | null;
-  // V1: URL-Provider („url" oder „mail") aus LinkRow.type. Welle B
-  // erweitert auf 15 Provider via links.provider-Spalte.
-  linkType: LinkRow['type'];
+  // WV.B.2: links.provider — 15 Werte (url/mail/onenote/...).
+  // Frueher LinkRow.type — seit Migration 073 umbenannt zu provider.
+  linkType: LinkRow['provider'];
 };
 
 export type KbChecklistCardModel = {
@@ -147,7 +147,7 @@ export function kbCardModelFromManif(
       label: link.label,
       url: link.url,
       alias: link.alias,
-      linkType: link.type,
+      linkType: link.provider,
     };
   }
 

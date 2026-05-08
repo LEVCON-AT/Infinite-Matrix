@@ -71,7 +71,13 @@ export type RealtimeTable =
   | 'user_hotkey_slots'
   // Welle WV.A.4 — Filter-Definitionen. Workspace-shared muss
   // cross-user live aktualisiert werden, user-privat cross-tab.
-  | 'saved_filters';
+  | 'saved_filters'
+  // Welle WV.B — typed Cell-Info-Felder + User-Markierungen.
+  // info_fields: workspace-wide. atom_markers: kind=star Workspace-shared
+  // (alle sehen Counter+User-Liste live), kind=eye User-privat
+  // (RLS filtert Subscribe).
+  | 'info_fields'
+  | 'atom_markers';
 
 export type RealtimeBumps = Partial<Record<RealtimeTable, () => void>>;
 
@@ -96,6 +102,8 @@ const DIRECT_TABLES: Array<Exclude<RealtimeTable, 'kb_cards' | 'checklist_items'
   'workspace_hotkey_slots',
   'user_hotkey_slots',
   'saved_filters',
+  'info_fields',
+  'atom_markers',
 ];
 
 type AtomManifPayload = {

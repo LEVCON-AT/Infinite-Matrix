@@ -347,6 +347,44 @@ const CHECKLIST_ATTRS: ReadonlyArray<AtomFilterAttribute> = [
   },
 ];
 
+// WV.B.1 — Info-Field-Atom (Migration 072). 6. Atom-Type, lebt in
+// info_fields-Tabelle. value_type-CHECK fuer 10 Werte (§12.1).
+const INFO_FIELD_ATTRS: ReadonlyArray<AtomFilterAttribute> = [
+  {
+    key: 'label',
+    label: 'Bezeichnung',
+    fieldType: 'text',
+    source: { kind: 'column', column: 'label' },
+    operators: defaultOperatorsFor('text'),
+  },
+  {
+    key: 'value',
+    label: 'Wert',
+    fieldType: 'text',
+    source: { kind: 'column', column: 'value' },
+    operators: ['contains', 'eq', 'is-empty', 'is-not-empty'],
+  },
+  {
+    key: 'value_type',
+    label: 'Feld-Typ',
+    fieldType: 'enum',
+    source: { kind: 'column', column: 'value_type' },
+    operators: defaultOperatorsFor('enum'),
+    enumValues: [
+      { value: 'text', label: 'Text' },
+      { value: 'number', label: 'Zahl' },
+      { value: 'date', label: 'Datum' },
+      { value: 'currency', label: 'Waehrung' },
+      { value: 'boolean', label: 'Ja/Nein' },
+      { value: 'email', label: 'E-Mail' },
+      { value: 'phone', label: 'Telefon' },
+      { value: 'url', label: 'URL' },
+      { value: 'enum', label: 'Auswahl' },
+      { value: 'alias-ref', label: 'Alias-Verweis' },
+    ],
+  },
+];
+
 const IMPORTED_EVENT_ATTRS: ReadonlyArray<AtomFilterAttribute> = [
   {
     key: 'summary',
@@ -418,6 +456,7 @@ const ATOM_FILTER_ATTRS_TABLE = {
   doc: [...DOC_ATTRS, ...COMMON_ATTRS],
   checklist: [...CHECKLIST_ATTRS, ...COMMON_ATTRS],
   imported_event: [...IMPORTED_EVENT_ATTRS, ...COMMON_ATTRS],
+  info_field: [...INFO_FIELD_ATTRS, ...COMMON_ATTRS],
 } as const satisfies Record<AtomKind, ReadonlyArray<AtomFilterAttribute>>;
 
 export function attrsFor(kind: AtomKind): ReadonlyArray<AtomFilterAttribute> {
@@ -464,12 +503,24 @@ export type SavedFilterBody = {
 
 // Defensive Decoder fuer SavedFilter aus untrusted Sources (Import,
 // MCP-Payload). Returns null bei Schema-Drift.
+const VALID_SAVED_FILTER_ATOM_KINDS: ReadonlySet<AtomKind> = new Set([
+  'task',
+  'link',
+  'doc',
+  'checklist',
+  'imported_event',
+  'info_field',
+]);
+
 export function isSavedFilterBody(raw: unknown): raw is SavedFilterBody {
   if (typeof raw !== 'object' || raw === null) return false;
   const o = raw as Record<string, unknown>;
   if (o.v !== 1) return false;
-  if (o.atomKind !== 'task' && o.atomKind !== 'link' && o.atomKind !== 'doc') {
-    if (o.atomKind !== 'checklist' && o.atomKind !== 'imported_event') return false;
+  if (
+    typeof o.atomKind !== 'string' ||
+    !VALID_SAVED_FILTER_ATOM_KINDS.has(o.atomKind as AtomKind)
+  ) {
+    return false;
   }
   if (o.logic !== 'and' && o.logic !== 'or') return false;
   if (!Array.isArray(o.conditions)) return false;

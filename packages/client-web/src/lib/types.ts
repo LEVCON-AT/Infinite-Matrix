@@ -248,13 +248,47 @@ export type ChecklistItemRow = {
   position: number;
 };
 
+// WV.B.2 — links-EXTENDED: type → provider. 15 Provider aus
+// Konzept §12.3.2. Backward-compat-Alias `LinkType` exportiert
+// die enge V1-Domain (url/mail) weiter, neue Code-Pfade nutzen
+// `LinkProvider`.
+export type LinkProvider =
+  | 'url'
+  | 'mail'
+  | 'mail-generic'
+  | 'onenote'
+  | 'notion'
+  | 'onedrive'
+  | 'drive'
+  | 'dropbox'
+  | 'nextcloud'
+  | 'slack'
+  | 'teams'
+  | 'whatsapp'
+  | 'discord'
+  | 'telegram'
+  | 'filesystem';
+
+// Backward-compat: Code-Pfade die vor WV.B nur 'url'|'mail' kannten.
+// Neuer Code nutzt LinkProvider.
 export type LinkType = 'url' | 'mail';
 
 export type LinkRow = {
   id: string;
   workspace_id: string;
   board_id: string;
-  type: LinkType;
+  // WV.B.2: provider statt type. Migration 073 hat type-Spalte
+  // gedroppt + provider mit CHECK auf 15 Werte hinzugefuegt.
+  provider: LinkProvider;
+  // WV.B.2: Provider-spezifische Metadaten (z.B. {channel_id} bei slack,
+  // {notebook_id, section_id, page_id} bei onenote).
+  provider_meta: Record<string, unknown>;
+  // WV.B.6 Symbol-System: User-Override gegenueber Auto-Symbol.
+  // NULL = Auto-Logik aus lib/symbol-resolution.ts.
+  symbol_override: string | null;
+  // WV.B.2: Click-Counter fuer „beliebte Links"-Sortierung.
+  // Inkrement via mcp_increment_link_click_count RPC.
+  click_count: number;
   label: string;
   url: string;
   alias: string | null;
@@ -389,7 +423,8 @@ export type WorkspaceTag = {
 
 export type AtomTag = {
   id: string;
-  atom_type: 'task' | 'link' | 'doc' | 'checklist' | 'imported_event';
+  // WV.B.1 erweitert um 'info_field' (atom_type-ENUM Migration 072).
+  atom_type: 'task' | 'link' | 'doc' | 'checklist' | 'imported_event' | 'info_field';
   atom_id: string;
   workspace_id: string;
   tag_id: string;
@@ -758,6 +793,49 @@ export type UserHotkeySlotRow = {
   set_at: string;
 };
 
+// WV.B.1 — Info-Felder (Migration 072). 6. Atom-Type. value_type
+// CHECK ueber 10 Werte aus Konzept §12.1.
+export type InfoFieldValueType =
+  | 'text'
+  | 'number'
+  | 'date'
+  | 'currency'
+  | 'boolean'
+  | 'email'
+  | 'phone'
+  | 'url'
+  | 'enum'
+  | 'alias-ref';
+
+export type InfoFieldRow = {
+  id: string;
+  workspace_id: string;
+  label: string;
+  value: string | null;
+  value_type: InfoFieldValueType;
+  // value_meta: typed Erweiterungen (z.B. {min,max,step,unit} bei number).
+  value_meta: Record<string, unknown>;
+  // WV.B.6 Symbol-System: User-Override fuer Auto-Symbol. NULL = Auto.
+  symbol_override: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// WV.B.3 — Atom-Markers (Migration 074). Polymorphe User-Markierungen.
+// kind=star Workspace-shared, kind=eye User-privat (RLS).
+export type AtomMarkerKind = 'star' | 'eye';
+
+export type AtomMarkerRow = {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  kind: AtomMarkerKind;
+  // Polymorphe Atom-Referenz — atom_type bestimmt Source-Tabelle.
+  atom_type: 'task' | 'link' | 'doc' | 'checklist' | 'imported_event' | 'info_field';
+  atom_id: string;
+  created_at: string;
+};
+
 // WV.A.4 — Saved-Filter (Migration 070). body folgt
 // SavedFilterBody aus lib/atom-filter-attrs.ts. owner_user_id NULL =
 // Workspace-shared, sonst User-privat.
@@ -766,7 +844,7 @@ export type SavedFilterRow = {
   workspace_id: string;
   owner_user_id: string | null;
   name: string;
-  atom_kind: 'task' | 'link' | 'doc' | 'checklist' | 'imported_event';
+  atom_kind: 'task' | 'link' | 'doc' | 'checklist' | 'imported_event' | 'info_field';
   // jsonb-Body — Caller dekodiert via isSavedFilterBody aus
   // lib/atom-filter-attrs.ts (defensiver Decoder).
   body: Record<string, unknown>;

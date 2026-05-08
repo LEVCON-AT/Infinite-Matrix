@@ -25,9 +25,17 @@ import { supabase } from './supabase';
 import { showToast, showUndoToast } from './toasts';
 
 // Welle I: 'imported_event' als 5. atom_type. Source-Tabelle external_events.
-export type AtomKind = 'task' | 'link' | 'doc' | 'checklist' | 'imported_event';
+// WV.B.1: 'info_field' als 6. atom_type. Source-Tabelle info_fields (Migration 072).
+export type AtomKind = 'task' | 'link' | 'doc' | 'checklist' | 'imported_event' | 'info_field';
 // WV.WV.1: 'pinned' als 5. kind (atom_pins-Konsolidierung, Migration 066).
-export type AtomManifestationKind = 'kanban' | 'checklist' | 'calendar' | 'standalone' | 'pinned';
+// WV.B.1: 'info' als 6. kind (Cell-Info-Section-Manifestation, Migration 072).
+export type AtomManifestationKind =
+  | 'kanban'
+  | 'checklist'
+  | 'calendar'
+  | 'standalone'
+  | 'pinned'
+  | 'info';
 
 // WV.WV.1: container_kind fuer kind='pinned' diskriminiert das Container-Target.
 // 'manifestation' war als parent_kind in atom_pins V2-deferred (Migration 064:62-64
@@ -138,7 +146,7 @@ export async function fetchAtomCalendarManifestations(
 
     const [linksRes, checklistsRes] = await Promise.all([
       linkIds.length > 0
-        ? supabase.from('links').select('id, label, url, type').in('id', linkIds)
+        ? supabase.from('links').select('id, label, url, provider').in('id', linkIds)
         : Promise.resolve({ data: [], error: null } as const),
       checklistIds.length > 0
         ? supabase.from('checklists').select('id, label').in('id', checklistIds)

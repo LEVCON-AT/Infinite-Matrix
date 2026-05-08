@@ -84,8 +84,8 @@ import type {
   InlineChecklistItem,
   KbCardRow,
   KbColRow,
+  LinkProvider,
   LinkRow,
-  LinkType,
   NodeRow,
   RowRow,
   TaskManifestationRow,
@@ -2013,12 +2013,12 @@ export async function delCardInlineItem(cardId: string, itemId: string): Promise
 // ─── Board-Links (links-Tabelle, board_id=X) ───────────────────
 // Eigene Tabelle (nicht JSONB): Sortierung per position, Alias moeglich.
 // URLs gehen durch sanitizeUrl — 'javascript:' etc. werden abgelehnt.
-// type: 'url' (normale Hyperlinks) oder 'mail' (url = reine E-Mail-
-// Adresse, href wird im UI zu mailto:<addr> gebaut).
+// WV.B.2: provider statt type. 15 Werte aus Konzept §12.3.2.
+// V1-Defaults: 'url' fuer normale Hyperlinks, 'mail' fuer mailto-Adressen.
 export async function addBoardLink(args: {
   workspaceId: string;
   boardId: string;
-  type: LinkType;
+  provider: LinkProvider;
   label?: string;
   url: string;
 }): Promise<LinkRow> {
@@ -2035,7 +2035,7 @@ export async function addBoardLink(args: {
         .insert({
           workspace_id: args.workspaceId,
           board_id: args.boardId,
-          type: args.type,
+          provider: args.provider,
           label: (args.label ?? '').trim() || safeUrl,
           url: safeUrl,
           position,
@@ -2056,7 +2056,10 @@ export async function addBoardLink(args: {
         id,
         workspace_id: args.workspaceId,
         board_id: args.boardId,
-        type: args.type,
+        provider: args.provider,
+        provider_meta: {},
+        symbol_override: null,
+        click_count: 0,
         label: (args.label ?? '').trim() || safeUrl,
         url: safeUrl,
         alias: null,
@@ -2070,7 +2073,7 @@ export async function addBoardLink(args: {
 
 async function updateBoardLink(
   linkId: string,
-  patch: Partial<Pick<LinkRow, 'label' | 'url' | 'type' | 'position' | 'alias'>>,
+  patch: Partial<Pick<LinkRow, 'label' | 'url' | 'provider' | 'position' | 'alias'>>,
 ): Promise<LinkRow> {
   return runOptimisticUpdate<LinkRow>({
     table: 'links',
@@ -2100,8 +2103,8 @@ export async function setBoardLinkUrl(linkId: string, url: string): Promise<void
   await updateBoardLink(linkId, { url: safe });
 }
 
-export async function setBoardLinkType(linkId: string, type: LinkType): Promise<void> {
-  await updateBoardLink(linkId, { type });
+export async function setBoardLinkProvider(linkId: string, provider: LinkProvider): Promise<void> {
+  await updateBoardLink(linkId, { provider });
 }
 
 export async function setBoardLinkPosition(linkId: string, position: number): Promise<void> {

@@ -859,10 +859,15 @@ export function buildSidebarTree(
   const docsByCellId = chipData?.docsByCellId ?? new Map<string, DocRow[]>();
 
   function linkEntryFromBoardLink(l: LinkRow): TreeEntry {
+    // WV.B.2: links.provider — der TreeEntry.linkType behaelt nur die
+    // V1-Domain ('url' | 'mail') fuer's Rendering. Brand-Provider
+    // (slack/onenote/...) werden V1 als 'url' gerendert; eigenes
+    // Tree-Icon-Mapping kommt mit dem Symbol-System (lib/symbol-resolution.ts).
+    const treeLinkType: 'url' | 'mail' = l.provider === 'mail' ? 'mail' : 'url';
     return {
       kind: 'link',
       id: `link-board-${l.id}`,
-      linkType: l.type,
+      linkType: treeLinkType,
       label: l.label || l.url,
       url: l.url,
       alias: l.alias,
@@ -925,7 +930,13 @@ export function buildSidebarTree(
     // Board-Node: Chip-Links direkt als Children anhaengen.
     if (node.type === 'board' && linkTypes.size > 0) {
       const links = linksByBoardId.get(node.id) ?? [];
-      const filtered = links.filter((l) => linkTypes.has(l.type));
+      // WV.B.2: provider auf den Tree-Filter-Set (url|mail) projizieren —
+      // Brand-Provider (slack/notion/...) werden hier wie 'url' behandelt
+      // bis Welle B Tree-Filter-Erweiterung pro Provider.
+      const filtered = links.filter((l) => {
+        const t: 'url' | 'mail' = l.provider === 'mail' ? 'mail' : 'url';
+        return linkTypes.has(t);
+      });
       (entry.children as TreeEntry[]).push(...filtered.map(linkEntryFromBoardLink));
       return entry;
     }

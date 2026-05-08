@@ -32,7 +32,7 @@ import {
   restoreCard,
   restoreKbColWithCards,
   setBoardLinkLabel,
-  setBoardLinkType,
+  setBoardLinkProvider,
   setBoardLinkUrl,
   setCardColAndPosition,
   setCardDoneOccurrences,
@@ -53,8 +53,8 @@ import type {
   DocRow,
   KbCardRow,
   KbColRow,
+  LinkProvider,
   LinkRow,
-  LinkType,
   NodeRow,
   TaskManifestationRow,
 } from '../lib/types';
@@ -817,7 +817,7 @@ const BoardView: Component<Props> = (p) => {
     if (!raw) return;
     // Simple Heuristik: enthaelt @ ohne :// → wohl eine Mail.
     const looksLikeMail = raw.includes('@') && !/^[a-z]+:\/\//i.test(raw);
-    const type: LinkType = looksLikeMail ? 'mail' : 'url';
+    const provider: LinkProvider = looksLikeMail ? 'mail' : 'url';
     const label =
       (await showPrompt({
         title: 'Anzeigetext',
@@ -827,7 +827,7 @@ const BoardView: Component<Props> = (p) => {
       await addBoardLink({
         workspaceId: p.workspaceId,
         boardId: p.boardId,
-        type,
+        provider,
         label,
         url: raw,
       });
@@ -885,9 +885,9 @@ const BoardView: Component<Props> = (p) => {
     }
   }
 
-  async function onLinkType(link: LinkRow, type: LinkType) {
-    if (type === link.type) return;
-    await wrap(() => setBoardLinkType(link.id, type));
+  async function onLinkProvider(link: LinkRow, provider: LinkProvider) {
+    if (provider === link.provider) return;
+    await wrap(() => setBoardLinkProvider(link.id, provider));
   }
 
   async function onToggleCardDone(card: KbCardRow, done: boolean) {
@@ -996,19 +996,21 @@ const BoardView: Component<Props> = (p) => {
                     fallback={
                       <a
                         class="board-link-chip"
-                        data-link-type={link.type}
+                        data-link-type={link.provider}
                         href={(() => {
                           // Render-Pfad-Sanitization analog NodeTree.hrefOf.
                           const safe = sanitizeUrl(link.url) ?? '';
-                          return link.type === 'mail' ? `mailto:${safe}` : safe;
+                          return link.provider === 'mail' ? `mailto:${safe}` : safe;
                         })()}
-                        target={link.type === 'url' ? '_blank' : undefined}
-                        rel={link.type === 'url' ? 'noopener noreferrer' : undefined}
+                        target={link.provider === 'url' ? '_blank' : undefined}
+                        rel={link.provider === 'url' ? 'noopener noreferrer' : undefined}
                         title={link.url}
                       >
                         <span class="link-ico">
                           <Icon
-                            name={link.type === 'mail' ? 'envelope' : 'arrow-top-right-on-square'}
+                            name={
+                              link.provider === 'mail' ? 'envelope' : 'arrow-top-right-on-square'
+                            }
                             size={12}
                           />
                         </span>
@@ -1019,13 +1021,16 @@ const BoardView: Component<Props> = (p) => {
                       </a>
                     }
                   >
-                    <div class="board-link-edit" data-link-type={link.type}>
+                    <div class="board-link-edit" data-link-type={link.provider}>
                       <select
                         class="board-link-type"
-                        value={link.type}
+                        value={link.provider}
                         title="Link-Typ"
                         onChange={(e) =>
-                          onLinkType(link, (e.currentTarget as HTMLSelectElement).value as LinkType)
+                          onLinkProvider(
+                            link,
+                            (e.currentTarget as HTMLSelectElement).value as LinkProvider,
+                          )
                         }
                       >
                         <option value="url">URL</option>
@@ -1048,7 +1053,7 @@ const BoardView: Component<Props> = (p) => {
                         class="board-link-url"
                         type="text"
                         value={link.url}
-                        placeholder={link.type === 'mail' ? 'name@example.com' : 'https://...'}
+                        placeholder={link.provider === 'mail' ? 'name@example.com' : 'https://...'}
                         onBlur={(e) => onLinkUrl(link, e.currentTarget.value)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {

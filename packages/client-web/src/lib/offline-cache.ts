@@ -101,6 +101,10 @@ const TABLES = [
   // Welle WV.A.4 — wiederverwendbare Filter-Definitionen pro
   // atom_kind (Migration 070, body folgt lib/atom-filter-attrs.ts).
   'saved_filters',
+  // Welle WV.B.1 — typed Cell-Info-Felder (Migration 072).
+  'info_fields',
+  // Welle WV.B.3 — User-Markierungen an Atomen (Migration 074).
+  'atom_markers',
 ] as const;
 
 export type CacheTable = (typeof TABLES)[number];
@@ -140,6 +144,8 @@ interface MatrixCacheSchema extends DBSchema {
   workspace_hotkey_slots: StoreDef;
   user_hotkey_slots: StoreDef;
   saved_filters: StoreDef;
+  info_fields: StoreDef;
+  atom_markers: StoreDef;
 }
 
 const DB_NAME = 'matrix-cache';
@@ -175,7 +181,9 @@ const DB_NAME = 'matrix-cache';
 // V16 (WV.A.4): saved_filters (Migration 070) — wiederverwendbare
 // Filter-Definitionen pro atom_kind, body folgt SavedFilterBody-
 // Format aus lib/atom-filter-attrs.ts (WV.Y).
-const DB_VERSION = 16;
+// V17 (WV.B.1+B.3): info_fields + atom_markers (Migrations 072 + 074)
+// — typed Cell-Info-Felder + User-Markierungen.
+const DB_VERSION = 17;
 const OBSOLETE_STORES = [
   'kb_cards',
   'checklist_items',
