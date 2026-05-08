@@ -122,6 +122,22 @@ export type WorkspaceExport = {
   // Round-Trip verloren.
   tasks?: Record<string, unknown>[];
   atom_manifestations?: Record<string, unknown>[];
+  // Welle WV.A — Vorlagen-Foundation (Migrations 067-070). Alle
+  // optional fuer V0-Parser-Kompat. Workspace-Export traegt sie voll;
+  // Subtree-Export filtert per cell_id auf cell_template_instances +
+  // cell_widget_overrides. feature_templates und Sub-Tabellen werden
+  // im Subtree-Export nicht abgerufen (gehoeren zur Vorlagen-Bibliothek
+  // des Workspace, nicht zur Subtree-Datenmenge).
+  feature_templates?: Record<string, unknown>[];
+  template_sections?: Record<string, unknown>[];
+  template_widgets?: Record<string, unknown>[];
+  cell_template_instances?: Record<string, unknown>[];
+  cell_widget_overrides?: Record<string, unknown>[];
+  workspace_hotkey_slots?: Record<string, unknown>[];
+  // user_hotkey_slots NICHT im Export — User-privat, gehoert nicht in
+  // Workspace-Snapshots. (Memory `feedback_clean_cut_no_prod_data.md`
+  // fuer den Datenhoheits-Aspekt.)
+  saved_filters?: Record<string, unknown>[];
   // Nur bei Cell-Subtree-Exports gesetzt: Meta-Info zur Quell-Zelle,
   // damit der Importer ihre info-Felder/Links und Feature-Flags in
   // die Ziel-Zelle mergen kann — ohne die Zelle selbst in cells[]
@@ -237,6 +253,13 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     objectTagsRes,
     groupsRes,
     groupMembersRes,
+    featureTemplatesRes,
+    templateSectionsRes,
+    templateWidgetsRes,
+    cellTemplateInstancesRes,
+    cellWidgetOverridesRes,
+    workspaceHotkeySlotsRes,
+    savedFiltersRes,
   ] = await Promise.all([
     supabase.from('nodes').select('*').eq('workspace_id', workspaceId),
     supabase.from('rows').select('*').eq('workspace_id', workspaceId),
@@ -253,6 +276,26 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     supabase.from('object_tags').select('*').eq('workspace_id', workspaceId),
     supabase.from('groups').select('*').eq('workspace_id', workspaceId),
     supabase.from('group_members').select('*').eq('workspace_id', workspaceId),
+    // Welle WV.A: Vorlagen-Foundation. feature_templates traegt nur
+    // workspace-spezifische Templates (workspace_id=$id) — Plattform-
+    // Vorlagen (workspace_id NULL) sind nicht im Workspace-Snapshot,
+    // weil sie pro Server-Setup gleich sind.
+    supabase
+      .from('feature_templates')
+      .select('*')
+      .eq('workspace_id', workspaceId),
+    supabase.from('template_sections').select('*').eq('workspace_id', workspaceId),
+    supabase.from('template_widgets').select('*').eq('workspace_id', workspaceId),
+    supabase.from('cell_template_instances').select('*').eq('workspace_id', workspaceId),
+    supabase.from('cell_widget_overrides').select('*').eq('workspace_id', workspaceId),
+    supabase.from('workspace_hotkey_slots').select('*').eq('workspace_id', workspaceId),
+    // saved_filters: nur workspace-shared (owner_user_id NULL) +
+    // privater Anteil des aktuellen Users — RLS regelt das, wir
+    // selektieren ohne weiteren Filter.
+    supabase
+      .from('saved_filters')
+      .select('*')
+      .eq('workspace_id', workspaceId),
   ]);
 
   for (const res of [
@@ -270,6 +313,13 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     objectTagsRes,
     groupsRes,
     groupMembersRes,
+    featureTemplatesRes,
+    templateSectionsRes,
+    templateWidgetsRes,
+    cellTemplateInstancesRes,
+    cellWidgetOverridesRes,
+    workspaceHotkeySlotsRes,
+    savedFiltersRes,
   ]) {
     if (res.error) throw res.error;
   }
@@ -297,6 +347,13 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     group_members: (groupMembersRes.data ?? []) as Record<string, unknown>[],
     tasks: legacyShapes.tasks as unknown as Record<string, unknown>[],
     atom_manifestations: legacyShapes.manifestations as unknown as Record<string, unknown>[],
+    feature_templates: (featureTemplatesRes.data ?? []) as Record<string, unknown>[],
+    template_sections: (templateSectionsRes.data ?? []) as Record<string, unknown>[],
+    template_widgets: (templateWidgetsRes.data ?? []) as Record<string, unknown>[],
+    cell_template_instances: (cellTemplateInstancesRes.data ?? []) as Record<string, unknown>[],
+    cell_widget_overrides: (cellWidgetOverridesRes.data ?? []) as Record<string, unknown>[],
+    workspace_hotkey_slots: (workspaceHotkeySlotsRes.data ?? []) as Record<string, unknown>[],
+    saved_filters: (savedFiltersRes.data ?? []) as Record<string, unknown>[],
   };
 }
 
