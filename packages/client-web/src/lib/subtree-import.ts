@@ -459,6 +459,7 @@ function splitChecklistItems(
 async function cleanupPartialImport(
   insertedNodeIds: string[],
   insertedDocIds: string[],
+  insertedInfoFieldIds: string[] = [],
 ): Promise<void> {
   try {
     if (insertedNodeIds.length > 0) {
@@ -466,6 +467,13 @@ async function cleanupPartialImport(
     }
     if (insertedDocIds.length > 0) {
       await supabase.from('docs').delete().in('id', insertedDocIds);
+    }
+    if (insertedInfoFieldIds.length > 0) {
+      // info_fields sind workspace-skopiert und nicht via Node-Cascade
+      // erreichbar. Trigger T1 aus Migration 082 raeumt verbundene
+      // atom_manifestations nicht — deren container (cell) wurde aber
+      // bereits per nodes-Cascade entfernt. Direkter Delete reicht.
+      await supabase.from('info_fields').delete().in('id', insertedInfoFieldIds);
     }
   } catch {
     // Original-Error bleibt im Vordergrund.
@@ -824,10 +832,12 @@ export async function executeSubtreeImportIntoCell(args: {
   // Progress-Tracking. Total haengt am Modus + am Payload-Typ
   // (Container-Merge hat weniger Phasen als Subtree).
   const hasSubtree = (payload.nodes as unknown[]).length > 0;
+  const hasInfoFieldsCell = Array.isArray(payload.info_fields) && payload.info_fields.length > 0;
   const phaseTotal =
     (mode === 'export-overwrite' ? 1 : 0) +
     (mode === 'overwrite' || mode === 'export-overwrite' ? 1 : 0) +
-    (hasSubtree ? 13 : 4);
+    (hasSubtree ? 13 : 4) +
+    (hasSubtree && hasInfoFieldsCell ? 2 : 0);
   let phaseIdx = 0;
   const step = (label: string) => {
     phaseIdx += 1;
@@ -1108,6 +1118,10 @@ export async function executeSubtreeImportIntoCell(args: {
   // (Doc→Cell, ggf. aus legacy-attached_cell_id rekonstruiert oder aus
   // payload.atom_pins gemappt).
   for (const d of payload.docs) remap((d as { id: string }).id, remapMap);
+  // WV.E #40 — info_fields-Atom-IDs vor-mappen (Round-Trip-Loop).
+  for (const f of (payload.info_fields ?? []) as Array<{ id: string }>) {
+    remap(f.id, remapMap);
+  }
   const docPinTargets = new Map<string, string>(); // newDocId -> newCellId
   const docsOut = (payload.docs as Array<Record<string, unknown>>).map((d) => {
     const raw = d as {
@@ -1276,6 +1290,47 @@ export async function executeSubtreeImportIntoCell(args: {
     }
   }
 
+  // ─── WV.E #40 — info_fields + info-Manifs (Cell-Subtree) ────
+  // Analog zur Matrix-Variante: info_fields-Atome workspace-skopiert
+  // einfuegen, dann kind='info'-Manifs auf die remapped Sub-Cells
+  // anlegen. Trigger T2 erzeugt die kind='calendar'-Auto-Manifs.
+  const infoFieldsOutCell = ((payload.info_fields ?? []) as Array<Record<string, unknown>>)
+    .filter((f) => remapMap.has((f as { id: string }).id))
+    .map((f) => ({
+      ...f,
+      id: mustRemap((f as { id: string }).id, remapMap),
+      workspace_id: workspaceId,
+    }));
+  const infoFieldManifsOutCell = (payload.atom_manifestations as Array<Record<string, unknown>>)
+    .filter((m) => {
+      const mm = m as {
+        atom_type: string;
+        kind: string;
+        container_kind: string;
+        atom_id: string;
+        container_id: string | null;
+        display_meta?: Record<string, unknown> | null;
+      };
+      if (mm.atom_type !== 'info_field') return false;
+      if (mm.kind !== 'info') return false;
+      if (mm.container_kind !== 'cell') return false;
+      if (!mm.container_id) return false;
+      if (!remapMap.has(mm.atom_id)) return false;
+      if (!remapMap.has(mm.container_id)) return false;
+      if ((mm.display_meta as { auto?: boolean } | null)?.auto) return false;
+      return true;
+    })
+    .map((m) => {
+      const mm = m as { id: string; atom_id: string; container_id: string };
+      return {
+        ...m,
+        id: newUuid(),
+        workspace_id: workspaceId,
+        atom_id: mustRemap(mm.atom_id, remapMap),
+        container_id: mustRemap(mm.container_id, remapMap),
+      };
+    });
+
   // Insert-Reihenfolge loest die FK-Schleife nodes<->cells so auf:
   //   Phase A: alle Nodes mit parent_cell_id=NULL einfuegen.
   //   Phase B: Rows + Cols (haengen an Matrix-Nodes, existieren).
@@ -1284,15 +1339,16 @@ export async function executeSubtreeImportIntoCell(args: {
   //   Phase D: UPDATE nodes.parent_cell_id aus nodeParentUpdates
   //            (Target-Cell fuer Root, remapped cells fuer Sub-Nodes).
   //   Phase E: Board-interne Tabellen (kb_cols, kb_cards, links) +
-  //            Checklisten + Items.
+  //            Checklisten + Items + info_fields + info-Manifs.
   //
   // Failure-Mode: faellt irgendeine Phase um, raeumt cleanupPartial-
-  // Import die schon angelegten Nodes + Docs wieder ab (Cascade
-  // entfernt rows/cols/cells/kb_*/checklists/items/links). Der
-  // Original-Fehler wird weitergereicht, damit der Caller ihn sauber
-  // toastet.
+  // Import die schon angelegten Nodes + Docs + info_fields wieder ab
+  // (Cascade entfernt rows/cols/cells/kb_*/checklists/items/links/
+  // info-Manifs ueber container_id). Der Original-Fehler wird weiter-
+  // gereicht, damit der Caller ihn sauber toastet.
   const insertedNodeIds = nodesOut.map((n) => (n as { id: string }).id);
   const insertedDocIds = docsOut.map((d) => (d as { id: string }).id);
+  const insertedInfoFieldIdsCell = infoFieldsOutCell.map((f) => (f as { id: string }).id);
   try {
     step('Nodes einfuegen…');
     await insertBatch('nodes', nodesOut);
@@ -1337,6 +1393,14 @@ export async function executeSubtreeImportIntoCell(args: {
       step('Doku-Pins einfuegen…');
       await insertBatch('atom_manifestations', atomPinsOut);
     }
+    if (infoFieldsOutCell.length > 0) {
+      step('Info-Felder einfuegen…');
+      await insertBatch('info_fields', infoFieldsOutCell);
+    }
+    if (infoFieldManifsOutCell.length > 0) {
+      step('Info-Manifestations einfuegen…');
+      await insertBatch('atom_manifestations', infoFieldManifsOutCell);
+    }
     if (workspaceTagsOut.length > 0) {
       step('Tag-Registry einfuegen…');
       await insertBatch('workspace_tags', workspaceTagsOut);
@@ -1346,7 +1410,7 @@ export async function executeSubtreeImportIntoCell(args: {
       await insertBatch('atom_tags', atomTagsOut);
     }
   } catch (err) {
-    await cleanupPartialImport(insertedNodeIds, insertedDocIds);
+    await cleanupPartialImport(insertedNodeIds, insertedDocIds, insertedInfoFieldIdsCell);
     throw err;
   }
   step('Ziel-Zelle anpassen…');
@@ -1437,10 +1501,10 @@ export async function executeSubtreeImportIntoCell(args: {
         };
   const { error: patchErr } = await supabase.from('cells').update(patch).eq('id', targetCellId);
   if (patchErr) {
-    // Ziel-Zelle-Patch hat geworfen — Nodes + Docs wurden schon
-    // eingefuegt. Cleanup nachziehen, damit der Workspace nicht mit
-    // freischwebenden Inserts zurueckbleibt.
-    await cleanupPartialImport(insertedNodeIds, insertedDocIds);
+    // Ziel-Zelle-Patch hat geworfen — Nodes + Docs + info_fields
+    // wurden schon eingefuegt. Cleanup nachziehen, damit der Workspace
+    // nicht mit freischwebenden Inserts zurueckbleibt.
+    await cleanupPartialImport(insertedNodeIds, insertedDocIds, insertedInfoFieldIdsCell);
     throw patchErr;
   }
 
@@ -1897,12 +1961,16 @@ export async function executeSubtreeImportIntoMatrix(args: {
     );
   }
 
-  // Progress-Tracking: Gesamtzahl der Phasen haengt am Modus.
+  // Progress-Tracking: Gesamtzahl der Phasen haengt am Modus + Payload.
+  // Optionale Phasen werden nur gezaehlt, wenn der Payload sie liefert,
+  // sonst laeuft phaseIdx ueber phaseTotal hinaus.
+  const hasInfoFields = Array.isArray(payload.info_fields) && payload.info_fields.length > 0;
   const phaseTotal =
     13 + // Vorbereitung / Nodes / Rows / Cols / Cells / Parent-Updates /
     //    kb_cols / kb_cards / checklists / items / links / docs / Patch
     (mode === 'overwrite' || mode === 'export-overwrite' ? 1 : 0) +
-    (mode === 'export-overwrite' ? 1 : 0);
+    (mode === 'export-overwrite' ? 1 : 0) +
+    (hasInfoFields ? 2 : 0); // Info-Felder + Info-Manifestations
   let phaseIdx = 0;
   const step = (label: string) => {
     phaseIdx += 1;
@@ -1976,6 +2044,10 @@ export async function executeSubtreeImportIntoMatrix(args: {
   for (const it of payload.checklist_items) remap((it as { id: string }).id, remapMap);
   for (const l of payload.links) remap((l as { id: string }).id, remapMap);
   for (const d of payload.docs) remap((d as { id: string }).id, remapMap);
+  // WV.E #40 — info_fields-Atom-IDs vor-mappen (Round-Trip-Loop).
+  for (const f of (payload.info_fields ?? []) as Array<{ id: string }>) {
+    remap(f.id, remapMap);
+  }
 
   // Nodes ohne Root einfuegen, parent_cell_id=NULL (Phase D setzt um).
   // NT.2: created_by aus dem Payload entfernen — importierte Knoten
@@ -2202,6 +2274,51 @@ export async function executeSubtreeImportIntoMatrix(args: {
     }
   }
 
+  // ─── WV.E #40 — info_fields + info-Manifs (Matrix-Subtree) ──
+  // info_fields-Atome traegt der Subtree-Export workspace-skopiert mit;
+  // referenzierte kind='info'-Manifs (container_kind='cell') haengen in
+  // payload.atom_manifestations. Beim Insert greift Trigger T2 aus
+  // Migration 082 und legt die kind='calendar'-Auto-Manifs fuer
+  // value_type='date'-Felder an — der Export traegt sie nicht mit.
+  const infoFieldsOut = ((payload.info_fields ?? []) as Array<Record<string, unknown>>)
+    .filter((f) => remapMap.has((f as { id: string }).id))
+    .map((f) => ({
+      ...f,
+      id: mustRemap((f as { id: string }).id, remapMap),
+      workspace_id: workspaceId,
+    }));
+  const infoFieldManifsOut = (payload.atom_manifestations as Array<Record<string, unknown>>)
+    .filter((m) => {
+      const mm = m as {
+        atom_type: string;
+        kind: string;
+        container_kind: string;
+        atom_id: string;
+        container_id: string | null;
+        display_meta?: Record<string, unknown> | null;
+      };
+      if (mm.atom_type !== 'info_field') return false;
+      if (mm.kind !== 'info') return false;
+      if (mm.container_kind !== 'cell') return false;
+      if (!mm.container_id) return false;
+      // Nur Manifs, deren atom_id + container_id im Subtree liegen.
+      if (!remapMap.has(mm.atom_id)) return false;
+      if (!remapMap.has(mm.container_id)) return false;
+      // Auto-Manifs sollten in kind='info' nicht vorkommen, defensiv:
+      if ((mm.display_meta as { auto?: boolean } | null)?.auto) return false;
+      return true;
+    })
+    .map((m) => {
+      const mm = m as { id: string; atom_id: string; container_id: string };
+      return {
+        ...m,
+        id: newUuid(),
+        workspace_id: workspaceId,
+        atom_id: mustRemap(mm.atom_id, remapMap),
+        container_id: mustRemap(mm.container_id, remapMap),
+      };
+    });
+
   // ─── Welle D — workspace_tags + atom_tags (Matrix-Subtree) ──
   const workspaceTagsOutMatrix: Array<Record<string, unknown>> = [];
   const atomTagsOutMatrix: Array<Record<string, unknown>> = [];
@@ -2266,9 +2383,11 @@ export async function executeSubtreeImportIntoMatrix(args: {
 
   // FK-Order wie bei Cell-Variante: Nodes (parent=null) → Rows → Cols →
   // Cells → UPDATE Nodes.parent_cell_id → kb/checklists/items/links/docs.
-  // Bei Failure raeumt cleanupPartialImport angelegte Nodes + Docs auf.
+  // Bei Failure raeumt cleanupPartialImport angelegte Nodes + Docs +
+  // info_fields auf.
   const insertedNodeIds = nodesOut.map((n) => (n as { id: string }).id);
   const insertedDocIds = docsOut.map((d) => (d as { id: string }).id);
+  const insertedInfoFieldIds = infoFieldsOut.map((f) => (f as { id: string }).id);
   try {
     step('Nodes einfuegen…');
     await insertBatch('nodes', nodesOut);
@@ -2310,6 +2429,16 @@ export async function executeSubtreeImportIntoMatrix(args: {
       step('Doku-Pins einfuegen…');
       await insertBatch('atom_manifestations', atomPinsOutMatrix);
     }
+    if (infoFieldsOut.length > 0) {
+      step('Info-Felder einfuegen…');
+      await insertBatch('info_fields', infoFieldsOut);
+    }
+    if (infoFieldManifsOut.length > 0) {
+      step('Info-Manifestations einfuegen…');
+      // Trigger T2 (Migration 082) erzeugt fuer date-Felder
+      // automatisch die kind='calendar'-Manif mit display_meta.auto=true.
+      await insertBatch('atom_manifestations', infoFieldManifsOut);
+    }
     if (workspaceTagsOutMatrix.length > 0) {
       step('Tag-Registry einfuegen…');
       await insertBatch('workspace_tags', workspaceTagsOutMatrix);
@@ -2319,7 +2448,7 @@ export async function executeSubtreeImportIntoMatrix(args: {
       await insertBatch('atom_tags', atomTagsOutMatrix);
     }
   } catch (err) {
-    await cleanupPartialImport(insertedNodeIds, insertedDocIds);
+    await cleanupPartialImport(insertedNodeIds, insertedDocIds, insertedInfoFieldIds);
     throw err;
   }
 
@@ -2343,8 +2472,8 @@ export async function executeSubtreeImportIntoMatrix(args: {
       if (nupErr) {
         // Matrix-Label-/Alias-Patch hat geworfen — Inserts stehen,
         // Workspace ist inkonsistent. Cleanup, damit die zuvor ange-
-        // legten Nodes/Docs nicht als Waisen stehen bleiben.
-        await cleanupPartialImport(insertedNodeIds, insertedDocIds);
+        // legten Nodes/Docs/Info-Felder nicht als Waisen stehen bleiben.
+        await cleanupPartialImport(insertedNodeIds, insertedDocIds, insertedInfoFieldIds);
         throw nupErr;
       }
     }

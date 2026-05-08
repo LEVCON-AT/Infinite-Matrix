@@ -683,6 +683,13 @@ export async function exportSubtree(
       if (m.container_kind === 'node') return m.container_id != null && inNodes(m.container_id);
       return false;
     }
+    // WV.E #40 — info_field-Manifestationen am Subtree (kind='info',
+    // container_kind='cell', cell im Subtree). Auto-erzeugte calendar-
+    // Manifs (display_meta.auto=true) werden NICHT mit-exportiert; sie
+    // entstehen beim Re-Import via Trigger T2 aus der info-Manif neu.
+    if (m.kind === 'info' && m.atom_type === 'info_field') {
+      return m.container_kind === 'cell' && m.container_id != null && inCells(m.container_id);
+    }
     if (m.atom_type !== 'task') return false;
     if (m.kind === 'kanban') return m.container_id != null && filteredKbColIds.has(m.container_id);
     if (m.kind === 'checklist')
@@ -706,6 +713,18 @@ export async function exportSubtree(
     }
   }
   const filteredDocs = all.docs.filter((d) => docIdsInSubtree.has(d.id));
+
+  // WV.E #40 — info_fields-Subtree-Filter aus den kind='info'-Manifs
+  // ableiten. info_fields-Atome sind workspace-skopiert; nur referenzierte
+  // wandern mit. Calendar-Auto-Manifs werden im Importer via Trigger T2
+  // aus den importierten info-Manifs neu erstellt.
+  const infoFieldIdsInSubtree = new Set<string>();
+  for (const m of filteredManifestations) {
+    if (m.kind === 'info' && m.atom_type === 'info_field') {
+      infoFieldIdsInSubtree.add(m.atom_id);
+    }
+  }
+  const filteredInfoFields = all.info_fields.filter((f) => infoFieldIdsInSubtree.has(f.id));
 
   // Welle D — atom_tags-Subtree-Filter. Tag-Owner = Atom; ein Tag
   // wandert nur mit, wenn der Owner-Atom im Subtree liegt. Owner-Atome:
@@ -773,6 +792,7 @@ export async function exportSubtree(
     group_members: filteredGroupMembers as unknown as Record<string, unknown>[],
     tasks: filteredTasks as unknown as Record<string, unknown>[],
     atom_manifestations: filteredManifestations as unknown as Record<string, unknown>[],
+    info_fields: filteredInfoFields as unknown as Record<string, unknown>[],
   };
 }
 
@@ -859,6 +879,13 @@ export async function exportCellSubtree(
       if (m.container_kind === 'node') return m.container_id != null && inNodes(m.container_id);
       return false;
     }
+    // WV.E #40 — info_field-Manifestationen am Cell-Subtree (Cell selbst
+    // + Sub-Cells). Auto-erzeugte calendar-Manifs werden vom Importer
+    // via Trigger T2 aus den importierten info-Manifs neu erstellt.
+    if (m.kind === 'info' && m.atom_type === 'info_field') {
+      if (m.container_kind !== 'cell' || m.container_id == null) return false;
+      return m.container_id === cellId || inCells(m.container_id);
+    }
     if (m.atom_type !== 'task') return false;
     if (m.kind === 'kanban')
       return m.container_id != null && filteredKbColIdsCell.has(m.container_id);
@@ -878,6 +905,15 @@ export async function exportCellSubtree(
     }
   }
   const filteredDocs = all.docs.filter((d) => docIdsInSubtreeCell.has(d.id));
+
+  // WV.E #40 — info_fields-Filter aus den kind='info'-Manifs ableiten.
+  const infoFieldIdsInSubtreeCell = new Set<string>();
+  for (const m of filteredManifestationsCell) {
+    if (m.kind === 'info' && m.atom_type === 'info_field') {
+      infoFieldIdsInSubtreeCell.add(m.atom_id);
+    }
+  }
+  const filteredInfoFieldsCell = all.info_fields.filter((f) => infoFieldIdsInSubtreeCell.has(f.id));
 
   // Welle D — atom_tags + workspace_tags fuer Cell-Subtree (analog
   // exportSubtree, aber mit den Cell-Subtree-Owner-Sets).
@@ -913,6 +949,7 @@ export async function exportCellSubtree(
     atom_tags: filteredAtomTagsCell as unknown as Record<string, unknown>[],
     tasks: filteredTasksCell as unknown as Record<string, unknown>[],
     atom_manifestations: filteredManifestationsCell as unknown as Record<string, unknown>[],
+    info_fields: filteredInfoFieldsCell as unknown as Record<string, unknown>[],
     sourceCell: {
       data: cell.data ?? {},
       features: Array.isArray(cell.features) ? cell.features : [],
