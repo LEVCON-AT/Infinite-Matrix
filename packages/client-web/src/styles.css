@@ -18474,3 +18474,137 @@ body[data-viewport="phone"] .overlay-card {
     max-width: 100%;
   }
 }
+
+/* ─── BulkWizardModal (WV.C.4) ─────────────────────────────── */
+.bulk-wizard-card {
+  max-width: 36rem;
+  width: 100%;
+}
+.bulk-wizard-card .overlay-head h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.bulk-wizard-step-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-hover);
+  color: var(--text3);
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-full);
+}
+.bulk-wizard-body {
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.bulk-wizard-hint {
+  margin: 0;
+  color: var(--text2);
+  font-size: 0.9rem;
+}
+.bulk-wizard-hint code {
+  background: var(--surface-hover);
+  padding: 0.05rem 0.3rem;
+  border-radius: 3px;
+  font-size: 0.85rem;
+  font-family: var(--mono, ui-monospace, monospace);
+}
+.bulk-wizard-template-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+.bulk-wizard-template-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0.55rem 0.7rem;
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius-md, 6px);
+  cursor: pointer;
+  text-align: left;
+}
+.bulk-wizard-template-item:hover {
+  border-color: var(--accent);
+  background: var(--surface-hover);
+}
+.bulk-wizard-template-item.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.bulk-wizard-template-symbol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-md, 6px);
+  background: var(--accent-soft);
+  color: var(--accent-strong, var(--accent));
+}
+.bulk-wizard-template-name {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text);
+}
+.bulk-wizard-template-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.4rem;
+  border-radius: var(--radius-md, 6px);
+  background: var(--accent-soft);
+  color: var(--accent-strong, var(--accent));
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.bulk-wizard-confirm-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 22rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.bulk-wizard-confirm-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+.bulk-wizard-confirm-coord {
+  font-family: var(--mono, ui-monospace, monospace);
+  color: var(--text);
+}
+.bulk-wizard-confirm-alias {
+  margin-left: auto;
+  font-family: var(--mono, ui-monospace, monospace);
+  color: var(--accent-strong, var(--accent));
+}
+.bulk-wizard-actions {
+  display: flex;
+  gap: var(--space-xs);
+  justify-content: flex-end;
+  padding: var(--space-md);
+  border-top: 1px solid var(--border);
+}
