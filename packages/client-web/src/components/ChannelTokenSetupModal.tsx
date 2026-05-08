@@ -10,12 +10,13 @@
 // Bis dahin reicht Manual-Paste fuer Tester.
 
 import { type Component, createSignal, onCleanup, onMount } from 'solid-js';
-import { CHANNEL_PROVIDER_LABEL } from '../lib/channels-meta';
+import { CHANNEL_PROVIDER_BRAND, CHANNEL_PROVIDER_LABEL } from '../lib/channels-meta';
 import { installFocusRestore, installFocusTrap } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
 import { setOAuthToken } from '../lib/oauth-tokens';
 import { showToast } from '../lib/toasts';
 import type { ChannelProvider } from '../lib/types';
+import BrandIcon from './BrandIcon';
 import Icon from './Icon';
 
 export type ChannelTokenSetupModalProps = {
@@ -96,7 +97,10 @@ const ChannelTokenSetupModal: Component<ChannelTokenSetupModalProps> = (p) => {
         aria-label={`${CHANNEL_PROVIDER_LABEL[p.provider]} verbinden`}
       >
         <header class="overlay-head">
-          <h3>{CHANNEL_PROVIDER_LABEL[p.provider]} verbinden</h3>
+          <h3 class="overlay-head-with-brand">
+            <BrandIcon brand={CHANNEL_PROVIDER_BRAND[p.provider]} size={18} colored />
+            <span>{CHANNEL_PROVIDER_LABEL[p.provider]} verbinden</span>
+          </h3>
           <button type="button" class="overlay-close" onClick={p.onClose} aria-label="Schliessen">
             <Icon name="x" size={18} />
           </button>

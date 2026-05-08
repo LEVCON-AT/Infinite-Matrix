@@ -5,6 +5,7 @@
 // AdminProviderSlots) — Single-Source statt In-Component-Repeats.
 
 import type { IconName } from '../components/Icon';
+import type { BrandKey } from './brand-icons';
 import type { ChannelProvider } from './types';
 
 // Anzeige-Label pro Provider. Konsistent fuer Buttons + Toasts +
@@ -25,9 +26,28 @@ export const CHANNEL_PROVIDER_LABEL: Record<ChannelProvider, string> = {
   telegram: 'Telegram',
 };
 
-// Heroicon-Name pro Provider (siehe lib/symbol-resolution.ts /
-// components/Icon.tsx). Bewusst symbolisch nicht Brand-genau, weil wir
-// keine Brand-SVGs bundlen — Brand-Distinct-Icons via WV.B fortgesetzt.
+// Brand-Key pro Provider — primaer-Pfad fuer UI-Render via BrandIcon
+// (lib/brand-icons.ts). 1:1-Mapping ChannelProvider → BrandKey.
+export const CHANNEL_PROVIDER_BRAND: Record<ChannelProvider, BrandKey> = {
+  outlook: 'outlook',
+  gmail: 'gmail',
+  'mail-generic': 'mail-generic',
+  onenote: 'onenote',
+  onedrive: 'onedrive',
+  drive: 'drive',
+  dropbox: 'dropbox',
+  nextcloud: 'nextcloud',
+  slack: 'slack',
+  teams: 'teams',
+  discord: 'discord',
+  whatsapp: 'whatsapp',
+  telegram: 'telegram',
+};
+
+// Heroicon-Fallback pro Provider — wird genutzt wenn BrandIcon-Render
+// nicht moeglich ist (z.B. in Symbol-Resolution Auto-Path fuer Link-
+// Atome ohne Brand-Bundle). Kategorie-Symbol (cloud / chat-bubble /
+// envelope) bleibt damit als Fallback verfuegbar.
 export const CHANNEL_PROVIDER_ICON: Record<ChannelProvider, IconName> = {
   outlook: 'envelope',
   gmail: 'envelope',

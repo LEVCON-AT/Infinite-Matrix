@@ -4,6 +4,7 @@
 // (Slack/Teams/...). V1 Manual-Paste; Auto-OAuth-Flow folgt mit D.3.f.
 
 import { type Component, For, Show, createResource, createSignal } from 'solid-js';
+import BrandIcon from '../../components/BrandIcon';
 import ChannelTokenSetupModal from '../../components/ChannelTokenSetupModal';
 import Icon from '../../components/Icon';
 import { useUser } from '../../lib/auth';
@@ -11,8 +12,8 @@ import { getChannelImpl, hasChannelImpl } from '../../lib/channels';
 import {
   CHANNEL_DOMAIN_ORDER,
   CHANNEL_PROVIDERS_BY_DOMAIN,
+  CHANNEL_PROVIDER_BRAND,
   CHANNEL_PROVIDER_DOCS_URL,
-  CHANNEL_PROVIDER_ICON,
   CHANNEL_PROVIDER_LABEL,
 } from '../../lib/channels-meta';
 import { showConfirm } from '../../lib/dialog';
@@ -152,7 +153,7 @@ const AccountChannels: Component = () => {
       <article class="channel-provider-card" data-provider={provider}>
         <header class="channel-provider-card-head">
           <span class="channel-provider-card-icon" aria-hidden="true">
-            <Icon name={CHANNEL_PROVIDER_ICON[provider]} size={18} />
+            <BrandIcon brand={CHANNEL_PROVIDER_BRAND[provider]} size={20} colored />
           </span>
           <div class="channel-provider-card-title">
             <h4>{CHANNEL_PROVIDER_LABEL[provider]}</h4>
