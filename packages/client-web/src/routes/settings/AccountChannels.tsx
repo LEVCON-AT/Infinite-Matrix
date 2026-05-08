@@ -17,7 +17,7 @@ import {
 } from '../../lib/channels-meta';
 import { showConfirm } from '../../lib/dialog';
 import { translateDbError } from '../../lib/errors';
-import { startOAuthFlow, supportsBrowserPkce } from '../../lib/oauth-flow';
+import { startOAuthFlow, supportsBrowserPkce, supportsServerSideOAuth } from '../../lib/oauth-flow';
 import {
   deleteOAuthToken,
   fetchOAuthProviderSlots,
@@ -63,7 +63,7 @@ const AccountChannels: Component = () => {
   };
 
   const canUseBrowserOauth = (provider: ChannelProvider): boolean => {
-    if (!supportsBrowserPkce(provider)) return false;
+    if (!supportsBrowserPkce(provider) && !supportsServerSideOAuth(provider)) return false;
     const slot = slotFor(provider);
     if (!slot) return false;
     return Boolean(slot.client_id && slot.auth_url && slot.token_url);

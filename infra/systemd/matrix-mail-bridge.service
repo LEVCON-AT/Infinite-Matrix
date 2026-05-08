@@ -1,0 +1,48 @@
+[Unit]
+Description=Matrix Mail-Bridge IMAP+SMTP (WV.D.3.d)
+After=network.target
+Documentation=https://github.com/LEVCON-AT/Infinite-Matrix
+
+[Service]
+Type=simple
+User=matrix-mail-bridge
+Group=matrix-mail-bridge
+WorkingDirectory=/opt/matrix-mail-bridge
+EnvironmentFile=/opt/matrix-mail-bridge/.env
+ExecStart=/usr/bin/node /opt/matrix-mail-bridge/dist/index.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=matrix-mail-bridge
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+ProcSubset=pid
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0027
+
+LimitNOFILE=8192
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

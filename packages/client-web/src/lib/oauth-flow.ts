@@ -30,15 +30,32 @@
 // scopes_granted unter dem state-Key.
 
 import { setOAuthToken } from './oauth-tokens';
+import { supabase } from './supabase';
 import type { ChannelProvider, OAuthProviderSlotSafe } from './types';
 
 // Provider die V1 browser-only PKCE unterstuetzen. Andere fallen zurueck
 // auf Manual-Paste oder D.3.f.2-Server-Side.
 const PUBLIC_CLIENT_PROVIDERS: ReadonlySet<ChannelProvider> = new Set(['outlook', 'teams']);
 
+// Welle WV.D.3.f.2 — Provider die ueber den oauth-bridge-Service laufen
+// (client_secret beim Token-Exchange noetig). slack/gmail klassisch,
+// aber auch onenote/onedrive wenn Azure-App nicht als SPA registriert ist.
+const SERVER_SIDE_OAUTH_PROVIDERS: ReadonlySet<ChannelProvider> = new Set([
+  'slack',
+  'gmail',
+  'discord',
+]);
+
 export function supportsBrowserPkce(provider: ChannelProvider): boolean {
   return PUBLIC_CLIENT_PROVIDERS.has(provider);
 }
+
+export function supportsServerSideOAuth(provider: ChannelProvider): boolean {
+  return SERVER_SIDE_OAUTH_PROVIDERS.has(provider);
+}
+
+const OAUTH_BRIDGE_BASE =
+  (import.meta.env.VITE_OAUTH_BRIDGE_BASE as string | undefined) ?? '/api/oauth-bridge';
 
 const STORAGE_PREFIX = 'matrix-oauth-pending:';
 
@@ -137,7 +154,7 @@ export async function startOAuthFlow(
   options: StartOAuthFlowOptions,
 ): Promise<StartOAuthFlowResult> {
   const { provider, slot } = options;
-  if (!supportsBrowserPkce(provider)) {
+  if (!supportsBrowserPkce(provider) && !supportsServerSideOAuth(provider)) {
     throw new Error(
       `OAuth-Browser-Flow fuer ${provider} nicht unterstuetzt — bitte Manual-Paste benutzen.`,
     );
@@ -229,53 +246,90 @@ export async function completeOAuthFlow(
   const pending = readPending(state);
   if (!pending) return { ok: false, reason: 'state_not_found' };
 
-  // Token-Exchange. Public-Client-Flow: kein client_secret.
-  // Microsoft: token_url akzeptiert form-encoded Body via CORS fuer
-  // SPA-registrierte Apps. application/x-www-form-urlencoded.
-  const body = new URLSearchParams({
-    grant_type: 'authorization_code',
-    client_id: pending.clientId,
-    code,
-    redirect_uri: pending.redirectUri,
-    code_verifier: pending.codeVerifier,
-  });
-
   let tokenJson: {
     access_token?: string;
     refresh_token?: string;
     expires_in?: number;
+    expires_at?: string | null;
     scope?: string;
+    scopes?: string[] | null;
     error?: string;
     error_description?: string;
+    reason?: string;
   };
-  try {
-    const res = await fetch(pending.tokenUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body,
+
+  if (supportsServerSideOAuth(pending.provider)) {
+    // Welle WV.D.3.f.2 — Server-Side-Path. Frontend ruft oauth-bridge,
+    // der den client_secret-basierten Token-Exchange uebernimmt.
+    try {
+      const session = (await supabase.auth.getSession()).data.session;
+      const userJwt = session?.access_token ?? '';
+      const res = await fetch(`${OAUTH_BRIDGE_BASE}/exchange`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${userJwt}`,
+        },
+        body: JSON.stringify({
+          provider: pending.provider,
+          code,
+          code_verifier: pending.codeVerifier,
+          redirect_uri: pending.redirectUri,
+        }),
+      });
+      tokenJson = await res.json();
+    } catch (err) {
+      clearPending(state);
+      return {
+        ok: false,
+        reason: `oauth_bridge_network: ${err instanceof Error ? err.message : 'unknown'}`,
+      };
+    }
+  } else {
+    // Public-Client-PKCE-Flow: Browser-direkter Token-Exchange ohne client_secret.
+    const body = new URLSearchParams({
+      grant_type: 'authorization_code',
+      client_id: pending.clientId,
+      code,
+      redirect_uri: pending.redirectUri,
+      code_verifier: pending.codeVerifier,
     });
-    tokenJson = await res.json();
-  } catch (err) {
-    clearPending(state);
-    return {
-      ok: false,
-      reason: `token_exchange_network: ${err instanceof Error ? err.message : 'unknown'}`,
-    };
+    try {
+      const res = await fetch(pending.tokenUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+      });
+      tokenJson = await res.json();
+    } catch (err) {
+      clearPending(state);
+      return {
+        ok: false,
+        reason: `token_exchange_network: ${err instanceof Error ? err.message : 'unknown'}`,
+      };
+    }
   }
 
   if (tokenJson.error || !tokenJson.access_token) {
     clearPending(state);
     return {
       ok: false,
-      reason: tokenJson.error_description ?? tokenJson.error ?? 'no_access_token',
+      reason:
+        tokenJson.reason ?? tokenJson.error_description ?? tokenJson.error ?? 'no_access_token',
     };
   }
 
-  const expiresAt =
-    typeof tokenJson.expires_in === 'number'
-      ? new Date(Date.now() + tokenJson.expires_in * 1000)
-      : null;
-  const scopes = tokenJson.scope ? tokenJson.scope.split(/\s+/).filter(Boolean) : pending.scopes;
+  let expiresAt: Date | null = null;
+  if (tokenJson.expires_at) {
+    expiresAt = new Date(tokenJson.expires_at);
+  } else if (typeof tokenJson.expires_in === 'number') {
+    expiresAt = new Date(Date.now() + tokenJson.expires_in * 1000);
+  }
+  const scopes = Array.isArray(tokenJson.scopes)
+    ? tokenJson.scopes
+    : tokenJson.scope
+      ? tokenJson.scope.split(/\s+/).filter(Boolean)
+      : pending.scopes;
 
   try {
     await setOAuthToken({
