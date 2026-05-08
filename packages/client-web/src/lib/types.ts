@@ -710,6 +710,33 @@ export type TemplateSectionRow = {
   created_at: string;
 };
 
+// WV.A.2 — Cell ↔ Vorlage-Junction (Migration 068).
+// Multi-Vorlagen pro Cell: mehrere Rows mit unterschiedlichen
+// template_id. layout_version pinned beim Apply, Update-Hint
+// vergleicht gegen feature_templates.layout_version (Konzept §6.5).
+export type CellTemplateInstanceRow = {
+  id: string;
+  cell_id: string;
+  template_id: string;
+  workspace_id: string;
+  layout_version: number;
+  applied_at: string;
+  applied_by: string | null;
+};
+
+// Sparse-Override: enthaelt nur die Felder, die der User explizit
+// veraendert hat. JSON-Patch auf template_widgets.data. Reset-to-
+// Template via DELETE der Row (Konzept §6.5).
+export type CellWidgetOverrideRow = {
+  id: string;
+  instance_id: string;
+  widget_id: string;
+  workspace_id: string;
+  override_data: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
 // workspace_id denormalisiert wie TemplateSectionRow — Trigger pflegt
 // aus section.workspace_id automatisch.
 export type TemplateWidgetRow = {

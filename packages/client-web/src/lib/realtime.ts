@@ -58,7 +58,12 @@ export type RealtimeTable =
   // einzeln subscriben damit Konsumenten gezielt refetchen.
   | 'feature_templates'
   | 'template_sections'
-  | 'template_widgets';
+  | 'template_widgets'
+  // Welle WV.A.2 — Cell ↔ Vorlage-Junction + Sparse-Overrides.
+  // Cross-User-Live-Update wenn ein Member eine Vorlage einer Cell
+  // hinzufuegt oder einen Override setzt.
+  | 'cell_template_instances'
+  | 'cell_widget_overrides';
 
 export type RealtimeBumps = Partial<Record<RealtimeTable, () => void>>;
 
@@ -78,6 +83,8 @@ const DIRECT_TABLES: Array<Exclude<RealtimeTable, 'kb_cards' | 'checklist_items'
   'feature_templates',
   'template_sections',
   'template_widgets',
+  'cell_template_instances',
+  'cell_widget_overrides',
 ];
 
 type AtomManifPayload = {

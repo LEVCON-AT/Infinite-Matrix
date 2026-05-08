@@ -90,6 +90,10 @@ const TABLES = [
   'feature_templates',
   'template_sections',
   'template_widgets',
+  // Welle WV.A.2 — Cell ↔ Vorlage-Junction + Sparse-Overrides
+  // (Migration 068).
+  'cell_template_instances',
+  'cell_widget_overrides',
 ] as const;
 
 export type CacheTable = (typeof TABLES)[number];
@@ -124,6 +128,8 @@ interface MatrixCacheSchema extends DBSchema {
   feature_templates: StoreDef;
   template_sections: StoreDef;
   template_widgets: StoreDef;
+  cell_template_instances: StoreDef;
+  cell_widget_overrides: StoreDef;
 }
 
 const DB_NAME = 'matrix-cache';
@@ -152,7 +158,9 @@ const DB_NAME = 'matrix-cache';
 // Stores fuer die Vorlagen-Foundation (Migration 067). Plattform-
 // Vorlagen werden separat geladen — die Stores spiegeln pro Workspace
 // die sichtbaren Templates (Workspace-shared + User-privat).
-const DB_VERSION = 13;
+// V14 (WV.A.2): cell_template_instances + cell_widget_overrides
+// (Migration 068) — Junction Cell ↔ Vorlage + sparse User-Overrides.
+const DB_VERSION = 14;
 const OBSOLETE_STORES = [
   'kb_cards',
   'checklist_items',
