@@ -35,6 +35,7 @@ import ImportedEventDetailModal from '../components/ImportedEventDetailModal';
 import { ModalTransition } from '../components/ModalTransition';
 import MobileCalendar from '../components/mobile/MobileCalendar';
 import { pageEnter, slideIn, slideOut } from '../lib/animations';
+import { fetchAutoCalendarSuppressedCellIds } from '../lib/auto-calendar-toggle';
 import {
   fetchAtomCalendarManifestations,
   removeAtomManifestation,
@@ -136,6 +137,13 @@ const Calendar: Component = () => {
     async (wid) => (wid ? fetchAtomCalendarManifestations(wid) : []),
   );
 
+  // WV.E #37 V1.5 — Auto-Calendar-Toggle-Filter. Set von cell_ids in
+  // denen Vorlage-Toggle date_field_auto_calendar=false ist.
+  const [suppressedCells] = createResource(
+    () => params.workspaceId,
+    async (wid) => (wid ? fetchAutoCalendarSuppressedCellIds(wid) : new Set<string>()),
+  );
+
   // Build CalendarEvents aus den Agenda-Items (jeweils task + manifs).
   // T.AC.D.2: viewRange aktiviert Recur-Expansion fuer den sichtbaren
   // Monatsgrid (rangeFrom..rangeTo deckt nicht nur den Anker-Monat ab,
@@ -148,16 +156,24 @@ const Calendar: Component = () => {
     return buildEvents({
       tasks,
       manifestations: manifs,
-      atomManifestations: (atomManifs() ?? []).map((a) => ({
-        id: a.id,
-        atom_type: a.atom_type as 'link' | 'checklist' | 'doc' | 'imported_event',
-        atom_id: a.atom_id,
-        label: a.label,
-        display_meta: a.display_meta,
-        url: a.url ?? null,
-        source_provider: a.source_provider ?? null,
-        source_color: a.source_color ?? null,
-      })),
+      atomManifestations: (atomManifs() ?? [])
+        .filter((a) => {
+          // WV.E #37 V1.5: Auto-Manifs aus suppressed Cells filtern.
+          if (a.atom_type !== 'info_field') return true;
+          if ((a.display_meta as Record<string, unknown>).auto !== true) return true;
+          if (!a.container_id) return true;
+          return !(suppressedCells() ?? new Set()).has(a.container_id);
+        })
+        .map((a) => ({
+          id: a.id,
+          atom_type: a.atom_type as 'link' | 'checklist' | 'doc' | 'imported_event' | 'info_field',
+          atom_id: a.atom_id,
+          label: a.label,
+          display_meta: a.display_meta,
+          url: a.url ?? null,
+          source_provider: a.source_provider ?? null,
+          source_color: a.source_color ?? null,
+        })),
       viewRange: { fromIso: r.rangeFrom, toIso: r.rangeTo },
     });
   });

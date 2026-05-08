@@ -52,6 +52,7 @@ import {
   fetchAtomCalendarManifestations,
   fetchAtomManifestationsByWorkspace,
 } from '../lib/atom-manifestations';
+import { fetchAutoCalendarSuppressedCellIds } from '../lib/auto-calendar-toggle';
 import { signOut, useUser } from '../lib/auth';
 import { installBulkHotkeys } from '../lib/bulk-hotkeys';
 import { openBulkWizard, openDangerousDelete } from '../lib/bulk-wizard-state';
@@ -436,6 +437,12 @@ const Workspace: Component = () => {
     () => params.workspaceId,
     async (wid) => (wid ? fetchAtomCalendarManifestations(wid) : []),
   );
+  // WV.E #37 V1.5 — Auto-Calendar-Toggle-Filter (siehe Calendar.tsx).
+  // Sidebar-Build verwendet denselben Set-Filter.
+  const [wsAutoCalendarSuppressedCells] = createResource(
+    () => params.workspaceId,
+    async (wid) => (wid ? fetchAutoCalendarSuppressedCellIds(wid) : new Set<string>()),
+  );
   // Welle D.9 + WV.WV.1: wsDocs wird immer geladen (nicht mehr an
   // chips.isOn('docs') gekoppelt), damit NodeDocsButton + DocsIndicator
   // + AtomDocsSection auch dann Counts/Listen rendern, wenn der
@@ -600,14 +607,22 @@ const Workspace: Component = () => {
     return buildEvents({
       tasks: wsTasks() ?? [],
       manifestations: wsManifestations() ?? [],
-      atomManifestations: (wsAtomManifestations() ?? []).map((a) => ({
-        id: a.id,
-        atom_type: a.atom_type as 'link' | 'checklist' | 'doc',
-        atom_id: a.atom_id,
-        label: a.label,
-        display_meta: a.display_meta,
-        url: a.url ?? null,
-      })),
+      atomManifestations: (wsAtomManifestations() ?? [])
+        .filter((a) => {
+          // WV.E #37 V1.5: Auto-Manifs aus suppressed Cells filtern.
+          if (a.atom_type !== 'info_field') return true;
+          if ((a.display_meta as Record<string, unknown>).auto !== true) return true;
+          if (!a.container_id) return true;
+          return !(wsAutoCalendarSuppressedCells() ?? new Set()).has(a.container_id);
+        })
+        .map((a) => ({
+          id: a.id,
+          atom_type: a.atom_type as 'link' | 'checklist' | 'doc' | 'info_field',
+          atom_id: a.atom_id,
+          label: a.label,
+          display_meta: a.display_meta,
+          url: a.url ?? null,
+        })),
       viewRange: { fromIso, toIso },
     });
   });
