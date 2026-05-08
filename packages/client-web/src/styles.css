@@ -1817,6 +1817,147 @@ button[type="submit"]:hover:not(:disabled) {
   flex: 0 0 auto;
 }
 
+/* ── FilterBuilderModal (WV.A.7) ──────────────────────────── */
+/* Dynamisches Filter-Builder-Modal, konsumiert lib/atom-filter-attrs.ts.
+   Nutzt overlay-modal-Foundation; nur Builder-Layout ist neu. */
+.filter-builder-modal .overlay-card {
+  width: min(640px, 92vw);
+  max-height: 85vh;
+}
+
+.filter-builder-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  overflow-y: auto;
+}
+
+.filter-builder-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-builder-field {
+  font-size: var(--fs-small);
+  font-weight: 500;
+  color: var(--text);
+}
+
+.filter-builder-input {
+  padding: 6px var(--space-sm);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--fs-base);
+  transition: border-color var(--tr-std);
+}
+
+.filter-builder-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+.filter-builder-conditions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding-top: var(--space-sm);
+  border-top: 0.5px solid var(--border2);
+}
+
+.filter-builder-conditions-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--fs-small);
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: var(--space-xs);
+}
+
+.filter-builder-logic {
+  padding: 4px var(--space-xs);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--fs-small);
+}
+
+.filter-builder-condition {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) minmax(8rem, 1fr) minmax(8rem, 1.5fr) auto;
+  gap: var(--space-xs);
+  align-items: center;
+}
+
+.filter-builder-input-field,
+.filter-builder-input-operator,
+.filter-builder-input-value {
+  width: 100%;
+}
+
+.filter-builder-condition-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: none;
+  border-radius: var(--rs);
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  transition: background var(--tr-std), color var(--tr-std);
+}
+
+.filter-builder-condition-remove:hover {
+  background: var(--surface-hover);
+  color: var(--red, #ef4444);
+}
+
+.filter-builder-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px var(--space-sm);
+  border: 1px dashed var(--border2);
+  border-radius: var(--rs);
+  background: transparent;
+  color: var(--text2);
+  font-size: var(--fs-small);
+  cursor: pointer;
+  align-self: flex-start;
+  transition: background var(--tr-std), border-color var(--tr-std), color var(--tr-std);
+}
+
+.filter-builder-add:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.filter-builder-checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--fs-small);
+  color: var(--text2);
+  cursor: pointer;
+}
+
+.filter-builder-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 0.5px solid var(--border2);
+}
+
 /* ── CellTemplateRenderer (WV.A.6) ───────────────────────────── */
 /* Top-Level-Container fuer Cell-Vorlagen-Render. Zero-Shift-Edit-Mode
    (Memory `feedback_zero_shift_edit_mode.md`): Edit-Affordances als
