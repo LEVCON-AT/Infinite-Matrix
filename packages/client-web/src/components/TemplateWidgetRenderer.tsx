@@ -72,24 +72,35 @@ const TemplateWidgetRenderer: Component<TemplateWidgetRendererProps> = (p) => {
         </Show>
       </header>
       <div class="template-widget-body">
-        <Switch fallback={<p class="template-widget-stub-hint">{widgetStubHint(p.widget.type)}</p>}>
-          <Match when={p.widget.type === 'channel'}>
-            <ChannelWidget
-              channel={p.channel ?? null}
-              editMode={p.editMode}
-              onPickChannel={p.onPickChannel}
-            />
-          </Match>
-          <Match when={p.widget.type === 'drive'}>
-            <DriveWidget
-              channel={p.channel ?? null}
-              editMode={p.editMode}
-              onPickChannel={p.onPickChannel}
-              cellId={p.cellId}
-              workspaceId={p.workspaceId}
-            />
-          </Match>
-        </Switch>
+        <Show
+          when={sourceMode(p.widget.toggles) !== 'off'}
+          fallback={
+            <p class="template-widget-stub-hint">
+              Datenquelle „aus" — Widget rendert leer (Designer/Toggles).
+            </p>
+          }
+        >
+          <Switch
+            fallback={<p class="template-widget-stub-hint">{widgetStubHint(p.widget.type)}</p>}
+          >
+            <Match when={p.widget.type === 'channel'}>
+              <ChannelWidget
+                channel={p.channel ?? null}
+                editMode={p.editMode}
+                onPickChannel={p.onPickChannel}
+              />
+            </Match>
+            <Match when={p.widget.type === 'drive'}>
+              <DriveWidget
+                channel={p.channel ?? null}
+                editMode={p.editMode}
+                onPickChannel={p.onPickChannel}
+                cellId={p.cellId}
+                workspaceId={p.workspaceId}
+              />
+            </Match>
+          </Switch>
+        </Show>
       </div>
     </div>
   );
@@ -128,6 +139,13 @@ const WidgetTypeIcon: Component<{ type: ResolvedWidget['type'] }> = (p) => {
     </Switch>
   );
 };
+
+// Welle WV.D.8 — Source-Mode aus widget.toggles.source. Default 'extern'.
+function sourceMode(toggles: Record<string, unknown>): 'extern' | 'native' | 'off' {
+  const v = (toggles as { source?: string })?.source;
+  if (v === 'native' || v === 'off') return v;
+  return 'extern';
+}
 
 function widgetTypeLabel(t: ResolvedWidget['type']): string {
   if (t === 'kanban') return 'Kanban';

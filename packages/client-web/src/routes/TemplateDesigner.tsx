@@ -751,11 +751,50 @@ const WidgetInspector = (p: {
         />
       </div>
 
+      {/* Welle WV.D.8 — Source-Toggle „extern / native / off". Konzept §14.7
+          Default-Direktive: extern. Channel/Drive/OneNote-Widgets nutzen
+          Channel-Bridge wenn extern; native (V2) nutzt Atom-Foundation;
+          off blendet das Widget aus. */}
+      <fieldset class="designer-inspector-field designer-source-fieldset">
+        <legend class="designer-inspector-label">Datenquelle</legend>
+        <div class="designer-source-toggle">
+          <For each={['extern', 'native', 'off'] as const}>
+            {(mode) => {
+              const active = () =>
+                ((p.widget.toggles as { source?: string })?.source ?? 'extern') === mode;
+              return (
+                <label
+                  class="designer-source-toggle-btn"
+                  classList={{ 'designer-source-toggle-btn-active': active() }}
+                >
+                  <input
+                    type="radio"
+                    name="source-mode"
+                    value={mode}
+                    checked={active()}
+                    disabled={p.disabled}
+                    onChange={() =>
+                      void p.onPatch({
+                        toggles: { ...(p.widget.toggles ?? {}), source: mode },
+                      })
+                    }
+                  />
+                  <span>{mode === 'extern' ? 'extern' : mode === 'native' ? 'nativ' : 'aus'}</span>
+                </label>
+              );
+            }}
+          </For>
+        </div>
+        <span class="adapter-dialog-field-hint">
+          extern = Channel-Bridge (Default). nativ = Welle-WV.B-Atome (V2). aus = Widget rendert
+          leer.
+        </span>
+      </fieldset>
+
       <details class="designer-inspector-toggles">
         <summary>Toggles ({Object.keys(p.widget.toggles).length})</summary>
         <p class="adapter-dialog-field-hint">
-          Toggle-Editor (comments/attachments/marker/header/edit_in_view) folgt mit Welle WV.D
-          Channel-Bridges. V1: nur Anzeige.
+          Weitere Toggle-Editor (comments/attachments/marker/header/edit_in_view) folgen.
         </p>
       </details>
     </div>
