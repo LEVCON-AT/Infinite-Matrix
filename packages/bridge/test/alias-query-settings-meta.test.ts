@@ -11,8 +11,12 @@ function get<T extends { name: string }>(tools: T[], name: string): T {
 }
 
 describe('Sprint 4.5 tool registrierung', () => {
-  it('aliasTools enthält resolve + set', () => {
-    expect(aliasTools.map((t) => t.name).sort()).toEqual(['alias.resolve', 'alias.set']);
+  it('aliasTools enthält resolve + set + expand_to_text', () => {
+    expect(aliasTools.map((t) => t.name).sort()).toEqual([
+      'alias.expand_to_text',
+      'alias.resolve',
+      'alias.set',
+    ]);
   });
   it('queryTools enthält cards + aliases', () => {
     expect(queryTools.map((t) => t.name).sort()).toEqual(['query.aliases', 'query.cards']);
@@ -38,6 +42,24 @@ describe('alias.set schema', () => {
   });
   it('ohne alias lehnt ab', () => {
     expect(tool.schema.safeParse({ currentAlias: '^old' }).success).toBe(false);
+  });
+});
+
+describe('alias.expand_to_text schema', () => {
+  const tool = get(aliasTools, 'alias.expand_to_text');
+  it('alias allein akzeptiert (markdown default)', () => {
+    const r = tool.schema.safeParse({ alias: 'vertrag' });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.format).toBe('markdown');
+  });
+  it.each(['markdown', 'plain', 'html'] as const)('format=%s akzeptiert', (format) => {
+    expect(tool.schema.safeParse({ alias: 'x', format }).success).toBe(true);
+  });
+  it('format=invalid lehnt ab', () => {
+    expect(tool.schema.safeParse({ alias: 'x', format: 'rst' }).success).toBe(false);
+  });
+  it('ohne alias lehnt ab', () => {
+    expect(tool.schema.safeParse({ format: 'plain' }).success).toBe(false);
   });
 });
 

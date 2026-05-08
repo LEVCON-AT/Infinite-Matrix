@@ -9000,6 +9000,27 @@ const MATRIX_TOOLS={
     return{alias:args.alias,resolved:entry};
   },
 
+  // Welle WV.D.7 — alias.expand_to_text. Liefert eine kontext-formatierte
+  // Repraesentation eines Alias (markdown / plain / html). Konzept §14.3.
+  'alias.expand_to_text':async(args)=>{
+    const key=String(args.alias||'').replace(/^\^/,'').toLowerCase();
+    if(!key)return{error:'Alias darf nicht leer sein'};
+    const entry=aliasIndex[key];
+    if(!entry)return{error:'Alias nicht gefunden: '+args.alias};
+    // Label aus dem Resolve-Entry. Fallback: alias-Schluessel.
+    const label=entry.label||entry.name||entry.title||args.alias;
+    const aliasRef='^'+key;
+    const fmt=String(args.format||'markdown').toLowerCase();
+    if(fmt==='plain')return{text:label+' ('+aliasRef+')'};
+    if(fmt==='html'){
+      const safeLabel=String(label).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      const safeRef=aliasRef.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      return{text:'<a href="'+safeRef+'" data-alias="'+safeRef+'">'+safeLabel+'</a>'};
+    }
+    // markdown default
+    return{text:'['+label+']('+aliasRef+')'};
+  },
+
   // ─── Sprint 4.1: matrix-crud + edit-mode ──────────────────────────
   'matrix.rename':async(args)=>{
     const id=_resolveNodeRef(args.ref);

@@ -18,6 +18,17 @@ const setSchema = z.object({
   alias: z.string().describe('Neuer Alias-Wert. Leer = bestehenden Alias löschen.'),
 });
 
+// Welle WV.D.7 — alias.expand_to_text.
+const expandSchema = z.object({
+  alias: z.string().describe('Alias zum Expandieren (case-insensitiv).'),
+  format: z
+    .enum(['markdown', 'plain', 'html'])
+    .default('markdown')
+    .describe(
+      'Output-Format: markdown=`[Label](^alias)`, plain=`Label (^alias)`, html=`<a href="...">Label</a>`.',
+    ),
+});
+
 export const aliasTools: ToolDef[] = [
   {
     name: 'alias.resolve',
@@ -32,5 +43,12 @@ export const aliasTools: ToolDef[] = [
       'Setzt, renamed oder löscht einen Alias. Via currentAlias für Rename/Delete, via nodeRef für neuen Matrix/Board-Alias. Für Cell/Card/Link: spezifische Tools nutzen.',
     schema: setSchema,
     jsonSchema: zodToJsonSchema(setSchema),
+  },
+  {
+    name: 'alias.expand_to_text',
+    description:
+      'Expandiert einen Alias zu einer kontextangepassten Text-Repräsentation (markdown / plain / html). Nützlich beim Compose von Mails, Doku-Snippets oder HTML-Editoren — der KI generiert Verweise, die sowohl maschinen-resolvable bleiben (^alias) als auch lesbar sind. Permission: Tool läuft mit User-Context, leakt nichts was der Caller nicht sehen darf.',
+    schema: expandSchema,
+    jsonSchema: zodToJsonSchema(expandSchema),
   },
 ];

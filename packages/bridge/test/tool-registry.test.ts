@@ -15,6 +15,7 @@ describe('registerAllTools() Integration', () => {
     // Vollständige Liste aller Tools (Phase 4 + V2.1 + V2.2 + Welle D
     // atom_pin / tag / doc.pin + Welle WV.A Vorlagen-Foundation)
     const expected = [
+      'alias.expand_to_text',
       'alias.resolve',
       'alias.set',
       'atom_marker.list',
@@ -104,7 +105,7 @@ describe('registerAllTools() Integration', () => {
     ];
 
     expect(names).toEqual(expected);
-    expect(tools.size).toBe(86);
+    expect(tools.size).toBe(87);
   });
 
   it('jedes registrierte Tool hat schema + jsonSchema', () => {
