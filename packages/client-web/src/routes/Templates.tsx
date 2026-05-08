@@ -16,7 +16,7 @@
 // Edit-Sub-Route /templates/edit/:id (WYSIWYG-Editor §7.3) wird in
 // Welle WV.C separat gebaut — V1-Stub zeigt Toast „Editor in Vorbereitung".
 
-import { A, useParams } from '@solidjs/router';
+import { A, useNavigate, useParams } from '@solidjs/router';
 import { For, Show, createMemo, createResource, createSignal } from 'solid-js';
 import Icon from '../components/Icon';
 import DeleteTemplateModal from '../components/templates/DeleteTemplateModal';
@@ -52,6 +52,7 @@ type ModalState =
 const Templates = () => {
   const params = useParams<{ workspaceId: string }>();
   const session = useSession();
+  const navigate = useNavigate();
 
   const [workspaces] = createResource(
     () => session()?.user?.id ?? null,
@@ -233,9 +234,7 @@ const Templates = () => {
   }
 
   function handleEdit(template: FeatureTemplateRow): void {
-    // V1-Stub: Designer-Sub-Route §7.3 wird separat gebaut. Toast +
-    // Direkt-Navigieren-Pfad bleibt auskommentiert bis Editor steht.
-    showToast(`Designer fuer „${template.name}" ist in Vorbereitung (Welle WV.C).`, 'info');
+    navigate(`/w/${params.workspaceId}/templates/edit/${template.id}`);
   }
 
   function handleDuplicate(template: FeatureTemplateRow): void {
