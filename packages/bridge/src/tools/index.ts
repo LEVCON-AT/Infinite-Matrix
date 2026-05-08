@@ -14,10 +14,12 @@ import { infoLinkTools } from './info-link.js';
 import { matrixCrudTools } from './matrix-crud.js';
 import { matrixTools } from './matrix.js';
 import { metaTools } from './meta.js';
+import { oauthTokenTools } from './oauth-tokens.js';
 import { queryTools } from './query.js';
 import { savedFilterTools } from './saved-filters.js';
 import { settingsTools } from './settings.js';
 import { templateTools } from './template.js';
+import { widgetChannelTools } from './widget-channels.js';
 
 export function registerAllTools(): void {
   for (const tool of [
@@ -42,6 +44,9 @@ export function registerAllTools(): void {
     // Welle WV.B — info_fields + atom_markers.
     ...infoFieldTools,
     ...atomMarkerTools,
+    // Welle WV.D Heptad-Pflege — Channel-Bridges + OAuth-Tokens.
+    ...widgetChannelTools,
+    ...oauthTokenTools,
   ]) {
     registerTool(tool);
   }

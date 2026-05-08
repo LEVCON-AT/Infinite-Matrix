@@ -82,6 +82,8 @@ describe('registerAllTools() Integration', () => {
       'matrix.navigate',
       'matrix.rename',
       'matrix.state.get',
+      'oauth_token.disconnect',
+      'oauth_token.list',
       'query.aliases',
       'query.cards',
       'row.add',
@@ -102,10 +104,13 @@ describe('registerAllTools() Integration', () => {
       'template.instantiate',
       'template.list',
       'undo.last',
+      'widget_channel.delete',
+      'widget_channel.list',
+      'widget_channel.set',
     ];
 
     expect(names).toEqual(expected);
-    expect(tools.size).toBe(87);
+    expect(tools.size).toBe(92);
   });
 
   it('jedes registrierte Tool hat schema + jsonSchema', () => {

@@ -138,6 +138,11 @@ export type WorkspaceExport = {
   // Workspace-Snapshots. (Memory `feedback_clean_cut_no_prod_data.md`
   // fuer den Datenhoheits-Aspekt.)
   saved_filters?: Record<string, unknown>[];
+  // Welle WV.D.1 — widget_external_channels traegt die Bridge-Identitaet
+  // (widget_id ↔ provider+external_ref). Workspace-scope, RLS-protected.
+  // Optional fuer V0-Parser-Kompat. user_oauth_tokens explizit NICHT im
+  // Export — User-private Zugangsdaten verlassen den Workspace nie.
+  widget_external_channels?: Record<string, unknown>[];
   // Nur bei Cell-Subtree-Exports gesetzt: Meta-Info zur Quell-Zelle,
   // damit der Importer ihre info-Felder/Links und Feature-Flags in
   // die Ziel-Zelle mergen kann — ohne die Zelle selbst in cells[]
@@ -260,6 +265,7 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     cellWidgetOverridesRes,
     workspaceHotkeySlotsRes,
     savedFiltersRes,
+    widgetExternalChannelsRes,
   ] = await Promise.all([
     supabase.from('nodes').select('*').eq('workspace_id', workspaceId),
     supabase.from('rows').select('*').eq('workspace_id', workspaceId),
@@ -296,6 +302,12 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
       .from('saved_filters')
       .select('*')
       .eq('workspace_id', workspaceId),
+    // Welle WV.D.1: widget_external_channels — Widget→Provider-Refs.
+    // user_oauth_tokens ist NICHT dabei (sensible Zugangsdaten).
+    supabase
+      .from('widget_external_channels')
+      .select('*')
+      .eq('workspace_id', workspaceId),
   ]);
 
   for (const res of [
@@ -320,6 +332,7 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     cellWidgetOverridesRes,
     workspaceHotkeySlotsRes,
     savedFiltersRes,
+    widgetExternalChannelsRes,
   ]) {
     if (res.error) throw res.error;
   }
@@ -354,6 +367,7 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     cell_widget_overrides: (cellWidgetOverridesRes.data ?? []) as Record<string, unknown>[],
     workspace_hotkey_slots: (workspaceHotkeySlotsRes.data ?? []) as Record<string, unknown>[],
     saved_filters: (savedFiltersRes.data ?? []) as Record<string, unknown>[],
+    widget_external_channels: (widgetExternalChannelsRes.data ?? []) as Record<string, unknown>[],
   };
 }
 
