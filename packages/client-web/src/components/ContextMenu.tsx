@@ -100,8 +100,8 @@ const ContextMenu: Component<Props> = (p) => {
       let y = state.y;
       if (x + rect.width > vw - 8) x = Math.max(8, vw - rect.width - 8);
       if (y + rect.height > vh - 8) y = Math.max(8, vh - rect.height - 8);
-      menuRef.style.left = `${x}px`;
-      menuRef.style.top = `${y}px`;
+      menuRef.style.setProperty('--cm-x', `${x}px`);
+      menuRef.style.setProperty('--cm-y', `${y}px`);
     });
   });
 
@@ -112,7 +112,9 @@ const ContextMenu: Component<Props> = (p) => {
           ref={menuRef}
           class="ctx-menu"
           role="menu"
-          style={{ left: `${s().x}px`, top: `${s().y}px` }}
+          // Runtime-Position via Custom-Properties (style.md §4). Werte
+          // werden in onMount nach Viewport-Clamp neu gesetzt.
+          style={{ '--cm-x': `${s().x}px`, '--cm-y': `${s().y}px` }}
         >
           <Show when={s().headerLabel}>
             <div class="ctx-menu-head">

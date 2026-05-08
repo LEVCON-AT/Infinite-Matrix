@@ -7,9 +7,9 @@
 import { type Component, For, Show, createMemo } from 'solid-js';
 import { aliasAutocompleteState, commitAliasAutocomplete } from '../lib/use-alias-autocomplete';
 
-// Feste Offsets: knapp unter dem Input, minimales Leading.
+// Feste Offsets: knapp unter dem Input, minimales Leading. max-width
+// liegt jetzt in CSS als 22rem (style.md §4 Migration).
 const POPUP_GAP_PX = 4;
-const POPUP_MAX_W = 320;
 
 const AliasAutocomplete: Component = () => {
   const s = aliasAutocompleteState;
@@ -30,12 +30,12 @@ const AliasAutocomplete: Component = () => {
       {(anchorPos) => (
         <div
           class="alias-ac-popup"
+          // Runtime-DOM-derived Position via Custom-Properties (style.md §4
+          // Inline-Style-Erlaubt). Statisches position/max-width/z-index in
+          // CSS-Klasse.
           style={{
-            position: 'fixed',
-            left: `${anchorPos().left}px`,
-            top: `${anchorPos().top}px`,
-            'max-width': `${POPUP_MAX_W}px`,
-            'z-index': '10000',
+            '--ac-x': `${anchorPos().left}px`,
+            '--ac-y': `${anchorPos().top}px`,
           }}
           // biome-ignore lint/a11y/useSemanticElements: bewusst <div role="listbox"> — Popup wird absolut positioniert via Portal, kein nativer <select> moeglich.
           role="listbox"

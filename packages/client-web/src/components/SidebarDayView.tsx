@@ -298,7 +298,7 @@ const SidebarDayView: Component<Props> = (p) => {
                         }}
                         onClick={(ev) => openEvent(e, ev)}
                         onDblClick={(ev) => onDoubleClickEvent(e, ev)}
-                        style={{ height: `${ALL_DAY_BAR_HEIGHT}px` }}
+                        style={{ '--sb-day-allday-h': `${ALL_DAY_BAR_HEIGHT}px` }}
                         draggable={e.atomType === 'task'}
                         onDragStart={dragHandlers.onDragStart}
                         onDragEnd={dragHandlers.onDragEnd}
@@ -349,7 +349,7 @@ const SidebarDayView: Component<Props> = (p) => {
 
           <div
             class="sb-day-grid"
-            style={{ height: `${gridHeight()}px` }}
+            style={{ '--sb-day-grid-h': `${gridHeight()}px` }}
             ref={(el) => {
               gridEl = el;
             }}
@@ -364,7 +364,7 @@ const SidebarDayView: Component<Props> = (p) => {
             <Show when={bufferBeforeHeight() > 0}>
               <div
                 class="sb-day-buffer sb-day-buffer-before"
-                style={{ top: '0px', height: `${bufferBeforeHeight()}px` }}
+                style={{ '--sb-buf-h': `${bufferBeforeHeight()}px` }}
                 aria-hidden="true"
               />
             </Show>
@@ -372,8 +372,8 @@ const SidebarDayView: Component<Props> = (p) => {
               <div
                 class="sb-day-buffer sb-day-buffer-after"
                 style={{
-                  top: `${bufferAfterTop()}px`,
-                  height: `${bufferAfterHeight()}px`,
+                  '--sb-buf-top': `${bufferAfterTop()}px`,
+                  '--sb-buf-h': `${bufferAfterHeight()}px`,
                 }}
                 aria-hidden="true"
               />
@@ -383,7 +383,7 @@ const SidebarDayView: Component<Props> = (p) => {
               {(h) => {
                 const minRel = h * 60 - range().startMin;
                 return (
-                  <div class="sb-day-hourline" style={{ top: `${topPx(minRel)}px` }}>
+                  <div class="sb-day-hourline" style={{ '--sb-hour-top': `${topPx(minRel)}px` }}>
                     <span class="sb-day-hourlabel">{formatHHMM(h * 60)}</span>
                   </div>
                 );
@@ -419,10 +419,10 @@ const SidebarDayView: Component<Props> = (p) => {
                     onDragStart={dragHandlers.onDragStart}
                     onDragEnd={dragHandlers.onDragEnd}
                     style={{
-                      top: `${topPx(it.startMin)}px`,
-                      height: `${heightPx(it.durationMin, PIXELS_PER_MINUTE)}px`,
-                      left: `calc(40px + ${geom.leftPct}% * (1 - 40px / 100))`,
-                      width: `calc(${geom.widthPct}% - 4px)`,
+                      '--sb-evt-top': `${topPx(it.startMin)}px`,
+                      '--sb-evt-h': `${heightPx(it.durationMin, PIXELS_PER_MINUTE)}px`,
+                      '--sb-evt-left-pct': `${geom.leftPct}`,
+                      '--sb-evt-w-pct': `${geom.widthPct}`,
                     }}
                     onClick={(ev) => openEvent(it.event, ev)}
                     onDblClick={(ev) => onDoubleClickEvent(it.event, ev)}

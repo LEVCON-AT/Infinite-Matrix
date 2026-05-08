@@ -17,8 +17,8 @@
 import { type Component, For, Show, createMemo } from 'solid-js';
 import { objectSuggestState, pickObjectSuggest } from '../lib/use-object-suggest';
 
+// max-width liegt jetzt in CSS als 22rem (style.md §4 Migration).
 const POPUP_GAP_PX = 4;
-const POPUP_MAX_W = 360;
 
 const ObjectSuggestion: Component = () => {
   const s = objectSuggestState;
@@ -36,13 +36,11 @@ const ObjectSuggestion: Component = () => {
       {(anchorPos) => (
         <div
           class="object-suggest-popup"
+          // Runtime-Position + Anchor-Width via Custom-Properties.
           style={{
-            position: 'fixed',
-            left: `${anchorPos().left}px`,
-            top: `${anchorPos().top}px`,
-            'min-width': `${anchorPos().minWidth}px`,
-            'max-width': `${POPUP_MAX_W}px`,
-            'z-index': 'var(--z-popup)',
+            '--os-x': `${anchorPos().left}px`,
+            '--os-y': `${anchorPos().top}px`,
+            '--os-min-w': `${anchorPos().minWidth}px`,
           }}
           // biome-ignore lint/a11y/useSemanticElements: bewusst <div role="listbox"> — fixed-Popup, kein nativer <select> moeglich.
           role="listbox"
