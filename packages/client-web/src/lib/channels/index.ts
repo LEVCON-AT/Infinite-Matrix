@@ -9,8 +9,11 @@
 // Operationen sind anders geformt (File-Pick / Download / Upload).
 
 import type { ChannelProvider } from '../types';
+import { googleDriveProvider } from './drive-google';
 import type { DriveProviderImpl } from './drive-types';
+import { dropboxProvider } from './dropbox';
 import { gmailProvider } from './gmail';
+import { nextcloudProvider } from './nextcloud';
 import { onedriveProvider } from './onedrive';
 import { outlookProvider } from './outlook';
 import { slackProvider } from './slack';
@@ -57,6 +60,9 @@ export function listImplementedProviders(): ChannelProvider[] {
 const DRIVE_REGISTRY = new Map<ChannelProvider, DriveProviderImpl>();
 
 DRIVE_REGISTRY.set('onedrive', onedriveProvider);
+DRIVE_REGISTRY.set('drive', googleDriveProvider);
+DRIVE_REGISTRY.set('dropbox', dropboxProvider);
+DRIVE_REGISTRY.set('nextcloud', nextcloudProvider);
 
 export function getDriveImpl(provider: ChannelProvider): DriveProviderImpl {
   const impl = DRIVE_REGISTRY.get(provider);
