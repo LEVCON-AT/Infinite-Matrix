@@ -41,6 +41,7 @@
 
 import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
 import { validateAlias } from '../lib/alias';
+import { useSession } from '../lib/auth';
 import { openCellSuggest } from '../lib/cell-suggest';
 import { installFocusRestore, installFocusTrap, showConfirm } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
@@ -64,9 +65,12 @@ import {
   updateCell,
 } from '../lib/mutations';
 import { type ExistingNameableInfo, fetchCellExistingTemplates, isNodeEmpty } from '../lib/queries';
+import { fetchMyWorkspaces } from '../lib/queries';
 import { showToast } from '../lib/toasts';
 import type { CellRow, ColRow, RowRow } from '../lib/types';
+import { canWrite } from '../lib/workspace-role';
 import Icon from './Icon';
+import SaveAsTemplateModal from './templates/SaveAsTemplateModal';
 
 // Phase 3 O.8.M.2: Initial-State eines Edit-Wizards aus existing
 // Cell ableiten — welche Features sind aktuell „aktiv"?
@@ -112,6 +116,21 @@ const NewCellWizard: Component<Props> = (p) => {
   // bleibt als Snapshot fuer Delta-Berechnung beim Commit.
   const originalKeys = deriveInitialSelected(p.cell);
   const isEditMode = originalKeys.length > 0;
+
+  // Welle WV.C.2 — Save-as-Template-Trigger.
+  const session = useSession();
+  const myUserId = () => session()?.user?.id ?? null;
+  const [saveAsTemplateOpen, setSaveAsTemplateOpen] = createSignal(false);
+  // Workspace-Rolle (lazy fetch — fetchMyWorkspaces hat localStorage-Cache).
+  // canChooseVisibility nur fuer write-berechtigte User (workspace-shared
+  // Vorlagen sind owner/admin/editor-Privileg).
+  const [myRole, setMyRole] = createSignal<'owner' | 'admin' | 'editor' | 'viewer' | undefined>(
+    undefined,
+  );
+  void fetchMyWorkspaces()
+    .then((wss) => setMyRole(wss.find((w) => w.id === p.workspaceId)?.role))
+    .catch(() => setMyRole(undefined));
+  const canSaveAsTemplate = () => isEditMode && Boolean(p.cell) && canWrite(myRole());
 
   const [step, setStep] = createSignal<Step>({ kind: 'pick' });
   const [aliasDraft, setAliasDraft] = createSignal(p.cell?.alias ?? '');
@@ -815,6 +834,18 @@ const NewCellWizard: Component<Props> = (p) => {
                 ✨ AI vorschlagen
               </button>
             </Show>
+            <Show when={canSaveAsTemplate()}>
+              <button
+                type="button"
+                class="btn-subtle"
+                onClick={() => setSaveAsTemplateOpen(true)}
+                disabled={busy()}
+                title="Layout dieser Cell als wiederverwendbare Vorlage speichern"
+              >
+                <Icon name="document-text" size={12} />
+                <span>Als Vorlage speichern</span>
+              </button>
+            </Show>
             <Show when={isEditMode}>
               <button
                 type="button"
@@ -955,6 +986,25 @@ const NewCellWizard: Component<Props> = (p) => {
           </div>
         </Show>
       </div>
+      <Show when={saveAsTemplateOpen() && p.cell}>
+        {(_) => {
+          const cell = p.cell;
+          if (!cell) return null;
+          return (
+            <SaveAsTemplateModal
+              workspaceId={p.workspaceId}
+              ownerUserId={myUserId()}
+              cell={cell}
+              defaultName={cell.alias ?? `${p.row.label} ${p.col.label}`}
+              canChooseVisibility={canWrite(myRole())}
+              onSaved={(_tpl, _openInDesigner) => {
+                setSaveAsTemplateOpen(false);
+              }}
+              onClose={() => setSaveAsTemplateOpen(false)}
+            />
+          );
+        }}
+      </Show>
     </div>
   );
 };
