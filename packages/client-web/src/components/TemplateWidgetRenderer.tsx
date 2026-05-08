@@ -17,6 +17,7 @@ import { type Component, Match, Show, Switch } from 'solid-js';
 import type { WidgetExternalChannelRow } from '../lib/types';
 import type { ResolvedWidget } from '../lib/widget-foundation';
 import ChannelWidget from './ChannelWidget';
+import DriveWidget from './DriveWidget';
 import Icon from './Icon';
 
 export type TemplateWidgetRendererProps = {
@@ -34,6 +35,11 @@ export type TemplateWidgetRendererProps = {
   channel?: WidgetExternalChannelRow | null;
   // Edit-Mode-CTA: Caller oeffnet einen Picker fuer Channel-Auswahl.
   onPickChannel?: () => void;
+  // Welle WV.D.5.a — DriveWidget braucht cellId+workspaceId fuer den
+  // „Datei verknuepfen"-Button (addCellAtomLink). Caller (CellTemplateRenderer)
+  // gibt cell-Kontext weiter.
+  cellId?: string;
+  workspaceId?: string;
 };
 
 const TemplateWidgetRenderer: Component<TemplateWidgetRendererProps> = (p) => {
@@ -74,6 +80,15 @@ const TemplateWidgetRenderer: Component<TemplateWidgetRendererProps> = (p) => {
               onPickChannel={p.onPickChannel}
             />
           </Match>
+          <Match when={p.widget.type === 'drive'}>
+            <DriveWidget
+              channel={p.channel ?? null}
+              editMode={p.editMode}
+              onPickChannel={p.onPickChannel}
+              cellId={p.cellId}
+              workspaceId={p.workspaceId}
+            />
+          </Match>
         </Switch>
       </div>
     </div>
@@ -107,6 +122,9 @@ const WidgetTypeIcon: Component<{ type: ResolvedWidget['type'] }> = (p) => {
       <Match when={p.type === 'channel'}>
         <Icon name="chat-bubble" size={14} />
       </Match>
+      <Match when={p.type === 'drive'}>
+        <Icon name="cloud" size={14} />
+      </Match>
     </Switch>
   );
 };
@@ -119,6 +137,7 @@ function widgetTypeLabel(t: ResolvedWidget['type']): string {
   if (t === 'link') return 'Link';
   if (t === 'calendar') return 'Kalender';
   if (t === 'channel') return 'Channel';
+  if (t === 'drive') return 'Drive';
   return 'Smart Summary';
 }
 
@@ -130,6 +149,7 @@ function widgetStubHint(t: ResolvedWidget['type']): string {
   if (t === 'link') return 'Link (Foundation — volles Wiring in Welle C).';
   if (t === 'calendar') return 'Kalender (Foundation — volles Wiring in Welle C).';
   if (t === 'channel') return 'Channel-Bridge — verknuepfe einen Slack/Teams/Mail-Channel.';
+  if (t === 'drive') return 'Drive-Bridge — verknuepfe einen Cloud-Drive-Folder.';
   return 'Smart Summary (Foundation — Inhalt kommt in Welle F).';
 }
 

@@ -19388,3 +19388,125 @@ body[data-viewport="phone"] .overlay-card {
   margin: 0;
   color: var(--red, #c0392b);
 }
+
+/* ─── DriveWidget (Welle WV.D.5.a) ────────────────────────── */
+.drive-widget-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-height: 0;
+  overflow-y: auto;
+}
+.drive-widget-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+}
+.drive-widget-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text3);
+}
+.drive-widget-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 11px;
+  color: var(--text3);
+  padding: 2px var(--space-sm);
+}
+.drive-widget-path {
+  flex: 1;
+  font-variant: small-caps;
+}
+.drive-widget-folders {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.drive-widget-folder-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-hover);
+  color: var(--text2);
+  font-size: 11px;
+  border: 0;
+  cursor: pointer;
+}
+.drive-widget-folder-btn:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.drive-widget-files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.drive-widget-file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 4px var(--space-sm);
+  border-radius: var(--rs);
+  border: 0.0625rem solid transparent;
+}
+.drive-widget-file:hover {
+  border-color: var(--border);
+  background: var(--bg2);
+}
+.drive-widget-file-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  cursor: grab;
+}
+.drive-widget-file-main:active {
+  cursor: grabbing;
+}
+.drive-widget-file-name {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.drive-widget-file-time {
+  font-size: 10px;
+  color: var(--text3);
+  font-variant-numeric: tabular-nums;
+}
+.drive-widget-file-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.drive-widget-file-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text3);
+  border: 0;
+  cursor: pointer;
+}
+.drive-widget-file-link:hover {
+  background: var(--surface-hover);
+  color: var(--accent);
+}

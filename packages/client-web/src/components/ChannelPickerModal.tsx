@@ -26,7 +26,10 @@ import { useUser } from '../lib/auth';
 import {
   type ChannelInbox,
   getChannelImpl,
+  getDriveImpl,
   hasChannelImpl,
+  hasDriveImpl,
+  listImplementedDriveProviders,
   listImplementedProviders,
 } from '../lib/channels';
 import { CHANNEL_PROVIDER_LABEL } from '../lib/channels-meta';
@@ -34,13 +37,16 @@ import { installFocusRestore, installFocusTrap } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
 import { fetchOAuthTokens, tokenStatusFor } from '../lib/oauth-tokens';
 import { showToast } from '../lib/toasts';
-import type { ChannelProvider, WidgetExternalChannelRow } from '../lib/types';
+import type { ChannelProvider, TemplateWidgetType, WidgetExternalChannelRow } from '../lib/types';
 import { setWidgetChannel } from '../lib/widget-channels';
 import Icon from './Icon';
 
 export type ChannelPickerModalProps = {
   widgetId: string;
   workspaceId: string;
+  // Welle WV.D.5.a — Picker-Modus. 'channel' = Mail/Chat-Inbox-Liste,
+  // 'drive' = Drive-Folder-Liste. Default 'channel'.
+  widgetType?: TemplateWidgetType;
   // null = neue Verknuepfung. Set = bestehende editieren (Provider
   // bleibt fest, nur Inbox-Auswahl moeglich).
   existing: WidgetExternalChannelRow | null;
@@ -52,13 +58,14 @@ export type ChannelPickerModalProps = {
 
 const ChannelPickerModal: Component<ChannelPickerModalProps> = (p) => {
   const user = useUser();
+  const isDrive = () => p.widgetType === 'drive';
   const initialProvider = (p.existing?.provider ?? null) as ChannelProvider | null;
   const [provider, setProvider] = createSignal<ChannelProvider | null>(initialProvider);
-  const [inboxId, setInboxId] = createSignal<string | null>(
-    ((p.existing?.external_ref as Record<string, unknown> | undefined)?.inbox_id as
-      | string
-      | undefined) ?? null,
-  );
+  const initialInboxId = ((): string | null => {
+    const ref = p.existing?.external_ref as Record<string, unknown> | undefined;
+    return ((ref?.inbox_id ?? ref?.folder_id) as string | undefined) ?? null;
+  })();
+  const [inboxId, setInboxId] = createSignal<string | null>(initialInboxId);
   const [busy, setBusy] = createSignal(false);
 
   let cardRef: HTMLDivElement | undefined;
@@ -100,18 +107,26 @@ const ChannelPickerModal: Component<ChannelPickerModalProps> = (p) => {
     return stat?.kind === 'valid';
   };
 
+  const hasImpl = (prov: ChannelProvider): boolean =>
+    isDrive() ? hasDriveImpl(prov) : hasChannelImpl(prov);
+
   const [inboxes] = createResource(
     () => {
       const prov = provider();
-      if (!prov || !hasChannelImpl(prov) || !tokenReady()) return null;
-      return prov;
+      if (!prov || !hasImpl(prov) || !tokenReady()) return null;
+      return { prov, drive: isDrive() };
     },
-    async (prov) => {
+    async (req): Promise<ChannelInbox[]> => {
       try {
-        const impl = getChannelImpl(prov);
+        if (req.drive) {
+          const impl = getDriveImpl(req.prov);
+          const folders = await impl.listFolders();
+          return folders.map((f) => ({ id: f.id, name: f.name }));
+        }
+        const impl = getChannelImpl(req.prov);
         return await impl.listInboxes();
       } catch (err) {
-        console.warn('listInboxes:', err);
+        console.warn('listInboxes/listFolders:', err);
         return [];
       }
     },
@@ -127,7 +142,7 @@ const ChannelPickerModal: Component<ChannelPickerModalProps> = (p) => {
         widgetId: p.widgetId,
         workspaceId: p.workspaceId,
         provider: prov,
-        externalRef: { inbox_id: inb },
+        externalRef: isDrive() ? { folder_id: inb } : { inbox_id: inb },
       });
       showToast('Channel verknuepft.', 'success');
       p.onSaved();
@@ -178,7 +193,7 @@ const ChannelPickerModal: Component<ChannelPickerModalProps> = (p) => {
               }
             >
               <option value="">— bitte waehlen —</option>
-              <For each={listImplementedProviders()}>
+              <For each={isDrive() ? listImplementedDriveProviders() : listImplementedProviders()}>
                 {(prov) => <option value={prov}>{CHANNEL_PROVIDER_LABEL[prov]}</option>}
               </For>
             </select>

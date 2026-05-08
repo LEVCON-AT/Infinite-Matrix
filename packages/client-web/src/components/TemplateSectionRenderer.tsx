@@ -18,6 +18,9 @@ export type TemplateSectionRendererProps = {
   // Welle WV.D.3.g — Channel-Bridge-Picker. Caller (CellTemplateRenderer)
   // entscheidet was passiert (V1: oeffnet ChannelPickerModal).
   onPickChannel?: (widgetId: string) => void;
+  // Welle WV.D.5.a — DriveWidget braucht cell-Kontext fuer Link-Action.
+  cellId?: string;
+  workspaceId?: string;
 };
 
 const TemplateSectionRenderer: Component<TemplateSectionRendererProps> = (p) => {
@@ -55,6 +58,8 @@ const TemplateSectionRenderer: Component<TemplateSectionRendererProps> = (p) => 
                   onResetOverride={p.onResetOverride}
                   channel={widget.channel}
                   onPickChannel={p.onPickChannel ? () => p.onPickChannel?.(widget.id) : undefined}
+                  cellId={p.cellId}
+                  workspaceId={p.workspaceId}
                 />
               )}
             </For>

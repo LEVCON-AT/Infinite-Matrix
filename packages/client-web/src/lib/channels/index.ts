@@ -9,15 +9,19 @@
 // Operationen sind anders geformt (File-Pick / Download / Upload).
 
 import type { ChannelProvider } from '../types';
+import type { DriveProviderImpl } from './drive-types';
 import { gmailProvider } from './gmail';
+import { onedriveProvider } from './onedrive';
 import { outlookProvider } from './outlook';
 import { slackProvider } from './slack';
 import { teamsProvider } from './teams';
 import type { ChannelProviderImpl } from './types';
 
 export type * from './types';
+export type * from './drive-types';
 export { getDecryptedOAuthToken, getBearerToken } from './token';
 
+// ─── Channel-Provider (Mail/Chat) ────────────────────────────────
 const REGISTRY = new Map<ChannelProvider, ChannelProviderImpl>();
 
 REGISTRY.set('slack', slackProvider);
@@ -44,4 +48,28 @@ export function hasChannelImpl(provider: ChannelProvider): boolean {
 // registriert wird.
 export function listImplementedProviders(): ChannelProvider[] {
   return Array.from(REGISTRY.keys());
+}
+
+// ─── Drive-Provider (File-Bridge) ────────────────────────────────
+// Welle WV.D.5: Eigenes Interface, eigene Registry. Drive-Widget
+// (DriveWidget.tsx) dispatcht via getDriveImpl.
+
+const DRIVE_REGISTRY = new Map<ChannelProvider, DriveProviderImpl>();
+
+DRIVE_REGISTRY.set('onedrive', onedriveProvider);
+
+export function getDriveImpl(provider: ChannelProvider): DriveProviderImpl {
+  const impl = DRIVE_REGISTRY.get(provider);
+  if (!impl) {
+    throw new Error(`drive:${provider}:not_implemented`);
+  }
+  return impl;
+}
+
+export function hasDriveImpl(provider: ChannelProvider): boolean {
+  return DRIVE_REGISTRY.has(provider);
+}
+
+export function listImplementedDriveProviders(): ChannelProvider[] {
+  return Array.from(DRIVE_REGISTRY.keys());
 }

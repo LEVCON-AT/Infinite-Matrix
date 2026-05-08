@@ -69,6 +69,12 @@ const CellTemplateRenderer: Component<CellTemplateRendererProps> = (p) => {
     const list = p.sources.widgetChannels ?? [];
     return list.find((c) => c.widget_id === wid) ?? null;
   };
+  const pickingWidgetType = () => {
+    const wid = pickingWidgetId();
+    if (!wid) return undefined;
+    const widget = p.sources.widgets.find((w) => w.id === wid);
+    return widget?.type;
+  };
 
   // Reset-Override: Snapshot vor Delete fuer Undo. Override-Daten + IDs
   // landen im Closure damit der Undo-Handler restoren kann.
@@ -189,6 +195,8 @@ const CellTemplateRenderer: Component<CellTemplateRendererProps> = (p) => {
                   editMode={p.editMode}
                   onResetOverride={handleResetOverride}
                   onPickChannel={(widgetId) => setPickingWidgetId(widgetId)}
+                  cellId={p.cellId}
+                  workspaceId={p.workspaceId}
                 />
               )}
             </For>
@@ -200,6 +208,7 @@ const CellTemplateRenderer: Component<CellTemplateRendererProps> = (p) => {
           <ChannelPickerModal
             widgetId={wid()}
             workspaceId={p.workspaceId}
+            widgetType={pickingWidgetType()}
             existing={pickingChannel()}
             settingsWorkspaceId={p.workspaceId}
             onClose={() => setPickingWidgetId(null)}

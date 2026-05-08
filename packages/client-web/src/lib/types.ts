@@ -704,7 +704,10 @@ export type TemplateWidgetType =
   | 'smart_summary'
   // Welle WV.D.3.g — Channel-Bridge-Widget (Mail/Chat). Provider +
   // external_ref leben in widget_external_channels (Migration 077).
-  | 'channel';
+  | 'channel'
+  // Welle WV.D.5.a — Drive-Bridge-Widget (File-Pick). Provider +
+  // external_ref.folder_id leben in widget_external_channels.
+  | 'drive';
 
 export type TemplateSectionVisibility = 'always' | 'edit_only';
 
