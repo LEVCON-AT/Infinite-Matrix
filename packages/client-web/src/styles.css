@@ -18608,3 +18608,17 @@ body[data-viewport="phone"] .overlay-card {
   padding: var(--space-md);
   border-top: 1px solid var(--border);
 }
+
+/* ─── Save-as-Template Modal (WV.C.2) ──────────────────────── */
+.save-as-template-hint {
+  margin: 0 0 var(--space-sm);
+  padding: 0.5rem 0.65rem;
+  background: var(--accent-soft);
+  border-radius: var(--radius-md, 6px);
+  color: var(--text2);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.save-as-template-actions {
+  flex-wrap: wrap;
+}
