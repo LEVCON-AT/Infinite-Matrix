@@ -57,20 +57,20 @@ const LINK_PROVIDER_SYMBOL: Record<LinkProvider, IconName> = {
   url: 'arrow-top-right-on-square',
   mail: 'envelope',
   'mail-generic': 'envelope',
-  // Brand-Provider — V1-Fallback auf generic Icons. Welle B
-  // fortgesetzt: Brand-SVG-Sprites einbinden.
+  // Brand-Provider — V1-Distinct-Heroicons (Welle B fortgesetzt
+  // 2026-05-08). Echte Brand-SVG-Sprites V2 deferred.
   onenote: 'document-text',
   notion: 'document-text',
-  onedrive: 'archive-box',
-  drive: 'archive-box',
-  dropbox: 'archive-box',
-  nextcloud: 'archive-box',
-  slack: 'envelope',
-  teams: 'users',
-  whatsapp: 'envelope',
-  discord: 'users',
-  telegram: 'envelope',
-  filesystem: 'archive-box',
+  onedrive: 'cloud',
+  drive: 'cloud',
+  dropbox: 'cloud',
+  nextcloud: 'cloud',
+  slack: 'chat-bubble',
+  teams: 'chat-bubble',
+  whatsapp: 'phone',
+  discord: 'chat-bubble',
+  telegram: 'paper-airplane',
+  filesystem: 'folder',
 };
 
 // ─── Resolver ──────────────────────────────────────────────────

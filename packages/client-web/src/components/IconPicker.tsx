@@ -55,11 +55,16 @@ const PICKABLE_ICONS: ReadonlyArray<{ name: IconName; group: string; aliases?: s
   { name: 'tag', group: 'Daten' },
   { name: 'link', group: 'Daten', aliases: ['url'] },
   { name: 'envelope', group: 'Daten', aliases: ['mail', 'email'] },
-  { name: 'phone', group: 'Daten', aliases: ['tel'] },
+  { name: 'phone', group: 'Daten', aliases: ['tel', 'whatsapp'] },
   { name: 'banknotes', group: 'Daten', aliases: ['money', 'currency'] },
   { name: 'calculator', group: 'Daten', aliases: ['number'] },
   { name: 'at-symbol', group: 'Daten', aliases: ['alias'] },
   { name: 'funnel', group: 'Daten', aliases: ['filter'] },
+  // Provider (Brand-Distinct, Welle WV.B fortgesetzt)
+  { name: 'cloud', group: 'Provider', aliases: ['drive', 'onedrive', 'dropbox', 'storage'] },
+  { name: 'folder', group: 'Provider', aliases: ['filesystem', 'directory'] },
+  { name: 'chat-bubble', group: 'Provider', aliases: ['slack', 'teams', 'discord', 'message'] },
+  { name: 'paper-airplane', group: 'Provider', aliases: ['telegram', 'send'] },
   // System
   { name: 'cog', group: 'System', aliases: ['settings'] },
   { name: 'user', group: 'System' },
@@ -71,7 +76,7 @@ const PICKABLE_ICONS: ReadonlyArray<{ name: IconName; group: string; aliases?: s
   { name: 'moon', group: 'System', aliases: ['dark'] },
 ];
 
-const GROUP_ORDER = ['Struktur', 'Status', 'Daten', 'Aktion', 'System'];
+const GROUP_ORDER = ['Struktur', 'Status', 'Daten', 'Provider', 'Aktion', 'System'];
 
 export type IconPickerProps = {
   // Aktueller Wert (Heroicon-Name oder null fuer „kein Symbol").

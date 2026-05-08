@@ -73,7 +73,13 @@ export type IconName =
   | 'phone'
   | 'banknotes'
   | 'calculator'
-  | 'at-symbol';
+  | 'at-symbol'
+  // Welle WV.B Brand-Distinction — fuer LINK_PROVIDER_SYMBOL-Visual-
+  // Differentiation. Echte Brand-SVGs deferred V2 (slack/notion/...).
+  | 'cloud'
+  | 'folder'
+  | 'chat-bubble'
+  | 'paper-airplane';
 
 // Heroicons v2 outline path-data. 24x24 viewBox. Factory-Functions
 // wichtig: sonst shared Solid dieselben DOM-Nodes zwischen mehreren
@@ -440,6 +446,31 @@ const ICONS: Record<IconName, () => JSX.Element> = {
     <>
       <circle cx="12" cy="12" r="3.5" />
       <path d="M15.5 12V13.5a2 2 0 0 0 4 0V12a7.5 7.5 0 1 0-3 6" />
+    </>
+  ),
+  // Cloud: Wolken-Outline (fuer drive/onedrive/dropbox/nextcloud-Provider)
+  cloud: () => (
+    <>
+      <path d="M7 18a4 4 0 1 1 1.2-7.8A5 5 0 0 1 18 11a3.5 3.5 0 0 1 0 7H7Z" />
+    </>
+  ),
+  // Folder: Ordner (fuer filesystem-Provider)
+  folder: () => (
+    <>
+      <path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+    </>
+  ),
+  // Chat-Bubble: Sprechblase (fuer slack/teams/discord-Provider)
+  'chat-bubble': () => (
+    <>
+      <path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3v-3H6a2 2 0 0 1-2-2Z" />
+    </>
+  ),
+  // Paper-Airplane: Versand-Pfeil (fuer telegram-Provider, generisches Send)
+  'paper-airplane': () => (
+    <>
+      <path d="m3 11 18-7-7 18-2-8Z" />
+      <path d="m11 13 8-9" />
     </>
   ),
 };
