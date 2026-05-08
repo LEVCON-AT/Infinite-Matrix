@@ -2071,6 +2071,88 @@ export async function addBoardLink(args: {
   });
 }
 
+// Welle WV.C — Cell-Link Atom (board_id NULL): Migration 076 hat board_id
+// nullable gemacht. Cell-Links manifestieren sich via atom_manifestation
+// (kind='pinned', container_kind='cell') statt ueber board_id.
+//
+// Naming-Konflikt mit Legacy-addCellLink (cell.data.links): das
+// Legacy-API bleibt bis Cell-Renderer auf Atom-Pfad umgestellt ist
+// (Welle WV.B Cell-Renderer). Diese neue Funktion fuer den Atom-Pfad
+// heisst `addCellAtomLink`.
+export async function addCellAtomLink(args: {
+  workspaceId: string;
+  cellId: string;
+  provider: LinkProvider;
+  label?: string;
+  url: string;
+}): Promise<LinkRow> {
+  const safeUrl = sanitizeUrl(args.url);
+  if (!safeUrl) throw new InvalidUrlError();
+  const link = await runOptimisticInsert<LinkRow>({
+    table: 'links',
+    workspaceId: args.workspaceId,
+    label: 'Cell-Link anlegen',
+    run: async () => {
+      const { data, error } = await supabase
+        .from('links')
+        .insert({
+          workspace_id: args.workspaceId,
+          board_id: null,
+          provider: args.provider,
+          label: (args.label ?? '').trim() || safeUrl,
+          url: safeUrl,
+          position: 0,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as LinkRow;
+    },
+    buildOffline: (id) => {
+      const now = new Date().toISOString();
+      return {
+        id,
+        workspace_id: args.workspaceId,
+        board_id: null,
+        provider: args.provider,
+        provider_meta: {},
+        symbol_override: null,
+        click_count: 0,
+        label: (args.label ?? '').trim() || safeUrl,
+        url: safeUrl,
+        alias: null,
+        position: 0,
+        data: null,
+        created_at: now,
+      } as unknown as LinkRow;
+    },
+  });
+
+  // Manifestation: cell-pinned. Caller (UI) uebergibt cellId als
+  // Container — Sortierung + Reorder erfolgen via atom-manifestations.
+  // Position = max+1 in der Cell.
+  try {
+    const { error } = await supabase.from('atom_manifestations').insert({
+      atom_type: 'link',
+      atom_id: link.id,
+      workspace_id: args.workspaceId,
+      kind: 'pinned',
+      container_id: args.cellId,
+      container_kind: 'cell',
+      position: 1,
+      level: null,
+      display_meta: {},
+    });
+    if (error) {
+      console.warn('addCellLink: manifestation insert failed:', error);
+    }
+  } catch (err) {
+    console.warn('addCellLink: manifestation skipped:', err);
+  }
+
+  return link;
+}
+
 async function updateBoardLink(
   linkId: string,
   patch: Partial<Pick<LinkRow, 'label' | 'url' | 'provider' | 'position' | 'alias'>>,
