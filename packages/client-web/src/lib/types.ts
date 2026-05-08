@@ -737,6 +737,27 @@ export type CellWidgetOverrideRow = {
   updated_at: string;
 };
 
+// WV.A.3 — Hotkey-Slot-Belegung 1-9 (Migration 069). Owner setzt
+// pro Workspace, jeder User kann fuer den eigenen Account
+// uebersteuern.
+export type WorkspaceHotkeySlotRow = {
+  id: string;
+  workspace_id: string;
+  slot: number;
+  template_id: string;
+  set_by: string | null;
+  set_at: string;
+};
+
+export type UserHotkeySlotRow = {
+  id: string;
+  user_id: string;
+  workspace_id: string;
+  slot: number;
+  template_id: string;
+  set_at: string;
+};
+
 // workspace_id denormalisiert wie TemplateSectionRow — Trigger pflegt
 // aus section.workspace_id automatisch.
 export type TemplateWidgetRow = {

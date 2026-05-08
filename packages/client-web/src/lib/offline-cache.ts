@@ -94,6 +94,10 @@ const TABLES = [
   // (Migration 068).
   'cell_template_instances',
   'cell_widget_overrides',
+  // Welle WV.A.3 — Hotkey-Slot-Belegung pro Workspace + User-Override
+  // (Migration 069).
+  'workspace_hotkey_slots',
+  'user_hotkey_slots',
 ] as const;
 
 export type CacheTable = (typeof TABLES)[number];
@@ -130,6 +134,8 @@ interface MatrixCacheSchema extends DBSchema {
   template_widgets: StoreDef;
   cell_template_instances: StoreDef;
   cell_widget_overrides: StoreDef;
+  workspace_hotkey_slots: StoreDef;
+  user_hotkey_slots: StoreDef;
 }
 
 const DB_NAME = 'matrix-cache';
@@ -160,7 +166,9 @@ const DB_NAME = 'matrix-cache';
 // die sichtbaren Templates (Workspace-shared + User-privat).
 // V14 (WV.A.2): cell_template_instances + cell_widget_overrides
 // (Migration 068) — Junction Cell ↔ Vorlage + sparse User-Overrides.
-const DB_VERSION = 14;
+// V15 (WV.A.3): workspace_hotkey_slots + user_hotkey_slots
+// (Migration 069) — Slot-Belegung 1-9 pro Workspace + User-Override.
+const DB_VERSION = 15;
 const OBSOLETE_STORES = [
   'kb_cards',
   'checklist_items',

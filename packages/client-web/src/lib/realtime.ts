@@ -63,7 +63,12 @@ export type RealtimeTable =
   // Cross-User-Live-Update wenn ein Member eine Vorlage einer Cell
   // hinzufuegt oder einen Override setzt.
   | 'cell_template_instances'
-  | 'cell_widget_overrides';
+  | 'cell_widget_overrides'
+  // Welle WV.A.3 — Hotkey-Slot-Belegung. Workspace-Variante: alle
+  // Member sehen Owner-Aenderung live. User-Variante: Cross-Tab-
+  // Konsistenz fuer den eigenen Account.
+  | 'workspace_hotkey_slots'
+  | 'user_hotkey_slots';
 
 export type RealtimeBumps = Partial<Record<RealtimeTable, () => void>>;
 
@@ -85,6 +90,8 @@ const DIRECT_TABLES: Array<Exclude<RealtimeTable, 'kb_cards' | 'checklist_items'
   'template_widgets',
   'cell_template_instances',
   'cell_widget_overrides',
+  'workspace_hotkey_slots',
+  'user_hotkey_slots',
 ];
 
 type AtomManifPayload = {
