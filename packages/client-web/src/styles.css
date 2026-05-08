@@ -1817,6 +1817,216 @@ button[type="submit"]:hover:not(:disabled) {
   flex: 0 0 auto;
 }
 
+/* ── CellTemplateRenderer (WV.A.6) ───────────────────────────── */
+/* Top-Level-Container fuer Cell-Vorlagen-Render. Zero-Shift-Edit-Mode
+   (Memory `feedback_zero_shift_edit_mode.md`): Edit-Affordances als
+   Overlay-Layer, kein Push auf Section-Inhalt. */
+
+.cell-template-renderer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.cell-template-instance {
+  border: 0.5px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  background: var(--surface);
+  position: relative;
+}
+
+.cell-template-instance-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.cell-template-instance-name {
+  font-size: var(--fs-small);
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+}
+
+.cell-template-update-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border: none;
+  border-radius: var(--rs);
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
+  color: var(--amber);
+  font-size: var(--fs-tiny);
+  cursor: pointer;
+  transition: background var(--tr-std);
+}
+
+.cell-template-update-hint:hover {
+  background: color-mix(in srgb, var(--amber) 22%, transparent);
+}
+
+.cell-template-remove {
+  position: absolute;
+  top: var(--space-xs);
+  right: var(--space-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: none;
+  border-radius: var(--rs);
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  transition: background var(--tr-std), color var(--tr-std);
+}
+
+.cell-template-remove:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+/* ── TemplateSectionRenderer (WV.A.6) ─────────────────────── */
+.template-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.template-section + .template-section {
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 0.5px solid var(--border2);
+}
+
+.template-section-head {
+  display: flex;
+  align-items: center;
+}
+
+.template-section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text2);
+  font-size: var(--fs-small);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.template-section-title {
+  letter-spacing: 0.02em;
+}
+
+.template-section-grid {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+/* ── TemplateWidgetRenderer (WV.A.6) ──────────────────────── */
+.template-widget {
+  display: flex;
+  flex-direction: column;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  min-height: 4rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.template-widget-overridden {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border2));
+}
+
+.template-widget-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: 0.5px solid var(--border2);
+  background: var(--surface);
+}
+
+.template-widget-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-tiny);
+  font-weight: 600;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex: 1;
+}
+
+.template-widget-type-label {
+  margin-left: 2px;
+}
+
+.template-widget-type-kanban {
+  color: var(--accent);
+}
+.template-widget-type-checklist {
+  color: var(--green, #16a34a);
+}
+.template-widget-type-info {
+  color: var(--text);
+}
+.template-widget-type-doc {
+  color: var(--amber);
+}
+.template-widget-type-link {
+  color: var(--blue, #3b82f6);
+}
+.template-widget-type-calendar {
+  color: var(--text2);
+}
+.template-widget-type-smart_summary {
+  color: var(--purpletxt, #7c3aed);
+}
+
+.template-widget-reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: none;
+  border-radius: var(--rs);
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  transition: background var(--tr-std), color var(--tr-std);
+}
+
+.template-widget-reset:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.template-widget-body {
+  padding: var(--space-sm);
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.template-widget-stub-hint {
+  margin: 0;
+  font-size: var(--fs-tiny);
+  color: var(--text3);
+  text-align: center;
+}
+
 /* ── AdapterDialog (WV.WV.7) ──────────────────────────────────── */
 /* Cross-Type-Drop-Adapter (Konzept §9.C). Reuse-Shell fuer
    Field-Mapping-Dialoge (info_field→Link, doc→Kanban etc.).
