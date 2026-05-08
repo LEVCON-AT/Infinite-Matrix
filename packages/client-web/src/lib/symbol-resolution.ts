@@ -28,28 +28,21 @@ import type { IconName } from '../components/Icon';
 import type { InfoFieldValueType, LinkProvider } from './types';
 
 // ─── Auto-Symbol pro Field-Type (Konzept §12.3.1) ──────────────
-// 10 Heroicons-Defaults pro value_type. IconName-Enum aus components/Icon
-// limitiert was wir hier benutzen koennen — fehlen IconName-Werte
-// (banknotes, calculator, at-symbol, etc.), nehmen wir Fallback aus
-// existing IconName-Set.
+// 10 Heroicons-Defaults pro value_type. IconName erweitert in
+// Welle WV.B fortgesetzt um phone/banknotes/calculator/at-symbol —
+// alle 10 Werte mappen jetzt auf passende Heroicons.
 
 const FIELD_TYPE_SYMBOL: Record<InfoFieldValueType, IconName> = {
   text: 'document-text',
-  // 'calculator' ist nicht in IconName — wir nehmen 'cog' als Fallback
-  // bis IconName erweitert wird (Welle B fortgesetzt).
-  number: 'cog',
+  number: 'calculator',
   date: 'calendar',
-  // 'banknotes' / 'currency-euro' nicht in IconName — Fallback.
-  currency: 'tag',
+  currency: 'banknotes',
   boolean: 'check-circle',
   email: 'envelope',
-  // 'phone' nicht in IconName — Fallback bis IconName-Erweiterung
-  // (Welle B fortgesetzt). 'envelope' ist visuell verwandt (Kontakt).
-  phone: 'envelope',
+  phone: 'phone',
   url: 'link',
   enum: 'list-bullet',
-  // 'at-symbol' nicht in IconName — Fallback auf 'tag' (Alias-Marker).
-  'alias-ref': 'tag',
+  'alias-ref': 'at-symbol',
 };
 
 // ─── Auto-Symbol pro Link-Provider (Konzept §12.3.2) ───────────

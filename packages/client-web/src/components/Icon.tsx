@@ -67,7 +67,13 @@ export type IconName =
   | 'users'
   | 'list-bullet'
   | 'shield-check'
-  | 'bell';
+  | 'bell'
+  // Welle WV.B fortgesetzt — IconName-Erweiterung fuer Symbol-Resolution
+  // (lib/symbol-resolution.ts FIELD_TYPE_SYMBOL).
+  | 'phone'
+  | 'banknotes'
+  | 'calculator'
+  | 'at-symbol';
 
 // Heroicons v2 outline path-data. 24x24 viewBox. Factory-Functions
 // wichtig: sonst shared Solid dieselben DOM-Nodes zwischen mehreren
@@ -400,6 +406,40 @@ const ICONS: Record<IconName, () => JSX.Element> = {
   bell: () => (
     <>
       <path d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+    </>
+  ),
+  // Telefon: Hoerer
+  phone: () => (
+    <>
+      <path d="M5 4h4l1 5-2 2c1.5 3 4 5.5 7 7l2-2 5 1v4a2 2 0 0 1-2 2A18 18 0 0 1 3 6a2 2 0 0 1 2-2" />
+    </>
+  ),
+  // Banknoten: zwei Geldscheine uebereinander
+  banknotes: () => (
+    <>
+      <rect x="3" y="6" width="18" height="11" rx="2" />
+      <circle cx="12" cy="11.5" r="2.5" />
+      <path d="M6 9.5h.01M18 13.5h.01" />
+    </>
+  ),
+  // Calculator: Display + Tasten-Grid
+  calculator: () => (
+    <>
+      <rect x="5" y="3" width="14" height="18" rx="2" />
+      <rect x="7.5" y="6" width="9" height="3" rx="0.5" />
+      <circle cx="8.5" cy="13" r="0.7" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="13" r="0.7" fill="currentColor" stroke="none" />
+      <circle cx="15.5" cy="13" r="0.7" fill="currentColor" stroke="none" />
+      <circle cx="8.5" cy="17" r="0.7" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="17" r="0.7" fill="currentColor" stroke="none" />
+      <circle cx="15.5" cy="17" r="0.7" fill="currentColor" stroke="none" />
+    </>
+  ),
+  // At-Symbol: Klassisches @-Zeichen (vereinfacht)
+  'at-symbol': () => (
+    <>
+      <circle cx="12" cy="12" r="3.5" />
+      <path d="M15.5 12V13.5a2 2 0 0 0 4 0V12a7.5 7.5 0 1 0-3 6" />
     </>
   ),
 };

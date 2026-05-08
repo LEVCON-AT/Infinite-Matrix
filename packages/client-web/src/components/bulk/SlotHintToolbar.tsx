@@ -57,6 +57,13 @@ const KNOWN_SYMBOL_NAMES = new Set<IconName>([
   'envelope',
   'flag',
   'cog',
+  'phone',
+  'banknotes',
+  'calculator',
+  'at-symbol',
+  'shield-check',
+  'lock-closed',
+  'users',
 ]);
 
 const SlotHintToolbar: Component<SlotHintToolbarProps> = (p) => {

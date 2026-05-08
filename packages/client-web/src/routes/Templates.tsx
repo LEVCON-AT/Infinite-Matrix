@@ -563,6 +563,15 @@ const KNOWN_ICON_NAMES = new Set([
   'tag',
   'eye',
   'envelope',
+  'phone',
+  'banknotes',
+  'calculator',
+  'at-symbol',
+  'flag',
+  'cog',
+  'shield-check',
+  'lock-closed',
+  'users',
 ]);
 
 function isKnownIconName(s: string | null): boolean {
