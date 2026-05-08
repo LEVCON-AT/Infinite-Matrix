@@ -32,6 +32,7 @@ import type {
   FeatureTemplateRow,
   TemplateSectionRow,
   TemplateWidgetRow,
+  WidgetExternalChannelRow,
 } from './types';
 
 // ─── Resolved Shapes ───────────────────────────────────────────
@@ -42,6 +43,10 @@ export type ResolvedWidget = TemplateWidgetRow & {
   hasOverride: boolean;
   // Sparse-Override-Bezug fuer reset-Action (Caller braucht overrideId).
   overrideId: string | null;
+  // Welle WV.D.3.g — Channel-Bridge (widget_external_channels-Row),
+  // wenn dieses Widget einen Provider+Inbox verknuepft hat. null = nicht
+  // verknuepft. Nur fuer type='channel' (und kuenftig 'drive') relevant.
+  channel: WidgetExternalChannelRow | null;
 };
 
 export type ResolvedSection = TemplateSectionRow & {
@@ -69,6 +74,10 @@ export type WidgetFoundationSources = {
   widgets: ReadonlyArray<TemplateWidgetRow>;
   cellInstances: ReadonlyArray<CellTemplateInstanceRow>;
   overrides: ReadonlyArray<CellWidgetOverrideRow>;
+  // Welle WV.D.3.g — optional Workspace-weite Channel-Bridges. Wenn
+  // nicht uebergeben (oder leer), erscheinen Channel-Widgets als
+  // „nicht verknuepft" (Edit-Mode-CTA).
+  widgetChannels?: ReadonlyArray<WidgetExternalChannelRow>;
 };
 
 // ─── Override-Merge ────────────────────────────────────────────
@@ -81,7 +90,7 @@ export function mergeWidgetWithOverride(
   override?: CellWidgetOverrideRow,
 ): ResolvedWidget {
   if (!override) {
-    return { ...widget, hasOverride: false, overrideId: null };
+    return { ...widget, hasOverride: false, overrideId: null, channel: null };
   }
   const od = override.override_data;
   return {
@@ -106,6 +115,7 @@ export function mergeWidgetWithOverride(
     size_rows: typeof od.size_rows === 'number' ? od.size_rows : widget.size_rows,
     hasOverride: true,
     overrideId: override.id,
+    channel: null,
   };
 }
 
@@ -144,6 +154,14 @@ export function loadCellTemplateInstances(
     overrideByInstanceWidget.set(`${o.instance_id}:${o.widget_id}`, o);
   }
 
+  // WV.D.3.g: pro widget_id genau eine widget_external_channels-Row
+  // (UNIQUE-Constraint widget_id+provider — V1 erlauben wir nur 1
+  // Provider pro Widget; bei mehreren landet der erste sortier-stable).
+  const channelByWidget = new Map<string, WidgetExternalChannelRow>();
+  for (const c of src.widgetChannels ?? []) {
+    if (!channelByWidget.has(c.widget_id)) channelByWidget.set(c.widget_id, c);
+  }
+
   const views: CellTemplateView[] = [];
   for (const inst of instances) {
     const template = templateById.get(inst.template_id);
@@ -159,7 +177,9 @@ export function loadCellTemplateInstances(
         .sort((a, b) => a.position - b.position);
       const resolvedWidgets = widgets.map((widget) => {
         const override = overrideByInstanceWidget.get(`${inst.id}:${widget.id}`);
-        return mergeWidgetWithOverride(widget, override);
+        const merged = mergeWidgetWithOverride(widget, override);
+        const channel = channelByWidget.get(widget.id) ?? null;
+        return { ...merged, channel };
       });
       return { ...section, widgets: resolvedWidgets };
     });

@@ -701,7 +701,10 @@ export type TemplateWidgetType =
   | 'doc'
   | 'link'
   | 'calendar'
-  | 'smart_summary';
+  | 'smart_summary'
+  // Welle WV.D.3.g — Channel-Bridge-Widget (Mail/Chat). Provider +
+  // external_ref leben in widget_external_channels (Migration 077).
+  | 'channel';
 
 export type TemplateSectionVisibility = 'always' | 'edit_only';
 

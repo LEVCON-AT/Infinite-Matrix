@@ -48,6 +48,7 @@ const WIDGET_DEFAULT_SYMBOL: Record<TemplateWidgetType, string> = {
   link: 'link',
   calendar: 'calendar',
   smart_summary: 'sparkles',
+  channel: 'chat-bubble',
 };
 
 export type SaveAsTemplateInput = {

@@ -14,7 +14,9 @@
 // Konzept-Verankerung: §6.5 Widget-System, §6.6 Render-Layout.
 
 import { type Component, Match, Show, Switch } from 'solid-js';
+import type { WidgetExternalChannelRow } from '../lib/types';
 import type { ResolvedWidget } from '../lib/widget-foundation';
+import ChannelWidget from './ChannelWidget';
 import Icon from './Icon';
 
 export type TemplateWidgetRendererProps = {
@@ -26,6 +28,12 @@ export type TemplateWidgetRendererProps = {
   // Reset-Action — Caller (CellTemplateRenderer) loescht den Override
   // via lib/cell-templates.ts resetWidgetOverride.
   onResetOverride?: (overrideId: string) => void;
+  // Welle WV.D.3.g — Channel-Bridge-Lookup (widget_external_channels-
+  // Row fuer dieses Widget). null = noch nicht verknuepft. Caller
+  // (CellTemplateRenderer) filtert aus seiner wsWidgetChannels-Resource.
+  channel?: WidgetExternalChannelRow | null;
+  // Edit-Mode-CTA: Caller oeffnet einen Picker fuer Channel-Auswahl.
+  onPickChannel?: () => void;
 };
 
 const TemplateWidgetRenderer: Component<TemplateWidgetRendererProps> = (p) => {
@@ -58,7 +66,15 @@ const TemplateWidgetRenderer: Component<TemplateWidgetRendererProps> = (p) => {
         </Show>
       </header>
       <div class="template-widget-body">
-        <p class="template-widget-stub-hint">{widgetStubHint(p.widget.type)}</p>
+        <Switch fallback={<p class="template-widget-stub-hint">{widgetStubHint(p.widget.type)}</p>}>
+          <Match when={p.widget.type === 'channel'}>
+            <ChannelWidget
+              channel={p.channel ?? null}
+              editMode={p.editMode}
+              onPickChannel={p.onPickChannel}
+            />
+          </Match>
+        </Switch>
       </div>
     </div>
   );
@@ -88,6 +104,9 @@ const WidgetTypeIcon: Component<{ type: ResolvedWidget['type'] }> = (p) => {
       <Match when={p.type === 'smart_summary'}>
         <Icon name="sparkles" size={14} />
       </Match>
+      <Match when={p.type === 'channel'}>
+        <Icon name="chat-bubble" size={14} />
+      </Match>
     </Switch>
   );
 };
@@ -99,6 +118,7 @@ function widgetTypeLabel(t: ResolvedWidget['type']): string {
   if (t === 'doc') return 'Doku';
   if (t === 'link') return 'Link';
   if (t === 'calendar') return 'Kalender';
+  if (t === 'channel') return 'Channel';
   return 'Smart Summary';
 }
 
@@ -109,6 +129,7 @@ function widgetStubHint(t: ResolvedWidget['type']): string {
   if (t === 'doc') return 'Doku (Foundation — volles Wiring in Welle C).';
   if (t === 'link') return 'Link (Foundation — volles Wiring in Welle C).';
   if (t === 'calendar') return 'Kalender (Foundation — volles Wiring in Welle C).';
+  if (t === 'channel') return 'Channel-Bridge — verknuepfe einen Slack/Teams/Mail-Channel.';
   return 'Smart Summary (Foundation — Inhalt kommt in Welle F).';
 }
 

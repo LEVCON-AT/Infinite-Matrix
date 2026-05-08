@@ -15,6 +15,9 @@ export type TemplateSectionRendererProps = {
   section: ResolvedSection;
   editMode?: boolean;
   onResetOverride?: (overrideId: string) => void;
+  // Welle WV.D.3.g — Channel-Bridge-Picker. Caller (CellTemplateRenderer)
+  // entscheidet was passiert (V1: oeffnet ChannelPickerModal).
+  onPickChannel?: (widgetId: string) => void;
 };
 
 const TemplateSectionRenderer: Component<TemplateSectionRendererProps> = (p) => {
@@ -50,6 +53,8 @@ const TemplateSectionRenderer: Component<TemplateSectionRendererProps> = (p) => 
                   widget={widget}
                   editMode={p.editMode}
                   onResetOverride={p.onResetOverride}
+                  channel={widget.channel}
+                  onPickChannel={p.onPickChannel ? () => p.onPickChannel?.(widget.id) : undefined}
                 />
               )}
             </For>

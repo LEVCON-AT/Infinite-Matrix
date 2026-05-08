@@ -26,7 +26,7 @@
 //     CellPage erfolgt in Welle C wenn cell.features → cell_template_instances
 //     migriert wird.
 
-import { type Component, For, Show } from 'solid-js';
+import { type Component, For, Show, createSignal } from 'solid-js';
 import {
   applyTemplateToCell,
   removeTemplateFromCell,
@@ -38,11 +38,13 @@ import { translateDbError } from '../lib/errors';
 import { showToast, showUndoToast } from '../lib/toasts';
 import { type CellTemplateView, loadCellTemplateInstances } from '../lib/widget-foundation';
 import type { WidgetFoundationSources } from '../lib/widget-foundation';
+import ChannelPickerModal from './ChannelPickerModal';
 import Icon from './Icon';
 import TemplateSectionRenderer from './TemplateSectionRenderer';
 
 export type CellTemplateRendererProps = {
   cellId: string;
+  workspaceId: string;
   sources: WidgetFoundationSources;
   editMode?: boolean;
   // Optional: Caller kann selbst entscheiden was bei „Vorlage entfernen"
@@ -52,10 +54,21 @@ export type CellTemplateRendererProps = {
   // Optional: „Update verfuegbar" akzeptieren (Re-Baseline).
   // Caller ruft setInstanceLayoutVersion mit aktueller template.layout_version.
   onAcceptLayoutUpdate?: (instance: CellTemplateView) => void;
+  // Welle WV.D.3.g — Caller refetcht widget_external_channels nach
+  // einem Channel-Pick (in `sources.widgetChannels` werden die neuen
+  // Werte sichtbar).
+  onChannelChanged?: () => void;
 };
 
 const CellTemplateRenderer: Component<CellTemplateRendererProps> = (p) => {
   const views = () => loadCellTemplateInstances(p.cellId, p.sources);
+  const [pickingWidgetId, setPickingWidgetId] = createSignal<string | null>(null);
+  const pickingChannel = () => {
+    const wid = pickingWidgetId();
+    if (!wid) return null;
+    const list = p.sources.widgetChannels ?? [];
+    return list.find((c) => c.widget_id === wid) ?? null;
+  };
 
   // Reset-Override: Snapshot vor Delete fuer Undo. Override-Daten + IDs
   // landen im Closure damit der Undo-Handler restoren kann.
@@ -175,12 +188,28 @@ const CellTemplateRenderer: Component<CellTemplateRendererProps> = (p) => {
                   section={section}
                   editMode={p.editMode}
                   onResetOverride={handleResetOverride}
+                  onPickChannel={(widgetId) => setPickingWidgetId(widgetId)}
                 />
               )}
             </For>
           </article>
         )}
       </For>
+      <Show when={pickingWidgetId()}>
+        {(wid) => (
+          <ChannelPickerModal
+            widgetId={wid()}
+            workspaceId={p.workspaceId}
+            existing={pickingChannel()}
+            settingsWorkspaceId={p.workspaceId}
+            onClose={() => setPickingWidgetId(null)}
+            onSaved={() => {
+              setPickingWidgetId(null);
+              p.onChannelChanged?.();
+            }}
+          />
+        )}
+      </Show>
     </div>
   );
 };
