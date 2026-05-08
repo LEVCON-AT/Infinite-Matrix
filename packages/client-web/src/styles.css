@@ -18088,3 +18088,389 @@ body[data-viewport="phone"] .overlay-card {
     margin-right: 0.4rem;
   }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   Welle WV.C.5 — Bulk-Komponenten:
+     - DangerousDeleteModal (§8.2.3)
+     - BulkConflictPicker (§8.2.4a)
+     - BulkScalarInput (§8.2.4)
+     - SlotHintToolbar (§8.4.2)
+   ════════════════════════════════════════════════════════════════ */
+
+/* ─── DangerousDeleteModal ─────────────────────────────────── */
+.dangerous-delete-card {
+  max-width: 32rem;
+}
+.dangerous-delete-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-md);
+}
+.dangerous-delete-summary {
+  margin: 0;
+  font-weight: 500;
+  color: var(--text);
+}
+.dangerous-delete-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 6px);
+  padding: 0.4rem 0.65rem;
+  background: var(--canvas);
+}
+.dangerous-delete-list-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem 0;
+  color: var(--text2);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+.dangerous-delete-list-toggle:hover {
+  color: var(--text);
+}
+.dangerous-delete-items {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  max-height: 14rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.dangerous-delete-items li {
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+.dangerous-delete-preview {
+  color: var(--text3);
+  font-size: 0.75rem;
+}
+.dangerous-delete-export {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.65rem;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: var(--radius-md, 6px);
+}
+.dangerous-delete-export input[type="checkbox"] {
+  margin-top: 0.2rem;
+}
+.dangerous-delete-export span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.dangerous-delete-export-hint {
+  font-size: 0.8rem;
+  color: var(--text3);
+}
+.dangerous-delete-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text3);
+}
+.dangerous-delete-actions {
+  display: flex;
+  gap: var(--space-xs);
+  justify-content: flex-end;
+  margin-top: var(--space-sm);
+}
+
+/* ─── BulkConflictPicker ───────────────────────────────────── */
+.bulk-conflict-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+.bulk-conflict-legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.bulk-conflict-summary {
+  margin: 0;
+  font-weight: 500;
+}
+.bulk-conflict-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text3);
+}
+.bulk-conflict-bulk-actions {
+  display: flex;
+  gap: var(--space-xs);
+}
+.bulk-conflict-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 18rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 6px);
+}
+.bulk-conflict-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: var(--space-sm);
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+.bulk-conflict-row:last-child {
+  border-bottom: none;
+}
+.bulk-conflict-row.skipped {
+  opacity: 0.6;
+}
+.bulk-conflict-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+.bulk-conflict-name {
+  font-weight: 500;
+  color: var(--text);
+}
+.bulk-conflict-detail {
+  font-size: 0.8rem;
+  color: var(--text3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 12rem;
+}
+.bulk-conflict-tag {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.bulk-conflict-tag.tag-other-template {
+  background: var(--surface-hover);
+  color: var(--text2);
+}
+.bulk-conflict-tag.tag-re-sync {
+  background: var(--accent-soft);
+  color: var(--accent-strong, var(--accent));
+}
+.bulk-conflict-tag.tag-overrides {
+  background: var(--danger-soft, rgba(198, 40, 40, 0.08));
+  color: var(--danger, #c62828);
+}
+.bulk-conflict-tag.tag-locked {
+  background: var(--surface-elevated, var(--surface-hover));
+  color: var(--text2);
+  font-style: italic;
+}
+.bulk-conflict-tag.tag-duplicate {
+  background: var(--surface-hover);
+  color: var(--text3);
+}
+
+/* ─── BulkScalarInput ──────────────────────────────────────── */
+.bulk-scalar-input {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.bulk-scalar-pattern-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.bulk-scalar-pattern-label {
+  font-size: 0.85rem;
+  color: var(--text2);
+  font-weight: 500;
+}
+.bulk-scalar-pattern-field {
+  display: flex;
+  align-items: stretch;
+  gap: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 6px);
+  background: var(--surface);
+  padding: 0.25rem;
+}
+.bulk-scalar-pattern-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  outline: none;
+  font-family: var(--mono, ui-monospace, monospace);
+}
+.bulk-scalar-pattern-apply,
+.bulk-scalar-pattern-toggle {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.4rem 0.5rem;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--text2);
+  font-size: 0.85rem;
+}
+.bulk-scalar-pattern-apply:hover,
+.bulk-scalar-pattern-toggle:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.bulk-scalar-pattern-toggle[aria-expanded="true"] {
+  background: var(--accent-soft);
+  color: var(--accent-strong, var(--accent));
+}
+.bulk-scalar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  max-height: 16rem;
+  overflow-y: auto;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 6px);
+  background: var(--canvas);
+}
+.bulk-scalar-row {
+  display: grid;
+  grid-template-columns: 8rem 1fr;
+  gap: 0.5rem;
+  align-items: center;
+}
+.bulk-scalar-row-label {
+  font-size: 0.8rem;
+  color: var(--text3);
+  font-family: var(--mono, ui-monospace, monospace);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bulk-scalar-row-input {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 0.3rem 0.4rem;
+  font-size: 0.85rem;
+  border-radius: 4px;
+  font-family: var(--mono, ui-monospace, monospace);
+}
+.bulk-scalar-row-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
+/* ─── SlotHintToolbar ──────────────────────────────────────── */
+.slot-hint-toolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 6px);
+  flex-wrap: nowrap;
+}
+.slot-hint-button {
+  position: relative;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 6px);
+  cursor: pointer;
+  transition: background var(--tr-std), border-color var(--tr-std), opacity var(--tr-std);
+  padding: 0;
+}
+.slot-hint-button:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+}
+.slot-hint-button:focus-visible {
+  outline: 2px solid var(--focus, var(--accent));
+  outline-offset: 1px;
+}
+.slot-hint-button.slot-hint-empty {
+  opacity: 0.5;
+  border-style: dashed;
+}
+.slot-hint-button.slot-hint-empty:hover {
+  opacity: 1;
+}
+.slot-hint-button.slot-hint-no-selection {
+  opacity: 0.65;
+}
+.slot-hint-button.slot-hint-no-selection:hover {
+  opacity: 1;
+}
+.slot-hint-symbol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-strong, var(--accent));
+}
+.slot-hint-num {
+  position: absolute;
+  bottom: 1px;
+  right: 3px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text3);
+  line-height: 1;
+}
+.slot-hint-dot {
+  position: absolute;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  bottom: 2px;
+}
+.slot-hint-dot-workspace {
+  left: 2px;
+  background: var(--bluetxt, var(--accent));
+}
+.slot-hint-dot-user {
+  right: 2px;
+  background: var(--warn, #d97706);
+}
+
+/* Mobile (< 48em): horizontale Scroll-Liste statt Dropdown V1. */
+@media (max-width: 48em) {
+  .slot-hint-toolbar {
+    overflow-x: auto;
+    max-width: 100%;
+  }
+}
