@@ -9,15 +9,18 @@
 // Operationen sind anders geformt (File-Pick / Download / Upload).
 
 import type { ChannelProvider } from '../types';
+import { discordProvider } from './discord';
 import { googleDriveProvider } from './drive-google';
 import type { DriveProviderImpl } from './drive-types';
 import { dropboxProvider } from './dropbox';
 import { gmailProvider } from './gmail';
 import { nextcloudProvider } from './nextcloud';
 import { onedriveProvider } from './onedrive';
+import { onenoteProvider } from './onenote';
 import { outlookProvider } from './outlook';
 import { slackProvider } from './slack';
 import { teamsProvider } from './teams';
+import { telegramProvider } from './telegram';
 import type { ChannelProviderImpl } from './types';
 
 export type * from './types';
@@ -31,6 +34,9 @@ REGISTRY.set('slack', slackProvider);
 REGISTRY.set('teams', teamsProvider);
 REGISTRY.set('outlook', outlookProvider);
 REGISTRY.set('gmail', gmailProvider);
+REGISTRY.set('onenote', onenoteProvider);
+REGISTRY.set('discord', discordProvider);
+REGISTRY.set('telegram', telegramProvider);
 
 export function getChannelImpl(provider: ChannelProvider): ChannelProviderImpl {
   const impl = REGISTRY.get(provider);
