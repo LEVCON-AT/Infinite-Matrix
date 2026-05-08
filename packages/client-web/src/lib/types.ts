@@ -646,3 +646,89 @@ export type ExternalEvent = {
 // Bei Task-Ableitung aus External-Event: User-waehlbare Modi.
 export type DeriveSyncMode = 'snapshot' | 'live';
 export type DeriveScope = 'instance' | 'series';
+
+// ─── Welle WV.A — Vorlagen-Foundation (Migration 067) ──────────
+// Drei Tabellen aus dem Widget+Vorlagen-Konzept §6.2:
+// feature_templates + template_sections + template_widgets.
+// Visibility-Modell (Konzept §6.1): platform / workspace / user.
+
+export type TemplateVisibility = 'platform' | 'workspace' | 'user';
+
+export type TemplateRenderPosition = 'hotkey_slot' | 'auto_under_features';
+
+// 7 Widget-Types aus dem Konzept §6.5/§7. Re-Export aus
+// lib/widget-picker.ts (WidgetType) — Single-Source dort.
+// Hier nur Zeichen-konstanten als Subset wiederholt fuer Row-Type.
+export type TemplateWidgetType =
+  | 'kanban'
+  | 'checklist'
+  | 'info'
+  | 'doc'
+  | 'link'
+  | 'calendar'
+  | 'smart_summary';
+
+export type TemplateSectionVisibility = 'always' | 'edit_only';
+
+export type FeatureTemplateRow = {
+  id: string;
+  // workspace_id NULL = Plattform-Vorlage. workspace_id SET +
+  // owner_user_id NULL = Workspace-shared. Beide SET = User-privat.
+  workspace_id: string | null;
+  owner_user_id: string | null;
+  name: string;
+  symbol: string | null;
+  symbol_color: string | null;
+  // Default-Hint fuer den Hotkey-Slot. Effektive Slot-Belegung pro
+  // Workspace lebt in workspace_hotkey_slots (WV.A.3).
+  hotkey_slot: number | null;
+  is_global: boolean;
+  visibility: TemplateVisibility;
+  layout_version: number;
+  title_template: string | null;
+  // Default-Drop-Target fuer Atomic-Drop (§9.10). DEFERRABLE FK auf
+  // template_widgets.id — kann NULL sein bei Vorlagen ohne klares
+  // Root (z.B. Smart Summary), dann zeigt WidgetPicker alle Slots.
+  root_widget_id: string | null;
+  render_position: TemplateRenderPosition;
+  config: Record<string, unknown>;
+  created_at: string;
+  created_by: string | null;
+  updated_at: string;
+};
+
+// workspace_id denormalisiert (Trigger pflegt aus parent template) —
+// NULL bei Plattform-Vorlagen, sonst = parent.workspace_id.
+export type TemplateSectionRow = {
+  id: string;
+  template_id: string;
+  workspace_id: string | null;
+  position: number;
+  title: string | null;
+  default_collapsed: boolean;
+  visibility: TemplateSectionVisibility;
+  created_at: string;
+};
+
+// workspace_id denormalisiert wie TemplateSectionRow — Trigger pflegt
+// aus section.workspace_id automatisch.
+export type TemplateWidgetRow = {
+  id: string;
+  section_id: string;
+  workspace_id: string | null;
+  // 1-basierter Spalten-Index im 12-Col-Grid (Konzept §7.1 — Grid-Foundation).
+  column: number;
+  position: number;
+  type: TemplateWidgetType;
+  // size_cols 1-12, size_rows 1-24 — Layout-Grid-Dimensionen.
+  size_cols: number;
+  size_rows: number;
+  // data: typabhaengiges Widget-Schema (Konzept §6.5 + §7).
+  data: Record<string, unknown>;
+  // toggles: User-Switches pro Widget (z.B. show-completed,
+  // group-by, sort-mode).
+  toggles: Record<string, unknown>;
+  // config: technische Render-Optionen (z.B. caching, channel-bridge-ref).
+  config: Record<string, unknown>;
+  created_at: string;
+};

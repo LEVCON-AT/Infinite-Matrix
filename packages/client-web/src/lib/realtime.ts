@@ -52,7 +52,13 @@ export type RealtimeTable =
   // unter atom_manifestations(kind='pinned') — werden ueber den
   // atom_manifestations-Slot geroutet.)
   | 'workspace_tags'
-  | 'atom_tags';
+  | 'atom_tags'
+  // Welle WV.A.1 — Vorlagen-Foundation. Cross-User-Live-Update wenn
+  // Owner/Admin eine Workspace-Vorlage editiert. Drei Tabellen
+  // einzeln subscriben damit Konsumenten gezielt refetchen.
+  | 'feature_templates'
+  | 'template_sections'
+  | 'template_widgets';
 
 export type RealtimeBumps = Partial<Record<RealtimeTable, () => void>>;
 
@@ -69,6 +75,9 @@ const DIRECT_TABLES: Array<Exclude<RealtimeTable, 'kb_cards' | 'checklist_items'
   'objects',
   'workspace_tags',
   'atom_tags',
+  'feature_templates',
+  'template_sections',
+  'template_widgets',
 ];
 
 type AtomManifPayload = {

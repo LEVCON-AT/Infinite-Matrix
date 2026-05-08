@@ -83,6 +83,13 @@ const TABLES = [
   // atom_manifestations(kind='pinned') konsolidiert — Migration 066.)
   'workspace_tags',
   'atom_tags',
+  // Welle WV.A.1 — Vorlagen-Foundation (Migration 067). Alle drei
+  // Tabellen sind workspace-scope (Plattform-Vorlagen denormalisiert
+  // mit workspace_id NULL — werden im Cache pro Workspace nicht
+  // mit gespiegelt, sondern via separater Lade-Funktion).
+  'feature_templates',
+  'template_sections',
+  'template_widgets',
 ] as const;
 
 export type CacheTable = (typeof TABLES)[number];
@@ -114,6 +121,9 @@ interface MatrixCacheSchema extends DBSchema {
   notifications: StoreDef;
   workspace_tags: StoreDef;
   atom_tags: StoreDef;
+  feature_templates: StoreDef;
+  template_sections: StoreDef;
+  template_widgets: StoreDef;
 }
 
 const DB_NAME = 'matrix-cache';
@@ -138,7 +148,11 @@ const DB_NAME = 'matrix-cache';
 // (Migration 066). atom_pins-Store wird obsolet — atom_manifestations
 // haelt jetzt auch kind='pinned'-Rows mit container_kind ∈ {cell, atom,
 // node}. workspace_tags + atom_tags bleiben unveraendert.
-const DB_VERSION = 12;
+// V13 (WV.A.1): feature_templates + template_sections + template_widgets
+// Stores fuer die Vorlagen-Foundation (Migration 067). Plattform-
+// Vorlagen werden separat geladen — die Stores spiegeln pro Workspace
+// die sichtbaren Templates (Workspace-shared + User-privat).
+const DB_VERSION = 13;
 const OBSOLETE_STORES = [
   'kb_cards',
   'checklist_items',
