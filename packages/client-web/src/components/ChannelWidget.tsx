@@ -18,13 +18,32 @@
 
 import { A } from '@solidjs/router';
 import { useParams } from '@solidjs/router';
-import { type Component, For, Show, createMemo, createResource } from 'solid-js';
+import {
+  type Component,
+  For,
+  Show,
+  createMemo,
+  createResource,
+  createSignal,
+  onCleanup,
+  onMount,
+} from 'solid-js';
 import { useUser } from '../lib/auth';
 import { type ChannelMessage, getChannelImpl, hasChannelImpl } from '../lib/channels';
 import { CHANNEL_PROVIDER_LABEL } from '../lib/channels-meta';
 import { fetchOAuthTokens, tokenStatusFor } from '../lib/oauth-tokens';
-import type { WidgetExternalChannelRow } from '../lib/types';
+import type { ChannelProvider, WidgetExternalChannelRow } from '../lib/types';
 import Icon from './Icon';
+
+// Welle WV.D.4.b — Polling-Intervall pro Provider. OneNote-Pages
+// werden serverseitig in OneNote-Notebooks asynchron geupdatet —
+// damit der User Veraenderungen sieht ohne Reload, pollen wir alle
+// 60s. Andere Provider haben aktuell kein Polling (V2: Slack/Teams
+// Realtime via WebSocket, Mail via IMAP-Push) — Polling-Map liefert
+// 0 wenn kein Polling gewuenscht.
+const POLL_INTERVAL_MS: Partial<Record<ChannelProvider, number>> = {
+  onenote: 60_000, // 60s — OneNote-Pages-Polling.
+};
 
 export type ChannelWidgetProps = {
   // Channel-Bridge fuer dieses Widget. null = Widget noch nicht
@@ -76,7 +95,11 @@ const ChannelWidget: Component<ChannelWidgetProps> = (p) => {
     return ((r.inbox_id ?? r.channel_id ?? r.chat_id ?? r.folder_id) as string | undefined) ?? null;
   });
 
-  const [messages] = createResource(
+  // lastSyncAt: ISO-Timestamp des letzten erfolgreichen listMessages-
+  // Aufrufs. Wird in der UI als „Synchronisiert vor X" gerendert.
+  const [lastSyncAt, setLastSyncAt] = createSignal<string | null>(null);
+
+  const [messages, { refetch: refetchMessages }] = createResource(
     () => {
       const prov = provider();
       const inb = inboxId();
@@ -88,13 +111,84 @@ const ChannelWidget: Component<ChannelWidgetProps> = (p) => {
     async (req) => {
       try {
         const impl = getChannelImpl(req.prov);
-        return await impl.listMessages(req.inb, 20);
+        const result = await impl.listMessages(req.inb, 20);
+        setLastSyncAt(new Date().toISOString());
+        return result;
       } catch (err) {
         console.warn('ChannelWidget listMessages:', err);
         return [];
       }
     },
   );
+
+  // Polling-Loop: provider-spezifisches Intervall (siehe
+  // POLL_INTERVAL_MS). Bei Tab-Hide wird Polling pausiert, bei Visible
+  // sofort gerefetcht (Last-Write-Wins via lastModifiedDateTime auf
+  // Provider-Seite — wir uebernehmen einfach die frischen Messages).
+  onMount(() => {
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    let refreshOnVisibility = false;
+
+    const start = () => {
+      const prov = provider();
+      if (!prov) return;
+      const ms = POLL_INTERVAL_MS[prov] ?? 0;
+      if (ms <= 0) return;
+      intervalId = setInterval(() => {
+        if (document.visibilityState !== 'visible') {
+          refreshOnVisibility = true;
+          return;
+        }
+        void refetchMessages();
+      }, ms);
+    };
+
+    const stop = () => {
+      if (intervalId !== null) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && refreshOnVisibility) {
+        refreshOnVisibility = false;
+        void refetchMessages();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    start();
+
+    onCleanup(() => {
+      stop();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    });
+  });
+
+  // Gerenderte Sync-Indicator — relative Zeit „vor X min".
+  const syncRelative = createMemo<string | null>(() => {
+    const iso = lastSyncAt();
+    if (!iso) return null;
+    const diffSec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (diffSec < 5) return 'gerade synchronisiert';
+    if (diffSec < 60) return `vor ${diffSec}s synchronisiert`;
+    if (diffSec < 3600) return `vor ${Math.floor(diffSec / 60)} min synchronisiert`;
+    return `vor ${Math.floor(diffSec / 3600)} h synchronisiert`;
+  });
+
+  // Tickt die syncRelative-Anzeige jede Sekunde damit „vor X min" sich
+  // ohne Refetch aktualisiert. Cleanup bei Unmount.
+  const [, setSyncTick] = createSignal(0);
+  onMount(() => {
+    const t = setInterval(() => setSyncTick((n) => n + 1), 1000);
+    onCleanup(() => clearInterval(t));
+  });
+
+  const showsPollingProvider = createMemo(() => {
+    const prov = provider();
+    return prov ? (POLL_INTERVAL_MS[prov] ?? 0) > 0 : false;
+  });
 
   return (
     <div class="channel-widget-body">
@@ -137,6 +231,21 @@ const ChannelWidget: Component<ChannelWidgetProps> = (p) => {
               <ul class="channel-widget-list">
                 <For each={messages() ?? []}>{(msg) => <ChannelMessageItem message={msg} />}</For>
               </ul>
+              <Show when={showsPollingProvider() && syncRelative()}>
+                <footer class="channel-widget-sync">
+                  <Icon name="arrow-path" size={11} />
+                  <span>{syncRelative()}</span>
+                  <button
+                    type="button"
+                    class="channel-widget-sync-refresh"
+                    onClick={() => void refetchMessages()}
+                    aria-label="Jetzt synchronisieren"
+                    title="Jetzt synchronisieren"
+                  >
+                    Jetzt
+                  </button>
+                </footer>
+              </Show>
             </Show>
           </>
         )}
