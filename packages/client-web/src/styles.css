@@ -17553,3 +17553,538 @@ body[data-viewport="phone"] .overlay-card {
   transform: translateX(-50%);
   box-shadow: 0 0 0.5rem var(--accent);
 }
+
+/* ════════════════════════════════════════════════════════════════
+   Welle WV.C.1 — Vorlagen-Verwaltungs-Route (`routes/Templates.tsx`)
+   Konzept §7.1. Reuse: settings-shell-Pattern + overlay-modal-Pattern.
+   Mobile (< --bp-md): Tabelle kollabiert zu Card-Layout.
+   ════════════════════════════════════════════════════════════════ */
+
+.templates-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--canvas);
+}
+
+.templates-shell-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.templates-head-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.templates-main {
+  flex: 1;
+  padding: var(--space-lg);
+  max-width: 80rem;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.templates-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.templates-tabs {
+  display: inline-flex;
+  gap: var(--space-xs);
+  padding: 0.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+}
+
+.templates-tab {
+  background: transparent;
+  border: none;
+  padding: 0.4rem 0.85rem;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  color: var(--text2);
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: background var(--tr-std), color var(--tr-std);
+}
+.templates-tab:hover:not(.active) {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+.templates-tab.active {
+  background: var(--accent-soft);
+  color: var(--accent-strong, var(--accent));
+}
+.templates-tab:focus-visible {
+  outline: 2px solid var(--focus, var(--accent));
+  outline-offset: 2px;
+}
+
+.templates-search {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 0.4rem 0.65rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 6px);
+  min-width: 12rem;
+  max-width: 20rem;
+}
+
+.templates-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 0.9rem;
+  color: var(--text);
+  outline: none;
+}
+
+.templates-search-clear {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text3);
+  padding: 0.15rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+}
+.templates-search-clear:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.templates-loading {
+  text-align: center;
+  color: var(--text3);
+  padding: var(--space-xl);
+}
+
+.templates-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl);
+  color: var(--text3);
+  text-align: center;
+}
+
+/* Tabelle (Desktop). Mobile-Card-Layout via media-query unten. */
+.templates-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 6px);
+  overflow: hidden;
+}
+
+.templates-table thead th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text3);
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--canvas);
+}
+
+.templates-table .col-symbol {
+  width: 2.5rem;
+  text-align: center;
+}
+.templates-table .col-actions {
+  width: 2.5rem;
+  text-align: right;
+}
+
+.templates-sort-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.templates-sort-btn:hover {
+  color: var(--text);
+}
+
+.templates-row td {
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.templates-row:last-child td {
+  border-bottom: none;
+}
+.templates-row:hover {
+  background: var(--surface-hover);
+}
+
+.template-symbol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-md, 6px);
+  background: var(--accent-soft);
+  color: var(--accent-strong, var(--accent));
+}
+
+.template-name {
+  display: block;
+  font-weight: 500;
+  color: var(--text);
+}
+.template-desc {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text3);
+  margin-top: 0.1rem;
+}
+
+.template-visibility-badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.template-visibility-badge.v-platform {
+  background: var(--bluebg, var(--accent-soft));
+  color: var(--bluetxt, var(--accent-strong, var(--accent)));
+}
+.template-visibility-badge.v-workspace {
+  background: var(--surface-elevated, var(--surface-hover));
+  color: var(--text2);
+}
+.template-visibility-badge.v-user {
+  background: var(--surface-hover);
+  color: var(--text2);
+  font-style: italic;
+}
+
+.template-slot-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.4rem;
+  border-radius: var(--radius-md, 6px);
+  background: var(--accent-soft);
+  color: var(--accent-strong, var(--accent));
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.template-slot-empty {
+  color: var(--text3);
+}
+
+.template-usage {
+  font-variant-numeric: tabular-nums;
+  color: var(--text2);
+}
+.template-updated {
+  font-size: 0.85rem;
+  color: var(--text3);
+  white-space: nowrap;
+}
+
+/* Drei-Punkte-Action-Menue. */
+.template-action-menu {
+  position: relative;
+  display: inline-block;
+}
+.template-action-trigger {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.35rem;
+  border-radius: var(--radius-md, 6px);
+  color: var(--text3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.template-action-trigger:hover,
+.template-action-trigger[aria-expanded="true"] {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.template-action-trigger:focus-visible {
+  outline: 2px solid var(--focus, var(--accent));
+  outline-offset: 1px;
+}
+.template-action-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.25rem);
+  z-index: 50;
+  min-width: 12rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 6px);
+  box-shadow: var(--shadow-lg, 0 0.5rem 1rem rgba(0, 0, 0, 0.15));
+  padding: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  animation: expand-fade 120ms ease-out;
+}
+.template-action-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 0.85rem;
+  text-align: left;
+  width: 100%;
+}
+.template-action-item:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.template-action-item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.template-action-item-danger {
+  color: var(--danger, #c62828);
+}
+.template-action-item-danger:hover:not(:disabled) {
+  background: var(--danger-soft, rgba(198, 40, 40, 0.08));
+}
+
+/* New-Template-Modal — Visibility-Radio-Row. */
+.new-template-visibility-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+.new-template-visibility-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+/* Delete-Modal Spezifisches. */
+.delete-template-warning {
+  background: var(--surface-elevated, var(--surface-hover));
+  color: var(--text2);
+  padding: var(--space-sm);
+  border-radius: var(--radius-md, 6px);
+  border-left: 3px solid var(--accent);
+  margin: 0;
+}
+.delete-template-summary {
+  margin: 0;
+  color: var(--text);
+}
+.delete-template-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: var(--space-sm) 0;
+}
+.delete-template-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 6px);
+  cursor: pointer;
+  background: var(--surface);
+}
+.delete-template-option.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.delete-template-option > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.delete-template-option strong {
+  color: var(--text);
+}
+.delete-template-option span {
+  font-size: 0.85rem;
+  color: var(--text3);
+}
+.delete-template-irrev {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text3);
+}
+
+/* Hotkey-Slot-Picker — 3×3 Grid. */
+.hotkey-slot-summary {
+  margin: 0;
+  color: var(--text);
+}
+.hotkey-slot-scope {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem 0;
+}
+.hotkey-slot-scope label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  cursor: pointer;
+}
+.hotkey-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-xs);
+  margin: var(--space-sm) 0;
+}
+.hotkey-slot-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 6px);
+  background: var(--surface);
+  cursor: pointer;
+  min-height: 4rem;
+  transition: background var(--tr-std), border-color var(--tr-std);
+}
+.hotkey-slot-cell:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--surface-hover);
+}
+.hotkey-slot-cell.occupied {
+  background: var(--surface-hover);
+  border-style: dashed;
+}
+.hotkey-slot-cell.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.hotkey-slot-cell:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.hotkey-slot-num {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent-strong, var(--accent));
+}
+.hotkey-slot-occupant {
+  font-size: 0.7rem;
+  color: var(--text3);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.hotkey-slot-empty {
+  font-size: 0.7rem;
+  color: var(--text3);
+  font-style: italic;
+}
+.hotkey-slot-current-hint {
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text3);
+}
+
+/* Mobile (< 48em) — Card-Layout statt Tabelle. */
+@media (max-width: 48em) {
+  .templates-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .templates-search {
+    max-width: 100%;
+  }
+  .templates-table {
+    border: none;
+    background: transparent;
+  }
+  .templates-table thead {
+    display: none;
+  }
+  .templates-table,
+  .templates-table tbody,
+  .templates-table tr,
+  .templates-table td {
+    display: block;
+    width: 100%;
+  }
+  .templates-row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md, 6px);
+    margin-bottom: var(--space-sm);
+    padding: var(--space-sm);
+    position: relative;
+  }
+  .templates-row td {
+    border-bottom: none;
+    padding: 0.2rem 0;
+  }
+  .templates-row .col-symbol {
+    position: absolute;
+    top: var(--space-sm);
+    left: var(--space-sm);
+    width: 1.75rem;
+  }
+  .templates-row .col-name {
+    padding-left: 2.5rem;
+  }
+  .templates-row .col-actions {
+    position: absolute;
+    top: var(--space-sm);
+    right: var(--space-sm);
+    width: auto;
+  }
+  .templates-row .col-visibility::before,
+  .templates-row .col-hotkey::before,
+  .templates-row .col-usage::before,
+  .templates-row .col-updated::before {
+    content: attr(data-label);
+    color: var(--text3);
+    font-size: 0.75rem;
+    margin-right: 0.4rem;
+  }
+}

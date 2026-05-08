@@ -13,6 +13,7 @@ import ResetPassword from './routes/ResetPassword';
 import Settings from './routes/Settings';
 import Signup from './routes/Signup';
 import TaskDetail from './routes/TaskDetail';
+import Templates from './routes/Templates';
 import Workspace from './routes/Workspace';
 import AccountAi from './routes/settings/AccountAi';
 import AccountCalendars from './routes/settings/AccountCalendars';
@@ -67,6 +68,7 @@ render(
       <Route path="/w/:workspaceId/agenda" component={Agenda} />
       <Route path="/w/:workspaceId/calendar" component={Calendar} />
       <Route path="/w/:workspaceId/task/:taskId" component={TaskDetail} />
+      <Route path="/w/:workspaceId/templates" component={Templates} />
       <Route path="/w/:workspaceId/settings" component={Settings}>
         <Route path="/" component={AccountProfile} />
         <Route path="/account/profile" component={AccountProfile} />
