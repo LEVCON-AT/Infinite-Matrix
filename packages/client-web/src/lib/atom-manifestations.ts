@@ -724,3 +724,233 @@ export function reportPinError(err: unknown, contextLabel: string): void {
   }
   showToast(`${contextLabel} fehlgeschlagen.`, 'error');
 }
+
+// ─── Generic-Drop-Helper (WV.WV.2 — §9.A.3 Goldlösung) ────────
+// Polymorphe Drops fuer alle 5 Atom-Typen (task / link / doc /
+// checklist / imported_event) auf jedes Drop-Target. Idempotent:
+// existing Manifestation desselben Kinds + Atoms wird verschoben
+// (Move) statt dupliziert.
+//
+// Heutige task-only Pendants in lib/manifestation-cross-view.ts
+// (dropOnKanbanCol / dropOnChecklist) bleiben fuer Welle-D-Caller
+// (BoardView / ChecklistPanel) erhalten — Card-Polymorphie (WV.WV.6)
+// schaltet die Caller spaeter um auf die generischen Helper.
+
+// Polymorphes Pendant zu lib/tasks.ts.nextManifestationPosition.
+// Filter ohne atom_type-Constraint, damit Drops aller 5 Atom-Typen
+// am Container-Ende einsortiert werden ohne Position-Kollision mit
+// existing Task-Manifestations.
+export async function nextAtomManifestationPosition(
+  containerId: string,
+  kind: AtomManifestationKind,
+): Promise<number> {
+  if (!containerId) return 0;
+  try {
+    const { data, error } = await supabase
+      .from('atom_manifestations')
+      .select('position')
+      .eq('container_id', containerId)
+      .eq('kind', kind)
+      .order('position', { ascending: false })
+      .limit(1);
+    if (error) throw error;
+    const top = data && data.length > 0 ? (data[0] as { position: number }).position : -1;
+    markLiveSuccess();
+    return top + 1;
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    // Cache-Fallback: alle Manifestations laden, client-seitig
+    // filtern. Workspace-loser Lookup geht weil wir den Index
+    // by_workspace nicht brauchen — IDB-Scan ist klein.
+    const all = await getByWorkspace<AtomManifestationRow>(ATOM_MANIF_TABLE, '');
+    const filtered = all.filter((m) => m.container_id === containerId && m.kind === kind);
+    markCacheFallback();
+    if (filtered.length === 0) return 0;
+    return filtered.reduce((m, r) => Math.max(m, r.position ?? -1), -1) + 1;
+  }
+}
+
+type DropAtomOnContainerArgs = {
+  workspaceId: string;
+  atomType: AtomKind;
+  atomId: string;
+  atomLabel?: string;
+  targetContainerId: string;
+  targetPosition?: number;
+  level?: number; // nur fuer kind='checklist' relevant
+  // Bestaende fuer Idempotenz/Move-Detect — Caller filtert pro Atom.
+  existingForAtom: AtomManifestationRow[];
+};
+
+// Generic Kanban-Col-Drop: prueft ob das Atom schon eine kanban-
+// Manifestation hat. Move statt Add wenn ja, sonst Add.
+export async function dropAtomOnKanbanCol(args: DropAtomOnContainerArgs): Promise<void> {
+  const existingKanban = args.existingForAtom.find((m) => m.kind === 'kanban');
+  if (existingKanban && existingKanban.container_id === args.targetContainerId) {
+    showToast('Schon in dieser Spalte.', 'info');
+    return;
+  }
+  if (existingKanban) {
+    const oldContainer = existingKanban.container_id;
+    const oldPosition = existingKanban.position;
+    try {
+      const pos =
+        args.targetPosition ??
+        (await nextAtomManifestationPosition(args.targetContainerId, 'kanban'));
+      await updateAtomManifestation(existingKanban.id, {
+        container_id: args.targetContainerId,
+        position: pos,
+      });
+      showUndoToast('Karte verschoben', () => {
+        void updateAtomManifestation(existingKanban.id, {
+          container_id: oldContainer,
+          position: oldPosition,
+        }).catch(() => {});
+      });
+    } catch (err) {
+      console.error('dropAtomOnKanbanCol (move):', err);
+      showToast(translateDbError(err, 'Verschieben fehlgeschlagen.'), 'error');
+    }
+    return;
+  }
+  try {
+    const pos =
+      args.targetPosition ??
+      (await nextAtomManifestationPosition(args.targetContainerId, 'kanban'));
+    const created = await addAtomManifestation({
+      workspaceId: args.workspaceId,
+      atomType: args.atomType,
+      atomId: args.atomId,
+      kind: 'kanban',
+      containerId: args.targetContainerId,
+      position: pos,
+    });
+    showUndoToast('Als Karte hinzugefuegt', () => {
+      void removeAtomManifestation(created.id).catch(() => {});
+    });
+  } catch (err) {
+    console.error('dropAtomOnKanbanCol (add):', err);
+    showToast(translateDbError(err, 'Hinzufuegen fehlgeschlagen.'), 'error');
+  }
+}
+
+// Generic Checklist-Drop: analog Kanban, plus level (default 0).
+export async function dropAtomOnChecklist(args: DropAtomOnContainerArgs): Promise<void> {
+  const level = args.level ?? 0;
+  const existingChecklist = args.existingForAtom.find((m) => m.kind === 'checklist');
+  if (existingChecklist && existingChecklist.container_id === args.targetContainerId) {
+    showToast('Schon in dieser Checkliste.', 'info');
+    return;
+  }
+  if (existingChecklist) {
+    const oldContainer = existingChecklist.container_id;
+    const oldPosition = existingChecklist.position;
+    try {
+      const pos =
+        args.targetPosition ??
+        (await nextAtomManifestationPosition(args.targetContainerId, 'checklist'));
+      await updateAtomManifestation(existingChecklist.id, {
+        container_id: args.targetContainerId,
+        position: pos,
+      });
+      showUndoToast('Eintrag verschoben', () => {
+        void updateAtomManifestation(existingChecklist.id, {
+          container_id: oldContainer,
+          position: oldPosition,
+        }).catch(() => {});
+      });
+    } catch (err) {
+      console.error('dropAtomOnChecklist (move):', err);
+      showToast(translateDbError(err, 'Verschieben fehlgeschlagen.'), 'error');
+    }
+    return;
+  }
+  try {
+    const pos =
+      args.targetPosition ??
+      (await nextAtomManifestationPosition(args.targetContainerId, 'checklist'));
+    const created = await addAtomManifestation({
+      workspaceId: args.workspaceId,
+      atomType: args.atomType,
+      atomId: args.atomId,
+      kind: 'checklist',
+      containerId: args.targetContainerId,
+      position: pos,
+      level,
+    });
+    showUndoToast('Als Checklisten-Punkt hinzugefuegt', () => {
+      void removeAtomManifestation(created.id).catch(() => {});
+    });
+  } catch (err) {
+    console.error('dropAtomOnChecklist (add):', err);
+    showToast(translateDbError(err, 'Hinzufuegen fehlgeschlagen.'), 'error');
+  }
+}
+
+// Generic Pin-Drops auf Cell / Atom / Node — Wrapper um createAtomPin
+// (idempotent via DB-UNIQUE-Index, kein Move-vs-Add-Branch noetig).
+type DropAtomOnPinArgs = {
+  workspaceId: string;
+  atomType: AtomKind;
+  atomId: string;
+  atomLabel?: string;
+  targetId: string;
+  position?: number;
+};
+
+export async function dropAtomOnCell(args: DropAtomOnPinArgs): Promise<void> {
+  try {
+    const created = await createAtomPin({
+      workspaceId: args.workspaceId,
+      atomType: args.atomType,
+      atomId: args.atomId,
+      containerKind: 'cell',
+      containerId: args.targetId,
+      position: args.position,
+    });
+    showUndoToast('An Zelle gepinnt', () => {
+      void deleteAtomPin(created.id).catch(() => {});
+    });
+  } catch (err) {
+    console.error('dropAtomOnCell:', err);
+    reportPinError(err, 'An Zelle pinnen');
+  }
+}
+
+export async function dropAtomOnAtom(args: DropAtomOnPinArgs): Promise<void> {
+  try {
+    const created = await createAtomPin({
+      workspaceId: args.workspaceId,
+      atomType: args.atomType,
+      atomId: args.atomId,
+      containerKind: 'atom',
+      containerId: args.targetId,
+      position: args.position,
+    });
+    showUndoToast('Am Atom gepinnt', () => {
+      void deleteAtomPin(created.id).catch(() => {});
+    });
+  } catch (err) {
+    console.error('dropAtomOnAtom:', err);
+    reportPinError(err, 'Am Atom pinnen');
+  }
+}
+
+export async function dropAtomOnNode(args: DropAtomOnPinArgs): Promise<void> {
+  try {
+    const created = await createAtomPin({
+      workspaceId: args.workspaceId,
+      atomType: args.atomType,
+      atomId: args.atomId,
+      containerKind: 'node',
+      containerId: args.targetId,
+      position: args.position,
+    });
+    showUndoToast('Am Node gepinnt', () => {
+      void deleteAtomPin(created.id).catch(() => {});
+    });
+  } catch (err) {
+    console.error('dropAtomOnNode:', err);
+    reportPinError(err, 'Am Node pinnen');
+  }
+}

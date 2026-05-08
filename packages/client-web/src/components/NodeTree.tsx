@@ -376,6 +376,7 @@ const TreeItem: Component<{
             atom: 'link',
             atomId: p.entry.id,
             label: p.entry.label,
+            workspaceId: p.workspaceId,
           }
         : null,
   });

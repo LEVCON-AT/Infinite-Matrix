@@ -38,7 +38,69 @@ export type DragSource = {
   // jsonb, kein FK) auch nach dem Drop ohne Source-Lookup angezeigt
   // werden koennen — die display_meta sind self-contained.
   url?: string;
+  // WV.WV.8: Workspace-Scope fuer den MIME-Payload
+  // `application/x-matrix-atom-ref`. Erlaubt cross-window /
+  // cross-tab-Drag und MCP-Tool-Konsumenten den Atom eindeutig zu
+  // referenzieren. Optional — Caller die das nicht setzen
+  // produzieren ein Payload mit `workspaceId: undefined` (Drop-
+  // Targets innerhalb der App lesen primaer activeDrag(), nicht das
+  // dataTransfer-JSON).
+  workspaceId?: string;
 };
+
+// WV.WV.8: Custom-MIME-Type fuer den Atom-Reference-Drag.
+// „ref" macht klar, dass das Payload eine Referenz auf ein
+// existing Atom ist (atom_type + atom_id), kein Atom-Inhalt.
+// Frueherer Name `application/x-matrix-atom` hatte das Mehrdeutig
+// gemacht — Welle WV.WV consolidiert auf `-ref`.
+export const ATOM_REF_MIME = 'application/x-matrix-atom-ref';
+
+// JSON-Payload-Shape fuer ATOM_REF_MIME. Versioniert ueber `v` —
+// Konsumenten, die einen unbekannten `v`-Wert sehen, brechen ab
+// (Forward-Compat-Vertrag).
+export type AtomRefPayload = {
+  v: 1;
+  atomType: DragAtomType;
+  atomId: string;
+  workspaceId: string | null;
+  sourceManifId?: string;
+};
+
+export function encodeAtomRefPayload(src: DragSource): string {
+  const payload: AtomRefPayload = {
+    v: 1,
+    atomType: src.atom,
+    atomId: src.atomId,
+    workspaceId: src.workspaceId ?? null,
+    ...(src.sourceManifId ? { sourceManifId: src.sourceManifId } : {}),
+  };
+  return JSON.stringify(payload);
+}
+
+// Defensive Decoder fuer Konsumenten ausserhalb der App (z.B. Welle B
+// MCP-Bridge, die Drag-Payloads von externen Sources akzeptiert).
+// Returns null bei JSON-Parse-Fehler oder Schema-Drift.
+export function decodeAtomRefPayload(raw: string): AtomRefPayload | null {
+  try {
+    const obj = JSON.parse(raw) as unknown;
+    if (typeof obj !== 'object' || obj === null) return null;
+    const o = obj as Record<string, unknown>;
+    if (o.v !== 1) return null;
+    if (typeof o.atomType !== 'string') return null;
+    if (typeof o.atomId !== 'string') return null;
+    const at = o.atomType;
+    if (at !== 'task' && at !== 'link' && at !== 'doc' && at !== 'checklist') return null;
+    return {
+      v: 1,
+      atomType: at,
+      atomId: o.atomId,
+      workspaceId: typeof o.workspaceId === 'string' ? o.workspaceId : null,
+      ...(typeof o.sourceManifId === 'string' ? { sourceManifId: o.sourceManifId } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
 
 const [active, setActive] = createSignal<DragSource | null>(null);
 
@@ -81,7 +143,11 @@ export function bindDragSource(opts: {
       if (e.dataTransfer) {
         e.dataTransfer.effectAllowed = 'move';
         try {
-          e.dataTransfer.setData('application/x-matrix-atom', `${src.atom}:${src.atomId}`);
+          // WV.WV.8: JSON-Payload mit ATOM_REF_MIME. Drop-Targets
+          // innerhalb der App lesen primaer activeDrag() (Solid-
+          // Signal); der MIME-Eintrag ist Pflicht damit der Browser
+          // den Drag akzeptiert + fuer cross-window/MCP-Konsumenten.
+          e.dataTransfer.setData(ATOM_REF_MIME, encodeAtomRefPayload(src));
         } catch {
           /* manche Browser werfen — egal, wir haben activeDrag(). */
         }

@@ -137,6 +137,7 @@ const ChecklistPanel: Component<Props> = (p) => {
       atom: 'checklist',
       atomId: p.checklist.id,
       label: displayLabel() || p.checklist.label,
+      workspaceId: p.checklist.workspace_id,
     }),
   });
 
@@ -574,6 +575,7 @@ const ChecklistPanel: Component<Props> = (p) => {
                   atomId: it.id,
                   label: it.text,
                   sourceManifId: manif?.id,
+                  workspaceId: p.checklist.workspace_id,
                 };
               },
             });

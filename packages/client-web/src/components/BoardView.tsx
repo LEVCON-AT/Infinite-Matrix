@@ -313,6 +313,7 @@ const BoardView: Component<Props> = (p) => {
       atomId: card.id,
       label: card.name,
       sourceManifId: kanbanManif?.id,
+      workspaceId: card.workspace_id,
     });
   }
 

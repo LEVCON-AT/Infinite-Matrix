@@ -279,7 +279,12 @@ const SidebarDayView: Component<Props> = (p) => {
                   const dragHandlers = bindDragSource({
                     build: () =>
                       e.atomType === 'task'
-                        ? { atom: 'task', atomId: e.atomId, label: e.label }
+                        ? {
+                            atom: 'task',
+                            atomId: e.atomId,
+                            label: e.label,
+                            workspaceId: p.workspaceId,
+                          }
                         : null,
                   });
                   return (
@@ -396,6 +401,7 @@ const SidebarDayView: Component<Props> = (p) => {
                           atomId: it.event.atomId,
                           label: it.event.label,
                           sourceManifId: it.event.manifId ?? undefined,
+                          workspaceId: p.workspaceId,
                         }
                       : null,
                 });

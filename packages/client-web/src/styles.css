@@ -151,6 +151,13 @@
   --overlay-soft: rgba(0, 0, 0, 0.28);
   --overlay-strong: rgba(0, 0, 0, 0.4);
 
+  /* WV.WV.4 Drag-Hover-Navigation (style.md §6.5). Token fuer Canvas-
+     Scrim + Backdrop-Blur waehrend ein Atom gedraggt wird und User per
+     Hover via NavTree zum Drop-Target navigiert. GPU-effizient, an
+     Reduced-Motion gekoppelt (siehe Pflicht-Override am CSS-Ende). */
+  --blur-canvas: blur(0.25rem);
+  --scrim-canvas: rgba(0, 0, 0, 0.32);
+
   /* Radien — Legacy (Q.3.B). Aliase auf die Manifest-Skala unten. */
   --rs: var(--radius);
   --r: var(--radius-md);
@@ -1808,6 +1815,122 @@ button[type="submit"]:hover:not(:disabled) {
   color: var(--text3);
   font-size: var(--fs-tiny);
   flex: 0 0 auto;
+}
+
+/* ── AdapterDialog (WV.WV.7) ──────────────────────────────────── */
+/* Cross-Type-Drop-Adapter (Konzept §9.C). Reuse-Shell fuer
+   Field-Mapping-Dialoge (info_field→Link, doc→Kanban etc.).
+   Konkrete Adapter-Faelle wandern in Welle B/C/D rein.
+   Nutzt overlay-modal-Foundation; nur Form-Layout ist neu. */
+.adapter-dialog .overlay-card {
+  width: min(480px, 92vw);
+  max-height: 80vh;
+}
+
+.adapter-dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  overflow-y: auto;
+}
+
+.adapter-dialog-desc {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--text2);
+}
+
+.adapter-dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.adapter-dialog-field-label {
+  font-size: var(--fs-small);
+  font-weight: 500;
+  color: var(--text);
+}
+
+.adapter-dialog-field-required {
+  color: var(--red, #ef4444);
+  margin-left: 2px;
+}
+
+.adapter-dialog-input {
+  padding: 6px var(--space-sm);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--fs-base);
+  transition: border-color var(--tr-std);
+}
+
+.adapter-dialog-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+.adapter-dialog-textarea {
+  resize: vertical;
+  min-height: 4.5rem;
+  font-family: inherit;
+}
+
+.adapter-dialog-field-hint {
+  font-size: var(--fs-tiny);
+  color: var(--text3);
+}
+
+.adapter-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 0.5px solid var(--border2);
+}
+
+/* ── WidgetPicker (WV.WV.5) ───────────────────────────────────── */
+/* Multi-Root-Widget-Disambiguierung — Section-Header + Root-Badge.
+   Nutzt sonst die .atom-picker-list/.atom-picker-item-Foundation
+   aus der Welle-D-Picker-CSS oben. Siehe Konzept §9.A.6 + Memory
+   `feedback_drag_hover_navigation.md`. */
+.widget-picker-section {
+  padding: var(--space-sm) var(--space-md) 0;
+}
+
+.widget-picker-section-label {
+  font-size: var(--fs-tiny);
+  font-weight: 600;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.widget-picker-item-root .atom-picker-item-label {
+  font-weight: 500;
+}
+
+.widget-picker-item-rootbadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  border-radius: var(--rs);
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
+  color: var(--amber);
+  font-size: var(--fs-tiny);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex: 0 0 auto;
+}
+
+.widget-picker-item-sub {
+  color: var(--text3);
+  font-size: var(--fs-tiny);
 }
 
 /* ── Command-Palette (^) ──────────────────────────────────────── */
@@ -5177,6 +5300,65 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   font-size: 10px;
 }
 
+/* ── KbAtomCardBody (WV.WV.6) — Card<AtomType>-Polymorphie ──── */
+/* Foundation fuer doc/link/checklist/imported_event-Cards in Kanban-
+   Spalten ab Welle A. Tasks behalten ihre tiefe Inline-Render-Branch
+   in BoardView; diese Klassen sind nur fuer die nicht-task-Variants. */
+.kb-card-atom-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text3);
+  flex: 0 0 auto;
+}
+
+.kb-card-doc-excerpt,
+.kb-card-link-domain {
+  margin: 2px 0 0;
+  font-size: 10px;
+  color: var(--text3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.kb-card-pin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
+  color: var(--amber);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.kb-card-progress {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--green, #16a34a) 14%, transparent);
+  color: var(--green, #16a34a);
+}
+
+.kb-card-event-time {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--bg2);
+  color: var(--text2);
+}
+
+.kb-card-event-provider {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text3) 12%, transparent);
+  color: var(--text3);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .kb-tag {
   padding: 1px 6px;
   border-radius: 999px;
@@ -5447,6 +5629,32 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
 body[data-dragging] .cl-it-draggable[draggable="true"]:active {
   opacity: 0.5;
 }
+
+/* ───────────────────────────────────────────────────────────────
+   WV.WV.4 Drag-Hover-Navigation — Canvas-Scrim
+   style.md §6.5 + animations.md §3 (Backdrop-Blur als Helper-Anker).
+
+   Pattern: User drag-t Atom + DragHoverNavigator-Komponente
+   (lib/drag-context.ts triggers via document.body.dataset.dragging
+   während activeDrag() aktiv ist). Canvas (.ws-main) wird gedimmt
+   + gaussian-blurred — Fokus wandert auf NavTree-Sidebar, User
+   navigiert per Hover zum Ziel-Widget. Drop-Detection lebt in den
+   Drop-Targets selbst (bindDropTarget). NavTree-Section-Header
+   expandieren via existing bindSectionDragExpand.
+
+   Zero-Shift (style.md §6.4): Effekte rein visuell — opacity +
+   filter — keine Layout-Verschiebung der Cell-Inhalte.
+   ─────────────────────────────────────────────────────────────── */
+.ws-main {
+  transition: opacity var(--tr-base) var(--ease-smooth), filter var(--tr-base) var(--ease-smooth);
+}
+body[data-dragging] .ws-main {
+  opacity: 0.55;
+  filter: var(--blur-canvas);
+}
+/* Pointer-Events bleiben aktiv — Drop-Targets im Canvas (Calendar-Tag,
+   KanbanCol etc.) sollen nicht gestoert werden. NavTree ist ohnehin
+   jenseits der dim-Zone. */
 
 .cl-checkbox-input {
   width: 15px;

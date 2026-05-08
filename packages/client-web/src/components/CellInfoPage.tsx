@@ -364,6 +364,7 @@ const CellInfoPage: Component<Props> = (p) => {
                     atomId: l.id,
                     label: l.label || l.url,
                     url: l.url,
+                    workspaceId: p.workspaceId,
                   }),
                 });
                 return (

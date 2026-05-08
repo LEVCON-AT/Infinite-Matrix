@@ -20,6 +20,7 @@ import CommandPalette from '../components/CommandPalette';
 import ContextMenu from '../components/ContextMenu';
 import CreateManifestationModal from '../components/CreateManifestationModal';
 import DocsPopup from '../components/DocsPopup';
+import DragHoverNavigator from '../components/DragHoverNavigator';
 import GlobalSearch from '../components/GlobalSearch';
 import HeaderSearchBar from '../components/HeaderSearchBar';
 import Icon from '../components/Icon';
@@ -1166,6 +1167,11 @@ const Workspace: Component = () => {
           onClose={() => setMobileTreeDrawerOpen(false)}
         />
       </Show>
+      {/* WV.WV.4 — Drag-Hover-Navigation: einmaliger Mount-Anchor fuer
+          das Querschnitt-Pattern (style.md §6.5). Visuelle Effekte
+          (Canvas-Dim + Backdrop-Blur) leben in styles.css ueber den
+          body[data-dragging]-Selektor. */}
+      <DragHoverNavigator />
       <div class="ws-shell" data-sb-mode={sidebar.mode()}>
         <aside class="ws-sidebar" data-sb-mode={sidebar.mode()}>
           {/* Schmale Top-Bar — Pendant zur ws-main-header. Workspace-
