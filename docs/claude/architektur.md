@@ -207,6 +207,26 @@ Kein Sub-Sprint gilt als done, wenn nicht alle sieben stehen. **Das ist die haeu
 - **Smart-Summary / KI-Prompts**: wenn die neue Tabelle Atom-Eigenschaften traegt die in LLM-Prompts erscheinen, `task-aggregate.ts` o.ae. anpassen.
 - **Sidebar-Tree / Chip-Filter**: wenn die Tabelle einen Sidebar-Indicator brauchen sollte (z.B. Atom-Type-Pin), `useSidebarChips` + `buildSidebarTree` ergaenzen.
 
+### 3.2a Constraint-Drift bei polymorphen Tabellen (Pflicht-Synchronitaet)
+
+**Verbindlich.** Wenn eine polymorphe Tabelle (heute: `atom_manifestations`) Diskriminator-Spalten via Enum + zusaetzliche CHECK-Constraints fuehrt, muessen Enum-Erweiterungen + CHECK-Updates in **derselben** Migration passieren. Sonst entsteht ein latenter Bug: das Enum kennt den neuen Wert, aber der CHECK-Constraint blockt jede INSERT/UPDATE-Operation damit.
+
+Vorfall-Historie:
+- Migration 072 (WV.B.1) hat `info_field` ins `atom_type`-Enum aufgenommen, den `atom_manifestations_atom_type_check` aber nicht erweitert. Latent gebrochen bis Migration 082 (WV.E #37) das nachzog.
+- Migration 072 hat `info` in `atom_manifestation_kind`-Enum aufgenommen, den `atom_manifestations_container_check` aber nicht erweitert. Latent gebrochen — `kind='info'`-Inserts haben in der Praxis nie funktioniert.
+
+**Pflicht-Selbstcheck bei Enum-Erweiterungen** an `atom_type` / `atom_manifestation_kind` / aehnlichen Diskriminatoren:
+
+```
+[ ] Enum erweitert (ALTER TYPE ... ADD VALUE)
+[ ] atom_type_check synchron erweitert (DROP + RECREATE mit neuer Werteliste)
+[ ] container_check synchron erweitert (Branch fuer neuen kind/container_kind)
+[ ] level_check synchron erweitert (falls neuer kind level braucht)
+[ ] UNIQUE-/Partial-Indexes synchron — pro neuer Diskriminator-Kombination eigener Index?
+```
+
+**Smoke-Test** post-Migration: `INSERT ... VALUES (<neuer-enum-wert>, ...)` als psql-1-Liner. Wenn der Insert mit `violates check constraint` failt → CHECK ist nicht synchron, Migration unvollstaendig.
+
 ### 3.3 Pre-Commit-Heptad-Selbstcheck
 
 Vor jedem Migration-Commit ankreuzen — kostet 30 Sekunden, spart 30 Minuten Nachzieh-Sprint:
@@ -219,6 +239,7 @@ Vor jedem Migration-Commit ankreuzen — kostet 30 Sekunden, spart 30 Minuten Na
 [ ] Realtime     → RealtimeTable + DIRECT_TABLES + Workspace-Bumps
 [ ] Export       → WorkspaceExport + alle 4 Export-Pfade + Import
 [ ] MCP-Tools    → Tool-Bundle + index.ts-Registrierung
+[ ] Constraint-Sync → atom_type_check + container_check + level_check + UNIQUE-Indexes (siehe §3.2a)
 ```
 
 ### 3.4 Lueckenexport-Verbot
