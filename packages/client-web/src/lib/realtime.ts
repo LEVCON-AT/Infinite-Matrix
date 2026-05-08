@@ -68,7 +68,10 @@ export type RealtimeTable =
   // Member sehen Owner-Aenderung live. User-Variante: Cross-Tab-
   // Konsistenz fuer den eigenen Account.
   | 'workspace_hotkey_slots'
-  | 'user_hotkey_slots';
+  | 'user_hotkey_slots'
+  // Welle WV.A.4 — Filter-Definitionen. Workspace-shared muss
+  // cross-user live aktualisiert werden, user-privat cross-tab.
+  | 'saved_filters';
 
 export type RealtimeBumps = Partial<Record<RealtimeTable, () => void>>;
 
@@ -92,6 +95,7 @@ const DIRECT_TABLES: Array<Exclude<RealtimeTable, 'kb_cards' | 'checklist_items'
   'cell_widget_overrides',
   'workspace_hotkey_slots',
   'user_hotkey_slots',
+  'saved_filters',
 ];
 
 type AtomManifPayload = {

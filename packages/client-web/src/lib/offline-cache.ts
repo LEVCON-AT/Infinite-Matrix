@@ -98,6 +98,9 @@ const TABLES = [
   // (Migration 069).
   'workspace_hotkey_slots',
   'user_hotkey_slots',
+  // Welle WV.A.4 — wiederverwendbare Filter-Definitionen pro
+  // atom_kind (Migration 070, body folgt lib/atom-filter-attrs.ts).
+  'saved_filters',
 ] as const;
 
 export type CacheTable = (typeof TABLES)[number];
@@ -136,6 +139,7 @@ interface MatrixCacheSchema extends DBSchema {
   cell_widget_overrides: StoreDef;
   workspace_hotkey_slots: StoreDef;
   user_hotkey_slots: StoreDef;
+  saved_filters: StoreDef;
 }
 
 const DB_NAME = 'matrix-cache';
@@ -168,7 +172,10 @@ const DB_NAME = 'matrix-cache';
 // (Migration 068) — Junction Cell ↔ Vorlage + sparse User-Overrides.
 // V15 (WV.A.3): workspace_hotkey_slots + user_hotkey_slots
 // (Migration 069) — Slot-Belegung 1-9 pro Workspace + User-Override.
-const DB_VERSION = 15;
+// V16 (WV.A.4): saved_filters (Migration 070) — wiederverwendbare
+// Filter-Definitionen pro atom_kind, body folgt SavedFilterBody-
+// Format aus lib/atom-filter-attrs.ts (WV.Y).
+const DB_VERSION = 16;
 const OBSOLETE_STORES = [
   'kb_cards',
   'checklist_items',

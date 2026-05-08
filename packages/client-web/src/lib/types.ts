@@ -758,6 +758,22 @@ export type UserHotkeySlotRow = {
   set_at: string;
 };
 
+// WV.A.4 — Saved-Filter (Migration 070). body folgt
+// SavedFilterBody aus lib/atom-filter-attrs.ts. owner_user_id NULL =
+// Workspace-shared, sonst User-privat.
+export type SavedFilterRow = {
+  id: string;
+  workspace_id: string;
+  owner_user_id: string | null;
+  name: string;
+  atom_kind: 'task' | 'link' | 'doc' | 'checklist' | 'imported_event';
+  // jsonb-Body — Caller dekodiert via isSavedFilterBody aus
+  // lib/atom-filter-attrs.ts (defensiver Decoder).
+  body: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
 // workspace_id denormalisiert wie TemplateSectionRow — Trigger pflegt
 // aus section.workspace_id automatisch.
 export type TemplateWidgetRow = {
