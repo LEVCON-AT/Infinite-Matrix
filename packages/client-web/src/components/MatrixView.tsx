@@ -10,6 +10,14 @@ import {
   onMount,
 } from 'solid-js';
 import { drillNavigate } from '../lib/animations';
+import { handleCellSelectionClick } from '../lib/bulk-hotkeys';
+import {
+  type CellCoord,
+  registerMatrixCells,
+  selectionSet,
+  setActiveMatrixId,
+  unregisterMatrix,
+} from '../lib/cell-selection';
 import { showChoice, showConfirm } from '../lib/dialog';
 import { openDokuForContext } from '../lib/docs-open';
 import { useEditMode } from '../lib/edit-mode';
@@ -121,6 +129,35 @@ const MatrixView: Component<Props> = (p) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const editMode = useEditMode();
   const mobile = useMobile();
+
+  // ─── Welle WV.C — Multi-Select-Wiring ───────────────────────
+  // Aktive Matrix beim Mount/Wechsel registrieren (Drill-Up/Down clear).
+  // Cells aus content fuettern — registry-Lookup fuer selectRange.
+  // Auf Unmount Matrix deregistrieren damit der Store keine stale
+  // Cells haelt.
+  createEffect(() => {
+    const mid = p.matrixId;
+    if (!mid) return;
+    setActiveMatrixId(mid);
+  });
+  createEffect(() => {
+    const mid = p.matrixId;
+    const c = p.content;
+    if (!mid || !c) return;
+    const coords: CellCoord[] = [];
+    const colByPos = new Map(c.cols.map((col) => [col.id, col.position]));
+    const rowByPos = new Map(c.rows.map((row) => [row.id, row.position]));
+    for (const cell of c.cells) {
+      const rowPos = rowByPos.get(cell.row_id);
+      const colPos = colByPos.get(cell.col_id);
+      if (rowPos === undefined || colPos === undefined) continue;
+      coords.push({ id: cell.id, row: rowPos, col: colPos });
+    }
+    registerMatrixCells(mid, coords);
+  });
+  onCleanup(() => {
+    if (p.matrixId) unregisterMatrix(p.matrixId);
+  });
 
   // Phase 4 T.1.E: Smart-Summary-Map pro Cell. Eine einzige Aggregation
   // ueber wsTasks + wsManifestations + wsChecklists, danach pro Cell
@@ -971,6 +1008,10 @@ const MatrixView: Component<Props> = (p) => {
                             //       Info/Checklisten → Panel (WIP, siehe onChipClick)
                             // tabIndex=0 immer, damit der User per Tab/Arrow durch
                             // die Matrix navigieren kann (auch im View-Mode).
+                            const cellSelected = () => {
+                              const c = cell();
+                              return c ? selectionSet().has(c.id) : false;
+                            };
                             return (
                               <div
                                 class="mx-cell"
@@ -978,6 +1019,7 @@ const MatrixView: Component<Props> = (p) => {
                                   'mx-cell-empty': !cell(),
                                   'mx-cell-clickable': editMode(),
                                   'mx-cell-editable': editMode(),
+                                  'mx-cell-selected': cellSelected(),
                                 }}
                                 role={editMode() ? 'button' : 'gridcell'}
                                 tabIndex={0}
@@ -1003,7 +1045,17 @@ const MatrixView: Component<Props> = (p) => {
                                 onMouseLeave={() => {
                                   p.onCellHover?.(undefined);
                                 }}
-                                onClick={() => {
+                                onClick={(e) => {
+                                  // Welle WV.C — Strg/Shift+Click → Multi-Select.
+                                  // Cell muss existieren (kein Selection auf leeren
+                                  // Zellen V1).
+                                  const c = cell();
+                                  if (
+                                    c &&
+                                    handleCellSelectionClick(e, c.id, p.matrixId, editMode())
+                                  ) {
+                                    return;
+                                  }
                                   if (editMode()) onCellEdit(row, col, cell());
                                 }}
                                 onKeyDown={(e) => {
@@ -1027,6 +1079,11 @@ const MatrixView: Component<Props> = (p) => {
                                 />
                                 <Show when={cell()?.alias}>
                                   {(alias) => <span class="mx-cell-alias">^{alias()}</span>}
+                                </Show>
+                                <Show when={cellSelected()}>
+                                  <span class="mx-cell-selected-badge" aria-hidden="true">
+                                    <Icon name="check-circle" size={14} />
+                                  </span>
                                 </Show>
                                 <Show
                                   when={(() => {

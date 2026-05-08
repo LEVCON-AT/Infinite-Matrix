@@ -18622,3 +18622,47 @@ body[data-viewport="phone"] .overlay-card {
 .save-as-template-actions {
   flex-wrap: wrap;
 }
+
+/* ─── Multi-Select Visual-Feedback (WV.C — MatrixView) ───── */
+/* Zero-Shift: Outline statt Border (Memory `feedback_zero_shift_edit_mode.md`).
+   Nur sichtbar im Edit-Mode + bei aktiver Selektion. */
+.mx-cell.mx-cell-selected {
+  outline: 0.125rem solid var(--accent);
+  outline-offset: -0.125rem;
+  background: var(--accent-soft);
+}
+.mx-cell-selected-badge {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  background: var(--surface);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 5;
+  animation: expand-fade 120ms ease-out;
+}
+
+/* ─── ws-bulk-toolbar (WV.C — Workspace.tsx) ───────────────── */
+.ws-bulk-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0.5rem var(--space-md);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-wrap: wrap;
+}
+.ws-bulk-selection-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.65rem;
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--accent-strong, var(--accent));
+  font-weight: 600;
+  font-size: 0.85rem;
+}

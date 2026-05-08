@@ -38,6 +38,8 @@ import SidebarCalendarMini from '../components/SidebarCalendarMini';
 import SidebarDayView from '../components/SidebarDayView';
 import WorkspaceEmptyState from '../components/WorkspaceEmptyState';
 import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
+import BulkWizardManager from '../components/bulk/BulkWizardManager';
+import SlotHintToolbar from '../components/bulk/SlotHintToolbar';
 import MobileShell from '../components/mobile/MobileShell';
 import MobileTreeDrawer from '../components/mobile/MobileTreeDrawer';
 import { useAggregateView } from '../lib/aggregate-view';
@@ -50,8 +52,17 @@ import {
   fetchAtomManifestationsByWorkspace,
 } from '../lib/atom-manifestations';
 import { signOut, useUser } from '../lib/auth';
+import { installBulkHotkeys } from '../lib/bulk-hotkeys';
+import { openBulkWizard, openDangerousDelete } from '../lib/bulk-wizard-state';
 import { buildEvents, isoDate } from '../lib/calendar';
+import { installCellSelectionAutoClear, selectionCount } from '../lib/cell-selection';
 import { installCrossViewTabDrop } from '../lib/cross-view-tab-drop';
+import {
+  fetchUserHotkeySlots,
+  fetchWorkspaceHotkeySlots,
+  resolveSlotTemplateId,
+} from '../lib/hotkey-slots';
+import { fetchFeatureTemplatesForWorkspace } from '../lib/templates';
 import { useMobile } from '../lib/use-mobile';
 
 // addMonthsToDate: lokale Monatsverschiebung ohne UTC-Drift. Nicht in
@@ -889,6 +900,51 @@ const Workspace: Component = () => {
     onCleanup(cleanup);
   });
 
+  // ─── Welle WV.C — Bulk-Wiring ────────────────────────────────
+  // Resources fuer Hotkey-Slot-Resolver + Vorlagen (lazy beim ersten
+  // Edit-Mode-Mount; wenn der User nie 1-9 drueckt sind die Resources
+  // billig idle).
+  const [wsHotkeySlots] = createResource(
+    () => params.workspaceId ?? null,
+    async (wsId) => (wsId ? await fetchWorkspaceHotkeySlots(wsId) : []),
+  );
+  const [userHotkeySlots] = createResource(
+    () => params.workspaceId ?? null,
+    async (wsId) => (wsId ? await fetchUserHotkeySlots(wsId) : []),
+  );
+  const [featureTemplates] = createResource(
+    () => params.workspaceId ?? null,
+    async (wsId) => (wsId ? await fetchFeatureTemplatesForWorkspace(wsId) : []),
+  );
+
+  installCellSelectionAutoClear({
+    isEditMode: editMode,
+    workspaceId: () => params.workspaceId ?? null,
+  });
+
+  installBulkHotkeys({
+    onPickSlot: (slot) => {
+      const wsId = params.workspaceId;
+      const uid = user()?.id;
+      if (!wsId || !uid) return;
+      const tplId = resolveSlotTemplateId(
+        slot,
+        wsHotkeySlots() ?? [],
+        userHotkeySlots() ?? [],
+        wsId,
+        uid,
+      );
+      if (!tplId) {
+        showToast(`Slot ${slot} ist frei. Vorlage in /templates zuweisen.`, 'info');
+        return;
+      }
+      openBulkWizard({ preselectedTemplateId: tplId });
+    },
+    onEnter: () => openBulkWizard(),
+    onAltSlot: (slot) => openDangerousDelete({ kind: 'remove-template', slot }),
+    onAltDelete: () => openDangerousDelete({ kind: 'clear-cells' }),
+  });
+
   // Palette-Shortcut: `^` ist der einzige Entry-Point (Ctrl+K und Shift+P
   // entfernt auf User-Wunsch 2026-04-24). Die Palette macht sowohl
   // Alias-Navigation als auch Commands — siehe CommandPalette.tsx.
@@ -1172,6 +1228,20 @@ const Workspace: Component = () => {
           (Canvas-Dim + Backdrop-Blur) leben in styles.css ueber den
           body[data-dragging]-Selektor. */}
       <DragHoverNavigator />
+      {/* WV.C — BulkWizardManager: globaler Mount-Anchor fuer
+          BulkWizardModal + DangerousDeleteModal. Liest Open-Signale
+          aus lib/bulk-wizard-state, laedt Templates+Instances lazy. */}
+      <Show when={params.workspaceId}>
+        {(wsId) => (
+          <BulkWizardManager
+            workspaceId={wsId()}
+            userId={user()?.id ?? null}
+            cells={cells() ?? []}
+            rows={rows() ?? []}
+            cols={colsData() ?? []}
+          />
+        )}
+      </Show>
       <div class="ws-shell" data-sb-mode={sidebar.mode()}>
         <aside class="ws-sidebar" data-sb-mode={sidebar.mode()}>
           {/* Schmale Top-Bar — Pendant zur ws-main-header. Workspace-
@@ -1676,6 +1746,33 @@ const Workspace: Component = () => {
                 </button>
               </Show>
             </header>
+
+            {/* Welle WV.C — Edit-Mode-Bulk-Toolbar.
+                SlotHintToolbar (§8.4.2) + Selektions-Counter (§8.4.1).
+                Nur sichtbar im Edit-Mode + Workspace-Kontext geladen. */}
+            <Show when={editMode() && params.workspaceId}>
+              {(wsId) => (
+                <div class="ws-bulk-toolbar" role="toolbar" aria-label="Bulk-Aktionen">
+                  <SlotHintToolbar
+                    workspaceId={wsId()}
+                    userId={user()?.id ?? null}
+                    workspaceSlots={wsHotkeySlots() ?? []}
+                    userSlots={userHotkeySlots() ?? []}
+                    templates={featureTemplates() ?? []}
+                    selectionCount={selectionCount()}
+                    onPickSlot={(_slot, templateId) =>
+                      openBulkWizard({ preselectedTemplateId: templateId })
+                    }
+                    onPickEmptySlot={() => navigate(`/w/${wsId()}/templates`)}
+                  />
+                  <Show when={selectionCount() > 0}>
+                    <span class="ws-bulk-selection-pill" aria-live="polite">
+                      {selectionCount()} {selectionCount() === 1 ? 'Zelle' : 'Zellen'} ausgewaehlt
+                    </span>
+                  </Show>
+                </div>
+              )}
+            </Show>
 
             <Show
               when={currentCell() || currentNode()}
