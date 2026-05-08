@@ -16,7 +16,8 @@
   "packageManager": "pnpm@9.15.9",
   "pnpm": {
     "overrides": {
-      "axios": ">=1.13.5"
+      "axios": ">=1.13.5",
+      "fast-uri": ">=3.1.1"
     }
   }
 }

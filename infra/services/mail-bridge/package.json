@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "imapflow": "^1.0.158",
-    "nodemailer": "^6.9.7",
+    "nodemailer": "^7.0.11",
     "pg": "^8.11.3"
   },
   "devDependencies": {
