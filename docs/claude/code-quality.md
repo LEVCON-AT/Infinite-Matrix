@@ -611,14 +611,25 @@ GitHub-Actions-Run pollen — siehe §5.6. Bei `failure` reproduzieren
 
 ## 13. Bekannte Drift
 
-Stand 2026-05-01 nach Q.3.C-Audit:
+Stand 2026-05-08 nach Drift-Sweep (Commits `b6b0968` + `cc2414c`):
 
-**Behoben in Q.3.C:**
+**Behoben in Q.3.C (2026-05-01):**
 
 - ~~Doublet-Verdacht `formatDate*`~~ → `lib/dates.ts` mit `formatDateDE` / `formatDateTimeDE` / `formatDateTimeWithSecsDE`. 6 Komponenten konsolidiert (AuditLogSection, ChecklistPanel, CardOverlay, PlatformAdminsSection, StatsSection, recur.ts). Number-Format-`toLocaleString` (z.B. Stats-Counts) bleibt inline — kein Date-Doublet.
 - ~~`as any`-Casts~~ → 4 Stellen verifiziert, alle in `lib/realtime.ts` mit dokumentierter biome-ignore + Supabase-Workaround-Erklaerung. Manifest-konform.
 - ~~TODO ohne Trigger~~ → 1 Stelle in `routes/Calendar.tsx` Header-Doc, ist Out-of-Scope-Hinweis (Drag-Drop / Atom-Generalisierung), kein Code-Todo.
 - **Inline-Styles** → groesstenteils Custom-Property-Set (Manifest-konform). Echte Verstoesse in NodeTree (padding-left in px) und Icon (flex/display hardcoded) per Q.3.B behoben.
+
+**Behoben in Drift-Sweep 2026-05-08 (Commit `cc2414c`):**
+
+- ~~Inline-Styles in Dynamic-Position-Popups~~ → AliasAutocomplete (`--ac-x/y`), ContextMenu (`--cm-x/y`), ObjectSuggestion (`--os-x/y/min-w`) auf CSS-Custom-Properties migriert. position:fixed + max-inline-size + z-index in CSS-Klassen.
+- ~~Inline-Styles im Hour-Grid (SidebarDayView)~~ → 9 Custom-Properties (`--sb-day-allday-h`, `--sb-day-grid-h`, `--sb-buf-top/h`, `--sb-hour-top`, `--sb-evt-top/h/left-pct/w-pct`). calc-Geometry fuer Hour-Label-Reserve in CSS-Klasse.
+
+**Behoben in Drift-Sweep 2026-05-08 (Commit `b6b0968`):**
+
+- ~~console.log-Audit~~ → 3 `[gemini]`-Trace-Logs + Debug-Counter in `gemini.ts` entfernt; andere AI-Provider sind clean. Production-Code-Standard (`console.error`/`console.warn` nur dokumentiert) erfuellt.
+- ~~Auskommentierter Code-Audit~~ → keine Treffer. Alle `//`-Bloecke sind Doku-Beispiele in Library-Headers, alle `/* ignore */`-Marker sind dokumentierte Silent-Catches. Drift clean.
+- ~~Component-internal Helper-Doubletten~~ → `formatRelative` (MembersList) + `formatRelativeDate` (Templates) konsolidiert in `lib/dates.ts` als `formatRelativeDeLong` + `formatRelativeDeShort`. Single-Source.
 
 **Nicht-Defekte (verifiziert):**
 
@@ -626,10 +637,7 @@ Stand 2026-05-01 nach Q.3.C-Audit:
 
 **Offen / Folge-Sub-Sprints:**
 
-- **console.log-Audit:** noch offen.
-- **Auskommentierter Code-Audit:** noch offen.
-- **Component-internal Helper-Doubletten:** noch offen, ggf. ad-hoc bei Sprint-Pass-throughs.
-- **Inline-Styles in Dynamic-Position-Popups** (AliasAutocomplete, ContextMenu, ObjectSuggestion) und Hour-Grid (SidebarDayView) — Custom-Property-Migration in eigenem Sub-Sprint.
+- (kein bekannter Drift — bei Befund eintragen, sonst `git blame` faellig)
 
 ---
 
