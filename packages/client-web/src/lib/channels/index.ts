@@ -10,6 +10,7 @@
 
 import type { ChannelProvider } from '../types';
 import { slackProvider } from './slack';
+import { teamsProvider } from './teams';
 import type { ChannelProviderImpl } from './types';
 
 export type * from './types';
@@ -18,6 +19,7 @@ export { getDecryptedOAuthToken, getBearerToken } from './token';
 const REGISTRY = new Map<ChannelProvider, ChannelProviderImpl>();
 
 REGISTRY.set('slack', slackProvider);
+REGISTRY.set('teams', teamsProvider);
 
 export function getChannelImpl(provider: ChannelProvider): ChannelProviderImpl {
   const impl = REGISTRY.get(provider);
