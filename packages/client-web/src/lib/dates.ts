@@ -47,3 +47,37 @@ export function formatDateTimeWithSecsDE(iso: string | null | undefined): string
     second: '2-digit',
   });
 }
+
+// Lange relative Zeitangabe: heute / vor 1 Tag / vor X Tagen / vor 1
+// Monat / vor X Monaten / vor 1 Jahr / vor X Jahren. Fuer „letzte
+// Aktivitaet"-Indikatoren in Listen wo das exakte Datum weniger
+// wichtig als das Alter ist.
+export function formatRelativeDeLong(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (!isValidDate(d)) return iso;
+  const ms = Date.now() - d.getTime();
+  const days = Math.floor(ms / 86_400_000);
+  if (days <= 0) return 'heute';
+  if (days === 1) return 'vor 1 Tag';
+  if (days < 30) return `vor ${days} Tagen`;
+  const months = Math.floor(days / 30);
+  if (months === 1) return 'vor 1 Monat';
+  if (months < 12) return `vor ${months} Monaten`;
+  const years = Math.floor(months / 12);
+  return years === 1 ? 'vor 1 Jahr' : `vor ${years} Jahren`;
+}
+
+// Kurze relative Zeitangabe mit Datum-Fallback: heute / gestern /
+// vor X Tagen (< 7) / DE-Lokal-Datum. Fuer Cards/Cells wo aelteres
+// Material das exakte Datum braucht (Vorlagen-Liste, Aktivitaet-Stream).
+export function formatRelativeDeShort(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (!isValidDate(d)) return iso;
+  const days = Math.floor((Date.now() - d.getTime()) / 86_400_000);
+  if (days <= 0) return 'heute';
+  if (days === 1) return 'gestern';
+  if (days < 7) return `vor ${days} Tagen`;
+  return d.toLocaleDateString('de-AT');
+}

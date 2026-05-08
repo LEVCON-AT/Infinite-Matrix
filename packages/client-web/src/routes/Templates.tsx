@@ -25,6 +25,7 @@ import NewTemplateModal from '../components/templates/NewTemplateModal';
 import TemplateActionMenu from '../components/templates/TemplateActionMenu';
 import { useSession } from '../lib/auth';
 import { fetchCellTemplateInstancesForWorkspace } from '../lib/cell-templates';
+import { formatRelativeDeShort } from '../lib/dates';
 import { translateDbError } from '../lib/errors';
 import { fetchUserHotkeySlots, fetchWorkspaceHotkeySlots } from '../lib/hotkey-slots';
 import { fetchMyWorkspaces } from '../lib/queries';
@@ -450,7 +451,7 @@ const Templates = () => {
                       </td>
                       <td class="col-updated">
                         <span class="template-updated" title={t.updated_at}>
-                          {formatRelativeDate(t.updated_at)}
+                          {formatRelativeDeShort(t.updated_at)}
                         </span>
                       </td>
                       <td class="col-actions">
@@ -537,16 +538,6 @@ function getDescription(t: FeatureTemplateRow): string | null {
 }
 
 // V1-relativ: heute / gestern / vorgestern / DD.MM.YYYY.
-function formatRelativeDate(iso: string): string {
-  const date = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  if (days <= 0) return 'heute';
-  if (days === 1) return 'gestern';
-  if (days < 7) return `vor ${days} Tagen`;
-  return date.toLocaleDateString('de-AT');
-}
 
 // Bekannte Heroicon-Namen (lib/Icon.tsx IconName-Union). V1: Whitelist
 // per typeof — Default-Symbol fuer unbekannte Werte ist `document-text`.

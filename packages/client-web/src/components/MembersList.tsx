@@ -12,6 +12,7 @@
 //   - Self: keine Aktionen (man kann sich nicht selbst rauswerfen).
 
 import { type Component, For, Show, createSignal } from 'solid-js';
+import { formatRelativeDeLong } from '../lib/dates';
 import { showChoice } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
 import {
@@ -41,19 +42,6 @@ export type MembersListProps = {
   myUserId: string | undefined;
   // Caller invalidiert die Listen nach Mutationen.
   onChanged: () => void;
-};
-
-const formatRelative = (iso: string): string => {
-  const ms = Date.now() - new Date(iso).getTime();
-  const days = Math.floor(ms / 86_400_000);
-  if (days <= 0) return 'heute';
-  if (days === 1) return 'vor 1 Tag';
-  if (days < 30) return `vor ${days} Tagen`;
-  const months = Math.floor(days / 30);
-  if (months === 1) return 'vor 1 Monat';
-  if (months < 12) return `vor ${months} Monaten`;
-  const years = Math.floor(months / 12);
-  return years === 1 ? 'vor 1 Jahr' : `vor ${years} Jahren`;
 };
 
 const MembersList: Component<MembersListProps> = (p) => {
@@ -293,7 +281,7 @@ const MembersList: Component<MembersListProps> = (p) => {
                   </span>
                 </Show>
               </td>
-              <td class="members-meta">{formatRelative(m.joined_at)}</td>
+              <td class="members-meta">{formatRelativeDeLong(m.joined_at)}</td>
               <td class="members-row-actions">
                 <Show when={canManage() && !isSelf(m.user_id)}>
                   <Show
@@ -355,7 +343,7 @@ const MembersList: Component<MembersListProps> = (p) => {
                   <div class="members-name-stack">
                     <span class="members-name">{inv.invited_email ?? 'Unbenannte Einladung'}</span>
                     <span class="members-sub">
-                      Einladung offen, erstellt {formatRelative(inv.created_at)}
+                      Einladung offen, erstellt {formatRelativeDeLong(inv.created_at)}
                     </span>
                   </div>
                 </td>

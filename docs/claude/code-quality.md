@@ -279,7 +279,7 @@ Konkret:
 
 Niemals `biome-ignore` benutzen weil "Refactor zu aufwendig" oder "Pattern ist etabliert". Das ist Umgehen der Pruefung. Wenn 5 Files denselben Workaround brauchen, ist der Refactor 5× mehr Aufwand — aber er ist trotzdem die richtige Antwort.
 
-### 5.4 Test-Pflicht-Mapping
+### 5.5 Test-Pflicht-Mapping
 
 | Aenderungs-Trigger | Test-Pflicht |
 |---|---|
@@ -289,6 +289,58 @@ Niemals `biome-ignore` benutzen weil "Refactor zu aufwendig" oder "Pattern ist e
 | Schema-Migration | `to_regclass`-Smoke + count-Diff vor/nach |
 | Realtime-Subscribe | 2-Tab-Smoke (Tab A mutiert, Tab B sieht Update ohne Reload) |
 | Export/Import | Roundtrip-Test (Export → Wipe → Import → identical State) |
+
+### 5.6 Post-Push Deploy-Verifikation (Pflicht)
+
+**Nach jedem `git push origin main`** — und vor allem nach jedem
+Welle-/Sub-Sprint-Abschluss — den GitHub-Actions-Deploy-Workflow
+pollen + Ergebnis melden. Stille Deploy-Failures sind der
+schlimmste Fehler-Modus: Code ist gepusht, Pipeline rot, Staging
+auf altem Build, niemand merkt's.
+
+**Workflow:**
+
+```bash
+# Repo ist public, keine Auth noetig:
+curl -s "https://api.github.com/repos/LEVCON-AT/Infinite-Matrix/actions/runs?per_page=1" \
+  -o /c/temp/run.json
+# Status auswerten — `status` ∈ {queued|in_progress|completed},
+# `conclusion` ∈ {success|failure|cancelled|skipped|null}.
+```
+
+**Cadence:**
+
+- Erste Pruefung: ~30 Sekunden nach Push (Run muss registriert sein).
+- Bei `in_progress`: One-Shot-Check ~2 Minuten spaeter, **kein**
+  Polling-Loop in Bash (haengt!). Lieber `run_in_background: true`
+  oder zwei separate Reads.
+- Wenn Run noch laeuft + es gibt Folge-Arbeit: parallel weiter
+  arbeiten, vor naechstem Push erneut pruefen.
+
+**Failure-Handling:**
+
+1. Jobs+Steps via `/actions/runs/<id>/jobs` holen → fehlgeschlagenen
+   Step identifizieren.
+2. Logs-API ist auth-gated (403 ohne Token). Reproduzierbare Fails
+   (Audit / Lint / Typecheck / Test / Build) lokal nachstellen mit
+   den entsprechenden `pnpm`-Skripten.
+3. Nicht-reproduzierbare Fails (SSH-Auth, rsync, Smoke-Test gegen
+   Live-VPS): Step + bekanntes Symptom dem User melden, **nicht
+   blind raten**.
+4. Reproduzierbare Fixes: lokal fixen → committen → erneut pushen
+   → erneut Workflow-Run beobachten.
+
+**Tools:**
+
+- `gh` CLI ist auf dem Dev-PC NICHT installiert. Direkter
+  GitHub-API-Zugriff via `curl` ist der einzige Pfad.
+- API-Antworten landen in `/c/temp/run.json` (Windows-Bash-`/tmp`
+  haengt nicht zuverlaessig).
+- Polling-Loops in Bash (`until ...; do sleep 15; done`) sind
+  geblockt — nicht wieder versuchen.
+
+**Verbindlich seit 2026-05-08** (User-Direktive nach Stillem-Failure
+mit HIGH-CVE-Audit). Memory-Sicherung: `feedback_post_push_deploy_check.md`.
 
 ---
 
@@ -543,6 +595,10 @@ Presence-Events: max alle 2s ein Update. Mass-Inserts (Bulk-Import): Channel tem
 11. Memory-Files updated falls neue Lessons aus dem Sprint?
 
 Wenn **eine** Antwort Nein: Commit blockt.
+
+**Post-Push-Pflicht:** nach jedem `git push origin main` den
+GitHub-Actions-Run pollen — siehe §5.6. Bei `failure` reproduzieren
++ fixen, bei `success` zur naechsten Aufgabe.
 
 ---
 
