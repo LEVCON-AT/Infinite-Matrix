@@ -39,6 +39,7 @@
 //   - Existing Features behalten ihren Namen — User aendert via
 //     NodeTree-Sidebar (mit O.8.L atomic rename).
 
+import { useNavigate } from '@solidjs/router';
 import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
 import { validateAlias } from '../lib/alias';
 import { useSession } from '../lib/auth';
@@ -118,6 +119,7 @@ const NewCellWizard: Component<Props> = (p) => {
   const isEditMode = originalKeys.length > 0;
 
   // Welle WV.C.2 — Save-as-Template-Trigger.
+  const navigate = useNavigate();
   const session = useSession();
   const myUserId = () => session()?.user?.id ?? null;
   const [saveAsTemplateOpen, setSaveAsTemplateOpen] = createSignal(false);
@@ -997,8 +999,13 @@ const NewCellWizard: Component<Props> = (p) => {
               cell={cell}
               defaultName={cell.alias ?? `${p.row.label} ${p.col.label}`}
               canChooseVisibility={canWrite(myRole())}
-              onSaved={(_tpl, _openInDesigner) => {
+              onSaved={(tpl, openInDesigner) => {
                 setSaveAsTemplateOpen(false);
+                if (openInDesigner) {
+                  // Wizard schliessen + zum Designer navigieren.
+                  p.onClose();
+                  navigate(`/w/${p.workspaceId}/templates/edit/${tpl.id}`);
+                }
               }}
               onClose={() => setSaveAsTemplateOpen(false)}
             />
