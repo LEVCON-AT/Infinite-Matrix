@@ -910,11 +910,102 @@ const WidgetInspector = (p: {
         </span>
       </div>
 
+      {/* §13.1 Comment-Channel-Toggle V1 (3-state). off = keine Kommentare,
+          extern = Channel-Bridge-Provider (Wiring V2), native = atom_comments
+          (Wiring V2). V1 setzt nur die User-Praeferenz; Renderer zeigt
+          Stub-Section unter dem Widget. */}
+      <fieldset class="designer-inspector-field designer-source-fieldset">
+        <legend class="designer-inspector-label">Kommentare</legend>
+        <div class="designer-source-toggle">
+          <For each={['off', 'extern', 'native'] as const}>
+            {(mode) => {
+              const active = () =>
+                ((p.widget.toggles as { comments?: { mode?: string } })?.comments?.mode ??
+                  'off') === mode;
+              return (
+                <label
+                  class="designer-source-toggle-btn"
+                  classList={{ 'designer-source-toggle-btn-active': active() }}
+                >
+                  <input
+                    type="radio"
+                    name={`comments-mode-${p.widget.id}`}
+                    value={mode}
+                    checked={active()}
+                    disabled={p.disabled}
+                    onChange={() =>
+                      void p.onPatch({
+                        toggles: {
+                          ...(p.widget.toggles ?? {}),
+                          comments: {
+                            ...((p.widget.toggles as { comments?: Record<string, unknown> })
+                              ?.comments ?? {}),
+                            mode,
+                          },
+                        },
+                      })
+                    }
+                  />
+                  <span>{mode === 'extern' ? 'extern' : mode === 'native' ? 'nativ' : 'aus'}</span>
+                </label>
+              );
+            }}
+          </For>
+        </div>
+        <span class="adapter-dialog-field-hint">
+          Provider-/Thread-Auswahl folgt in V2 (Channel-Bridge-Wiring).
+        </span>
+      </fieldset>
+
+      {/* §13.2 Attachment-Source-Toggle V1 (3-state). off = keine Anhaenge,
+          cloud = DriveProvider (Wiring V2), native = Supabase-Storage-Bucket
+          (Wiring V2). */}
+      <fieldset class="designer-inspector-field designer-source-fieldset">
+        <legend class="designer-inspector-label">Anhaenge</legend>
+        <div class="designer-source-toggle">
+          <For each={['off', 'cloud', 'native'] as const}>
+            {(mode) => {
+              const active = () =>
+                ((p.widget.toggles as { attachments?: { mode?: string } })?.attachments?.mode ??
+                  'off') === mode;
+              return (
+                <label
+                  class="designer-source-toggle-btn"
+                  classList={{ 'designer-source-toggle-btn-active': active() }}
+                >
+                  <input
+                    type="radio"
+                    name={`attachments-mode-${p.widget.id}`}
+                    value={mode}
+                    checked={active()}
+                    disabled={p.disabled}
+                    onChange={() =>
+                      void p.onPatch({
+                        toggles: {
+                          ...(p.widget.toggles ?? {}),
+                          attachments: {
+                            ...((p.widget.toggles as { attachments?: Record<string, unknown> })
+                              ?.attachments ?? {}),
+                            mode,
+                          },
+                        },
+                      })
+                    }
+                  />
+                  <span>{mode === 'cloud' ? 'cloud' : mode === 'native' ? 'nativ' : 'aus'}</span>
+                </label>
+              );
+            }}
+          </For>
+        </div>
+        <span class="adapter-dialog-field-hint">
+          Provider-/Folder-Auswahl folgt in V2 (DriveProvider-Wiring).
+        </span>
+      </fieldset>
+
       <details class="designer-inspector-toggles">
         <summary>Toggles ({Object.keys(p.widget.toggles).length})</summary>
-        <p class="adapter-dialog-field-hint">
-          Weitere Toggle-Editor (comments/attachments/marker) folgen.
-        </p>
+        <p class="adapter-dialog-field-hint">Weitere Toggle-Editor (marker) folgen.</p>
       </details>
     </div>
   );

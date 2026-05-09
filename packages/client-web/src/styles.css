@@ -2171,6 +2171,34 @@ button[type="submit"]:hover:not(:disabled) {
   text-align: center;
 }
 
+/* §13.1 + §13.2 — Comment + Attachment Stub-Sections unter dem Widget.
+   V1: nur Marker dass der Toggle aktiv ist; volles Render-Wiring V2.
+   Hairline-Trenn-Border oben + ein-Zeilen-Layout mit Icon. */
+.template-widget-comments-stub,
+.template-widget-attachments-stub {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border-top: 1px solid var(--border1);
+  font-size: var(--fs-tiny);
+  color: var(--text3);
+}
+
+.template-widget-comments-icon,
+.template-widget-attachments-icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--text3);
+}
+
+.template-widget-comments-label,
+.template-widget-attachments-label {
+  flex: 1;
+  min-width: 0;
+}
+
 /* ── AdapterDialog (WV.WV.7) ──────────────────────────────────── */
 /* Cross-Type-Drop-Adapter (Konzept §9.C). Reuse-Shell fuer
    Field-Mapping-Dialoge (info_field→Link, doc→Kanban etc.).

@@ -1907,19 +1907,25 @@ Foundation-Direktive (§14) konkret:
 
 ### 13.1 Comment-Channel-Toggle
 
+**Status 2026-05-09:** V1 LIVE — 3-state-Toggle im WidgetInspector + Stub-Section im Renderer. Provider-/Thread-Picker fuer extern + atom_comments-Tabelle fuer native bleiben V2.
+
 UI:
 
 ```
 [ Kommentare ]   ( ) aus
-                 (•) extern  →  Provider: [Outlook-Mail ▾]   Thread: [Vertrag-Mueller ▾]
+                 (•) extern  →  Provider: [Outlook-Mail ▾]   Thread: [Vertrag-Mueller ▾]    ← V2
                  ( ) nativ
 ```
 
 Optionen:
 
-- **off** — keine Comment-Section unter dem Widget.
-- **extern** — Provider-Auswahl (OAuth-verbunden, sonst graued out + „Provider verbinden"-CTA). Thread-Auswahl: bestehender Thread linken oder neuen anlegen.
-- **nativ** — `atom_comments`-Tabelle, pro Atom thread, Realtime via Supabase. Default nur fuer Single-User-Workspaces oder explizit gewaehlt.
+- **off** — keine Comment-Section unter dem Widget. V1 default.
+- **extern** — Provider-Auswahl (OAuth-verbunden, sonst graued out + „Provider verbinden"-CTA). Thread-Auswahl: bestehender Thread linken oder neuen anlegen. V1: `widget.toggles.comments.mode='extern'` setzt nur User-Praeferenz, Stub-Section zeigt „Kommentare extern (Provider folgt in V2)".
+- **nativ** — `atom_comments`-Tabelle, pro Atom thread, Realtime via Supabase. Default nur fuer Single-User-Workspaces oder explizit gewaehlt. V1: Stub-Section zeigt „Kommentare nativ (atom_comments folgt in V2)".
+
+**V1-Schema:** `widget.toggles.comments = { mode: 'off'|'extern'|'native' }` — `provider` + `thread_ref` werden in V2 ergaenzt.
+
+`commentsMode(toggles)`-Helper im Renderer + 3-state-Radio im WidgetInspector. `template-widget-comments-stub`-CSS-Klasse fuer das Stub-Render mit Hairline-Trenner + Icon + Label.
 
 Provider-V1-Liste (final 2026-05-07):
 
@@ -1934,19 +1940,25 @@ V2: Outlook-Graph + Gmail-API (tieferer Sync mit Threading-Detail, Read-Receipts
 
 ### 13.2 Attachment-Source-Toggle
 
+**Status 2026-05-09:** V1 LIVE — 3-state-Toggle im WidgetInspector + Stub-Section im Renderer. Provider-/Folder-Picker fuer cloud + Supabase-Storage-Bucket fuer native bleiben V2.
+
 UI:
 
 ```
 [ Anhaenge ]    ( ) aus
-                (•) Cloud   →  Provider: [OneDrive ▾]    Ordner: [Vertrag-Mueller/]
+                (•) Cloud   →  Provider: [OneDrive ▾]    Ordner: [Vertrag-Mueller/]    ← V2
                 ( ) nativ
 ```
 
 Optionen:
 
-- **off** — keine Attachments.
-- **cloud** — Provider-Auswahl. Drag-Drop von Datei → Upload zum User-Cloud-Ordner. Widget zeigt Liste mit Cloud-Provider-Icons.
+- **off** — keine Attachments. V1 default.
+- **cloud** — Provider-Auswahl. Drag-Drop von Datei → Upload zum User-Cloud-Ordner. Widget zeigt Liste mit Cloud-Provider-Icons. V1: `widget.toggles.attachments.mode='cloud'` setzt nur User-Praeferenz.
 - **nativ** — Supabase-Storage-Bucket. Quota begrenzt, Antivirus-Awareness V2.
+
+**V1-Schema:** `widget.toggles.attachments = { mode: 'off'|'cloud'|'native' }` — `provider` + `folder_ref` werden in V2 ergaenzt.
+
+`attachmentsMode(toggles)`-Helper im Renderer + 3-state-Radio im WidgetInspector. `template-widget-attachments-stub`-CSS-Klasse fuer das Stub-Render.
 
 V1-Provider (final 2026-05-07): OneDrive, Google Drive, Dropbox, **Nextcloud** (DSGVO-konform, WebDAV-API), **pCloud** (Schweiz, eigene API). V2: kDrive (Infomaniak), MagentaCLOUD (Telekom), Tresorit (E2E-Encryption), Mailbox.org Drive.
 

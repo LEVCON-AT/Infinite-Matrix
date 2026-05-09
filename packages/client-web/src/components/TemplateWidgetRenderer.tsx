@@ -113,6 +113,39 @@ const TemplateWidgetRenderer: Component<TemplateWidgetRendererProps> = (p) => {
           </Switch>
         </Show>
       </div>
+      {/* §13.1 Comment-Channel-Toggle V1 — Stub-Section unter dem Widget.
+          extern/native Render-Modus folgt in V2 (Channel-Bridge-Wiring
+          fuer extern, atom_comments-Tabelle + Realtime fuer native). */}
+      <Show when={commentsMode(p.widget.toggles) !== 'off'}>
+        <section class="template-widget-comments-stub" data-mode={commentsMode(p.widget.toggles)}>
+          <span class="template-widget-comments-icon" aria-hidden="true">
+            <Icon name="chat-bubble" size={12} />
+          </span>
+          <span class="template-widget-comments-label">
+            {commentsMode(p.widget.toggles) === 'extern'
+              ? 'Kommentare extern (Provider folgt in V2)'
+              : 'Kommentare nativ (atom_comments folgt in V2)'}
+          </span>
+        </section>
+      </Show>
+      {/* §13.2 Attachment-Source-Toggle V1 — Stub-Section unter dem Widget.
+          cloud/native Render-Modus folgt in V2 (DriveProvider-Wiring fuer
+          cloud, Supabase-Storage-Bucket fuer native). */}
+      <Show when={attachmentsMode(p.widget.toggles) !== 'off'}>
+        <section
+          class="template-widget-attachments-stub"
+          data-mode={attachmentsMode(p.widget.toggles)}
+        >
+          <span class="template-widget-attachments-icon" aria-hidden="true">
+            <Icon name="archive-box" size={12} />
+          </span>
+          <span class="template-widget-attachments-label">
+            {attachmentsMode(p.widget.toggles) === 'cloud'
+              ? 'Anhaenge Cloud (Provider folgt in V2)'
+              : 'Anhaenge nativ (Storage-Bucket folgt in V2)'}
+          </span>
+        </section>
+      </Show>
     </div>
   );
 };
@@ -182,6 +215,25 @@ function editInViewToggle(toggles: Record<string, unknown>, type: ResolvedWidget
   if (typeof v === 'boolean') return v;
   // Default per Widget-Type.
   return type === 'kanban' || type === 'checklist';
+}
+
+// §13.1 — Comment-Channel-Toggle. Default 'off'. extern = Channel-Bridge-
+// Provider, native = atom_comments-Tabelle. V1 expose-only (Stub-Section
+// im Renderer + 3-state-Radio im Inspector); volles Wiring V2.
+function commentsMode(toggles: Record<string, unknown>): 'off' | 'extern' | 'native' {
+  const c = (toggles as { comments?: { mode?: string } })?.comments;
+  const v = c?.mode;
+  if (v === 'extern' || v === 'native') return v;
+  return 'off';
+}
+
+// §13.2 — Attachment-Source-Toggle. Default 'off'. cloud = DriveProvider,
+// native = Supabase-Storage-Bucket. V1 expose-only; volles Wiring V2.
+function attachmentsMode(toggles: Record<string, unknown>): 'off' | 'cloud' | 'native' {
+  const a = (toggles as { attachments?: { mode?: string } })?.attachments;
+  const v = a?.mode;
+  if (v === 'cloud' || v === 'native') return v;
+  return 'off';
 }
 
 function widgetTypeLabel(t: ResolvedWidget['type']): string {
