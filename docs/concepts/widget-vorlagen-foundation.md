@@ -2461,6 +2461,26 @@ CREATE TABLE widget_external_channels (
 
 Token-Bezug: jeder calling User authentifiziert mit eigenem `user_oauth_tokens`-Eintrag. `widget_external_channels` haelt nur den Provider-Ref, nicht die Tokens — Tokens bleiben User-Privat-Eigentum.
 
+### 15.0 Heptad-Round-Trip-Status (Audit 2026-05-09)
+
+**Status:** Workspace-Round-Trip-Loop fuer alle 13 Tabellen LIVE seit 2026-05-09.
+
+Vor 2026-05-09 wurden 8 Tabellen zwar exportiert aber NIE importiert (Slot-6-Heptad-Luecke):
+- `feature_templates`, `template_sections`, `template_widgets`, `cell_template_instances`, `cell_widget_overrides`, `workspace_hotkey_slots`, `saved_filters`, `widget_external_channels`
+
+**Behoben 2026-05-09 in `executeSubtreeImportIntoMatrix`:**
+- Workspace-Globals-Block fuer `payload.payloadType === 'workspace'`. Subtree-Imports skippen die Workspace-Globals (sind nicht im Subtree-Export).
+- FK-Reihenfolge respektiert: `feature_templates` → `template_sections` → `template_widgets` → (Root-Widget-Back-Ref-UPDATE) → `cell_template_instances` → `cell_widget_overrides` → `workspace_hotkey_slots` → `saved_filters` → `widget_external_channels`.
+- Filter pro Tabelle:
+  - `feature_templates`: nur `visibility='workspace'` (platform-Templates sind system-seeded; user-Templates sind privat zum source-User).
+  - `workspace_hotkey_slots`: nur `scope='workspace'`.
+  - `saved_filters`: nur `scope='workspace'` + `owner_user_id` → NULL.
+  - `widget_external_channels`: `oauth_token_ref` → NULL (§15.2 Sicherheits-Direktive — User muss neu authentisieren).
+- `feature_templates.root_widget_id` ist Back-Reference auf `template_widgets`; V1-Loesung: initial NULL, post-Insert UPDATE-Pass.
+- Cleanup-on-Fail erweitert: `cleanupPartialImport` nimmt `WorkspaceGlobalsCleanup` als optionalen Param. FK-CASCADE auf `feature_templates` raeumt `template_sections` + `template_widgets` automatisch mit; `cell_*` + `hotkey_slots` + `saved_filters` + `widget_external_channels` werden separat geloescht.
+
+**Konzept-Punkt §15.0 Workspace-Round-Trip zugemacht.**
+
 ### 15.1 Heptad-Pflege pro Tabelle (kein „dito"-Schleifen)
 
 **Direktive (User 2026-05-07: „du entscheidest fachlich"):** jede Tabelle bekommt eigene Spalte mit allen 8 Slots — Architektur §3 verlangt Pro-Tabelle-Pflege, „dito"-Verweise verschleiern Cache/Realtime/Export-Pflichten und brachen in Welle D als Lessons-Learned (Tag-System Heptad-Lueckenexport).

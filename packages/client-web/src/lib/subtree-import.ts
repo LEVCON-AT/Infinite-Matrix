@@ -456,10 +456,27 @@ function splitChecklistItems(
 // Fehler innerhalb des Cleanups werden bewusst geschluckt: der
 // Original-Fehler aus der Phase-Sequenz hat Prioritaet und muss den
 // Caller erreichen.
+type WorkspaceGlobalsCleanup = {
+  // Workspace-Globals-Inserts aus dem Workspace-Import-Pfad. Werden bei
+  // Failure des try-Blocks separat geloescht — sie haengen NICHT am
+  // Nodes-Cascade. Cascade-Reihenfolge muss von oben (FK-Wurzel) nach
+  // unten (FK-Blaetter) wirken; FK_CASCADE in den Migrations 067-070
+  // erlaubt es uns, nur die obersten Knoten zu loeschen — die Sub-
+  // Tabellen (template_sections, template_widgets, etc.) cascade
+  // automatisch mit.
+  featureTemplateIds?: string[];
+  cellTemplateInstanceIds?: string[];
+  cellWidgetOverrideIds?: string[];
+  hotkeySlotIds?: string[];
+  savedFilterIds?: string[];
+  widgetExternalChannelIds?: string[];
+};
+
 async function cleanupPartialImport(
   insertedNodeIds: string[],
   insertedDocIds: string[],
   insertedInfoFieldIds: string[] = [],
+  workspaceGlobals: WorkspaceGlobalsCleanup = {},
 ): Promise<void> {
   try {
     if (insertedNodeIds.length > 0) {
@@ -474,6 +491,52 @@ async function cleanupPartialImport(
       // atom_manifestations nicht — deren container (cell) wurde aber
       // bereits per nodes-Cascade entfernt. Direkter Delete reicht.
       await supabase.from('info_fields').delete().in('id', insertedInfoFieldIds);
+    }
+    // Heptad-Round-Trip Workspace-Globals (WV.E #40-Phase-2). Reihenfolge:
+    // - widget_external_channels (FK zu template_widgets, NICHT cascade-
+    //   getriggert weil template_widgets-Delete unten nochmal greift)
+    // - cell_widget_overrides (FK zu instances + widgets)
+    // - cell_template_instances (FK zu cells + templates)
+    // - hotkey_slots (FK zu templates)
+    // - saved_filters (workspace-scope, keine Children)
+    // - feature_templates (FK-Wurzel — cascadet auf sections + widgets)
+    if ((workspaceGlobals.widgetExternalChannelIds ?? []).length > 0) {
+      await supabase
+        .from('widget_external_channels')
+        .delete()
+        .in('id', workspaceGlobals.widgetExternalChannelIds as string[]);
+    }
+    if ((workspaceGlobals.cellWidgetOverrideIds ?? []).length > 0) {
+      await supabase
+        .from('cell_widget_overrides')
+        .delete()
+        .in('id', workspaceGlobals.cellWidgetOverrideIds as string[]);
+    }
+    if ((workspaceGlobals.cellTemplateInstanceIds ?? []).length > 0) {
+      await supabase
+        .from('cell_template_instances')
+        .delete()
+        .in('id', workspaceGlobals.cellTemplateInstanceIds as string[]);
+    }
+    if ((workspaceGlobals.hotkeySlotIds ?? []).length > 0) {
+      await supabase
+        .from('workspace_hotkey_slots')
+        .delete()
+        .in('id', workspaceGlobals.hotkeySlotIds as string[]);
+    }
+    if ((workspaceGlobals.savedFilterIds ?? []).length > 0) {
+      await supabase
+        .from('saved_filters')
+        .delete()
+        .in('id', workspaceGlobals.savedFilterIds as string[]);
+    }
+    if ((workspaceGlobals.featureTemplateIds ?? []).length > 0) {
+      // FK-CASCADE entfernt template_sections + template_widgets
+      // automatisch — keine separaten Delete-Calls noetig.
+      await supabase
+        .from('feature_templates')
+        .delete()
+        .in('id', workspaceGlobals.featureTemplateIds as string[]);
     }
   } catch {
     // Original-Error bleibt im Vordergrund.
@@ -1965,12 +2028,30 @@ export async function executeSubtreeImportIntoMatrix(args: {
   // Optionale Phasen werden nur gezaehlt, wenn der Payload sie liefert,
   // sonst laeuft phaseIdx ueber phaseTotal hinaus.
   const hasInfoFields = Array.isArray(payload.info_fields) && payload.info_fields.length > 0;
+  const isWorkspaceImportPhase = payload.payloadType === 'workspace';
+  const hasFeatTpls =
+    isWorkspaceImportPhase &&
+    Array.isArray(payload.feature_templates) &&
+    payload.feature_templates.length > 0;
+  const hasSavedFilters =
+    isWorkspaceImportPhase &&
+    Array.isArray(payload.saved_filters) &&
+    payload.saved_filters.length > 0;
+  const hasWidgetChannels =
+    isWorkspaceImportPhase &&
+    Array.isArray(payload.widget_external_channels) &&
+    payload.widget_external_channels.length > 0;
   const phaseTotal =
     13 + // Vorbereitung / Nodes / Rows / Cols / Cells / Parent-Updates /
     //    kb_cols / kb_cards / checklists / items / links / docs / Patch
     (mode === 'overwrite' || mode === 'export-overwrite' ? 1 : 0) +
     (mode === 'export-overwrite' ? 1 : 0) +
-    (hasInfoFields ? 2 : 0); // Info-Felder + Info-Manifestations
+    (hasInfoFields ? 2 : 0) + // Info-Felder + Info-Manifestations
+    (hasFeatTpls ? 4 : 0) + // Templates + Sections + Widgets + RootRef-Update
+    (hasFeatTpls ? 2 : 0) + // CellInstances + WidgetOverrides
+    (hasFeatTpls ? 1 : 0) + // HotkeySlots
+    (hasSavedFilters ? 1 : 0) +
+    (hasWidgetChannels ? 1 : 0);
   let phaseIdx = 0;
   const step = (label: string) => {
     phaseIdx += 1;
@@ -2381,13 +2462,219 @@ export async function executeSubtreeImportIntoMatrix(args: {
     }
   }
 
+  // ─── Heptad-Round-Trip Workspace-Globals (WV.E #40-Phase-2) ──
+  //
+  // Nur fuer Workspace-Exports — Subtree-Exports tragen diese Tabellen
+  // nicht (Konzept §15.1, Vorlagen-Bibliothek + Channel-Bridges sind
+  // workspace-skopiert). Reihenfolge respektiert FK-Chain:
+  //   feature_templates → template_sections → template_widgets →
+  //   cell_template_instances → cell_widget_overrides
+  //   workspace_hotkey_slots (FK template_id)
+  //   saved_filters (independent, scope='workspace' nur)
+  //   widget_external_channels (FK widget_id, oauth_token_ref → NULL)
+  //
+  // feature_templates.root_widget_id ist eine Back-Reference (FK auf
+  // template_widgets, das erst SPAETER inseriert wird). V1-Loesung:
+  // initial root_widget_id=NULL, post-Insert UPDATE-Phase.
+  //
+  // Visibility-Filter:
+  // - feature_templates: nur visibility='workspace' (platform = system-
+  //   seeded, user = importing user hat noch keine User-Templates).
+  // - workspace_hotkey_slots: nur scope='workspace' (user-scope = privat).
+  // - saved_filters: nur scope='workspace' (analog).
+  // - widget_external_channels: oauth_token_ref → NULL (User muss neu
+  //   authentisieren, §15.2 Sicherheits-Direktive).
+
+  const isWorkspaceImport = payload.payloadType === 'workspace';
+
+  type FeatTplRow = {
+    id: string;
+    visibility?: string;
+    root_widget_id?: string | null;
+    workspace_id?: string | null;
+  };
+  const sourceFeatTpls = (
+    isWorkspaceImport && Array.isArray(payload.feature_templates)
+      ? (payload.feature_templates as Array<Record<string, unknown>>)
+      : []
+  ).filter((t) => (t as FeatTplRow).visibility === 'workspace');
+  for (const t of sourceFeatTpls) remap((t as FeatTplRow).id, remapMap);
+
+  const sourceTplSections = (
+    isWorkspaceImport && Array.isArray(payload.template_sections)
+      ? (payload.template_sections as Array<Record<string, unknown>>)
+      : []
+  ).filter((s) => remapMap.has((s as { template_id?: string }).template_id ?? ''));
+  for (const s of sourceTplSections) remap((s as { id: string }).id, remapMap);
+
+  const sourceTplWidgets = (
+    isWorkspaceImport && Array.isArray(payload.template_widgets)
+      ? (payload.template_widgets as Array<Record<string, unknown>>)
+      : []
+  ).filter((w) => remapMap.has((w as { section_id?: string }).section_id ?? ''));
+  for (const w of sourceTplWidgets) remap((w as { id: string }).id, remapMap);
+
+  const sourceCellTplInstances = (
+    isWorkspaceImport && Array.isArray(payload.cell_template_instances)
+      ? (payload.cell_template_instances as Array<Record<string, unknown>>)
+      : []
+  ).filter((i) => {
+    const ii = i as { cell_id?: string; template_id?: string };
+    return remapMap.has(ii.cell_id ?? '') && remapMap.has(ii.template_id ?? '');
+  });
+  for (const i of sourceCellTplInstances) remap((i as { id: string }).id, remapMap);
+
+  const sourceCellWidgetOverrides = (
+    isWorkspaceImport && Array.isArray(payload.cell_widget_overrides)
+      ? (payload.cell_widget_overrides as Array<Record<string, unknown>>)
+      : []
+  ).filter((o) => {
+    const oo = o as { instance_id?: string; widget_id?: string };
+    return remapMap.has(oo.instance_id ?? '') && remapMap.has(oo.widget_id ?? '');
+  });
+  for (const o of sourceCellWidgetOverrides) remap((o as { id: string }).id, remapMap);
+
+  const sourceHotkeySlots = (
+    isWorkspaceImport && Array.isArray(payload.workspace_hotkey_slots)
+      ? (payload.workspace_hotkey_slots as Array<Record<string, unknown>>)
+      : []
+  ).filter((h) => {
+    const hh = h as { scope?: string; template_id?: string };
+    return hh.scope === 'workspace' && (!hh.template_id || remapMap.has(hh.template_id));
+  });
+  for (const h of sourceHotkeySlots) remap((h as { id: string }).id, remapMap);
+
+  const sourceSavedFilters = (
+    isWorkspaceImport && Array.isArray(payload.saved_filters)
+      ? (payload.saved_filters as Array<Record<string, unknown>>)
+      : []
+  ).filter((f) => (f as { scope?: string }).scope === 'workspace');
+  for (const f of sourceSavedFilters) remap((f as { id: string }).id, remapMap);
+
+  const sourceWidgetChannels = (
+    isWorkspaceImport && Array.isArray(payload.widget_external_channels)
+      ? (payload.widget_external_channels as Array<Record<string, unknown>>)
+      : []
+  ).filter((c) => remapMap.has((c as { widget_id?: string }).widget_id ?? ''));
+  for (const c of sourceWidgetChannels) remap((c as { id: string }).id, remapMap);
+
+  // Out-Arrays mit remapped IDs + workspaceId-Patch.
+  const featTplsOut = sourceFeatTpls.map((t) => {
+    const tt = t as FeatTplRow;
+    return {
+      ...t,
+      id: mustRemap(tt.id, remapMap),
+      workspace_id: workspaceId,
+      // Back-Ref auf root_widget_id wird nach template_widgets-Insert
+      // per UPDATE gesetzt (siehe rootWidgetUpdates).
+      root_widget_id: null,
+    };
+  });
+  const rootWidgetUpdates: Array<{ id: string; root_widget_id: string }> = [];
+  for (const t of sourceFeatTpls) {
+    const tt = t as FeatTplRow;
+    if (tt.root_widget_id && remapMap.has(tt.root_widget_id)) {
+      rootWidgetUpdates.push({
+        id: mustRemap(tt.id, remapMap),
+        root_widget_id: mustRemap(tt.root_widget_id, remapMap),
+      });
+    }
+  }
+  const tplSectionsOut = sourceTplSections.map((s) => {
+    const ss = s as { id: string; template_id: string };
+    return {
+      ...s,
+      id: mustRemap(ss.id, remapMap),
+      workspace_id: workspaceId,
+      template_id: mustRemap(ss.template_id, remapMap),
+    };
+  });
+  const tplWidgetsOut = sourceTplWidgets.map((w) => {
+    const ww = w as { id: string; section_id: string };
+    return {
+      ...w,
+      id: mustRemap(ww.id, remapMap),
+      workspace_id: workspaceId,
+      section_id: mustRemap(ww.section_id, remapMap),
+    };
+  });
+  const cellTplInstancesOut = sourceCellTplInstances.map((i) => {
+    const ii = i as { id: string; cell_id: string; template_id: string };
+    return {
+      ...i,
+      id: mustRemap(ii.id, remapMap),
+      workspace_id: workspaceId,
+      cell_id: mustRemap(ii.cell_id, remapMap),
+      template_id: mustRemap(ii.template_id, remapMap),
+    };
+  });
+  const cellWidgetOverridesOut = sourceCellWidgetOverrides.map((o) => {
+    const oo = o as { id: string; instance_id: string; widget_id: string };
+    return {
+      ...o,
+      id: mustRemap(oo.id, remapMap),
+      workspace_id: workspaceId,
+      instance_id: mustRemap(oo.instance_id, remapMap),
+      widget_id: mustRemap(oo.widget_id, remapMap),
+    };
+  });
+  const hotkeySlotsOut = sourceHotkeySlots.map((h) => {
+    const hh = h as { id: string; template_id: string | null };
+    return {
+      ...h,
+      id: mustRemap(hh.id, remapMap),
+      workspace_id: workspaceId,
+      template_id:
+        hh.template_id && remapMap.has(hh.template_id) ? mustRemap(hh.template_id, remapMap) : null,
+    };
+  });
+  const savedFiltersOut = sourceSavedFilters.map((f) => {
+    const ff = f as { id: string };
+    return {
+      ...f,
+      id: mustRemap(ff.id, remapMap),
+      workspace_id: workspaceId,
+      // Workspace-shared: kein Owner-User. Falls owner_user_id im
+      // Payload gesetzt war (User-scope leakte versehentlich), explizit
+      // auf NULL setzen.
+      owner_user_id: null,
+    };
+  });
+  const widgetChannelsOut = sourceWidgetChannels.map((c) => {
+    const cc = c as { id: string; widget_id: string };
+    return {
+      ...c,
+      id: mustRemap(cc.id, remapMap),
+      workspace_id: workspaceId,
+      widget_id: mustRemap(cc.widget_id, remapMap),
+      // §15.2 Sicherheits-Direktive — Token-Ref haengt im urspruenglichen
+      // user_oauth_tokens-Eintrag, der nicht im Export ist. Importer
+      // muss neu authentisieren.
+      oauth_token_ref: null,
+    };
+  });
+
   // FK-Order wie bei Cell-Variante: Nodes (parent=null) → Rows → Cols →
   // Cells → UPDATE Nodes.parent_cell_id → kb/checklists/items/links/docs.
   // Bei Failure raeumt cleanupPartialImport angelegte Nodes + Docs +
-  // info_fields auf.
+  // info_fields + Workspace-Globals auf.
   const insertedNodeIds = nodesOut.map((n) => (n as { id: string }).id);
   const insertedDocIds = docsOut.map((d) => (d as { id: string }).id);
   const insertedInfoFieldIds = infoFieldsOut.map((f) => (f as { id: string }).id);
+  const insertedFeatTplIds = featTplsOut.map((t) => (t as { id: string }).id);
+  const insertedCellTplInstanceIds = cellTplInstancesOut.map((i) => (i as { id: string }).id);
+  const insertedCellWidgetOverrideIds = cellWidgetOverridesOut.map((o) => (o as { id: string }).id);
+  const insertedHotkeySlotIds = hotkeySlotsOut.map((h) => (h as { id: string }).id);
+  const insertedSavedFilterIds = savedFiltersOut.map((f) => (f as { id: string }).id);
+  const insertedWidgetChannelIds = widgetChannelsOut.map((c) => (c as { id: string }).id);
+  const workspaceGlobalsCleanup: WorkspaceGlobalsCleanup = {
+    featureTemplateIds: insertedFeatTplIds,
+    cellTemplateInstanceIds: insertedCellTplInstanceIds,
+    cellWidgetOverrideIds: insertedCellWidgetOverrideIds,
+    hotkeySlotIds: insertedHotkeySlotIds,
+    savedFilterIds: insertedSavedFilterIds,
+    widgetExternalChannelIds: insertedWidgetChannelIds,
+  };
   try {
     step('Nodes einfuegen…');
     await insertBatch('nodes', nodesOut);
@@ -2447,8 +2734,60 @@ export async function executeSubtreeImportIntoMatrix(args: {
       step('Atom-Tags einfuegen…');
       await insertBatch('atom_tags', atomTagsOutMatrix);
     }
+    // ─── Heptad-Round-Trip Workspace-Globals (FK-Order) ──
+    if (featTplsOut.length > 0) {
+      step('Vorlagen einfuegen…');
+      await insertBatch('feature_templates', featTplsOut);
+    }
+    if (tplSectionsOut.length > 0) {
+      step('Vorlagen-Sektionen einfuegen…');
+      await insertBatch('template_sections', tplSectionsOut);
+    }
+    if (tplWidgetsOut.length > 0) {
+      step('Vorlagen-Widgets einfuegen…');
+      await insertBatch('template_widgets', tplWidgetsOut);
+    }
+    if (rootWidgetUpdates.length > 0) {
+      step('Root-Widget-Verknuepfungen…');
+      // feature_templates.root_widget_id ist Back-Ref auf
+      // template_widgets — nach Insert per UPDATE setzen.
+      for (const up of rootWidgetUpdates) {
+        const { error: rwErr } = await supabase
+          .from('feature_templates')
+          .update({ root_widget_id: up.root_widget_id })
+          .eq('id', up.id);
+        if (rwErr) throw rwErr;
+      }
+    }
+    if (cellTplInstancesOut.length > 0) {
+      step('Cell-Vorlagen-Instanzen einfuegen…');
+      await insertBatch('cell_template_instances', cellTplInstancesOut);
+    }
+    if (cellWidgetOverridesOut.length > 0) {
+      step('Cell-Widget-Overrides einfuegen…');
+      await insertBatch('cell_widget_overrides', cellWidgetOverridesOut);
+    }
+    if (hotkeySlotsOut.length > 0) {
+      step('Hotkey-Slots einfuegen…');
+      await insertBatch('workspace_hotkey_slots', hotkeySlotsOut);
+    }
+    if (savedFiltersOut.length > 0) {
+      step('Gespeicherte Filter einfuegen…');
+      await insertBatch('saved_filters', savedFiltersOut);
+    }
+    if (widgetChannelsOut.length > 0) {
+      step('Channel-Bridges einfuegen…');
+      // §15.2: oauth_token_ref ist im Out-Array auf NULL gesetzt —
+      // User muss neu authentisieren um die Bridge zu reaktivieren.
+      await insertBatch('widget_external_channels', widgetChannelsOut);
+    }
   } catch (err) {
-    await cleanupPartialImport(insertedNodeIds, insertedDocIds, insertedInfoFieldIds);
+    await cleanupPartialImport(
+      insertedNodeIds,
+      insertedDocIds,
+      insertedInfoFieldIds,
+      workspaceGlobalsCleanup,
+    );
     throw err;
   }
 
@@ -2472,8 +2811,14 @@ export async function executeSubtreeImportIntoMatrix(args: {
       if (nupErr) {
         // Matrix-Label-/Alias-Patch hat geworfen — Inserts stehen,
         // Workspace ist inkonsistent. Cleanup, damit die zuvor ange-
-        // legten Nodes/Docs/Info-Felder nicht als Waisen stehen bleiben.
-        await cleanupPartialImport(insertedNodeIds, insertedDocIds, insertedInfoFieldIds);
+        // legten Nodes/Docs/Info-Felder/Workspace-Globals nicht als
+        // Waisen stehen bleiben.
+        await cleanupPartialImport(
+          insertedNodeIds,
+          insertedDocIds,
+          insertedInfoFieldIds,
+          workspaceGlobalsCleanup,
+        );
         throw nupErr;
       }
     }
