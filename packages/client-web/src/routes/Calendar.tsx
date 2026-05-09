@@ -39,7 +39,9 @@ import {
   fetchAtomCalendarManifestations,
   removeAtomManifestation,
 } from '../lib/atom-manifestations';
+import { fetchAtomMarkersForWorkspace } from '../lib/atom-markers';
 import { navigateToAtomEvent } from '../lib/atom-routing';
+import { useUser } from '../lib/auth';
 import { fetchAutoCalendarSuppressedCellIds } from '../lib/auto-calendar-toggle';
 import {
   type CalendarEvent,
@@ -142,6 +144,16 @@ const Calendar: Component = () => {
   const [suppressedCells] = createResource(
     () => params.workspaceId,
     async (wid) => (wid ? fetchAutoCalendarSuppressedCellIds(wid) : new Set<string>()),
+  );
+
+  // §13.3 V2.F — Workspace-Markers fuer ImportedEventDetailModal-Bundle.
+  // Direct-Open via /w/<wid>/calendar (unabhaengig von Workspace.tsx) —
+  // braucht eigene Resource. Realtime ist auf dieser Route nicht verkabelt
+  // (V1-Limit), Refresh erfolgt beim naechsten Modal-Open.
+  const user = useUser();
+  const [wsAtomMarkers] = createResource(
+    () => params.workspaceId,
+    async (wid) => (wid ? fetchAtomMarkersForWorkspace(wid) : []),
   );
 
   // Build CalendarEvents aus den Agenda-Items (jeweils task + manifs).
@@ -603,6 +615,8 @@ const Calendar: Component = () => {
               workspaceId={req().workspaceId}
               eventId={req().eventId}
               snapshot={req().snapshot}
+              wsAtomMarkers={wsAtomMarkers() ?? []}
+              selfUserId={user()?.id}
             />
           )}
         </Show>
