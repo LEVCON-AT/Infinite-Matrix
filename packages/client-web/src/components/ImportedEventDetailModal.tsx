@@ -16,8 +16,9 @@ import {
   closeImportedEventModal,
 } from '../lib/imported-event-modal-state';
 import { showToast } from '../lib/toasts';
-import type { CellRow, DocRow, NodeRow } from '../lib/types';
+import type { AtomMarkerRow, CellRow, DocRow, NodeRow } from '../lib/types';
 import AtomDocsSection from './AtomDocsSection';
+import AtomMarkerBar from './AtomMarkerBar';
 import AtomTagsEditor from './AtomTagsEditor';
 import DeriveTaskModal from './DeriveTaskModal';
 import Icon from './Icon';
@@ -43,6 +44,11 @@ export type ImportedEventDetailModalProps = {
   wsNodes?: NodeRow[];
   cellLabelById?: Map<string, string>;
   tagsRealtimeVersion?: number;
+  // §13.3 V2.C: AtomMarkerBar fuer imported_event-Atom im Header. Optional —
+  // Calendar-Route ohne Workspace-Bundle blendet die Bar aus. Workspace.tsx
+  // threadet wsAtomMarkers + selfUserId aus dem Workspace-Resource-Bundle.
+  wsAtomMarkers?: AtomMarkerRow[];
+  selfUserId?: string;
 };
 
 const ImportedEventDetailModal: Component<ImportedEventDetailModalProps> = (props) => {
@@ -147,6 +153,20 @@ const ImportedEventDetailModal: Component<ImportedEventDetailModalProps> = (prop
               <span class="imported-event-source-dot" aria-hidden="true" />
               <h3 id="imported-event-title">{props.snapshot.summary}</h3>
             </div>
+            {/* §13.3 V2.C: Marker-Bar (Star+Eye) im Header. Imported-Event-
+                Atoms sind im atom_markers-CHECK enthalten — eye-Marker sind
+                User-private „erinnere mich an diesen Termin". */}
+            <Show when={props.workspaceId && props.selfUserId}>
+              <AtomMarkerBar
+                workspaceId={props.workspaceId}
+                userId={props.selfUserId as string}
+                atomType="imported_event"
+                atomId={props.eventId}
+                markers={(props.wsAtomMarkers ?? []).filter(
+                  (m) => m.atom_type === 'imported_event' && m.atom_id === props.eventId,
+                )}
+              />
+            </Show>
             <button type="button" class="overlay-close" onClick={close} aria-label="Schliessen">
               <Icon name="x" size={18} />
             </button>

@@ -1580,6 +1580,8 @@ const Workspace: Component = () => {
                 wsNodes={nodes() ?? []}
                 cellLabelById={cellLabelById()}
                 tagsRealtimeVersion={rtTags()}
+                wsAtomMarkers={wsAtomMarkers() ?? []}
+                selfUserId={user()?.id}
               />
             )}
           </Show>
