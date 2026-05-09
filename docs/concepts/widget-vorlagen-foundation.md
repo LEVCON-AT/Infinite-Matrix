@@ -1968,16 +1968,17 @@ V1-Provider (final 2026-05-07): OneDrive, Google Drive, Dropbox, **Nextcloud** (
 
 ### 13.3 Marker-Toggle (final 2026-05-06)
 
-**Status 2026-05-09 — V1 LIVE.** `AtomMarkerBar`-Component (Star + Eye Click-Toggle, 1.5s-Throttle pro Atom+Kind, Star-Counter rechts vom Icon, Self-Eye-Indicator) gewired in fuenf Renderern:
+**Status 2026-05-09 — V1 LIVE.** `AtomMarkerBar`-Component (Star + Eye Click-Toggle, 1.5s-Throttle pro Atom+Kind, Star-Counter rechts vom Icon, Self-Eye-Indicator) gewired in sechs Renderern:
 - BoardView Card-Meta-Row (atom_type='task')
 - CardOverlay-Header (V2.A, atom_type='task')
 - TaskDetail-Header (V2.B, atom_type='task')
 - ImportedEventDetailModal-Header (V2.C, atom_type='imported_event')
 - ChecklistPanel cl-head (V2.D, atom_type='checklist')
+- DocsPopup-Actions im aktiven Tab-Header (V2.E, atom_type='doc'; pending-Tabs ohne docId zeigen die Bar nicht)
 
 `wsAtomMarkers`-Resource in `Workspace.tsx` (`fetchAtomMarkersForWorkspace`) + Realtime-Refetch ueber `atom_markers`-Slot. TaskDetail-Route hat eigene `wsAtomMarkers`-Resource (Direct-Open via `/w/<wid>/task/<tid>` ohne Workspace.tsx-Bundle). RLS filtert eye-Marker auf Owner. Konzept-Vorgabe „rechts in der Card-Toolbar" via `margin-left: auto` in `.atom-marker-bar`.
 
-**V1-Scope:** Click-Toggle (Star setzen/entfernen, Eye setzen/entfernen) + Counter (nur Star) + 1.5s-Throttle. Drei der sechs atom_markers-CHECK-Werte (`task` / `imported_event` / `checklist`) live. NodeTree-Atom-Rows fuer link/doc-Atome + Calendar-Route-Variants des ImportedEventDetailModal + info_field-Atom-Renderer folgen wenn die Card-Variants den `AtomMarkerBar` als Render-Hook bekommen (Calendar-Route hat aktuell kein wsAtomMarkers-Bundle, info_field-Atom-Renderer ist Welle B-Aufgabe).
+**V1-Scope:** Click-Toggle (Star setzen/entfernen, Eye setzen/entfernen) + Counter (nur Star) + 1.5s-Throttle. Vier der sechs atom_markers-CHECK-Werte (`task` / `imported_event` / `checklist` / `doc`) live. Fehlend: `link` (kein Detail-Modal — V2 Atom-Renderer-Foundation Welle B) + `info_field` (kein Atom-Renderer — Welle B). Calendar-Route-Variants des ImportedEventDetailModal folgen wenn die Calendar-Route ein `wsAtomMarkers`-Bundle bekommt.
 
 **V2-deferred:**
 - Hover-Tooltip „Wer hat gestartet" (User-Liste mit Avatars).

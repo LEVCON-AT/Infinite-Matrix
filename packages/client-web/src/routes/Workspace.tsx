@@ -1528,6 +1528,8 @@ const Workspace: Component = () => {
             request={docsRequest()}
             realtimeVersion={rtDocs()}
             atomPickerEntries={atomPickerEntries()}
+            wsAtomMarkers={wsAtomMarkers() ?? []}
+            selfUserId={user()?.id}
             onClose={() => {
               setShowDocs(false);
               clearDocsRequest();

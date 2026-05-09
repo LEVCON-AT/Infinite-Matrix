@@ -48,7 +48,8 @@ import { fetchAttachedCellIdForDoc, fetchDocById, fetchDocsRecent } from '../lib
 import { sanitizeHtml } from '../lib/sanitize-html';
 import { supabase } from '../lib/supabase';
 import { showToast, showUndoToast } from '../lib/toasts';
-import type { DocRow } from '../lib/types';
+import type { AtomMarkerRow, DocRow } from '../lib/types';
+import AtomMarkerBar from './AtomMarkerBar';
 import AtomPickerModal from './AtomPickerModal';
 import DocTagsEditor from './DocTagsEditor';
 import Icon from './Icon';
@@ -64,6 +65,10 @@ type Props = {
   // Welle D.8: AtomPicker-Daten fuer @-Trigger im Editor-Body.
   // Optional — ohne Daten zeigt sich kein Picker, '@' bleibt Plain-Text.
   atomPickerEntries?: import('./AtomPickerModal').AtomPickerEntry[];
+  // §13.3 V2.E: AtomMarkerBar im docs-popup-actions fuer das aktive
+  // Tab-Doc-Atom. Optional — ohne Bundle blendet die Bar aus.
+  wsAtomMarkers?: AtomMarkerRow[];
+  selfUserId?: string;
 };
 
 type TabMode = 'view' | 'edit';
@@ -906,6 +911,22 @@ const DocsPopup: Component<Props> = (p) => {
             </button>
           </div>
           <div class="docs-popup-actions">
+            {/* §13.3 V2.E: Marker-Bar (Star+Eye) fuer das aktive Tab-Doc.
+                Pending-Tabs (docId=null) bekommen keine Bar — Marker
+                erst wenn Doc tatsaechlich existiert. */}
+            <Show when={p.selfUserId && activeTab()?.docId}>
+              {(docId) => (
+                <AtomMarkerBar
+                  workspaceId={p.workspaceId}
+                  userId={p.selfUserId as string}
+                  atomType="doc"
+                  atomId={docId()}
+                  markers={(p.wsAtomMarkers ?? []).filter(
+                    (m) => m.atom_type === 'doc' && m.atom_id === docId(),
+                  )}
+                />
+              )}
+            </Show>
             <button
               type="button"
               class="btn-primary docs-popup-save"
