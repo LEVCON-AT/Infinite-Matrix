@@ -11,8 +11,11 @@
 
 import { useNavigate, useParams } from '@solidjs/router';
 import { type Component, For, Show, createMemo, createResource, createSignal } from 'solid-js';
+import AtomMarkerBar from '../components/AtomMarkerBar';
 import Icon from '../components/Icon';
 import { pageEnter } from '../lib/animations';
+import { fetchAtomMarkersForWorkspace } from '../lib/atom-markers';
+import { useUser } from '../lib/auth';
 import { translateDbError } from '../lib/errors';
 import { installEscReturn } from '../lib/keyboard-nav';
 import { fetchAllChecklists } from '../lib/queries';
@@ -66,6 +69,7 @@ function kindLabel(kind: TaskManifestationKind): string {
 const TaskDetail: Component = () => {
   const params = useParams<RouteParams>();
   const navigate = useNavigate();
+  const user = useUser();
   const [busy, setBusy] = createSignal(false);
 
   const [task, { refetch: refetchTask }] = createResource(
@@ -76,6 +80,18 @@ const TaskDetail: Component = () => {
   const [manifestations] = createResource(
     () => params.taskId,
     async (tid) => (tid ? await fetchManifestationsByTask(tid) : []),
+  );
+
+  // §13.3 V2.B: Workspace-Markers fuer den AtomMarkerBar im Header.
+  // Wird auf (atom_type='task', atom_id=task.id) clientseitig gefiltert.
+  // Eigene Resource statt Workspace.tsx-Bundle, weil TaskDetail eine
+  // eigenstaendige Route ist (Direct-Open via /w/<wid>/task/<tid>).
+  const [wsAtomMarkers] = createResource(
+    () => params.workspaceId,
+    async (wid) => (wid ? await fetchAtomMarkersForWorkspace(wid) : []),
+  );
+  const taskMarkers = createMemo(() =>
+    (wsAtomMarkers() ?? []).filter((m) => m.atom_type === 'task' && m.atom_id === params.taskId),
   );
 
   // Checklists workspace-weit fuer Container-Label-Aufloesung. Kanban-
@@ -150,6 +166,17 @@ const TaskDetail: Component = () => {
             {(t) => t().label || '(ohne Label)'}
           </Show>
         </h1>
+        {/* §13.3 V2.B: Marker-Bar (Star+Eye) im Task-Detail-Header. Nur
+            wenn User-Session + Task geladen ist. */}
+        <Show when={user() && task()}>
+          <AtomMarkerBar
+            workspaceId={params.workspaceId}
+            userId={(user() as { id: string }).id}
+            atomType="task"
+            atomId={params.taskId}
+            markers={taskMarkers()}
+          />
+        </Show>
       </header>
 
       <Show
