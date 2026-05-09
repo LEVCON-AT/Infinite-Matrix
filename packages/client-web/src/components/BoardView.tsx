@@ -55,6 +55,7 @@ import { isCardDone, isRecurCard, todayIso, toggleOccurrence } from '../lib/recu
 import { useVis } from '../lib/settings';
 import { showToast, showUndoToast } from '../lib/toasts';
 import type {
+  AtomMarkerRow,
   AtomTagWithTag,
   BoardContent,
   CellRow,
@@ -75,6 +76,7 @@ import {
   openObjectSuggest,
 } from '../lib/use-object-suggest';
 import { useViewerActive } from '../lib/workspace-role';
+import AtomMarkerBar from './AtomMarkerBar';
 import BulkAddModal from './BulkAddModal';
 import CardOverlay from './CardOverlay';
 import ChecklistPanel from './ChecklistPanel';
@@ -107,6 +109,11 @@ type Props = {
   // Welle D.9: Atom-Tags (joined mit workspace_tags-Registry) fuer
   // TagPills-Render auf Kanban-Cards. Filter pro Card client-seitig.
   wsAtomTagsEnriched?: AtomTagWithTag[];
+  // §13.3 V1: User-Markierungen (atom_markers, Migration 074) fuer Star+Eye-
+  // Toggle in der Card-Toolbar. Gefuettert aus Workspace.tsx wsAtomMarkers-
+  // Resource. Pro Card wird client-seitig auf (atom_type='task', atom_id=
+  // card.atom_id) gefiltert.
+  wsAtomMarkers?: AtomMarkerRow[];
   // Welle D.7c: Bundle der Workspace-Resources fuer den Tag-Editor +
   // Picker-Modals im CardOverlay. Optional durchgeleitet — Caller
   // (Workspace.tsx) reicht alles als atomPickerEntries-Memo + cells/nodes.
@@ -241,6 +248,20 @@ const BoardView: Component<Props> = (p) => {
       const arr = map.get(t.atom_id);
       if (arr) arr.push(t);
       else map.set(t.atom_id, [t]);
+    }
+    return map;
+  });
+
+  // §13.3 V1: AtomMarkerRow-Liste pro Task. Filtert die Workspace-Liste
+  // auf atom_type='task' + atom_id=card.id. Konsumenten sind die
+  // AtomMarkerBars in der Card-Meta-Zeile (Star+Eye-Toggle).
+  const markersByCard = createMemo<Map<string, AtomMarkerRow[]>>(() => {
+    const map = new Map<string, AtomMarkerRow[]>();
+    for (const m of p.wsAtomMarkers ?? []) {
+      if (m.atom_type !== 'task') continue;
+      const arr = map.get(m.atom_id);
+      if (arr) arr.push(m);
+      else map.set(m.atom_id, [m]);
     }
     return map;
   });
@@ -1362,7 +1383,8 @@ const BoardView: Component<Props> = (p) => {
                                       card.recur != null ||
                                       progress() ||
                                       (docPinCountByCard().get(card.id) ?? 0) > 0 ||
-                                      (tagsByCard().get(card.id)?.length ?? 0) > 0
+                                      (tagsByCard().get(card.id)?.length ?? 0) > 0 ||
+                                      !!p.selfUserId
                                     }
                                   >
                                     <div class="kb-card-meta">
@@ -1415,6 +1437,17 @@ const BoardView: Component<Props> = (p) => {
                                               {prog().done}/{prog().total}
                                             </span>
                                           </span>
+                                        )}
+                                      </Show>
+                                      <Show when={p.selfUserId}>
+                                        {(uid) => (
+                                          <AtomMarkerBar
+                                            workspaceId={p.workspaceId}
+                                            userId={uid()}
+                                            atomType="task"
+                                            atomId={card.id}
+                                            markers={markersByCard().get(card.id) ?? []}
+                                          />
                                         )}
                                       </Show>
                                     </div>

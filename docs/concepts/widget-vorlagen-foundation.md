@@ -1964,6 +1964,17 @@ V1-Provider (final 2026-05-07): OneDrive, Google Drive, Dropbox, **Nextcloud** (
 
 ### 13.3 Marker-Toggle (final 2026-05-06)
 
+**Status 2026-05-09 — V1 LIVE.** `AtomMarkerBar`-Component (Star + Eye Click-Toggle, 1.5s-Throttle pro Atom+Kind, Star-Counter rechts vom Icon, Self-Eye-Indicator) gewired in BoardView Card-Meta-Row. `wsAtomMarkers`-Resource in `Workspace.tsx` (`fetchAtomMarkersForWorkspace`) + Realtime-Refetch ueber `atom_markers`-Slot. RLS filtert eye-Marker auf Owner. Konzept-Vorgabe „rechts in der Card-Toolbar" via `margin-left: auto` in `.atom-marker-bar`.
+
+**V1-Scope:** Click-Toggle (Star setzen/entfernen, Eye setzen/entfernen) + Counter (nur Star) + 1.5s-Throttle. Render derzeit nur in BoardView-Cards (atom_type='task'); andere Atom-Card-Renderer (NodeTree/ChecklistPanel/CardOverlay/CalendarMini) folgen V2 wenn die Card-Variants den `AtomMarkerBar` als Render-Hook bekommen.
+
+**V2-deferred:**
+- Hover-Tooltip „Wer hat gestartet" (User-Liste mit Avatars).
+- Filter-Builder-Conditions `has_marker(kind=star, by_user=me, count>=N)` — siehe §5.2.6 Filter-DSL.
+- Vorlagen-Toggle `markers.workspace_star` / `markers.private_eye` (heute immer sichtbar; Toggle abschaltbar nur wenn Vorlage es deaktiviert).
+- Smart-Summary-Default-Widget „Beobachtet von dir" → `task-list` mit Filter `has_marker(kind=eye, by_user=me)`.
+- AtomMarkerBar in NodeTree-Atom-Rows + ChecklistPanel-Items + CardOverlay-Header.
+
 Marker leben in einer eigenen Tabelle `atom_markers` (siehe §15) — analog Layer-4-Pattern aus `architektur.md` §1.5. Zwei Kinds in V1:
 
 | Kind | Sichtbarkeit | UI | Counter |

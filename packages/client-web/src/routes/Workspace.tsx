@@ -83,6 +83,7 @@ function addMonthsToDate(d: Date, months: number): Date {
   next.setMonth(next.getMonth() + months);
   return next;
 }
+import { fetchAtomMarkersForWorkspace } from '../lib/atom-markers';
 import { fetchAtomTagsByWorkspace, joinAtomTagsWithRegistry } from '../lib/atom-tags';
 import { openDokuForContext } from '../lib/docs-open';
 import { clearDocsRequest, openDocsPopup, useDocsRequest } from '../lib/docs-ui';
@@ -476,6 +477,14 @@ const Workspace: Component = () => {
   );
   const wsAtomTagsEnriched = createMemo(() =>
     joinAtomTagsWithRegistry(wsAtomTags() ?? [], wsWorkspaceTags() ?? []),
+  );
+  // §13.3 V1 — atom_markers (Migration 074) als Workspace-Resource. Polymorphe
+  // User-Markierungen (kind=star Workspace-shared, kind=eye User-privat).
+  // Konsumenten (BoardView etc.) filtern client-seitig auf (atom_type, atom_id)
+  // via starCountForAtom / selfStarMarker / selfEyeMarker.
+  const [wsAtomMarkers, { refetch: refetchWsAtomMarkers }] = createResource(
+    () => params.workspaceId ?? null,
+    async (wid) => (wid ? fetchAtomMarkersForWorkspace(wid) : []),
   );
 
   // Welle D.7b: Flache Picker-Entry-Liste fuer AtomPickerModal — Tasks +
@@ -1244,6 +1253,12 @@ const Workspace: Component = () => {
         // DocTagsEditor im offenen DocsPopup haengt an rtDocs.
         setRtDocs((v) => v + 1);
       },
+      // §13.3 V1 — atom_markers Realtime. Star-Counter + Eye-Indicator
+      // muessen live updaten wenn andere User toggeln. RLS filtert eye
+      // bereits — der Refetch holt nur die fuer den User sichtbaren Rows.
+      atom_markers: () => {
+        void refetchWsAtomMarkers();
+      },
       // T.AC.A.5 + Q.2 + WV.WV.1: atom_manifestations ist Single-Source.
       // Der realtime-Subscriber (lib/realtime.ts) routet task-Atoms in
       // den kb_cards/checklist_items-Slot — dieser Slot hier feuert
@@ -2010,6 +2025,7 @@ const Workspace: Component = () => {
                         wsAtomPins={wsAtomPins() ?? []}
                         wsDocs={wsDocs() ?? []}
                         wsAtomTagsEnriched={wsAtomTagsEnriched()}
+                        wsAtomMarkers={wsAtomMarkers() ?? []}
                         atomPickerEntries={atomPickerEntries()}
                         wsCells={cells() ?? []}
                         wsNodes={nodes() ?? []}
