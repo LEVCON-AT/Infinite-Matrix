@@ -1856,6 +1856,7 @@ const NodeTree: Component<Props> = (props) => {
           <ChecklistPastePopup
             initialText={target().text}
             checklistLabel="Neue Checkliste"
+            workspaceId={props.workspaceId}
             onClose={() => setPasteTarget(null)}
             onCommit={async (parsed) => {
               await commitPastedChecklist(target().cellId, parsed);

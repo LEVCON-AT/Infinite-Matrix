@@ -12,11 +12,15 @@
 import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
 import { type ParsedPasteItem, parsePastedText } from '../lib/checklist-paste-parse';
 import { installFocusRestore } from '../lib/dialog';
+import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 import Icon from './Icon';
 
 type Props = {
   initialText: string;
   checklistLabel?: string;
+  // §14.6: optional fuer ^kuerzel-Autocomplete im Paste-Textarea. Fehlt
+  // wsId, wird Autocomplete einfach nicht aktiviert (kein Fehler).
+  workspaceId?: string;
   onCommit: (items: ParsedPasteItem[]) => void;
   onClose: () => void;
 };
@@ -82,7 +86,16 @@ const ChecklistPastePopup: Component<Props> = (p) => {
           <label class="cl-paste-label">
             Text
             <textarea
-              ref={textareaRef}
+              ref={(el) => {
+                textareaRef = el;
+                // §14.6: ^kuerzel-Autocomplete im Paste-Editor — User
+                // kann gepastete Items direkt mit Aliases anreichern,
+                // bevor commit() das Parser-Ergebnis als Items anlegt.
+                if (p.workspaceId) {
+                  const cleanup = bindAliasAutocomplete(el, p.workspaceId);
+                  onCleanup(cleanup);
+                }
+              }}
               class="cl-paste-ta"
               value={raw()}
               placeholder="Eine Zeile pro Punkt. Einrueckung via 2 Spaces oder Tab."

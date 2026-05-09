@@ -7,6 +7,7 @@ import { runAssist } from '../lib/ai-assist';
 import type { AssistEvent } from '../lib/ai-assist/types';
 import { closeCellSuggest, onCellSuggestRequest } from '../lib/cell-suggest';
 import { showToast } from '../lib/toasts';
+import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 
 type Phase = 'idle' | 'streaming' | 'done' | 'error';
 
@@ -122,6 +123,16 @@ const CellSuggestModal: Component = () => {
                     placeholder="z.B. Sub-Matrix fuer Quartalsplanung mit 4 Zeilen (Q1-Q4) und 3 Spalten (Ziele, Aufgaben, Notes)"
                     value={prompt()}
                     onInput={(e) => setPrompt(e.currentTarget.value)}
+                    ref={(el) => {
+                      // §14.6: AI-Prompt mit ^kuerzel-Referenzen ist
+                      // explizit erwuenscht — z.B. „mach mir das wie
+                      // ^kunde-acme aber fuer ^kunde-beta".
+                      const wsId = req().workspaceId;
+                      if (wsId) {
+                        const cleanup = bindAliasAutocomplete(el, wsId);
+                        onCleanup(cleanup);
+                      }
+                    }}
                   />
                 </label>
                 <div class="cell-suggest-actions">

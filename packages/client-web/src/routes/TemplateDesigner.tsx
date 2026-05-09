@@ -18,7 +18,7 @@
 // - Mobile-Editor (Touch-DnD).
 
 import { A, useNavigate, useParams } from '@solidjs/router';
-import { For, Show, createMemo, createResource, createSignal } from 'solid-js';
+import { For, Show, createMemo, createResource, createSignal, onCleanup } from 'solid-js';
 import Icon, { type IconName } from '../components/Icon';
 import IconPicker from '../components/IconPicker';
 import { translateDbError } from '../lib/errors';
@@ -46,6 +46,7 @@ import type {
   TemplateWidgetRow,
   TemplateWidgetType,
 } from '../lib/types';
+import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 
 const WIDGET_TYPES: { type: TemplateWidgetType; label: string; icon: IconName }[] = [
   { type: 'kanban', label: 'Kanban-Board', icon: 'view-columns' },
@@ -370,6 +371,12 @@ const TemplateDesigner = () => {
               <input
                 class="designer-head-name-input"
                 value={tpl().name}
+                ref={(el) => {
+                  // §14.6 Coverage-Pflicht: ^kuerzel-Autocomplete in
+                  // Vorlagen-Name (z.B. „^kunde-acme Kanban").
+                  const cleanup = bindAliasAutocomplete(el, params.workspaceId);
+                  onCleanup(cleanup);
+                }}
                 onChange={(e) => void handleTemplateRename(e.currentTarget.value)}
                 disabled={isPlatform()}
                 aria-label="Vorlagen-Name"
@@ -416,6 +423,12 @@ const TemplateDesigner = () => {
                         class="designer-section-title-input"
                         value={section.title ?? ''}
                         placeholder={`Sektion ${sIdx() + 1}`}
+                        ref={(el) => {
+                          // §14.6: ^kuerzel auch in Sektions-Titeln (Token
+                          // koexistiert mit Pattern-Tokens wie {row.label}).
+                          const cleanup = bindAliasAutocomplete(el, params.workspaceId);
+                          onCleanup(cleanup);
+                        }}
                         onChange={(e) =>
                           void handleSectionTitleChange(section, e.currentTarget.value)
                         }
@@ -572,6 +585,7 @@ const TemplateDesigner = () => {
             {(w) => (
               <WidgetInspector
                 widget={w()}
+                workspaceId={params.workspaceId}
                 disabled={isPlatform() || busy()}
                 onPatch={async (patch) => {
                   try {
@@ -654,6 +668,7 @@ const WidgetTypePicker = (p: {
 
 const WidgetInspector = (p: {
   widget: TemplateWidgetRow;
+  workspaceId: string;
   disabled?: boolean;
   onPatch: (patch: Partial<TemplateWidgetRow>) => void | Promise<void>;
 }) => {
@@ -722,6 +737,14 @@ const WidgetInspector = (p: {
           value={config().titleTemplate ?? ''}
           placeholder="z.B. {row.label} — Aufgaben"
           disabled={p.disabled}
+          ref={(el) => {
+            // §14.6: Konzept-explizit „`{vorlage}-{row}-{col}` und `^kuerzel`
+            // koexistieren". Pattern-Tokens (geschweifte Klammern) und
+            // Aliases (^) leben nebeneinander, der Resolver entscheidet pro
+            // Token.
+            const cleanup = bindAliasAutocomplete(el, p.workspaceId);
+            onCleanup(cleanup);
+          }}
           onChange={(e) =>
             void p.onPatch({
               config: { ...p.widget.config, titleTemplate: e.currentTarget.value || undefined },
@@ -743,6 +766,12 @@ const WidgetInspector = (p: {
           rows={2}
           value={config().description ?? ''}
           disabled={p.disabled}
+          ref={(el) => {
+            // §14.6: Beschreibung erlaubt Aliases als Anker auf Atome /
+            // Cells / Objects.
+            const cleanup = bindAliasAutocomplete(el, p.workspaceId);
+            onCleanup(cleanup);
+          }}
           onChange={(e) =>
             void p.onPatch({
               config: { ...p.widget.config, description: e.currentTarget.value || undefined },

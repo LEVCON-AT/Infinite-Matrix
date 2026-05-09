@@ -2149,23 +2149,42 @@ HTML5-DataTransfer mit **vier parallelen Formaten** (alle V1-Pflicht):
 
 **Direktive:** ueberall wo der User Text schreibt, ist `^` der Trigger fuer Alias-Autocomplete (existing `lib/use-alias-autocomplete.ts`).
 
-**Coverage V1 (Pflicht):**
+**Coverage V1 (Pflicht) — Status nach Audit 2026-05-09:**
 
-| Input | Autocomplete | Bei Send-Out / Save |
+| Input | Stelle | Autocomplete |
 |---|---|---|
-| Doc-Editor (ProseMirror) | live | Alias-Mark bleibt resolvabel (live re-resolved beim Render) |
-| Comment-Editor (extern + native Fallback) | live | Alias wird zu Hyperlink expandiert (Mail/Messenger-Bridge) |
-| Mail-Compose (Welle WV.B Channel-Bridge) | live | Aliase werden in Hyperlinks expandiert beim Send |
-| Bulk-Wizard Scalar-Input (`BulkScalarInput`) | live | Alias bleibt Alias bis zum Render |
-| Vorlagen-Designer Title-Template | live | `{vorlage}-{row}-{col}` und `^kuerzel` koexistieren |
-| Info-Field Value (text-Type) | live | Alias bleibt Alias-Markup |
-| **Info-Field Value (URL-Type)** | live | siehe §14.7 (Alias als Direktverlinkung) |
+| Doc-Editor (ProseMirror) | `DocsPopup.tsx` (Mention-Plugin separat, WV.D.8) | ✅ live |
+| Comment-Editor (Card-Note) | `CardOverlay.tsx:1185` | ✅ live |
+| Cell-Info-Edit (Notiz/Felder) | `CellInfoPage.tsx:319` | ✅ live |
+| Node-Beschreibung (Sidebar-Edit) | `NodeDescription.tsx:83` | ✅ live |
+| Checklist-Item-Edit | `ChecklistPanel.tsx:624` | ✅ live |
+| Checklist-Action-Modal | `ChecklistActionModal.tsx:172` | ✅ live |
+| Checklist-Paste-Popup (Bulk-Items) | `ChecklistPastePopup.tsx` (workspaceId-Prop) | ✅ live (Audit 2026-05-09) |
+| AI-Help-Drawer (Prompt) | `AiHelpDrawer.tsx:547` | ✅ live (Audit 2026-05-09) |
+| Cell-Suggest-Modal (AI-Prompt) | `CellSuggestModal.tsx:119` | ✅ live (Audit 2026-05-09) |
+| Vorlagen-Designer Vorlagen-Name | `TemplateDesigner.tsx:370` | ✅ live (Audit 2026-05-09) |
+| Vorlagen-Designer Section-Title | `TemplateDesigner.tsx:415` | ✅ live (Audit 2026-05-09) |
+| Vorlagen-Designer Title-Template | `TemplateDesigner.tsx:718` | ✅ live (Audit 2026-05-09) |
+| Vorlagen-Designer Beschreibung | `TemplateDesigner.tsx:740` | ✅ live (Audit 2026-05-09) |
+| Mail-Compose (Welle WV.B Channel-Bridge) | TBD bei Welle B Implementation | 🚧 deferred |
+| **Info-Field Value (URL-Type)** | siehe §14.7 (Alias als Direktverlinkung) | 🚧 §14.7 |
 
-**Anti-Pattern (Review-Stop):** neuer Text-Input ohne `useAliasAutocomplete`-Hook. Adjacent-Cleanup-Pflicht — wenn beim Bearbeiten ein Text-Input ohne Autocomplete entdeckt wird, ansprechen + nach Approval mitziehen.
+**V1-Exempts (kein Autocomplete sinnvoll):**
 
-**Querverweis:** `lib/use-alias-autocomplete.ts` ist die einzige Stelle. Globaler Helper, kein Re-Implement.
+| Input | Stelle | Begruendung |
+|---|---|---|
+| Bulk-Alias-Vergabe-Pattern | `BulkScalarInput.tsx` (BulkWizardModal-Caller) | Input IST der Alias-String — kein `^kuerzel`-Lookup. V2 Bulk-Tag/Field-Edit braucht's. |
+| Template-Name-Modal | `NewTemplateModal.tsx`, `SaveAsTemplateModal.tsx` | Vorlagen-Name = Alias-Quelle, kein Resolver-Target. |
+| Onboarding-Wizard | `wizard/StepQuestions.tsx` | Pre-Workspace — kein Alias-Index verfuegbar. |
+| Generic-Adapter-Dialog | `AdapterDialog.tsx` | Caller-spezifisch (showPrompt etc.); pro Caller entscheiden. |
+| Admin-System-Config | `admin/SystemConfigSection.tsx` | API-Keys + URLs, keine Alias-Targets. |
+| Import-Passphrase | `ImportDialog.tsx` | Passwort-Input. |
 
-**Worksheet-Bestaetigung 14.6:** ueberall wo User Text schreibt. ✓
+**Anti-Pattern (Review-Stop):** neuer Text-Input ohne `bindAliasAutocomplete`-Hook (es sei denn, Exempts-Liste oben deckt's). Adjacent-Cleanup-Pflicht — wenn beim Bearbeiten ein Text-Input ohne Autocomplete entdeckt wird, ansprechen + nach Approval mitziehen.
+
+**Querverweis:** `lib/use-alias-autocomplete.ts` exportiert `bindAliasAutocomplete(el, wsId)` als globalen Helper. Pattern: `ref={(el) => { onCleanup(bindAliasAutocomplete(el, wsId)); }}`. Kein Re-Implement.
+
+**Worksheet-Bestaetigung 14.6:** ueberall wo User Text schreibt. ✓ Konzept-Punkt zugemacht 2026-05-09.
 
 ### 14.7 Alias als URL-Wert in info_field-URL-Type
 

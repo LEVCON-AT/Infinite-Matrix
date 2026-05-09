@@ -32,6 +32,7 @@ import { installFocusRestore, showConfirm } from '../lib/dialog';
 import { fetchMembers } from '../lib/members';
 import { fetchNodesForWorkspace } from '../lib/queries';
 import { showToast } from '../lib/toasts';
+import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 import Icon from './Icon';
 
 // ─── Drawer-State ────────────────────────────────────────────
@@ -547,6 +548,14 @@ const AiHelpDrawer: Component = () => {
           <textarea
             ref={(el) => {
               inputEl = el;
+              // §14.6: AI-Prompt unterstuetzt ^kuerzel — User kann Atome
+              // direkt referenzieren („was ist ^kunde-acme grad faellig?").
+              // alias.expand_to_text-Tool im AI-Pfad loest das beim Send.
+              const wsId = params.workspaceId;
+              if (wsId) {
+                const cleanup = bindAliasAutocomplete(el, wsId);
+                onCleanup(cleanup);
+              }
             }}
             class="ai-help-input"
             value={input()}

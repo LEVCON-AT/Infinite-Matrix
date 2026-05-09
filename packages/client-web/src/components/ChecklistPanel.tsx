@@ -789,6 +789,7 @@ const ChecklistPanel: Component<Props> = (p) => {
         <ChecklistPastePopup
           initialText={pasteText() as string}
           checklistLabel={p.checklist.label}
+          workspaceId={p.workspaceId}
           onClose={() => setPasteText(null)}
           onCommit={async (parsed: ParsedPasteItem[]) => {
             setPasteText(null);
