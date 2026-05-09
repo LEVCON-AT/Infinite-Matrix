@@ -19,6 +19,7 @@ import {
   summarizeExport,
 } from '../lib/export';
 import { type ContextMaps, resolveNodeLabel } from '../lib/label-template';
+import { incrementLinkClickCount, parseTreeLinkEntryId } from '../lib/link-clicks';
 import type { WorkspaceMember } from '../lib/members';
 import {
   addCellChecklist,
@@ -450,7 +451,15 @@ const TreeItem: Component<{
                     initialDocId: (p.entry as Extract<TreeEntry, { kind: 'doc' }>).docId,
                   });
                 }
-              : undefined
+              : p.entry.kind === 'link'
+                ? () => {
+                    // §11.7 — Click-Tracking. Native <a>-Navigation laeuft
+                    // weiter (kein preventDefault); RPC feuert parallel.
+                    // Nur 'link-board-' Entries → echte links-Tabelle-Rows.
+                    const linkId = parseTreeLinkEntryId(p.entry.id);
+                    if (linkId) incrementLinkClickCount(linkId);
+                  }
+                : undefined
           }
           class="tree-link"
           classList={{
@@ -1431,6 +1440,11 @@ const NodeTree: Component<Props> = (props) => {
             showToast('Link enthaelt nicht-erlaubtes Schema', 'error');
             return;
           }
+          // §11.7 — Click-Tracking nur fuer 'link-board-'-Entries (echte
+          // links-Tabelle-Rows). 'link-info-' ist cell.data.links jsonb
+          // ohne click_count-Spalte; parseTreeLinkEntryId liefert null.
+          const linkId = parseTreeLinkEntryId(entry.id);
+          if (linkId) incrementLinkClickCount(linkId);
           const href = entry.linkType === 'mail' ? `mailto:${safe}` : safe;
           if (entry.linkType === 'mail') window.location.href = href;
           else window.open(href, '_blank', 'noopener,noreferrer');

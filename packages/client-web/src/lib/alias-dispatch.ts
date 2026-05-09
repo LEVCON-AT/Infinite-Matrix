@@ -8,6 +8,7 @@
 
 import type { AliasResolveResult } from './alias-resolve';
 import { openDocsPopup } from './docs-ui';
+import { incrementLinkClickCount } from './link-clicks';
 import { rememberFocus } from './navigation-focus';
 import { sanitizeUrl } from './url';
 
@@ -67,6 +68,9 @@ export function dispatchAliasResult(result: AliasResolveResult, deps: DispatchDe
         deps.onError('Link-URL ist ungueltig.');
         return;
       }
+      // §11.7 — Click-Tracking via Migration 073 RPC. Best-Effort,
+      // blockt den Open-Flow nicht.
+      incrementLinkClickCount(result.linkId);
       window.open(safe, '_blank', 'noopener,noreferrer');
       return;
     }

@@ -29,7 +29,7 @@ export type AliasResolveResult =
   | { kind: 'card'; cardId: string; boardId: string; name: string }
   | { kind: 'checklist-board'; checklistId: string; boardId: string; label: string }
   | { kind: 'checklist-cell'; checklistId: string; cellId: string; matrixId: string; label: string }
-  | { kind: 'link'; url: string; label: string }
+  | { kind: 'link'; linkId: string; url: string; label: string }
   | { kind: 'doc'; docId: string; title: string }
   // Welle B B.0.B: reservierte Aliase werden vor der Format-Validation
   // abgefangen (siehe RESERVED_ROUTES). path ist ein absoluter Workspace-
@@ -243,7 +243,7 @@ export async function resolveAlias(raw: string, workspaceId: string): Promise<Al
     return {
       ok: true,
       canonical: a,
-      result: { kind: 'link', url: l.url, label: l.label },
+      result: { kind: 'link', linkId: l.id, url: l.url, label: l.label },
     };
   }
 

@@ -1748,14 +1748,22 @@ User kann pro Widget den Filter im Vorlage-Designer (§7.10) anpassen. Plattform
 
 User kann pro Cell Smart-Summary-Widgets ausblenden / hinzufuegen / umordnen — sparse-Overrides in `cell_widget_overrides` (existing in §5.3 + §6.3a). Vorlage-Update zieht ueber non-overridete Widgets, Overrides bleiben.
 
-### 11.7 `link.click_count` V1-Pflicht (heute fehlend)
+### 11.7 `link.click_count` V1-Pflicht (LIVE 2026-05-09)
 
-**Audit 2026-05-07:** Keine `click_count`-Spalte in `links`-Schema, kein Code-Pfad. Fuer Widget „Haeufige Links" (sort=click_count DESC) muss V1 nachgezogen werden.
+**Status:** LIVE. Migration 073 hat `click_count int DEFAULT 0` Spalte + RPC `mcp_increment_link_click_count(p_link_id)`. Code-Pfad seit 2026-05-09 verkabelt.
 
-**Migration in WV.B (Atom-Erweiterungen):**
-- `ALTER TABLE links ADD COLUMN click_count int DEFAULT 0`
-- Increment-Trigger pro `^kuerzel`-Resolve **oder** Link-Click-Event (Mutation in lib/links.ts).
-- Realtime-Sync wie alle Atom-Updates.
+**Code-Pfad:**
+- `lib/link-clicks.ts` — `incrementLinkClickCount(linkId)` Best-Effort-Helper. RPC-Call mit Promise-Wrap, swallows Errors silent (Click-Tracking blockt nie den User-Flow). 1.5s-Dedup-Cache pro `linkId` gegen Doppel-Click-Events.
+- `parseTreeLinkEntryId(entryId)` — extrahiert echte `links.id` aus TreeEntry-IDs mit Prefix `link-board-`. `link-info-` (cell.data.links jsonb ohne click_count) liefert null.
+
+**Pflicht-Call-Sites:**
+- `lib/alias-dispatch.ts` — `case 'link'` ruft `incrementLinkClickCount(result.linkId)` vor `window.open()`. `AliasResolveResult.link` traegt jetzt `linkId: string` (frueher nur url+label).
+- `lib/atom-routing.ts` — `case 'link'` (Calendar-Manifestation als Link-Atom) ruft `incrementLinkClickCount(event.atomId)`.
+- `components/NodeTree.tsx` — Sidebar-Link-Entry: TreeLink-onClick + Context-Menu-„Link oeffnen" rufen Increment fuer `link-board-`-IDs.
+
+**Realtime:** Workspace-Channel `links` deckt das ab — Increment via RPC triggert UPDATE → Realtime-Subscriber bekommen den neuen Counter ohne Extra-Sync.
+
+**Konzept-Punkt §11.7 zugemacht.**
 
 ### 11.8 Migrations-Pfad
 

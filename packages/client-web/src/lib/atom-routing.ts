@@ -14,6 +14,7 @@
 
 import type { CalendarEvent } from './calendar';
 import { openImportedEventModal } from './imported-event-modal-state';
+import { incrementLinkClickCount } from './link-clicks';
 import { supabase } from './supabase';
 import { showToast } from './toasts';
 import { sanitizeUrl } from './url';
@@ -36,6 +37,9 @@ export async function navigateToAtomEvent(
         showToast('Link ohne (sichere) URL.', 'info');
         return;
       }
+      // §11.7 — Click-Tracking. event.atomId fuer atomType='link' ist
+      // die echte links.id (Calendar-Manifestation kennt den Atom-Ref).
+      incrementLinkClickCount(event.atomId);
       // mailto-Links bleiben in selben Tab — sonst oeffnet Browser
       // einen leeren Tab; URL-Links target=_blank.
       const isMail = url.startsWith('mailto:');
