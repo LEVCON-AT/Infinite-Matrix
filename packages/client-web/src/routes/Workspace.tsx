@@ -941,15 +941,15 @@ const Workspace: Component = () => {
   // Resources fuer Hotkey-Slot-Resolver + Vorlagen (lazy beim ersten
   // Edit-Mode-Mount; wenn der User nie 1-9 drueckt sind die Resources
   // billig idle).
-  const [wsHotkeySlots] = createResource(
+  const [wsHotkeySlots, { refetch: refetchWsHotkeySlots }] = createResource(
     () => params.workspaceId ?? null,
     async (wsId) => (wsId ? await fetchWorkspaceHotkeySlots(wsId) : []),
   );
-  const [userHotkeySlots] = createResource(
+  const [userHotkeySlots, { refetch: refetchUserHotkeySlots }] = createResource(
     () => params.workspaceId ?? null,
     async (wsId) => (wsId ? await fetchUserHotkeySlots(wsId) : []),
   );
-  const [featureTemplates] = createResource(
+  const [featureTemplates, { refetch: refetchFeatureTemplates }] = createResource(
     () => params.workspaceId ?? null,
     async (wsId) => (wsId ? await fetchFeatureTemplatesForWorkspace(wsId) : []),
   );
@@ -1286,11 +1286,19 @@ const Workspace: Component = () => {
       // brauchen Refetch wenn Bulk-Wizard auf einer anderen Tab Cells
       // mit Vorlagen versorgt. widget_external_channels triggert
       // ChannelWidget-Refresh nach Channel-Pick eines anderen Members.
+      // Welle WV.A.1 §15.3 — feature_templates Workspace-Channel mit RLS-
+      // Filter. Owner/Admin editiert eine Workspace-Vorlage → andere Member
+      // sehen den Update-Lauf live, ohne /templates-Reload.
+      feature_templates: () => void refetchFeatureTemplates(),
       template_sections: () => void refetchTemplateSections(),
       template_widgets: () => void refetchTemplateWidgets(),
       cell_template_instances: () => void refetchCellTemplateInstances(),
       cell_widget_overrides: () => void refetchCellWidgetOverrides(),
       widget_external_channels: () => void refetchWidgetChannels(),
+      // Welle WV.A.3 — Hotkey-Slot-Belegung. Workspace-Variante: Owner-
+      // Aenderung wird cross-user live; User-Variante: Cross-Tab-Konsistenz.
+      workspace_hotkey_slots: () => void refetchWsHotkeySlots(),
+      user_hotkey_slots: () => void refetchUserHotkeySlots(),
     });
   });
 
