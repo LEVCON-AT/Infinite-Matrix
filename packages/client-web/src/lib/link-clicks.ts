@@ -34,11 +34,11 @@ export function incrementLinkClickCount(linkId: string): void {
   // Supabase-rpc liefert PostgrestBuilder (thenable, kein Promise) —
   // .then(...).catch(...) klappt am sauberen Promise. Wir erzwingen
   // Promise-Wrap via Promise.resolve.
-  void Promise.resolve(
-    supabase.rpc('mcp_increment_link_click_count', { p_link_id: linkId }),
-  ).catch(() => {
-    /* silent */
-  });
+  void Promise.resolve(supabase.rpc('mcp_increment_link_click_count', { p_link_id: linkId })).catch(
+    () => {
+      /* silent */
+    },
+  );
 }
 
 // Helper fuer NodeTree-Sidebar-Link-Entries: parsed das `link-board-<id>`
