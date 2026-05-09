@@ -2130,6 +2130,12 @@ Public-Sharing eines Aliases („Hier der Link, gilt fuer Aussenstehende") via s
 
 ### 14.3 AI-Tool `alias.expand_to_text`
 
+**Status 2026-05-09:**
+- Bridge-Schema (`packages/bridge/src/tools/alias.ts`) komplett: `alias` + `depth` (1-3, default 1, V1-Handler ignorieren) + `format` (markdown/plain/html, default markdown). Schema-Tests in `alias-query-settings-meta.test.ts` decken Defaults + Boundary-Cases ab.
+- Standalone-Handler (`matrix.html`) liefert `{ text }` in 3 Formaten — Single-Level (depth=1).
+- Client-Web ws-Bridge-Handler folgt mit Bridge-Wiring-Sprint (heute kein ws-Tool-Routing in client-web).
+- V2-Output `{ text, hyperlink, children: [...] }` mit Atom-Beziehungs-Traversal — deferred Welle F (braucht Resolver-Erweiterung um nested Aliase auf Atom-Children zu mappen).
+
 MCP-Tool fuer AI-Pipe (Welle A live):
 
 ```ts

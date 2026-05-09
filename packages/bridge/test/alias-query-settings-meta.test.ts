@@ -47,10 +47,13 @@ describe('alias.set schema', () => {
 
 describe('alias.expand_to_text schema', () => {
   const tool = get(aliasTools, 'alias.expand_to_text');
-  it('alias allein akzeptiert (markdown default)', () => {
+  it('alias allein akzeptiert (markdown default, depth=1)', () => {
     const r = tool.schema.safeParse({ alias: 'vertrag' });
     expect(r.success).toBe(true);
-    if (r.success) expect(r.data.format).toBe('markdown');
+    if (r.success) {
+      expect(r.data.format).toBe('markdown');
+      expect(r.data.depth).toBe(1);
+    }
   });
   it.each(['markdown', 'plain', 'html'] as const)('format=%s akzeptiert', (format) => {
     expect(tool.schema.safeParse({ alias: 'x', format }).success).toBe(true);
@@ -60,6 +63,18 @@ describe('alias.expand_to_text schema', () => {
   });
   it('ohne alias lehnt ab', () => {
     expect(tool.schema.safeParse({ format: 'plain' }).success).toBe(false);
+  });
+  it.each([1, 2, 3])('depth=%i akzeptiert', (depth) => {
+    expect(tool.schema.safeParse({ alias: 'x', depth }).success).toBe(true);
+  });
+  it('depth=0 lehnt ab (min 1)', () => {
+    expect(tool.schema.safeParse({ alias: 'x', depth: 0 }).success).toBe(false);
+  });
+  it('depth=4 lehnt ab (max 3)', () => {
+    expect(tool.schema.safeParse({ alias: 'x', depth: 4 }).success).toBe(false);
+  });
+  it('depth=1.5 lehnt ab (int only)', () => {
+    expect(tool.schema.safeParse({ alias: 'x', depth: 1.5 }).success).toBe(false);
   });
 });
 
