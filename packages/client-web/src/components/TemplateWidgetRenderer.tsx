@@ -46,31 +46,42 @@ const TemplateWidgetRenderer: Component<TemplateWidgetRendererProps> = (p) => {
   return (
     <div
       class="template-widget"
-      classList={{ 'template-widget-overridden': p.widget.hasOverride }}
+      classList={{
+        'template-widget-overridden': p.widget.hasOverride,
+        'template-widget-edit-in-view': editInViewToggle(p.widget.toggles, p.widget.type),
+      }}
       style={{
         'grid-column': `span ${p.widget.size_cols}`,
         'grid-row': `span ${p.widget.size_rows}`,
       }}
       data-widget-type={p.widget.type}
+      data-edit-in-view={editInViewToggle(p.widget.toggles, p.widget.type) ? 'true' : 'false'}
     >
-      <header class="template-widget-head">
-        <span class={`template-widget-type template-widget-type-${p.widget.type}`}>
-          <WidgetTypeIcon type={p.widget.type} />
-          <span class="template-widget-type-label">{widgetTypeLabel(p.widget.type)}</span>
-        </span>
-        <Show when={p.widget.hasOverride && p.editMode && p.widget.overrideId}>
-          {(overrideId) => (
-            <button
-              type="button"
-              class="template-widget-reset"
-              title="Auf Vorlage zuruecksetzen"
-              onClick={() => p.onResetOverride?.(overrideId())}
-            >
-              <Icon name="arrow-uturn-left" size={12} />
-            </button>
-          )}
-        </Show>
-      </header>
+      {/* §13.4 Header-Toggle (default true). Wenn aus: Header + Type-Badge
+          + Reset-Button entfallen — z.B. fuer Hero-Doc-Embed ohne Chrome.
+          Edit-Mode-Reset-Button geht im Off-Modus mit verloren — bewusst,
+          User schaltet den Header zurueck-an wenn er das Widget anders
+          konfigurieren will. */}
+      <Show when={headerToggle(p.widget.toggles)}>
+        <header class="template-widget-head">
+          <span class={`template-widget-type template-widget-type-${p.widget.type}`}>
+            <WidgetTypeIcon type={p.widget.type} />
+            <span class="template-widget-type-label">{widgetTypeLabel(p.widget.type)}</span>
+          </span>
+          <Show when={p.widget.hasOverride && p.editMode && p.widget.overrideId}>
+            {(overrideId) => (
+              <button
+                type="button"
+                class="template-widget-reset"
+                title="Auf Vorlage zuruecksetzen"
+                onClick={() => p.onResetOverride?.(overrideId())}
+              >
+                <Icon name="arrow-uturn-left" size={12} />
+              </button>
+            )}
+          </Show>
+        </header>
+      </Show>
       <div class="template-widget-body">
         <Show
           when={sourceMode(p.widget.toggles) !== 'off'}
@@ -145,6 +156,32 @@ function sourceMode(toggles: Record<string, unknown>): 'extern' | 'native' | 'of
   const v = (toggles as { source?: string })?.source;
   if (v === 'native' || v === 'off') return v;
   return 'extern';
+}
+
+// §13.4 — Header-Toggle aus widget.toggles.header. Default true (Header
+// sichtbar). Wenn explizit false gesetzt: Renderer skipped die Header-
+// Section komplett (Hero-Embed-Pattern).
+function headerToggle(toggles: Record<string, unknown>): boolean {
+  const v = (toggles as { header?: unknown })?.header;
+  if (v === false) return false;
+  return true;
+}
+
+// §13.5 — edit_in_view-Toggle aus widget.toggles.edit_in_view. Default
+// pro Widget-Type (siehe Konzept §13.5):
+//   task-list / kanban / checklist  → true  (Inline-Edit natural)
+//   info / doc / link / calendar / smart_summary / channel / drive → false
+// Caller-Code wertet das via classList aus (.template-widget-edit-in-view)
+// oder via data-edit-in-view-Attribut. V1: nur am Wrapper exponiert,
+// Sub-Renderer (BoardView / ChecklistPanel / Channel / Drive) konsumieren
+// es noch nicht — Inline-Edit-Pfad bleibt heute Edit-Mode-gated. V2:
+// Sub-Renderer lesen den Toggle und schalten Edit-Affordances unabhaengig
+// vom Cell-Edit-Mode frei.
+function editInViewToggle(toggles: Record<string, unknown>, type: ResolvedWidget['type']): boolean {
+  const v = (toggles as { edit_in_view?: unknown })?.edit_in_view;
+  if (typeof v === 'boolean') return v;
+  // Default per Widget-Type.
+  return type === 'kanban' || type === 'checklist';
 }
 
 function widgetTypeLabel(t: ResolvedWidget['type']): string {

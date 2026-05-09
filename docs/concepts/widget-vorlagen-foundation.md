@@ -1968,18 +1968,26 @@ Smart-Summary-Default-Vorlage erweitert: ein Widget „Beobachtet von dir" → `
 
 ### 13.4 Header-Toggle
 
-Boolean. Wenn aus: Widget rendert ohne Title + Action-Bar (z.B. fuer Hero-Doc-Embed).
+**Status 2026-05-09:** LIVE. Boolean `widget.toggles.header` (default `true`). Wenn `false`: `TemplateWidgetRenderer` skipped die Header-Section komplett (Type-Badge + Reset-Button) — z.B. fuer Hero-Doc-Embed ohne Chrome.
+
+`WidgetInspector` zeigt Checkbox „Header anzeigen" — Default an, User kann pro Widget abschalten. `headerToggle(toggles)`-Helper im Renderer.
 
 ### 13.5 edit_in_view-Toggle
 
-Boolean. Wenn an: User kann Widget-Inhalt aendern auch wenn die Cell nicht im Edit-Mode ist (z.B. Tasks abhaken in einem Smart-Summary-Widget).
+**Status 2026-05-09:** V1 LIVE (Wrapper-Klasse + Inspector-UI). Boolean `widget.toggles.edit_in_view`. Wenn an: User kann Widget-Inhalt aendern auch wenn die Cell nicht im Edit-Mode ist (z.B. Tasks abhaken in einem Smart-Summary-Widget).
 
 **Defaults pro Widget-Type (final 2026-05-07):**
-- `task-list` / `checklist` → `true` (Inline-Edit naturlich, Checkbox abhaken usw.).
-- `info-form` / `doc` → `false` (strukturierte Felder mit Validierung, Inline-Edit kann Daten-Inkonsistenz verursachen).
-- `kanban-column` / `calendar` / `link-list` / `activity` → `false`.
+- `kanban` / `checklist` → `true` (Inline-Edit naturlich, Checkbox abhaken usw.).
+- `info` / `doc` → `false` (strukturierte Felder mit Validierung, Inline-Edit kann Daten-Inkonsistenz verursachen).
+- `link` / `calendar` / `smart_summary` / `channel` / `drive` → `false`.
 
-Vorlage-Designer-Inspector zeigt Toggle pro Widget — User kann Default ueberschreiben.
+Vorlage-Designer-Inspector zeigt Toggle pro Widget — User kann Default ueberschreiben. `editInViewToggle(toggles, type)`-Helper liefert den effektiven Wert.
+
+**V1-Implementation:** Renderer setzt CSS-Klasse `.template-widget-edit-in-view` + `data-edit-in-view`-Attribut auf den Widget-Wrapper. Sub-Renderer (BoardView / ChecklistPanel / Channel / Drive) konsumieren das Flag noch nicht — Inline-Edit-Pfad bleibt heute Edit-Mode-gated.
+
+**V2-deferred:** Sub-Renderer lesen das Flag und schalten Edit-Affordances unabhaengig vom Cell-Edit-Mode frei. Pflicht-Stellen: `BoardView.onCardDragStart`-Guard (sort=manual), `ChecklistPanel`-Item-Edit, `info_field`-Value-Editor, `Channel`-Send-Button, `DriveWidget.handleLinkFile`. Pro Sub-Renderer einzeln gegated — Caller (`TemplateWidgetRenderer`) reicht das Flag durch.
+
+**Konzept-Punkt zugemacht V1.** V2-Sub-Renderer-Wiring bleibt offen.
 
 ### 13.5a Konflikt-Audit `AccountVisibility` vs. `edit_in_view`-Widget-Toggle (Audit-Stand 2026-05-07, Entscheidung deferred zum Wrap-up)
 

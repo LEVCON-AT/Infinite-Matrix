@@ -855,10 +855,65 @@ const WidgetInspector = (p: {
         </div>
       </Show>
 
+      {/* §13.4 Header-Toggle. Default true. Wenn aus: Widget rendert
+          ohne Type-Badge + Action-Bar (Hero-Embed-Pattern). */}
+      <div class="designer-inspector-field">
+        <label class="designer-inspector-label">
+          <input
+            type="checkbox"
+            checked={((p.widget.toggles as { header?: boolean })?.header ?? true) === true}
+            disabled={p.disabled}
+            onChange={(e) =>
+              void p.onPatch({
+                toggles: {
+                  ...(p.widget.toggles ?? {}),
+                  header: e.currentTarget.checked,
+                },
+              })
+            }
+          />
+          <span>Header anzeigen</span>
+        </label>
+        <span class="adapter-dialog-field-hint">
+          Aus = Widget ohne Type-Badge + Action-Bar (z.B. fuer Hero-Embed).
+        </span>
+      </div>
+
+      {/* §13.5 edit_in_view-Toggle. Default per Widget-Type
+          (kanban/checklist: true; sonst false). Wenn an: User kann
+          Inhalte aendern auch wenn Cell nicht im Edit-Mode. V1
+          Inspector-only — Sub-Renderer respektieren das Flag in
+          V2-Folge-Sprint. */}
+      <div class="designer-inspector-field">
+        <label class="designer-inspector-label">
+          <input
+            type="checkbox"
+            checked={
+              (p.widget.toggles as { edit_in_view?: boolean })?.edit_in_view ??
+              (p.widget.type === 'kanban' || p.widget.type === 'checklist')
+            }
+            disabled={p.disabled}
+            onChange={(e) =>
+              void p.onPatch({
+                toggles: {
+                  ...(p.widget.toggles ?? {}),
+                  edit_in_view: e.currentTarget.checked,
+                },
+              })
+            }
+          />
+          <span>Bearbeiten ohne Edit-Modus</span>
+        </label>
+        <span class="adapter-dialog-field-hint">
+          Standard fuer Kanban/Checklist an, fuer strukturierte Widgets aus. V1: Wrapper-Klasse
+          gesetzt; volles Sub-Renderer-Wiring folgt.
+        </span>
+      </div>
+
       <details class="designer-inspector-toggles">
         <summary>Toggles ({Object.keys(p.widget.toggles).length})</summary>
         <p class="adapter-dialog-field-hint">
-          Weitere Toggle-Editor (comments/attachments/marker/header/edit_in_view) folgen.
+          Weitere Toggle-Editor (comments/attachments/marker) folgen.
         </p>
       </details>
     </div>
