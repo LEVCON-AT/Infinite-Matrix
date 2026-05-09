@@ -2638,8 +2638,10 @@ Standard-Pattern §5.3 mit Diskriminator-Branching:
 | `widget_external_channels` | `is_workspace_member` | `can_write_workspace` |
 | `saved_filters` | `is_workspace_member AND (scope='workspace' OR owner_user_id=auth.uid())` | `can_write_workspace AND (scope='workspace' OR owner_user_id=auth.uid())` |
 | `atom_markers` | `is_workspace_member AND (kind='star' OR user_id=auth.uid())` (Star shared, Eye Owner-only) | nur Owner |
+| `oauth_provider_slots` | `is_platform_admin()` (Read+Write) — Plattform-Konfig, nicht User-/Workspace-skopiert. Status-Heartbeat-Updates ueber RPC `set_oauth_provider_slot_status` mit SECURITY DEFINER. | nur `is_platform_admin()` |
+| `atom_manifestations` (extended §9.A) | `is_workspace_member(workspace_id)` mit Container-Branching: `container_kind='cell'` join cells.workspace, `container_kind='atom'` join atom-Tabelle | `can_write_workspace` mit gleichem Branching |
 
-`is_platform_admin()` ist existing Helper aus Welle B (Plattform-Admin-Foundation).
+`is_platform_admin()` ist existing Helper aus Welle B (Plattform-Admin-Foundation). `is_workspace_member()` und `can_write_workspace()` sind Architektur-§5.3-Helper.
 
 ### 15.5 Channel-Bridge-Slot 8 immer gefuellt (User 2026-05-07 bestaetigt, §14.3 Pflicht)
 
