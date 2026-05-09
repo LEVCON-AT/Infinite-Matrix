@@ -420,6 +420,28 @@ p.ok {
   color: var(--text2);
 }
 
+/* §14.1 V1 — AliasRedirect-Route Stub. Kurzer Spinner-Text waehrend
+   resolveAlias laeuft; Komponente unmountet sich nach erfolgreichem
+   dispatch. Halbtransparenter Bg, mittiger Card. */
+.alias-redirect-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: var(--space-xl);
+}
+
+.alias-redirect-card {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-md);
+  background: var(--bg2);
+  color: var(--text2);
+  font-size: 0.95rem;
+}
+
 /* ── App-Shell ───────────────────────────────────────────────── */
 .app-shell {
   min-height: 100%;

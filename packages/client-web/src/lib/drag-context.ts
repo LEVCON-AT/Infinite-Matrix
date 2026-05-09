@@ -127,7 +127,13 @@ export function buildExternalDragUrl(src: DragSource): string | null {
   if (!src.workspaceId) return null;
   const origin = window.location.origin;
   const alias = findAliasForOwner(src.workspaceId, dragSourceAliasKind(src.atom), src.atomId);
-  if (alias) return `${origin}/api/resolve/${encodeURIComponent(alias)}`;
+  // §14.1 V1: Alias-Redirect-Route. SPA-Resolver in routes/AliasRedirect.tsx
+  // resolved via resolveAlias(workspaceId, alias) und navigiert auf das Ziel.
+  // RLS in resolveAlias filtert Non-Member-Zugriff (concept §14.1 „kein Hint
+  // auf Existenz" wird durch „nicht gefunden"-Toast realisiert).
+  if (alias) {
+    return `${origin}/r/${encodeURIComponent(src.workspaceId)}/${encodeURIComponent(alias)}`;
+  }
   return `${origin}/w/${encodeURIComponent(src.workspaceId)}`;
 }
 

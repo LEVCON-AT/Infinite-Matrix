@@ -2107,6 +2107,18 @@ Pattern aus Welle A `user_ai_providers` (Memory `project_phase2_kifirst_vision.m
 
 ### 14.1 Public-Resolve-Endpoint (Member-only V1)
 
+**Status 2026-05-09 — V1 LIVE.** SPA-Route `/r/:workspaceId/:alias` (`routes/AliasRedirect.tsx`) resolved Aliase aus extern-Drop-URLs (`buildExternalDragUrl` in `drag-context.ts`). Resolver ruft `resolveAlias(alias, workspaceId)` und dispatched via `dispatchAliasResult` auf die Cell/Karte/Doc/Link-Route. Member-only-Pflicht durch RLS in resolveAlias-Queries (Non-Member sehen die Atom-Targets nicht — kommt als „Alias nicht gefunden" zurueck, kein Hint auf Existenz, Konzept-Vorgabe gewahrt).
+
+**V1-Ein­schraenkungen (Folge-Sub-Sprints):**
+- Auth-Guard in `App.tsx` schickt nicht-eingeloggte User auf `/login`. **`?next=`-Parameter** + automatischer Re-Direct nach Login deferred V2 (Pattern wie `Invite.tsx` mit sessionStorage).
+- URL nutzt `workspaceId` (UUID) statt `:workspaceSlug` — Workspace-Slugs sind im Schema heute nicht definiert, Slug-URL bleibt V2-Polish.
+- Server-Side-Hydration via Edge-Function (concept Realisierung „kommt mit Test/Prod-V2") deferred.
+
+**Live-Pfad:**
+- Drag aus BoardView/NodeTree → `bindDragSource` ruft `setExternalDragMimes` → `buildExternalDragUrl` produziert `/r/<wsid>/<alias>`.
+- Empfaenger klickt Hyperlink in Mail/Messenger → SPA-Route `AliasRedirect` rendert Spinner → resolveAlias + Navigate.
+- Bei Non-Member oder geloeschtem Alias: showToast + Navigate auf Workspace-Root (defensiver Fallback).
+
 Neuer Endpoint `GET /alias/:workspaceSlug/:alias` mit:
 
 - **Default Member-only.** Permission-Check via `is_workspace_member(workspace_id)` analog Architektur §5.3 RLS.

@@ -3,6 +3,7 @@ import { render } from 'solid-js/web';
 import App from './App';
 import Admin from './routes/Admin';
 import Agenda from './routes/Agenda';
+import AliasRedirect from './routes/AliasRedirect';
 import Calendar from './routes/Calendar';
 import Invite from './routes/Invite';
 import Login from './routes/Login';
@@ -61,6 +62,7 @@ render(
       <Route path="/onboarding" component={Onboarding} />
       <Route path="/oauth/callback" component={OAuthCallback} />
       <Route path="/admin" component={Admin} />
+      <Route path="/r/:workspaceId/:alias" component={AliasRedirect} />
       <Route path="/w/:workspaceId" component={Workspace} />
       <Route path="/w/:workspaceId/n/:nodeId" component={Workspace} />
       <Route path="/w/:workspaceId/c/:cellId/checklists" component={Workspace} />
