@@ -47,6 +47,7 @@ import {
 import type { PresenceUser } from '../lib/presence';
 import { showToast, showUndoToast } from '../lib/toasts';
 import type {
+  AtomMarkerRow,
   ChecklistCloseMode,
   ChecklistItemRow,
   ChecklistRow,
@@ -54,6 +55,7 @@ import type {
 } from '../lib/types';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 import AliasText from './AliasText';
+import AtomMarkerBar from './AtomMarkerBar';
 import ChecklistActionModal from './ChecklistActionModal';
 import ChecklistPastePopup from './ChecklistPastePopup';
 import ChecklistToCardPopup from './ChecklistToCardPopup';
@@ -80,6 +82,9 @@ type Props = {
   // Drop-Idempotenz (Move-vs-Add-Detect). Optional — Drop-Target ist
   // dann inactive.
   wsManifestations?: TaskManifestationRow[];
+  // §13.3 V2.D: AtomMarkerBar im Checklist-Header (atom_type='checklist').
+  // Optional — Caller ohne Workspace-Bundle blendet die Bar aus.
+  wsAtomMarkers?: AtomMarkerRow[];
 };
 
 const ChecklistPanel: Component<Props> = (p) => {
@@ -547,6 +552,22 @@ const ChecklistPanel: Component<Props> = (p) => {
           <span class="cl-recur" title="wiederkehrend">
             <Icon name="arrow-path" size={12} />
           </span>
+        </Show>
+        {/* §13.3 V2.D: Marker-Bar (Star+Eye) fuer das Checklist-Atom.
+            Zeigt sich rechts in der cl-head, nur wenn selfUserId
+            durchgereicht ist (View-Mode-Kontext mit User-Session). */}
+        <Show when={p.selfUserId}>
+          {(uid) => (
+            <AtomMarkerBar
+              workspaceId={p.workspaceId}
+              userId={uid()}
+              atomType="checklist"
+              atomId={p.checklist.id}
+              markers={(p.wsAtomMarkers ?? []).filter(
+                (m) => m.atom_type === 'checklist' && m.atom_id === p.checklist.id,
+              )}
+            />
+          )}
         </Show>
       </header>
 

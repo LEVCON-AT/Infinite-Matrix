@@ -1600,6 +1600,8 @@ const BoardView: Component<Props> = (p) => {
                           items={items()}
                           workspaceId={p.workspaceId}
                           wsManifestations={p.wsManifestations ?? []}
+                          wsAtomMarkers={p.wsAtomMarkers}
+                          selfUserId={p.selfUserId}
                           onChanged={() => p.onChanged?.()}
                         />
                       );

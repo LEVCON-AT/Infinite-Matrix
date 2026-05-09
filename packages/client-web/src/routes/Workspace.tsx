@@ -1898,6 +1898,7 @@ const Workspace: Component = () => {
                         onItemHover={setHoverItemId}
                         resolverMaps={resolverMaps}
                         wsManifestations={wsManifestations() ?? []}
+                        wsAtomMarkers={wsAtomMarkers() ?? []}
                       />
                     </Show>
                     <Show when={cellSection() === 'info'}>

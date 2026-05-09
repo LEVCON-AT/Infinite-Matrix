@@ -13,7 +13,7 @@ import { addCellChecklist } from '../lib/mutations';
 import type { PresenceUser } from '../lib/presence';
 import { fetchCellChecklists } from '../lib/queries';
 import { showToast } from '../lib/toasts';
-import type { CellRow, ColRow, RowRow, TaskManifestationRow } from '../lib/types';
+import type { AtomMarkerRow, CellRow, ColRow, RowRow, TaskManifestationRow } from '../lib/types';
 import { useViewerActive } from '../lib/workspace-role';
 import CellDocsSection from './CellDocsSection';
 import ChecklistPanel from './ChecklistPanel';
@@ -37,6 +37,9 @@ type Props = {
   resolverMaps?: () => ContextMaps;
   // Phase 4 T.1.G.2.C: Workspace-weite Manifestations fuer Cross-View-Drop.
   wsManifestations?: TaskManifestationRow[];
+  // §13.3 V2.D: Atom-Markers (Star+Eye) fuer den Checklist-Header.
+  // Optional — Caller ohne Bundle blendet die Bar aus.
+  wsAtomMarkers?: AtomMarkerRow[];
 };
 
 const CellChecklistsPage: Component<Props> = (p) => {
@@ -168,6 +171,7 @@ const CellChecklistsPage: Component<Props> = (p) => {
                     onItemHover={p.onItemHover}
                     resolverMaps={p.resolverMaps}
                     wsManifestations={p.wsManifestations ?? []}
+                    wsAtomMarkers={p.wsAtomMarkers}
                   />
                 );
               }}
