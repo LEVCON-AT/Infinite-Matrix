@@ -40,6 +40,7 @@ import {
 } from '../lib/recur';
 import { showToast } from '../lib/toasts';
 import type {
+  AtomMarkerRow,
   AtomTagWithTag,
   BoardContent,
   CardRecur,
@@ -54,6 +55,7 @@ import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 import { useViewerActive } from '../lib/workspace-role';
 import AliasText from './AliasText';
 import AtomDocsSection from './AtomDocsSection';
+import AtomMarkerBar from './AtomMarkerBar';
 import AtomTagsEditor from './AtomTagsEditor';
 import Icon from './Icon';
 
@@ -79,6 +81,12 @@ type Props = {
   wsNodes?: NodeRow[];
   cellLabelById?: Map<string, string>;
   tagsRealtimeVersion?: number;
+  // §13.3 V2.A: AtomMarkerBar in der Overlay-Header. Workspace-skopierte
+  // Marker-Liste (atom_markers, Migration 074) wird auf (atom_type='task',
+  // atom_id=card.id) clientseitig gefiltert. selfUserId fuer Self-Toggle-
+  // Detection (Eye user-privat, Star self-Status fuer Active-Color).
+  wsAtomMarkers?: AtomMarkerRow[];
+  selfUserId?: string;
 };
 
 type OverlayItem = {
@@ -648,6 +656,22 @@ const CardOverlay: Component<Props> = (p) => {
               }
             }}
           />
+          {/* §13.3 V2.A: Marker-Bar (Star+Eye) im Overlay-Header. Wird nur
+              gerendert wenn Caller workspaceId + selfUserId durchreicht
+              (legacy Caller wie TaskOverview ohne Bundle bleiben Marker-frei). */}
+          <Show when={p.workspaceId && p.selfUserId}>
+            {(_) => (
+              <AtomMarkerBar
+                workspaceId={p.workspaceId as string}
+                userId={p.selfUserId as string}
+                atomType="task"
+                atomId={p.card.id}
+                markers={(p.wsAtomMarkers ?? []).filter(
+                  (m) => m.atom_type === 'task' && m.atom_id === p.card.id,
+                )}
+              />
+            )}
+          </Show>
           <button type="button" class="overlay-close" onClick={p.onClose} aria-label="Schliessen">
             <Icon name="x" size={18} />
           </button>

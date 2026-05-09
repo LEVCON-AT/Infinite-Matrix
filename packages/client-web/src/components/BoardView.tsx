@@ -1632,6 +1632,8 @@ const BoardView: Component<Props> = (p) => {
                   wsAtomPins={p.wsAtomPins}
                   wsDocs={p.wsDocs}
                   wsAtomTagsEnriched={p.wsAtomTagsEnriched}
+                  wsAtomMarkers={p.wsAtomMarkers}
+                  selfUserId={p.selfUserId}
                   workspaceId={p.workspaceId}
                   atomPickerEntries={p.atomPickerEntries}
                   wsCells={p.wsCells}
