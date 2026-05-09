@@ -6,7 +6,7 @@ import type { ParsedPasteItem } from '../lib/checklist-paste-parse';
 import { decryptPayload, isEncrypted } from '../lib/crypto';
 import { showChoice, showPrompt } from '../lib/dialog';
 import { openDocsPopup } from '../lib/docs-ui';
-import { bindDragSource } from '../lib/drag-context';
+import { ATOM_REF_MIME, bindDragSource, decodeAtomRefPayload } from '../lib/drag-context';
 import { useEditMode } from '../lib/edit-mode';
 import { translateDbError } from '../lib/errors';
 import {
@@ -1025,13 +1025,19 @@ const NodeTree: Component<Props> = (props) => {
   // Effect weiter unten, nach filtered() registriert (Use-Before-Decl).
 
   // Card-Drop auf Board-Eintraege in der Sidebar (cross-board move).
-  // BoardView setzt den Card-ID auf text/matrix-card-id; wir holen ihn
-  // im Drop-Handler, laden die Ziel-Board-Cols, und verschieben die
-  // Karte an die erste Spalte ans Ende.
+  // BoardView setzt drei MIMEs: `text/matrix-card-id` (legacy), `text/plain`
+  // (Browser-Fallback) und `application/x-matrix-atom-ref` (§14.5 JSON-
+  // Payload mit atom_type + atom_id + workspace_id). Wir akzeptieren alle
+  // drei — der Ref-MIME ist primaer (semantisch eindeutig), die anderen
+  // bleiben fuer Backward-Compat + browser-stripping-Faelle.
   function onCardDragOver(boardId: string, e: DragEvent) {
     if (!e.dataTransfer) return;
     const types = Array.from(e.dataTransfer.types);
-    if (!types.includes('text/matrix-card-id') && !types.includes('text/plain')) {
+    if (
+      !types.includes(ATOM_REF_MIME) &&
+      !types.includes('text/matrix-card-id') &&
+      !types.includes('text/plain')
+    ) {
       return;
     }
     e.preventDefault();
@@ -1045,8 +1051,21 @@ const NodeTree: Component<Props> = (props) => {
     e.preventDefault();
     setDragOverBoardId(null);
     if (!e.dataTransfer) return;
-    const cardId =
-      e.dataTransfer.getData('text/matrix-card-id') || e.dataTransfer.getData('text/plain');
+    // §14.5: Ref-MIME zuerst probieren — bei mismatch atom_type !== 'task'
+    // brechen wir ab (Cross-Board-Move ist Task-only). Fallbacks decken
+    // ext. Quellen + alte In-App-Sources die noch ohne Ref-MIME senden.
+    let cardId: string | null = null;
+    const refRaw = e.dataTransfer.getData(ATOM_REF_MIME);
+    if (refRaw) {
+      const ref = decodeAtomRefPayload(refRaw);
+      if (ref && ref.atomType === 'task') cardId = ref.atomId;
+    }
+    if (!cardId) {
+      cardId =
+        e.dataTransfer.getData('text/matrix-card-id') ||
+        e.dataTransfer.getData('text/plain') ||
+        null;
+    }
     if (!cardId) return;
     if (viewerActive()) {
       showToast('Read-only: Karten verschieben ist als Viewer nicht moeglich.', 'info');

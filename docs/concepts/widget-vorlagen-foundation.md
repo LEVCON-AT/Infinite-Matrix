@@ -2119,28 +2119,31 @@ HTML5-DataTransfer mit **vier parallelen Formaten** (alle V1-Pflicht):
 
 **Worksheet-Bestaetigung 14.4:** alle 4 Formate V1. ✓
 
-### 14.5 Custom-MIME-Rename + JSON-Format (Migration in WV.WV)
+### 14.5 Custom-MIME-Rename + JSON-Format (Migration LIVE)
 
-**Heutiger Stand (`packages/client-web/src/lib/drag-context.ts:84`):** Custom-MIME ist `application/x-matrix-atom` mit String-Payload `${atomType}:${atomId}`. Nur 1 Caller-Stelle.
+**Status:** Live seit WV.WV.8 + Caller-Audit 2026-05-09. MIME ist `application/x-matrix-atom-ref`, Payload ist versioniertes JSON `{ v:1, atomType, atomId, workspaceId, sourceManifId? }`.
 
-**V1-Aenderung (im WV.WV-Sprint):**
+**Code-Single-Source:** `packages/client-web/src/lib/drag-context.ts`
+- `ATOM_REF_MIME` — exportierte Konstante.
+- `AtomRefPayload` — Type mit `v: 1` (Forward-Compat-Versionierung).
+- `encodeAtomRefPayload(DragSource): string` — Encoder.
+- `decodeAtomRefPayload(raw): AtomRefPayload | null` — defensiver Decoder fuer ext. Konsumenten (MCP-Bridge, Cross-Window-Drops). Returns `null` bei Schema-Drift.
+- `bindDragSource()` setzt den MIME automatisch.
 
-```ts
-// FALSCH — heutiger Stand (1 Stelle, drag-context.ts:84)
-e.dataTransfer.setData('application/x-matrix-atom', `${src.atom}:${src.atomId}`);
+**Caller-Audit 2026-05-09 (alle In-App-Drag-Quellen emittieren Ref-MIME):**
+- `BoardView.onCardDragStart` — Kanban-Card-Drag (manuelles `setData`, weil `boardUi.sort()`-Guard `bindDragSource` nicht zulaesst). Setzt zusaetzlich `text/matrix-card-id` + `text/plain` als Legacy-Fallback fuer Browser-stripping.
+- `bindDragSource`-Konsumenten (DocsPopup-Atoms, Sidebar-Atoms, ChecklistPanel-Items, etc.) — automatisch.
 
-// RICHTIG — Vorlagen-Modell ab WV.WV
-e.dataTransfer.setData(
-  'application/x-matrix-atom-ref',
-  JSON.stringify({ atomType: src.atom, atomId: src.atomId, workspaceId: ws })
-);
-```
+**Drop-Handler-Audit 2026-05-09 (alle akzeptieren Ref-MIME als primaer):**
+- `BoardView.onCardDrop` + `onColDrop` — Ref-MIME → Legacy → `draggingCardId()`-Solid-Fallback.
+- `NodeTree.onCardDrop` + `onCardDragOver` — Ref-MIME → Legacy.
+- In-App-Drop-Targets (BoardView/ChecklistPanel/Calendar/SidebarDayView) lesen primaer `activeDrag()` (Solid-Signal); MIME-Pfad ist nur fuer Cross-Window-/MCP-/Bridge-Konsumenten relevant.
 
 **Begruendung Rename:** „atom" allein ist mehrdeutig, **„atom-ref"** macht klar, dass es um eine Referenz handelt — nicht den Atom-Body selbst. Konsistent zum Type `AtomRef` in Architektur-Manifest §1.6.
 
-**Begruendung JSON-Format:** Cross-Workspace-Drop (z.B. Bridge-Tool-Hosting) braucht `workspaceId`. Erweiterbar fuer kuenftige Felder (e.g. `aliasHint`, `displayMeta`-Snapshot). String-Format `${atomType}:${atomId}` ist nicht erweiterbar ohne Parser-Bruch.
+**Begruendung JSON-Format mit `v`:** Cross-Workspace-Drop (z.B. Bridge-Tool-Hosting) braucht `workspaceId`. `v: 1` ist Forward-Compat-Vertrag — Konsumenten brechen bei unbekanntem `v` ab. Erweiterbar fuer kuenftige Felder (e.g. `aliasHint`, `displayMeta`-Snapshot).
 
-**Migration-Aufwand:** trivial, 1 Code-Stelle (`drag-context.ts:84`) + alle Drop-Handler die `application/x-matrix-atom` lesen (Audit beim WV.WV-Sprint). Kein Bestand-User-Konflikt — Drag-Sessions persistieren nicht ueber Releases hinweg.
+**Konzept-Punkt zugemacht** — keine WV.WV-Folge-Aktion mehr noetig fuer §14.5.
 
 ### 14.6 Alias-Autocomplete in jedem Text-Input (Coverage-Pflicht)
 

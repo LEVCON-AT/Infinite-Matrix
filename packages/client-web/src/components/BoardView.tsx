@@ -13,7 +13,14 @@ import { useBoardUi } from '../lib/board-ui-state';
 import { showConfirm, showPrompt } from '../lib/dialog';
 import { openDokuForContext, shouldIgnoreDKey } from '../lib/docs-open';
 import { openDocsPopup } from '../lib/docs-ui';
-import { activeDrag, endDrag, startDrag } from '../lib/drag-context';
+import {
+  ATOM_REF_MIME,
+  activeDrag,
+  decodeAtomRefPayload,
+  encodeAtomRefPayload,
+  endDrag,
+  startDrag,
+} from '../lib/drag-context';
 import { translateDbError } from '../lib/errors';
 import { dropOnKanbanCol } from '../lib/manifestation-cross-view';
 import {
@@ -299,6 +306,20 @@ const BoardView: Component<Props> = (p) => {
     e.dataTransfer.setData('text/matrix-card-id', card.id);
     // Fallback fuer Browser die den custom-type ignorieren.
     e.dataTransfer.setData('text/plain', card.id);
+    // §14.5 / WV.WV.8: zusaetzlich generischen Atom-Ref-MIME emittieren.
+    // BoardView nutzt nicht `bindDragSource` (manuelle DragStart-Logik
+    // wegen `boardUi.sort()`-Guard), muss den Ref-MIME daher selbst
+    // setzen — sonst sehen Bridge-/MCP-/Cross-Window-Konsumenten die
+    // Kanban-Karte nicht als Atom-Ref.
+    e.dataTransfer.setData(
+      ATOM_REF_MIME,
+      encodeAtomRefPayload({
+        atom: 'task',
+        atomId: card.id,
+        workspaceId: p.workspaceId,
+        label: card.name,
+      }),
+    );
     setDraggingCardId(card.id);
     // Phase 4 T.1.G.2.D: Cross-View-Drag aktivieren — auch fuer Kanban-
     // Karten. Damit akzeptieren Sidebar-Calendar / Mini-Calendar / Day-
@@ -439,7 +460,17 @@ const BoardView: Component<Props> = (p) => {
   }
 
   async function onCardDrop(targetCard: KbCardRow, e: DragEvent) {
+    // §14.5: Ref-MIME als primaeren Pfad akzeptieren (Konsistenz mit
+    // anderen Drop-Handlern). Legacy-MIMEs + draggingCardId() bleiben
+    // Fallback fuer Browser-stripping + lokale Solid-State-Faelle.
+    const refRaw = e.dataTransfer?.getData(ATOM_REF_MIME) ?? '';
+    let refId: string | null = null;
+    if (refRaw) {
+      const ref = decodeAtomRefPayload(refRaw);
+      if (ref && ref.atomType === 'task') refId = ref.atomId;
+    }
     const srcId =
+      refId ||
       e.dataTransfer?.getData('text/matrix-card-id') ||
       e.dataTransfer?.getData('text/plain') ||
       draggingCardId();
@@ -481,7 +512,15 @@ const BoardView: Component<Props> = (p) => {
     // zusaetzlich (Drag-Target-Bubble). Guard via dragOverCardId:
     // wenn gesetzt, ist der Card-Handler zustaendig.
     const anchorCardId = dragOverCardId();
+    // §14.5: Ref-MIME-Pfad analog zu onCardDrop.
+    const refRawCol = e.dataTransfer?.getData(ATOM_REF_MIME) ?? '';
+    let refIdCol: string | null = null;
+    if (refRawCol) {
+      const ref = decodeAtomRefPayload(refRawCol);
+      if (ref && ref.atomType === 'task') refIdCol = ref.atomId;
+    }
     const cardId =
+      refIdCol ||
       e.dataTransfer?.getData('text/matrix-card-id') ||
       e.dataTransfer?.getData('text/plain') ||
       draggingCardId();
