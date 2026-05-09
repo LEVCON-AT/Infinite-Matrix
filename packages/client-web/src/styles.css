@@ -9546,6 +9546,23 @@ dialog.overlay-modal .overlay-card {
   text-decoration: underline;
 }
 
+/* §14.7 — Inline-URL-Link in AliasText. Tokenizer-detektiert https/
+   http/mailto/tel werden als <a> gerendert. Optisch dezent (nicht
+   so dominant wie der amber-Alias-Chip), aber klickbar erkennbar. */
+.alias-text-link {
+  color: var(--accent, #4a90e2);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  word-break: break-all;
+}
+
+.alias-text-link:hover,
+.alias-text-link:focus-visible {
+  text-decoration-thickness: 2px;
+  outline: none;
+}
+
 /* ── Checkliste: View-Mode Item-Text ──────────────────────────────
    Muss optisch nah am cl-text-input:read-only bleiben, damit der
    Mode-Toggle nicht springt.

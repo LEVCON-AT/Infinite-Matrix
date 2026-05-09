@@ -2190,30 +2190,42 @@ HTML5-DataTransfer mit **vier parallelen Formaten** (alle V1-Pflicht):
 
 **User-Direktive 2026-05-07:** *„In einem Infofeld URL kann ich auch einfach ein alias eintippen als direktverlinkung."*
 
+**Status nach Code-Pass 2026-05-09:** V1-Mixed-Tokenizer LIVE — `lib/alias-tokenizer.ts` erkennt drei Token-Typen (`text` / `alias` / `url`), `AliasText` rendert sie 1:1 (Alias als Chip, URL als `<a target=_blank rel=noopener>`, Text plain). `markdown-lite` nutzt denselben Tokenizer (URL-Detection-Doublet entfernt).
+
 **Verhalten:**
 
-- info_field mit `value_type='url'` (siehe §12.3 typed Field-Types) akzeptiert als Value entweder:
-  - **klassische URL** (`https://...`, `mailto:...`) — wie heute, Standard-Sanitization via `sanitizeUrl()` (Architektur §6.6).
-  - **Alias** (`^kuerzel`) — wird beim Render live durch `lib/alias-resolve.ts` aufgeloest zu absoluter App-URL.
-- **Speicherung:** Alias bleibt im `value` als Alias-String erhalten — KEIN Eager-Resolve in URL beim Save. Das laesst Renames der Ziel-Cell/Atom durchschlagen ohne Stale-URLs (Welle D-Resolver-Pattern).
-- **Rendering:** info_field-URL-Type-Renderer prueft ob `value` mit `^` beginnt → ja: Alias-Resolve, fallback auf Alias-Tag mit Hint („Alias nicht gefunden") wenn unaufloesbar. Nein: klassische URL.
-- **Symbol-System §12 Konsequenz:** Bei Alias-Wert wird **Symbol vom Ziel-Atom geerbt** (z.B. Alias auf Doc → Doc-Symbol; Alias auf Cell → Cell-Symbol). Bei klassischer URL: Provider-Auto-Symbol (siehe §12.7).
-- **Autocomplete:** `^` triggert Alias-Autocomplete (siehe §14.6).
+- info_field-Wert akzeptiert beliebige Mischung aus Text + Alias + URL. Renderer detektiert pro Token:
+  - **klassische URL** (`https://...`, `http://...`, `mailto:...`, `tel:...`) — sanitisiert via `sanitizeUrl()` (Architektur §6.6, Allowlist-Schemes), gerendert als Inline-Link.
+  - **Alias** (`^kuerzel`) — gerendert als `<AliasChip>`, click loest via `lib/alias-resolve.ts` zu Atom/Cell/Doc/Card auf, dispatch via `dispatchAliasResult` (navigate/Card-Overlay/Doc-Popup).
+  - **Text** — Plain-Render.
+- **Speicherung:** Alias bleibt im `value` als Alias-String erhalten — KEIN Eager-Resolve in URL beim Save. Renames der Ziel-Cell/Atom schlagen ohne Stale-URLs durch (Welle D-Resolver-Pattern).
+- **XSS-Defense:** Tokenizer dropt URLs deren Scheme nicht in der Allowlist (`https/http/mailto/tel`) — `javascript:`, `data:`, `vbscript:`, `blob:`, `file:` werden als Plain-Text gerendert, kein `<a href>`.
+- **Trailing-Punctuation:** `https://x.com,` wird als URL `https://x.com` + Text `,` gesplittet (Satzendung gehoert zum Satz, nicht zur URL).
+- **Autocomplete:** `^` triggert Alias-Autocomplete in Edit-Mode (siehe §14.6).
 - **Edit-Sync mit info_field-Origin:** Alias-Wert ist Single-Source — Edit am info_field laeuft durch Welle WV.B Realtime an alle Caller (Cross-View-Drag-Manifestationen).
 
 **Beispiel:**
 
 ```
-info_field(label='Vertrag', value_type='url', value='^kunde-vertrag-2026')
+info_field(label='Vertrag', value='^kunde-vertrag-2026 plus https://crm.acme.com')
+       ↓ tokenizer
+[alias: kunde-vertrag-2026] [text: ' plus '] [url: 'https://crm.acme.com']
        ↓ render
-[Vertrag] [📄 Kunde-Vertrag-2026 (Doc)]   ← Alias resolved + Symbol vom Doc-Ziel
-       ↓ click
-→ navigate(`/w/<ws>/atoms/doc/<id>`)
+[Vertrag] [^kunde-vertrag-2026] plus https://crm.acme.com
+              ↓ click chip                   ↓ click link
+              navigate via dispatchAlias     window.open in new tab
 ```
 
-**Schema-Konsequenz:** keine — `info_fields.value text` deckt beides ab. Render-Logik unterscheidet Alias-Praefix `^`.
+**Schema-Konsequenz:** keine — `info_fields.value text` deckt alle Mischungen ab. Render-Logik unterscheidet Alias-Praefix `^` und URL-Schemes.
 
-**Worksheet-Bestaetigung 14.7:** Verankert. ✓
+**Live-Stellen via `AliasText`-Reuse:** alle Konsumenten profitieren automatisch — `CellInfoPage` (info-Field-Values), `ChecklistPanel` (item-Text-View), `CardOverlay` (Card-Notes), `MarkdownLightView` (Node-Descriptions). Kein Renderer-Doublet.
+
+**V2-Erweiterung (deferred zu Welle B atom-Renderer-Foundation):**
+- Symbol-Inheritance fuer Alias-Chips (Symbol vom Ziel-Atom geerbt — heute zeigt der Chip den Alias-Text mit Amber-Akzent).
+- Provider-Auto-Symbol fuer URLs (favicon-style — Drive/OneNote/Mail-Icon je nach Hostname).
+- Beide haengen an §12.3 Symbol-System V2.
+
+**Worksheet-Bestaetigung 14.7:** Verankert + V1-Tokenizer-Pass live. ✓ Konzept-Punkt zugemacht 2026-05-09 fuer V1; Symbol-Inheritance bleibt offen bis Welle B.
 
 ---
 

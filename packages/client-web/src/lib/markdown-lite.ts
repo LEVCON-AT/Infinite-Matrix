@@ -16,7 +16,6 @@
 // data:/vbscript: ab) — Paranoia.
 
 import { tokenizeAliasText } from './alias-tokenizer';
-import { sanitizeUrl } from './url';
 
 export type MdText = { type: 'text'; value: string };
 export type MdBold = { type: 'bold'; children: MdInline[] };
@@ -26,44 +25,31 @@ export type MdLink = { type: 'link'; href: string; label: string };
 export type MdAlias = { type: 'alias'; alias: string };
 export type MdInline = MdText | MdBold | MdItalic | MdCode | MdLink | MdAlias;
 
-const URL_RE = /https?:\/\/[^\s<>"'`]+/g;
-// Alias-Tokenization erfolgt durch tokenizeAliasText (lib/alias-tokenizer);
-// wir splitten Text erst nach URLs, damit ein Alias-Muster innerhalb einer
-// URL nicht faelschlich erkannt wird, und fuettern die Reststuecke dort rein.
+// Alias- + URL-Tokenization erfolgt zentral in tokenizeAliasText
+// (§14.7 Konsolidierung). Frueher hatte markdown-lite einen eigenen
+// URL_RE — der ist gefallen, damit URL-Detection nicht doppelt lebt
+// (Doublet-Verbot, code-quality §1).
 
 // Erst Inline-Code ausschneiden (damit ** und * darin nicht greifen),
-// dann bold, dann italic, dann URLs.
+// dann bold, dann italic, dann URLs + Aliase via Tokenizer.
 function parseInline(input: string): MdInline[] {
   const out: MdInline[] = [];
   let i = 0;
 
-  function pushAliasOrText(s: string) {
-    if (!s) return;
-    for (const t of tokenizeAliasText(s)) {
-      if (t.kind === 'text') out.push({ type: 'text', value: t.value });
-      else out.push({ type: 'alias', alias: t.alias });
-    }
-  }
-
   function pushText(s: string) {
     if (!s) return;
-    // Zuerst URLs abspalten, dann in den verbleibenden Text-Teilen nach
-    // Alias-Tokens suchen. So ueberlappen sich URL- und Alias-Muster nicht.
-    let last = 0;
-    URL_RE.lastIndex = 0;
-    while (true) {
-      const m = URL_RE.exec(s);
-      if (m === null) break;
-      if (m.index > last) pushAliasOrText(s.slice(last, m.index));
-      const safe = sanitizeUrl(m[0]);
-      if (safe) {
-        out.push({ type: 'link', href: safe, label: m[0] });
+    // Tokenizer liefert text + alias + url. Wir mappen 1:1.
+    for (const t of tokenizeAliasText(s)) {
+      if (t.kind === 'text') {
+        out.push({ type: 'text', value: t.value });
+      } else if (t.kind === 'alias') {
+        out.push({ type: 'alias', alias: t.alias });
       } else {
-        out.push({ type: 'text', value: m[0] });
+        // url-Token: tokenizer hat sanitizeUrl bereits verifiziert;
+        // label = sanitized url (kein separates Display-Token).
+        out.push({ type: 'link', href: t.url, label: t.url });
       }
-      last = m.index + m[0].length;
     }
-    if (last < s.length) pushAliasOrText(s.slice(last));
   }
 
   while (i < input.length) {
