@@ -25,6 +25,7 @@
 //   - IconPicker-Modal (Welle B fortgesetzt).
 
 import type { IconName } from '../components/Icon';
+import type { BrandKey } from './brand-icons';
 import type { InfoFieldValueType, LinkProvider } from './types';
 
 // ─── Auto-Symbol pro Field-Type (Konzept §12.3.1) ──────────────
@@ -73,6 +74,25 @@ const LINK_PROVIDER_SYMBOL: Record<LinkProvider, IconName> = {
   filesystem: 'folder',
 };
 
+// ─── Brand-Key-Mapping (Konzept §12.3.2) ───────────────────────
+// 11 LinkProvider haben einen Brand-Distinct-Glyph in lib/brand-icons.ts.
+// Render-Component (AtomSymbol) bevorzugt BrandIcon ueber Heroicon, wenn
+// brandKey gesetzt ist. Provider 'url'/'mail'/'notion'/'filesystem'
+// haben keinen Brand-Glyph — fallback auf Heroicon.
+const LINK_PROVIDER_BRAND: Partial<Record<LinkProvider, BrandKey>> = {
+  'mail-generic': 'mail-generic',
+  onenote: 'onenote',
+  onedrive: 'onedrive',
+  drive: 'drive',
+  dropbox: 'dropbox',
+  nextcloud: 'nextcloud',
+  slack: 'slack',
+  teams: 'teams',
+  whatsapp: 'whatsapp',
+  discord: 'discord',
+  telegram: 'telegram',
+};
+
 // ─── Resolver ──────────────────────────────────────────────────
 
 export type SymbolSource = 'override' | 'favicon' | 'auto' | 'fallback';
@@ -83,6 +103,11 @@ export type ResolvedSymbol = {
   // Wenn source='favicon': URL des Favicon-Bildes (vom Caller via
   // <img>-Tag gerendert, nicht via Icon-Component).
   faviconUrl?: string;
+  // §12.3.2 — wenn der Provider eine Brand-distinct Glyph in
+  // lib/brand-icons.ts hat: BrandKey gesetzt. Render-Component
+  // (AtomSymbol) bevorzugt BrandIcon ueber Heroicon. iconName bleibt
+  // als Fallback fuer Caller die BrandIcon nicht aufloesen koennen.
+  brandKey?: BrandKey;
 };
 
 // Resolved Symbol fuer einen typed Info-Field. Caller liefert override
@@ -115,7 +140,12 @@ export function resolveLinkSymbol(
       return { iconName: 'arrow-top-right-on-square', source: 'favicon', faviconUrl: favicon };
     }
   }
-  return { iconName: LINK_PROVIDER_SYMBOL[provider] ?? 'link', source: 'auto' };
+  const brandKey = LINK_PROVIDER_BRAND[provider];
+  return {
+    iconName: LINK_PROVIDER_SYMBOL[provider] ?? 'link',
+    source: 'auto',
+    ...(brandKey ? { brandKey } : {}),
+  };
 }
 
 // ─── Favicon-URL-Builder ───────────────────────────────────────

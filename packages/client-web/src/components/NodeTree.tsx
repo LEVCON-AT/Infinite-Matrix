@@ -50,12 +50,14 @@ import {
   executeSubtreeImportIntoMatrix,
   parseImportPayload,
 } from '../lib/subtree-import';
+import { resolveLinkSymbol } from '../lib/symbol-resolution';
 import { showToast, showUndoToast } from '../lib/toasts';
 import { hasBeenExpanded, markEverExpanded, useTreeExpand } from '../lib/tree-expand';
 import type { CellFeature, CellRow, TreeEntry } from '../lib/types';
 import { sanitizeUrl } from '../lib/url';
 import { runResetScope } from '../lib/workspace-reset';
 import { useViewerActive } from '../lib/workspace-role';
+import AtomSymbol from './AtomSymbol';
 import ChecklistPastePopup from './ChecklistPastePopup';
 import ContextMenu, { type CtxMenuState } from './ContextMenu';
 import Icon, { type IconName } from './Icon';
@@ -511,7 +513,30 @@ const TreeItem: Component<{
         >
           <span class="tree-dot" aria-hidden="true" style={dotStyle} />
           <span class="tree-ico" aria-hidden="true">
-            <Icon name={iconNameFor(p.entry)} size={14} />
+            {/* §12.3 — Link-Entries mit `provider` (echte links-Tabelle-Rows
+                via linkEntryFromBoardLink) bekommen Provider-distinct
+                Symbol via resolveLinkSymbol. Legacy-cell.data.links und
+                non-link Entries fallen auf iconNameFor zurueck. */}
+            <Show
+              when={p.entry.kind === 'link' && p.entry.provider}
+              fallback={<Icon name={iconNameFor(p.entry)} size={14} />}
+            >
+              {(_provider) => {
+                const linkEntry = p.entry as Extract<TreeEntry, { kind: 'link' }> & {
+                  provider: NonNullable<Extract<TreeEntry, { kind: 'link' }>['provider']>;
+                };
+                return (
+                  <AtomSymbol
+                    resolved={resolveLinkSymbol(
+                      linkEntry.provider,
+                      linkEntry.url,
+                      linkEntry.symbolOverride ?? null,
+                    )}
+                    size={14}
+                  />
+                );
+              }}
+            </Show>
           </span>
           <span class="tree-label">
             <For each={highlightLabel(labelOf(p.entry, p.resolverMaps?.() ?? null), p.query)}>

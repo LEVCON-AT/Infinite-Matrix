@@ -358,6 +358,13 @@ export type TreeEntry =
       label: string;
       url: string;
       alias: string | null;
+      // §12.3 Symbol-System — provider + symbolOverride fuer
+      // Provider-distinct Icon-Render via lib/symbol-resolution.ts.
+      // Optional fuer Backward-Compat: legacy linkEntryFromInfoLink
+      // (cell.data.links jsonb) kennt sie nicht und faellt auf
+      // linkType-basiertes Fallback zurueck.
+      provider?: LinkProvider;
+      symbolOverride?: string | null;
       children: TreeEntry[]; // Immer []; pro Struktur vorhanden.
     }
   | {

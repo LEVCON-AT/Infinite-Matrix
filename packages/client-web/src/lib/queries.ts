@@ -859,10 +859,9 @@ export function buildSidebarTree(
   const docsByCellId = chipData?.docsByCellId ?? new Map<string, DocRow[]>();
 
   function linkEntryFromBoardLink(l: LinkRow): TreeEntry {
-    // WV.B.2: links.provider — der TreeEntry.linkType behaelt nur die
-    // V1-Domain ('url' | 'mail') fuer's Rendering. Brand-Provider
-    // (slack/onenote/...) werden V1 als 'url' gerendert; eigenes
-    // Tree-Icon-Mapping kommt mit dem Symbol-System (lib/symbol-resolution.ts).
+    // WV.B.2: links.provider treibt das Render-Icon ueber das
+    // Symbol-System (lib/symbol-resolution.ts). linkType bleibt als
+    // V1-Domain ('url' | 'mail') fuer Drop-Filter + Click-Routing.
     const treeLinkType: 'url' | 'mail' = l.provider === 'mail' ? 'mail' : 'url';
     return {
       kind: 'link',
@@ -871,6 +870,8 @@ export function buildSidebarTree(
       label: l.label || l.url,
       url: l.url,
       alias: l.alias,
+      provider: l.provider,
+      symbolOverride: l.symbol_override,
       children: [],
     };
   }

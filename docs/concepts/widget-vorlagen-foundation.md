@@ -1873,6 +1873,25 @@ ALTER TABLE links ADD COLUMN symbol_override text NULL;
 
 Haelt User-manuell-gewaehltes Symbol als Heroicons-Name oder Brand-Icon-Key. NULL = Auto-Logik.
 
+#### 12.3.5a Render-Pfad-Status (2026-05-09)
+
+**LIVE seit 2026-05-09:** Symbol-Resolver hatte seit WV.B 0 Konsumenten — Resolver-Helper waren totes Feature. V1-Closure verkabelt:
+
+- `ResolvedSymbol`-Type erweitert um `brandKey?: BrandKey`. 11 LinkProvider mit Brand-distinct Glyph (mail-generic, onenote, onedrive, drive, dropbox, nextcloud, slack, teams, whatsapp, discord, telegram) returnen den Key. Provider 'url'/'mail'/'notion'/'filesystem' bleiben Heroicon-only.
+- `<AtomSymbol resolved={ResolvedSymbol} />`-Wrapper-Component dispatcht zwischen drei Render-Pfaden:
+  - `source='favicon'` + `faviconUrl` → `<img>` mit onError-Fallback auf Heroicon (Favicon-Service down / Hostname unreachable).
+  - `brandKey` → `<BrandIcon brand={key} colored={?} />`.
+  - sonst → `<Icon name={iconName} />`.
+- `TreeEntry.kind='link'` erweitert um optionale `provider: LinkProvider` + `symbolOverride: string | null`. `linkEntryFromBoardLink` (lib/queries.ts) fuellt beides aus `LinkRow`. Legacy `linkEntryFromInfoLink` (cell.data.links jsonb) laesst sie undefiniert — Render-Fallback auf `iconNameFor`.
+- `NodeTree.tsx` Tree-Row-Render: Wenn `entry.kind==='link'` + `entry.provider`, `<AtomSymbol>` mit `resolveLinkSymbol(provider, url, override)`. Sonst `<Icon name={iconNameFor(entry)}>` wie bisher.
+
+**V2-deferred:**
+- info_field-Atom-Renderer (Welle B fortgesetzt) nutzt `resolveInfoFieldSymbol` + `<AtomSymbol>` analog. CellInfoPage rendert heute legacy infoFields-jsonb ohne `value_type`-Discriminator — kein Symbol-Render-Pfad anwendbar bis Welle B atom-Renderer-Foundation.
+- IconPicker-Modal Override-Auswahl (per-Atom-Symbol manuell): Schema (`info_fields.symbol_override` + `links.symbol_override`) live, UI-Anbindung folgt mit Atom-Edit-Modal in Welle B.
+- Per-Vorlage „Auto-Symbole an/aus" Toggle (§12.3.3 Ebene 1): noch nicht im WidgetInspector. Wenn aus, sollen alle Symbole im gerenderten Vorlagen-Layout ausgeblendet werden — Pflicht-Stelle bei `TemplateWidgetRenderer`/`AtomSymbol`-Bypass.
+
+**Konzept-Punkt §12.3 Render-Pfad V1 zugemacht.**
+
 #### 12.3.6 Performance-Pflicht
 
 - **Favicon-Fetch:** via Service-Worker-Cache, Cache-Key = Hostname, TTL 30 Tage. Nicht bei jedem Render.
