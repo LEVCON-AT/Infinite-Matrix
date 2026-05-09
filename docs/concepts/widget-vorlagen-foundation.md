@@ -1887,6 +1887,7 @@ Haelt User-manuell-gewaehltes Symbol als Heroicons-Name oder Brand-Icon-Key. NUL
   - sonst → `<Icon name={iconName} />`.
 - `TreeEntry.kind='link'` erweitert um optionale `provider: LinkProvider` + `symbolOverride: string | null`. `linkEntryFromBoardLink` (lib/queries.ts) fuellt beides aus `LinkRow`. Legacy `linkEntryFromInfoLink` (cell.data.links jsonb) laesst sie undefiniert — Render-Fallback auf `iconNameFor`.
 - `NodeTree.tsx` Tree-Row-Render: Wenn `entry.kind==='link'` + `entry.provider`, `<AtomSymbol>` mit `resolveLinkSymbol(provider, url, override)`. Sonst `<Icon name={iconNameFor(entry)}>` wie bisher.
+- `BoardView.tsx` board-link-chip-Render (Header-Links-Leiste): `<AtomSymbol resolved={resolveLinkSymbol(link.provider, link.url, link.symbol_override)} size={12}>` (Adjacent 2026-05-09). Frueher Statisch-Dispatch zwischen `envelope` (mail) + `arrow-top-right-on-square` (alle anderen) — Brand-Icons fuer Slack/Teams/OneNote/Notion/Drive etc. waren verloren.
 
 **V2-deferred:**
 - info_field-Atom-Renderer (Welle B fortgesetzt) nutzt `resolveInfoFieldSymbol` + `<AtomSymbol>` analog. CellInfoPage rendert heute legacy infoFields-jsonb ohne `value_type`-Discriminator — kein Symbol-Render-Pfad anwendbar bis Welle B atom-Renderer-Foundation.

@@ -54,6 +54,7 @@ import { ensureObjectForKbCol } from '../lib/objects';
 import type { PresenceUser } from '../lib/presence';
 import { isCardDone, isRecurCard, todayIso, toggleOccurrence } from '../lib/recur';
 import { useVis } from '../lib/settings';
+import { resolveLinkSymbol } from '../lib/symbol-resolution';
 import { showToast, showUndoToast } from '../lib/toasts';
 import type {
   AtomMarkerRow,
@@ -78,6 +79,7 @@ import {
 } from '../lib/use-object-suggest';
 import { useViewerActive } from '../lib/workspace-role';
 import AtomMarkerBar from './AtomMarkerBar';
+import AtomSymbol from './AtomSymbol';
 import BulkAddModal from './BulkAddModal';
 import CardOverlay from './CardOverlay';
 import ChecklistPanel from './ChecklistPanel';
@@ -1076,10 +1078,15 @@ const BoardView: Component<Props> = (p) => {
                         }}
                       >
                         <span class="link-ico">
-                          <Icon
-                            name={
-                              link.provider === 'mail' ? 'envelope' : 'arrow-top-right-on-square'
-                            }
+                          {/* §12.3 Symbol-System: Brand-Icon-Dispatch via
+                              resolveLinkSymbol → favicon / BrandKey / Heroicon-
+                              Fallback. Konsistent zum NodeTree-Pattern. */}
+                          <AtomSymbol
+                            resolved={resolveLinkSymbol(
+                              link.provider,
+                              link.url,
+                              link.symbol_override ?? null,
+                            )}
                             size={12}
                           />
                         </span>
