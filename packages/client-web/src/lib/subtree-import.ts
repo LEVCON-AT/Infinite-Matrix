@@ -470,6 +470,10 @@ type WorkspaceGlobalsCleanup = {
   hotkeySlotIds?: string[];
   savedFilterIds?: string[];
   widgetExternalChannelIds?: string[];
+  // §13.3 V2: atom_markers haben FK auf atom-Tabellen + user_id
+  // auf auth.users — kein Cascade von nodes/templates. Bei Failure
+  // separater Delete.
+  atomMarkerIds?: string[];
 };
 
 async function cleanupPartialImport(
@@ -500,6 +504,15 @@ async function cleanupPartialImport(
     // - hotkey_slots (FK zu templates)
     // - saved_filters (workspace-scope, keine Children)
     // - feature_templates (FK-Wurzel — cascadet auf sections + widgets)
+    if ((workspaceGlobals.atomMarkerIds ?? []).length > 0) {
+      // atom_markers haben FK auf atom-Tabellen — atom-Inserts kommen
+      // vor Markers, also Markers zuerst aufraeumen damit der nachher
+      // folgende Atom-Cleanup nicht in Marker-FK-Constraints rennt.
+      await supabase
+        .from('atom_markers')
+        .delete()
+        .in('id', workspaceGlobals.atomMarkerIds as string[]);
+    }
     if ((workspaceGlobals.widgetExternalChannelIds ?? []).length > 0) {
       await supabase
         .from('widget_external_channels')
@@ -2558,6 +2571,23 @@ export async function executeSubtreeImportIntoMatrix(args: {
   ).filter((c) => remapMap.has((c as { widget_id?: string }).widget_id ?? ''));
   for (const c of sourceWidgetChannels) remap((c as { id: string }).id, remapMap);
 
+  // §13.3 V2 — atom_markers Round-Trip. Filter:
+  //   - user_id == auth.uid() (Datenhoheit: nur eigene Markierungen
+  //     wandern mit, andere User-IDs wuerden FK auf auth.users nicht
+  //     aufloesen).
+  //   - atom_id in remapMap (imported_event-Markers haben kein Remap,
+  //     external_events sind nicht im Export — siehe §15.2-Pendant).
+  const { data: authUserData } = await supabase.auth.getUser();
+  const importingUserId = authUserData?.user?.id ?? null;
+  const sourceAtomMarkers =
+    isWorkspaceImport && Array.isArray(payload.atom_markers) && importingUserId
+      ? (payload.atom_markers as Array<Record<string, unknown>>).filter((m) => {
+          const mm = m as { user_id?: string; atom_id?: string };
+          return mm.user_id === importingUserId && remapMap.has(mm.atom_id ?? '');
+        })
+      : [];
+  for (const m of sourceAtomMarkers) remap((m as { id: string }).id, remapMap);
+
   // Out-Arrays mit remapped IDs + workspaceId-Patch.
   const featTplsOut = sourceFeatTpls.map((t) => {
     const tt = t as FeatTplRow;
@@ -2653,6 +2683,16 @@ export async function executeSubtreeImportIntoMatrix(args: {
       oauth_token_ref: null,
     };
   });
+  const atomMarkersOut = sourceAtomMarkers.map((m) => {
+    const mm = m as { id: string; atom_id: string };
+    return {
+      ...m,
+      id: mustRemap(mm.id, remapMap),
+      workspace_id: workspaceId,
+      atom_id: mustRemap(mm.atom_id, remapMap),
+      user_id: importingUserId,
+    };
+  });
 
   // FK-Order wie bei Cell-Variante: Nodes (parent=null) → Rows → Cols →
   // Cells → UPDATE Nodes.parent_cell_id → kb/checklists/items/links/docs.
@@ -2667,6 +2707,7 @@ export async function executeSubtreeImportIntoMatrix(args: {
   const insertedHotkeySlotIds = hotkeySlotsOut.map((h) => (h as { id: string }).id);
   const insertedSavedFilterIds = savedFiltersOut.map((f) => (f as { id: string }).id);
   const insertedWidgetChannelIds = widgetChannelsOut.map((c) => (c as { id: string }).id);
+  const insertedAtomMarkerIds = atomMarkersOut.map((m) => (m as { id: string }).id);
   const workspaceGlobalsCleanup: WorkspaceGlobalsCleanup = {
     featureTemplateIds: insertedFeatTplIds,
     cellTemplateInstanceIds: insertedCellTplInstanceIds,
@@ -2674,6 +2715,7 @@ export async function executeSubtreeImportIntoMatrix(args: {
     hotkeySlotIds: insertedHotkeySlotIds,
     savedFilterIds: insertedSavedFilterIds,
     widgetExternalChannelIds: insertedWidgetChannelIds,
+    atomMarkerIds: insertedAtomMarkerIds,
   };
   try {
     step('Nodes einfuegen…');
@@ -2780,6 +2822,14 @@ export async function executeSubtreeImportIntoMatrix(args: {
       // §15.2: oauth_token_ref ist im Out-Array auf NULL gesetzt —
       // User muss neu authentisieren um die Bridge zu reaktivieren.
       await insertBatch('widget_external_channels', widgetChannelsOut);
+    }
+    if (atomMarkersOut.length > 0) {
+      step('User-Markierungen einfuegen…');
+      // §13.3 V2: nur eigene atom_markers (Filter weiter oben). Atoms
+      // existieren zu diesem Zeitpunkt bereits — FK-Constraint greift
+      // sauber. UNIQUE (user_id, atom_type, atom_id, kind) gegen
+      // doppelte Importe.
+      await insertBatch('atom_markers', atomMarkersOut);
     }
   } catch (err) {
     await cleanupPartialImport(

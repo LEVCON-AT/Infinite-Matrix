@@ -147,6 +147,13 @@ export type WorkspaceExport = {
   // beim Anlegen vergessen, von WV.E #40 nachgezogen. Workspace-scope.
   // Optional fuer V0-Parser-Kompat.
   info_fields?: Record<string, unknown>[];
+  // §13.3 V2 — atom_markers (Migration 074). User-Markierungen Star+Eye
+  // pro Atom. RLS filtert Read auf {alle stars + eigene eyes} — Export
+  // traegt also nur, was der Exporter sehen darf. Importer filtert auf
+  // user_id == auth.uid() (eigene Markierungen wandern mit, andere
+  // werden nicht uebertragen — Datenhoheit + auth.users-FK-Sauberkeit).
+  // Optional fuer V0-Parser-Kompat.
+  atom_markers?: Record<string, unknown>[];
   // Nur bei Cell-Subtree-Exports gesetzt: Meta-Info zur Quell-Zelle,
   // damit der Importer ihre info-Felder/Links und Feature-Flags in
   // die Ziel-Zelle mergen kann — ohne die Zelle selbst in cells[]
@@ -281,6 +288,7 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     savedFiltersRes,
     widgetExternalChannelsRes,
     infoFieldsRes,
+    atomMarkersRes,
   ] = await Promise.all([
     supabase.from('nodes').select('*').eq('workspace_id', workspaceId),
     supabase.from('rows').select('*').eq('workspace_id', workspaceId),
@@ -328,6 +336,12 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
       .from('info_fields')
       .select('*')
       .eq('workspace_id', workspaceId),
+    // §13.3 V2 — atom_markers (Migration 074). RLS-gefiltert: alle
+    // sichtbaren Markierungen (Workspace-shared stars + eigene eyes).
+    supabase
+      .from('atom_markers')
+      .select('*')
+      .eq('workspace_id', workspaceId),
   ]);
 
   for (const res of [
@@ -354,6 +368,7 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     savedFiltersRes,
     widgetExternalChannelsRes,
     infoFieldsRes,
+    atomMarkersRes,
   ]) {
     if (res.error) throw res.error;
   }
@@ -390,6 +405,7 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceExp
     saved_filters: (savedFiltersRes.data ?? []) as Record<string, unknown>[],
     widget_external_channels: (widgetExternalChannelsRes.data ?? []) as Record<string, unknown>[],
     info_fields: (infoFieldsRes.data ?? []) as Record<string, unknown>[],
+    atom_markers: (atomMarkersRes.data ?? []) as Record<string, unknown>[],
   };
 }
 

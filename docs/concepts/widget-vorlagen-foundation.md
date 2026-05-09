@@ -2550,18 +2550,21 @@ Token-Bezug: jeder calling User authentifiziert mit eigenem `user_oauth_tokens`-
 Vor 2026-05-09 wurden 8 Tabellen zwar exportiert aber NIE importiert (Slot-6-Heptad-Luecke):
 - `feature_templates`, `template_sections`, `template_widgets`, `cell_template_instances`, `cell_widget_overrides`, `workspace_hotkey_slots`, `saved_filters`, `widget_external_channels`
 
+`atom_markers` (Migration 074) wurde zudem **gar nicht** exportiert/importiert — Slot-6-Luecke entdeckt + geschlossen 2026-05-09 nach Adjacent-Audit beim §13.3-V2-Wave.
+
 **Behoben 2026-05-09 in `executeSubtreeImportIntoMatrix`:**
 - Workspace-Globals-Block fuer `payload.payloadType === 'workspace'`. Subtree-Imports skippen die Workspace-Globals (sind nicht im Subtree-Export).
-- FK-Reihenfolge respektiert: `feature_templates` → `template_sections` → `template_widgets` → (Root-Widget-Back-Ref-UPDATE) → `cell_template_instances` → `cell_widget_overrides` → `workspace_hotkey_slots` → `saved_filters` → `widget_external_channels`.
+- FK-Reihenfolge respektiert: `feature_templates` → `template_sections` → `template_widgets` → (Root-Widget-Back-Ref-UPDATE) → `cell_template_instances` → `cell_widget_overrides` → `workspace_hotkey_slots` → `saved_filters` → `widget_external_channels` → `atom_markers`.
 - Filter pro Tabelle:
   - `feature_templates`: nur `visibility='workspace'` (platform-Templates sind system-seeded; user-Templates sind privat zum source-User).
   - `workspace_hotkey_slots`: nur `scope='workspace'`.
   - `saved_filters`: nur `scope='workspace'` + `owner_user_id` → NULL.
   - `widget_external_channels`: `oauth_token_ref` → NULL (§15.2 Sicherheits-Direktive — User muss neu authentisieren).
+  - `atom_markers`: nur `user_id == auth.uid()` (Datenhoheit + auth.users-FK-Sauberkeit) UND `atom_id` muss in `remapMap` aufloesbar sein (imported_event-Markers verlieren ihre Referenz, da `external_events` nicht exportiert wird). User-Eyes wandern mit, fremde Stars/Eyes werden gedroppt — andere User-IDs wuerden FK auf `auth.users` nicht aufloesen.
 - `feature_templates.root_widget_id` ist Back-Reference auf `template_widgets`; V1-Loesung: initial NULL, post-Insert UPDATE-Pass.
-- Cleanup-on-Fail erweitert: `cleanupPartialImport` nimmt `WorkspaceGlobalsCleanup` als optionalen Param. FK-CASCADE auf `feature_templates` raeumt `template_sections` + `template_widgets` automatisch mit; `cell_*` + `hotkey_slots` + `saved_filters` + `widget_external_channels` werden separat geloescht.
+- Cleanup-on-Fail erweitert: `cleanupPartialImport` nimmt `WorkspaceGlobalsCleanup` als optionalen Param. FK-CASCADE auf `feature_templates` raeumt `template_sections` + `template_widgets` automatisch mit; `cell_*` + `hotkey_slots` + `saved_filters` + `widget_external_channels` + `atom_markers` werden separat geloescht (atom_markers zuerst, da FK auf atom-Tabellen die anschliessend bei nodes-Cascade entfernt werden).
 
-**Konzept-Punkt §15.0 Workspace-Round-Trip zugemacht.**
+**Konzept-Punkt §15.0 Workspace-Round-Trip zugemacht (alle 13 Tabellen).**
 
 ### 15.1 Heptad-Pflege pro Tabelle (kein „dito"-Schleifen)
 
