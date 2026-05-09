@@ -1348,6 +1348,8 @@ WV.WV-Output-Erweiterung um `AdapterDialog`-Komponente (7. Output) — generisch
 <a id="9-14"></a>
 ## §9.14 Auto-Calendar-Manifestation aus `info_field(value_type='date')`
 
+**Status 2026-05-09 — LIVE seit Welle WV.E #37** (Migration 082 `082_info_field_auto_calendar.sql`). T1 (info_field-update), T2 (info_manif-insert), T3 (info_manif-delete) Postgres-Trigger pflegen die Auto-Manifestations-Liste mit `display_meta.auto = true`. `lib/calendar.ts` rendert die Auto-Eintraege zusammen mit den manuell gedroppten Calendar-Manifs. Vorlage-Toggle `template_widgets.config.toggles.date_field_auto_calendar` (default `true`) erlaubt pro Calendar-Widget das Auto-Verhalten abzuschalten. Manual-Delete-Block in `lib/atom-manifestations.ts` verhindert dass User Auto-Manifs direkt loescht (Re-Sync wuerde sie wieder erzeugen). Diagnose-MCP-Tool `manif.calendar.auto.list` (`bridge/src/tools/manif-calendar-auto.ts`) listet pro Workspace alle Auto-Manifs read-only.
+
 User-Direktive (Konzept-Pass 2026-05-08): *„wenn ein info_field als Datum getypt ist, soll das automatisch im Kalender erscheinen — ohne dass der User extra droppen muss."*
 
 Querschnitt zu §9.C (Cross-Type-Drop-Adapter) — der **Auto-Adapter ohne Dialog**-Fall: Date-Typed Info-Felder bekommen automatisch eine Calendar-Manifestation, mit Vorlage-Toggle als Off-Switch (§13.10 `date_field_auto_calendar`).
