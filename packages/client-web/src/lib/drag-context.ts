@@ -21,6 +21,8 @@
 // Phase Mobile-S3 — adapter mounted in App.tsx via installPointerDragAdapter().
 
 import { type Accessor, createSignal } from 'solid-js';
+import { type AliasKind, findAliasForOwner } from './alias-index';
+import { sanitizeUrl } from './url';
 
 export type DragAtomType = 'task' | 'link' | 'doc' | 'checklist';
 
@@ -75,6 +77,81 @@ export function encodeAtomRefPayload(src: DragSource): string {
     ...(src.sourceManifId ? { sourceManifId: src.sourceManifId } : {}),
   };
   return JSON.stringify(payload);
+}
+
+// §14.4 — Drag-Drop nach extern. Vier MIME-Types parallel:
+//   text/plain                       — absolute URL fuer Text-Editoren
+//   text/html                        — <a href>-Anchor fuer Mail/Word
+//   text/uri-list                    — Single-Line-URI fuer OS-Native-Drops
+//   application/x-matrix-atom-ref    — JSON-Atom-Ref (siehe oben)
+//
+// Helper bauen Label + URL aus einer DragSource. URL ist alias-resolve-
+// URL wenn Alias gefunden, sonst SPA-Workspace-Root als Fallback. Fuer
+// atom='link' mit `url` wird der Underlying-URL bevorzugt — externer
+// Empfaenger kriegt dann den eigentlichen Link-Target, nicht den
+// Matrix-Atom-Wrapper.
+
+// Mapping von DragAtomType auf AliasKind. Drag kennt 'task' (Karten +
+// Standalone-Tasks), Alias-Index hat 'card' fuer kanban-Karten — der
+// gemeinsame ID-Key macht das eindeutig (Task-ID = Card-ID seit Q.2).
+function dragSourceAliasKind(atom: DragAtomType): AliasKind {
+  if (atom === 'task') return 'card';
+  return atom; // link, doc, checklist match 1:1
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Liefert die externe URL fuer die DragSource, oder null wenn keine
+// sinnvolle URL ableitbar ist (kein workspaceId + kein link-url).
+// Reihenfolge:
+//   1. atom='link' mit `url`: sanitisierter Underlying-Link.
+//   2. workspaceId + Alias gefunden: alias-resolve-URL (302-redirect
+//      zum richtigen Atom-Page bzw. extern. Link).
+//   3. workspaceId ohne Alias: Workspace-Root (Empfaenger landet auf
+//      der Workspace-Page; ohne Alias gibt es keinen stabilen Atom-
+//      Deep-Link, weil die Atom-Routes parent-FK-abhaengig sind).
+//   4. weder noch: null.
+export function buildExternalDragUrl(src: DragSource): string | null {
+  if (typeof window === 'undefined') return null;
+  if (src.atom === 'link' && src.url) {
+    const safe = sanitizeUrl(src.url);
+    if (safe) return safe;
+  }
+  if (!src.workspaceId) return null;
+  const origin = window.location.origin;
+  const alias = findAliasForOwner(src.workspaceId, dragSourceAliasKind(src.atom), src.atomId);
+  if (alias) return `${origin}/api/resolve/${encodeURIComponent(alias)}`;
+  return `${origin}/w/${encodeURIComponent(src.workspaceId)}`;
+}
+
+// Setzt die §14.4-Pflicht-MIMEs auf einem DataTransfer. ATOM_REF_MIME
+// haengt der Caller separat an (er ist Pflicht, baut auf encode-
+// AtomRefPayload). Caller-Code in bindDragSource() ruft beides
+// hintereinander.
+export function setExternalDragMimes(dt: DataTransfer, src: DragSource): void {
+  const url = buildExternalDragUrl(src);
+  const label = src.label || src.atomId;
+  // text/plain ist universell — wenn URL da, URL; sonst Label als
+  // letzter Ausweg (besser als gar nichts beim Drop in Notepad).
+  dt.setData('text/plain', url ?? label);
+  // text/html — Anchor wenn URL da, sonst escaped Label.
+  if (url) {
+    dt.setData('text/html', `<a href="${escapeHtml(url)}">${escapeHtml(label)}</a>`);
+  } else {
+    dt.setData('text/html', escapeHtml(label));
+  }
+  // text/uri-list (RFC 2483) — nur wenn URL da. Spec: ein URI pro
+  // Zeile, keine Trailing-Newline noetig fuer Single-Line-Eintrag.
+  if (url) {
+    dt.setData('text/uri-list', url);
+  }
 }
 
 // Defensive Decoder fuer Konsumenten ausserhalb der App (z.B. Welle B
@@ -148,6 +225,11 @@ export function bindDragSource(opts: {
           // Signal); der MIME-Eintrag ist Pflicht damit der Browser
           // den Drag akzeptiert + fuer cross-window/MCP-Konsumenten.
           e.dataTransfer.setData(ATOM_REF_MIME, encodeAtomRefPayload(src));
+          // §14.4: drei zusaetzliche Standard-MIMEs fuer externe
+          // Drop-Targets (Mail, Messenger, OS-Native). text/plain
+          // + text/html + text/uri-list mit alias-resolve-URL bzw.
+          // underlying-URL bei link-Atomen.
+          setExternalDragMimes(e.dataTransfer, src);
         } catch {
           /* manche Browser werfen — egal, wir haben activeDrag(). */
         }

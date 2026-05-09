@@ -2102,20 +2102,32 @@ Mental-Modell User-AI: *„Schreib an xy@ alle Infos aus ^kunde mit Doku-Hyperli
 
 ### 14.4 Drag-Drop nach extern (alle 4 MIME-Types V1)
 
+**Status:** Live seit 2026-05-09 — `setExternalDragMimes(dt, src)` in `lib/drag-context.ts` setzt drei Standard-MIMEs, `bindDragSource` ruft es nach dem ATOM_REF_MIME automatisch auf. `BoardView.onCardDragStart` (Kanban-Karten, eigene DragStart-Logik wegen `boardUi.sort()`-Guard) ruft die Helper-Funktion ebenfalls.
+
 User zieht Atom oder Widget aus der App. Drop-Target ist ein externes App-Window (Mail-Compose, Messenger, Chat-KI).
 
 HTML5-DataTransfer mit **vier parallelen Formaten** (alle V1-Pflicht):
 
 | MIME | Inhalt | Konsument |
 |---|---|---|
-| `text/plain` | absolute URL (`https://matrix.levcon.at/w/<ws>/c/<cell>/...`) | Simple Text-Editoren, Slack, WhatsApp |
-| `text/html` | `<a href='...'>^kunde — Mueller AG</a>` | Outlook, Gmail, Word |
-| `text/uri-list` | absolute URL als Single-Line-URI | OS-Native Drop-Targets, Browser-Bookmark-Bar |
+| `text/plain` | absolute URL (alias-resolve oder Workspace-Root) | Simple Text-Editoren, Slack, WhatsApp |
+| `text/html` | `<a href="…">{label}</a>` (HTML-escaped) | Outlook, Gmail, Word |
+| `text/uri-list` | absolute URL als Single-Line-URI (RFC 2483) | OS-Native Drop-Targets, Browser-Bookmark-Bar |
 | `application/x-matrix-atom-ref` | JSON-Payload (siehe §14.5) | In-App-Drop (Matrix-zu-Matrix), Bridge-Tool-Drop |
+
+**URL-Aufloesung in `buildExternalDragUrl`:**
+1. atom='link' mit `url`-Property: sanitisierter Underlying-Link (Empfaenger kriegt das Original-Ziel, nicht den Matrix-Wrapper).
+2. workspaceId + Alias gefunden via `findAliasForOwner(wsId, kind, id)`: `${origin}/api/resolve/${alias}` → 302-Redirect auf richtiges Atom-Page (Member-Auth, §14.1 alias-resolve-Service).
+3. workspaceId ohne Alias: `${origin}/w/${wsId}` als Workspace-Root-Fallback. Atom-Deep-Links sind parent-FK-abhaengig (Card → Board, Cell → Matrix), ohne Alias kein stabiler universeller Pfad.
+4. weder noch: text/uri-list bleibt leer, text/plain = Label, text/html = escaped Label.
+
+**Reverse-Alias-Lookup:** `findAliasForOwner(wsId, kind, id)` (lib/alias-index.ts) — Linear-Scan ueber den in-memory Alias-Index. Drag-Start ist Single-Shot, ~hunderte Eintraege, kein Hot-Path. Kein dedizierter byOwner-Index noetig.
 
 **Konsum-Logik:**
 - Drop in die **eigene App**: Custom-MIME (`application/x-matrix-atom-ref`) wird konsumiert, bleibt Atom-Ref ohne Loss.
-- Drop in **externe App**: nur Standard-Formate werden gelesen — Alias wird zu Hyperlink. Alias bleibt resolvabel solange Empfaenger Member ist (§14.1).
+- Drop in **externe App**: nur Standard-Formate werden gelesen — Alias wird zu Hyperlink, Empfaenger-Member landet via 302-Resolve auf der richtigen Page. Non-Member sieht den Login-Redirect mit `return=/api/resolve/<alias>`.
+
+**Konzept-Punkt zugemacht** — §14.4 V1 LIVE.
 
 **Worksheet-Bestaetigung 14.4:** alle 4 Formate V1. ✓
 

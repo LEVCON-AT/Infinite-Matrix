@@ -299,6 +299,21 @@ export function lookupAlias(wsId: string, alias: string): AliasEntry | null {
   return s.byAlias.get(a) ?? null;
 }
 
+// Reverse-Lookup: gib den Alias zu einem (kind, id) zurueck — falls
+// vorhanden. §14.4 Drag-Drop nach extern braucht das, um die
+// alias-resolve-URL aus einer Atom-Drag-Source zu bauen. Linear-Scan
+// ueber die entries (typisch < 1000), reicht fuer einmaligen Drag-
+// Start. Konsumenten die das hoeher-frequent brauchen sollten einen
+// dedizierten byOwner-Index aufbauen.
+export function findAliasForOwner(wsId: string, kind: AliasKind, id: string): string | null {
+  const s = states.get(wsId);
+  if (!s) return null;
+  for (const e of s.entries()) {
+    if (e.kind === kind && e.id === id) return e.alias;
+  }
+  return null;
+}
+
 // Reset (z.B. bei Workspace-Wechsel). Der Realtime-Refresh baut den
 // Cache danach ohnehin neu — aber ein expliziter Clear verhindert,
 // dass veraltete Eintraege kurzfristig durchschlagen.

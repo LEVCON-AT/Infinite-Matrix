@@ -19,6 +19,7 @@ import {
   decodeAtomRefPayload,
   encodeAtomRefPayload,
   endDrag,
+  setExternalDragMimes,
   startDrag,
 } from '../lib/drag-context';
 import { translateDbError } from '../lib/errors';
@@ -304,22 +305,24 @@ const BoardView: Component<Props> = (p) => {
     }
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/matrix-card-id', card.id);
-    // Fallback fuer Browser die den custom-type ignorieren.
-    e.dataTransfer.setData('text/plain', card.id);
     // §14.5 / WV.WV.8: zusaetzlich generischen Atom-Ref-MIME emittieren.
     // BoardView nutzt nicht `bindDragSource` (manuelle DragStart-Logik
     // wegen `boardUi.sort()`-Guard), muss den Ref-MIME daher selbst
     // setzen — sonst sehen Bridge-/MCP-/Cross-Window-Konsumenten die
     // Kanban-Karte nicht als Atom-Ref.
-    e.dataTransfer.setData(
-      ATOM_REF_MIME,
-      encodeAtomRefPayload({
-        atom: 'task',
-        atomId: card.id,
-        workspaceId: p.workspaceId,
-        label: card.name,
-      }),
-    );
+    const dragSrc = {
+      atom: 'task' as const,
+      atomId: card.id,
+      workspaceId: p.workspaceId,
+      label: card.name,
+    };
+    e.dataTransfer.setData(ATOM_REF_MIME, encodeAtomRefPayload(dragSrc));
+    // §14.4 — externe MIMEs (text/plain + text/html + text/uri-list)
+    // mit alias-resolve-URL bzw. Workspace-Root als Fallback. Reorder-
+    // Pfad nutzt nicht text/plain (text/matrix-card-id ist primaer +
+    // draggingCardId() als finaler Solid-Fallback), daher freier
+    // Slot fuer §14.4.
+    setExternalDragMimes(e.dataTransfer, dragSrc);
     setDraggingCardId(card.id);
     // Phase 4 T.1.G.2.D: Cross-View-Drag aktivieren — auch fuer Kanban-
     // Karten. Damit akzeptieren Sidebar-Calendar / Mini-Calendar / Day-
