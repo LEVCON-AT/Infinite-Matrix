@@ -1760,6 +1760,7 @@ User kann pro Cell Smart-Summary-Widgets ausblenden / hinzufuegen / umordnen —
 - `lib/alias-dispatch.ts` — `case 'link'` ruft `incrementLinkClickCount(result.linkId)` vor `window.open()`. `AliasResolveResult.link` traegt jetzt `linkId: string` (frueher nur url+label).
 - `lib/atom-routing.ts` — `case 'link'` (Calendar-Manifestation als Link-Atom) ruft `incrementLinkClickCount(event.atomId)`.
 - `components/NodeTree.tsx` — Sidebar-Link-Entry: TreeLink-onClick + Context-Menu-„Link oeffnen" rufen Increment fuer `link-board-`-IDs.
+- `components/BoardView.tsx` — Board-Header-Links-Leiste (`content().links` aus `links`-Tabelle): `<a>`-onClick ruft Increment parallel zur nativen Navigation (Audit 2026-05-09).
 
 **Realtime:** Workspace-Channel `links` deckt das ab — Increment via RPC triggert UPDATE → Realtime-Subscriber bekommen den neuen Counter ohne Extra-Sync.
 
@@ -2089,7 +2090,17 @@ Verankert als Worksheet 13.7a — wird **am Schluss vor Implementierung** durchd
 
 ### 13.6 OAuth-Token-Storage (final 2026-05-07)
 
-Pattern aus Welle A `user_ai_providers` (Memory `project_phase2_kifirst_vision.md`) wiederverwenden:
+**Status 2026-05-09 — LIVE seit Welle WV.D.2** (Commit `6000d90`, Migration 078 `user_oauth_tokens` + `oauth_provider_slots`).
+
+Live-Pfad:
+- Tabelle `user_oauth_tokens` (user_id + provider + access_token_encrypted + refresh_token_encrypted + scope + expires_at). Verschluesselung per pgsodium-Wrap, Plaintext-Decrypt nur Bridge-side via `get_oauth_token_decrypted`-RPC — Frontend exposed das niemals.
+- View `user_oauth_tokens_safe` filtert die `*_encrypted`-Spalten aus dem Read-Pfad.
+- Write-Pfad nur ueber SECURITY-DEFINER-RPCs `set_oauth_token` / `delete_oauth_token` — direkte INSERT/UPDATE/DELETE policy-blockiert.
+- Provider-Slots in `oauth_provider_slots` (platform_admin-only) liefern Client-ID/Secret + Status-Heartbeat (Memory `feedback_admin_dashboard_config_gate.md`).
+- Cascade-Delete bei User-Loeschung via FK `user_id REFERENCES auth.users(id) ON DELETE CASCADE`.
+- Frontend-Layer `lib/oauth-tokens.ts` (Read mit IDB-Cache-Fallback) + Bridge-Tools `oauth-tokens.ts` + Heptad-Round-Trip (Export/Import deferred fuer Sicherheits-Direktive §15.2 — OAuth-Tokens werden bewusst NICHT exportiert).
+
+Pattern aus Welle A `user_ai_providers` (Memory `project_phase2_kifirst_vision.md`) wiederverwendet:
 
 - Workspace-scoped Tabelle `user_oauth_tokens` (oder erweiterte `user_ai_providers`).
 - Pro User + Provider eine Row mit Token + Refresh-Token (verschluesselt) + Scope.

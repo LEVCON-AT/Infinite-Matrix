@@ -23,6 +23,7 @@ import {
   startDrag,
 } from '../lib/drag-context';
 import { translateDbError } from '../lib/errors';
+import { incrementLinkClickCount } from '../lib/link-clicks';
 import { dropOnKanbanCol } from '../lib/manifestation-cross-view';
 import {
   InvalidUrlError,
@@ -1068,6 +1069,11 @@ const BoardView: Component<Props> = (p) => {
                         target={link.provider === 'url' ? '_blank' : undefined}
                         rel={link.provider === 'url' ? 'noopener noreferrer' : undefined}
                         title={link.url}
+                        onClick={() => {
+                          // §11.7 — Click-Tracking. Native <a>-Navigation laeuft
+                          // weiter (kein preventDefault); RPC feuert parallel.
+                          incrementLinkClickCount(link.id);
+                        }}
                       >
                         <span class="link-ico">
                           <Icon
