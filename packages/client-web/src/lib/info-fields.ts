@@ -12,7 +12,12 @@
 //   - components/InfoFieldEditor (Welle B): typed Form pro value_type.
 //   - MCP-Tools info_field.{add,edit,move,delete,list} (B.7).
 
-import type { AtomKind } from './atom-manifestations';
+import {
+  type AtomKind,
+  type AtomManifestationRow,
+  addAtomManifestation,
+  nextAtomManifestationPosition,
+} from './atom-manifestations';
 import { isNetworkError } from './mutation-queue';
 import { type CacheTable, getByWorkspace, mergeRows } from './offline-cache';
 import { markCacheFallback, markLiveSuccess } from './offline-state';
@@ -135,3 +140,39 @@ export async function deleteInfoField(id: string): Promise<void> {
 // ─── Atom-Kind-Helper ──────────────────────────────────────────
 // Re-Export fuer Konsumenten die `info_field` als AtomKind benoetigen.
 export const INFO_FIELD_ATOM_KIND: AtomKind = 'info_field';
+
+// ─── Cell-Bundle (Welle B Stub) ────────────────────────────────
+// addInfoFieldForCell legt info_field-Atom + atom_manifestations(kind=
+// 'info', container_kind='cell') in einer Sequenz an. Pattern aus
+// architektur.md §4.1.1 (Multi-Step): zwei safe-mutation-Specs FIFO,
+// Atomicity-Verlust offline akzeptabel — bei FK-Violation auf Step 2
+// bleibt das info_field-Atom workspace-skopiert sichtbar, Caller
+// re-tried oder loescht. Welle B Step 13 ersetzt den Pfad durch eine
+// SECURITY DEFINER RPC fuer atomare Server-Insert.
+
+export type AddInfoFieldForCellInput = AddInfoFieldInput & {
+  cellId: string;
+};
+
+export type InfoFieldWithManifestation = {
+  atom: InfoFieldRow;
+  manifestation: AtomManifestationRow;
+};
+
+export async function addInfoFieldForCell(
+  input: AddInfoFieldForCellInput,
+): Promise<InfoFieldWithManifestation> {
+  if (!input.cellId) throw new Error('Cell-Id ist Pflicht.');
+  const atom = await addInfoField(input);
+  const position = await nextAtomManifestationPosition(input.cellId, 'info');
+  const manifestation = await addAtomManifestation({
+    workspaceId: input.workspaceId,
+    atomType: INFO_FIELD_ATOM_KIND,
+    atomId: atom.id,
+    kind: 'info',
+    containerId: input.cellId,
+    containerKind: 'cell',
+    position,
+  });
+  return { atom, manifestation };
+}
