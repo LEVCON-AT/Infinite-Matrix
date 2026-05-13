@@ -1492,6 +1492,7 @@ const Workspace: Component = () => {
                     selfUserId={user()?.id}
                     members={() => workspaceMembers() ?? []}
                     resolverMaps={resolverMaps}
+                    wsAtomMarkers={wsAtomMarkers() ?? []}
                     onChanged={() => {
                       void refetchCells();
                       void refetchCellsWithDocs();

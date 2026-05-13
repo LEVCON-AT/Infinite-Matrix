@@ -53,10 +53,11 @@ import {
 import { resolveLinkSymbol } from '../lib/symbol-resolution';
 import { showToast, showUndoToast } from '../lib/toasts';
 import { hasBeenExpanded, markEverExpanded, useTreeExpand } from '../lib/tree-expand';
-import type { CellFeature, CellRow, TreeEntry } from '../lib/types';
+import type { AtomMarkerRow, CellFeature, CellRow, TreeEntry } from '../lib/types';
 import { sanitizeUrl } from '../lib/url';
 import { runResetScope } from '../lib/workspace-reset';
 import { useViewerActive } from '../lib/workspace-role';
+import AtomMarkerBar from './AtomMarkerBar';
 import AtomSymbol from './AtomSymbol';
 import ChecklistPastePopup from './ChecklistPastePopup';
 import ContextMenu, { type CtxMenuState } from './ContextMenu';
@@ -121,6 +122,10 @@ type Props = {
   // rendert labelOf() Templates (`{row.object}` / `{column.object}`)
   // live aus parent_cell-Kette. Default-Fallback: legacy node.label.
   resolverMaps?: () => ContextMaps;
+  // §13.3 V2-deferred (M.2): Workspace-skopierte atom_markers fuer
+  // Link- + Doc-Atom-Rows in der Tree. AtomMarkerBar filtert intern
+  // auf (atom_type, atom_id).
+  wsAtomMarkers?: ReadonlyArray<AtomMarkerRow>;
 };
 
 // Icon-Lookup nach Entry-Kind / Node-Type. Feature-Rows gibt es nur
@@ -319,6 +324,8 @@ const TreeItem: Component<{
   // Phase 3 O.8: Resolver-Maps (s. Component-Props oben). Wird durch
   // den Tree gereicht damit jede TreeItem Templates aufloesen kann.
   resolverMaps?: () => ContextMaps;
+  // §13.3 V2-deferred (M.2): atom_markers fuer Link/Doc-Row-Marker.
+  wsAtomMarkers?: ReadonlyArray<AtomMarkerRow>;
 }> = (p) => {
   // Presence-User die gerade in genau dieser Row sind. Selbst raus —
   // den eigenen Avatar im Tree zu sehen waere visueller Lärm, der
@@ -553,6 +560,43 @@ const TreeItem: Component<{
           <TreeAvatar member={creator()} workspaceId={p.workspaceId} />
         </Show>
         <TreeAvatarStack users={presenceForRow()} />
+        {/* §13.3 V2-deferred (M.2 2026-05-13) — AtomMarkerBar fuer
+            Atom-Rows in der Tree. link-Row nur fuer echte links-
+            Tabelle-Atome (link-board-Prefix); legacy cell.data.links
+            (link-info-Prefix) ohne Atom-ID werden uebergangen. doc-Row
+            traegt docId als atom_id. */}
+        <Show when={p.entry.kind === 'doc' ? p.selfUserId : undefined}>
+          {(uid) => {
+            const docEntry = p.entry as Extract<TreeEntry, { kind: 'doc' }>;
+            return (
+              <AtomMarkerBar
+                workspaceId={p.workspaceId}
+                userId={uid()}
+                atomType="doc"
+                atomId={docEntry.docId}
+                markers={p.wsAtomMarkers ?? []}
+              />
+            );
+          }}
+        </Show>
+        <Show when={p.entry.kind === 'link' ? p.selfUserId : undefined}>
+          {(uid) => {
+            const linkId = parseTreeLinkEntryId(p.entry.id);
+            return (
+              <Show when={linkId}>
+                {(id) => (
+                  <AtomMarkerBar
+                    workspaceId={p.workspaceId}
+                    userId={uid()}
+                    atomType="link"
+                    atomId={id()}
+                    markers={p.wsAtomMarkers ?? []}
+                  />
+                )}
+              </Show>
+            );
+          }}
+        </Show>
       </div>
       <Show when={hasChildren()}>
         <div class="tree-children-wrap" data-open={expanded() ? 'true' : 'false'}>
@@ -571,6 +615,7 @@ const TreeItem: Component<{
                     query={p.query}
                     activePath={p.activePath}
                     openMenu={p.openMenu}
+                    wsAtomMarkers={p.wsAtomMarkers}
                     onPasteChecklist={p.onPasteChecklist}
                     dragOverBoardId={p.dragOverBoardId}
                     onCardDragOver={p.onCardDragOver}
@@ -1873,6 +1918,7 @@ const NodeTree: Component<Props> = (props) => {
                   selfUserId={props.selfUserId}
                   members={props.members}
                   resolverMaps={props.resolverMaps}
+                  wsAtomMarkers={props.wsAtomMarkers}
                 />
               )}
             </For>
