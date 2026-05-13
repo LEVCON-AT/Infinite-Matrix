@@ -56,6 +56,8 @@ const TemplateWidgetRenderer: Component<TemplateWidgetRendererProps> = (p) => {
       }}
       data-widget-type={p.widget.type}
       data-edit-in-view={editInViewToggle(p.widget.toggles, p.widget.type) ? 'true' : 'false'}
+      data-markers-star={markersToggles(p.widget.toggles).workspaceStar ? 'true' : 'false'}
+      data-markers-eye={markersToggles(p.widget.toggles).privateEye ? 'true' : 'false'}
     >
       {/* §13.4 Header-Toggle (default true). Wenn aus: Header + Type-Badge
           + Reset-Button entfallen — z.B. fuer Hero-Doc-Embed ohne Chrome.
@@ -215,6 +217,27 @@ function editInViewToggle(toggles: Record<string, unknown>, type: ResolvedWidget
   if (typeof v === 'boolean') return v;
   // Default per Widget-Type.
   return type === 'kanban' || type === 'checklist';
+}
+
+// §13.3 — Marker-Toggles (workspace_star + private_eye). Defaults beide
+// true (Marker-Bar sichtbar). Wenn ein Toggle explizit false: die zugehoerige
+// Marker-Funktion wird im Widget unterdrueckt. V1 expose-only — der Helper
+// + die data-markers-*-Attribute am Wrapper sind heute fuer Sub-Renderer
+// lesbar; aktuell rendert keiner der Marker-Caller (BoardView /
+// CardOverlay / ChecklistPanel / DocsPopup / TaskDetail / ImportedEventDetail)
+// innerhalb des TemplateWidgetRenderer-Dispatchers, deshalb hat das Flag
+// heute keine sichtbare Wirkung. Wiring kommt mit Welle C, wenn Cells
+// ihre Render-Definition aus cell_template_instances ziehen und die
+// AtomMarkerBar-Calls die data-Attribute auswerten koennen.
+function markersToggles(toggles: Record<string, unknown>): {
+  workspaceStar: boolean;
+  privateEye: boolean;
+} {
+  const m = (toggles as { markers?: { workspace_star?: unknown; private_eye?: unknown } })?.markers;
+  return {
+    workspaceStar: m?.workspace_star !== false,
+    privateEye: m?.private_eye !== false,
+  };
 }
 
 // §13.1 — Comment-Channel-Toggle. Default 'off'. extern = Channel-Bridge-

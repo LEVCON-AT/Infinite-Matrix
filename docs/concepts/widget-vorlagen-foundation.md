@@ -1982,13 +1982,13 @@ V1-Provider (final 2026-05-07): OneDrive, Google Drive, Dropbox, **Nextcloud** (
 
 **V2-deferred:**
 - Filter-Builder-Conditions `has_marker(kind=star, by_user=me, count>=N)` — siehe §5.2.6 Filter-DSL.
-- Vorlagen-Toggle `markers.workspace_star` / `markers.private_eye` (heute immer sichtbar; Toggle abschaltbar nur wenn Vorlage es deaktiviert).
 - Smart-Summary-Default-Widget „Beobachtet von dir" → `task-list` mit Filter `has_marker(kind=eye, by_user=me)`.
 
 **V2-Polish vorgezogen (2026-05-13):**
 - AtomMarkerBar in NodeTree-Atom-Rows: live fuer Doc + Link-Atome (Link nur fuer `link-board-`-Prefix, legacy `link-info-` JSONB-Entries ohne Atom-ID werden uebergangen).
 - AtomMarkerBar in ChecklistPanel-Items: live pro Item (atom_type='task'), zusaetzlich zum existing Header-Marker (atom_type='checklist').
 - Hover-Tooltip „Wer hat gestartet" auf dem Star-Icon: live. Zeigt Avatar+Name jedes Users der den Atom markiert hat, Self-User mit „(Du)"-Suffix. Caller threadet `wsMembers` aus der workspaceMembers-Resource; Renderer ohne wsMembers (z.B. Calendar-Route) zeigen weiterhin nur den native title-Fallback.
+- Vorlagen-Toggle `markers.workspace_star` / `markers.private_eye` V1-expose: `markersToggles(toggles)`-Helper in `TemplateWidgetRenderer.tsx` (Defaults beide `true`) + `data-markers-star` / `data-markers-eye`-Attribute am Wrapper, analog zum `data-edit-in-view`-Pattern aus §13.5. Sub-Renderer-Wiring (BoardView / ChecklistPanel / CardOverlay / DocsPopup / TaskDetail / ImportedEventDetail lesen das Flag und gaten die `AtomMarkerBar`) kommt mit Welle C, wenn die Cell-Features durch den Template-Renderer laufen statt direkt am Cell zu haengen.
 
 Marker leben in einer eigenen Tabelle `atom_markers` (siehe §15) — analog Layer-4-Pattern aus `architektur.md` §1.5. Zwei Kinds in V1:
 
