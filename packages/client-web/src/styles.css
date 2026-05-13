@@ -19751,3 +19751,103 @@ body[data-viewport="phone"] .overlay-card {
 .designer-source-toggle-btn-active:hover {
   background: var(--accent);
 }
+
+/* §13.3 V2.G — info_field-Atom-Renderer-Stub (Welle B Vorlauf).
+   Card-Row: Symbol + Label + value_type-aware Value + AtomMarkerBar
+   rechts. View-Only V1. Layout-Border statt Card-Box, damit der Stub
+   in der CellInfoPage neben dem Legacy-Block ruhig wirkt. */
+.ifa-section {
+  margin-block-end: var(--space-md);
+  padding-block-end: var(--space-md);
+  border-bottom: 0.5px dashed var(--border);
+}
+.ifa-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.ifa-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.ifa-row > .ifa-card {
+  flex: 1;
+  min-width: 0;
+}
+.ifa-del {
+  padding-inline: var(--space-sm);
+  color: var(--text3);
+}
+.ifa-del:hover {
+  color: var(--danger);
+}
+.ifa-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border: 0.5px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--bg);
+  transition: border-color var(--tr-std), background var(--tr-std);
+}
+.ifa-card:hover {
+  border-color: var(--border2);
+  background: var(--bg2);
+}
+.ifa-symbol {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text2);
+  flex-shrink: 0;
+}
+.ifa-label {
+  font-weight: 500;
+  font-size: var(--fs-small);
+  color: var(--text);
+  flex-shrink: 0;
+}
+.ifa-value {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-small);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ifa-value-text {
+  color: var(--text);
+}
+.ifa-value-link {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.ifa-value-link:hover {
+  color: var(--accent-hover, var(--accent));
+}
+.ifa-empty {
+  padding: var(--space-md);
+  border: 0.5px dashed var(--border);
+  border-radius: var(--rs);
+  color: var(--text3);
+  font-size: var(--fs-small);
+  text-align: center;
+}
+.ifa-section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-block-end: var(--space-xs);
+}
+.ifa-section-title {
+  font-weight: 600;
+  font-size: var(--fs-small);
+  color: var(--text2);
+}
+.ifa-section-hint {
+  font-size: var(--fs-small);
+  color: var(--text3);
+  font-style: italic;
+}
