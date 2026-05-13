@@ -26,6 +26,12 @@ import {
   unenrollMfa,
   verifyTotpEnrollment,
 } from '../../lib/mfa';
+import {
+  type SessionRow,
+  getCurrentSessionId,
+  listMySessions,
+  revokeSession,
+} from '../../lib/sessions';
 import { showToast } from '../../lib/toasts';
 
 const AccountSecurity: Component = () => {
@@ -264,9 +270,10 @@ const AccountSecurity: Component = () => {
       <section class="settings-form-section">
         <h3>Sessions</h3>
         <p class="hint">
-          Du bist auf diesem Geraet eingeloggt. "Andere Geraete abmelden" invalidiert die JWTs aller
-          anderen offenen Sessions; sie muessen sich neu anmelden.
+          Liste aller aktiven Anmeldungen deines Kontos. Hier siehst du Geraet, IP und Zeitpunkt —
+          und kannst einzelne Sessions beenden, ohne dich selber abzumelden.
         </p>
+        <SessionsList />
         <div class="settings-foot">
           <button type="button" class="btn-c" onClick={() => void handleLogout()}>
             Abmelden (nur dieses Geraet)
@@ -351,6 +358,117 @@ const AccountSecurity: Component = () => {
 
 // Backup-Codes-Sektion. Eigene Komponente weil mehrere Resources +
 // Generate-Modal-State.
+// Session-Liste (Welle B.5). Pure-Online (Edge-Function). Step-Up bei
+// Revoke — der Server prueft AAL2 zusaetzlich.
+const SessionsList: Component = () => {
+  const [sessions, { refetch }] = createResource<SessionRow[]>(async () => {
+    try {
+      return await listMySessions();
+    } catch (err) {
+      console.error('listMySessions:', err);
+      showToast(translateDbError(err, 'Sessions nicht ladbar.'), 'error');
+      return [];
+    }
+  });
+  const [currentId, setCurrentId] = createSignal<string | null>(null);
+  const [busyId, setBusyId] = createSignal<string | null>(null);
+
+  void getCurrentSessionId().then(setCurrentId);
+
+  async function revoke(s: SessionRow) {
+    if (s.id === currentId()) {
+      showToast('Aktuelle Session bitte ueber "Abmelden" beenden.', 'info');
+      return;
+    }
+    const fresh = await requireFreshAal2({ reason: 'Session beenden' });
+    if (!fresh) return;
+    setBusyId(s.id);
+    try {
+      await revokeSession(s.id);
+      showToast('Session beendet.', 'success');
+      void refetch();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Beenden fehlgeschlagen.', 'error');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function shortenUa(ua: string | null): string {
+    if (!ua) return 'Unbekanntes Geraet';
+    // Heuristik: Browser-Familie + OS-Hinweis.
+    const browser = /Firefox\/[\d.]+/.exec(ua)
+      ? 'Firefox'
+      : /Edg\/[\d.]+/.exec(ua)
+        ? 'Edge'
+        : /Chrome\/[\d.]+/.exec(ua)
+          ? 'Chrome'
+          : /Safari\/[\d.]+/.exec(ua)
+            ? 'Safari'
+            : 'Browser';
+    const os = /Windows NT/i.test(ua)
+      ? 'Windows'
+      : /Macintosh|Mac OS X/i.test(ua)
+        ? 'macOS'
+        : /Android/i.test(ua)
+          ? 'Android'
+          : /iPhone|iPad/i.test(ua)
+            ? 'iOS'
+            : /Linux/i.test(ua)
+              ? 'Linux'
+              : '';
+    return os ? `${browser} · ${os}` : browser;
+  }
+
+  return (
+    <Show
+      when={!sessions.loading}
+      fallback={
+        <p class="hint" aria-live="polite">
+          Lade Sessions…
+        </p>
+      }
+    >
+      <Show
+        when={(sessions() ?? []).length > 0}
+        fallback={<p class="hint">Keine aktiven Sessions gefunden.</p>}
+      >
+        <ul class="sessions-list">
+          <For each={sessions()}>
+            {(s) => {
+              const isCurrent = () => s.id === currentId();
+              const isBusy = () => busyId() === s.id;
+              return (
+                <li class="sessions-row" classList={{ 'is-current': isCurrent() }}>
+                  <div class="sessions-row-meta">
+                    <strong>{shortenUa(s.user_agent)}</strong>
+                    <span class="hint">
+                      {s.ip ? `${s.ip} · ` : ''}
+                      AAL {s.aal ?? '–'} · Letzter Zugriff{' '}
+                      {formatDateDE(s.refreshed_at ?? s.updated_at ?? s.created_at)}
+                    </span>
+                    <Show when={isCurrent()}>
+                      <span class="badge badge-success">Aktuell</span>
+                    </Show>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn-subtle"
+                    onClick={() => void revoke(s)}
+                    disabled={isBusy() || isCurrent()}
+                  >
+                    {isBusy() ? 'Beende…' : 'Beenden'}
+                  </button>
+                </li>
+              );
+            }}
+          </For>
+        </ul>
+      </Show>
+    </Show>
+  );
+};
+
 const BackupCodesPane: Component = () => {
   const [status, { refetch }] = createResource(async () => {
     try {

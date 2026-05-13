@@ -4774,6 +4774,11 @@ button[type="submit"]:hover:not(:disabled) {
   color: var(--text2);
 }
 
+.badge-success {
+  background: var(--success);
+  color: var(--text-inverse);
+}
+
 .cardhd {
   background: var(--bg2);
   padding: 8px 13px;
@@ -15877,6 +15882,37 @@ html.view-transition-drill-up::view-transition-new(ws-main) {
 }
 
 .mfa-factor-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0_5);
+}
+
+.sessions-list {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.sessions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.sessions-row.is-current {
+  border-color: var(--accent);
+  background: var(--surface-hover);
+}
+
+.sessions-row-meta {
   display: flex;
   flex-direction: column;
   gap: var(--space-0_5);

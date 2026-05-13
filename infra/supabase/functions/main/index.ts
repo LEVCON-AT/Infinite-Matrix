@@ -17,6 +17,8 @@ type Handler = (req: Request) => Response | Promise<Response>;
 // damit ein Crash in einer Function nicht den Dispatcher mitreisst.
 const REGISTRY: Record<string, () => Promise<{ default: Handler }>> = {
   'delete-self-account': () => import('../delete-self-account/index.ts'),
+  'list-my-sessions': () => import('../list-my-sessions/index.ts'),
+  'revoke-session': () => import('../revoke-session/index.ts'),
 };
 
 const handlerCache = new Map<string, Handler>();
