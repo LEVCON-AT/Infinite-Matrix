@@ -110,3 +110,23 @@ services:
       - name: key-auth
         config:
           hide_credentials: false
+
+  ## Edge-Functions (Deno-Runtime, Single-Dispatcher main/index.ts)
+  - name: functions-v1
+    url: http://functions:9000/
+    routes:
+      - name: functions-v1-all
+        strip_path: true
+        paths:
+          - /functions/v1/
+    plugins:
+      - name: cors
+      - name: key-auth
+        config:
+          hide_credentials: false
+      - name: acl
+        config:
+          hide_groups_header: true
+          allow:
+            - admin
+            - anon

@@ -220,6 +220,39 @@ services:
           memory: 200M
 
   # ═══════════════════════════════════════════════════════════════
+  # Edge-Functions (Deno-Runtime)
+  # Single-Entry-Dispatcher `main/index.ts` routet anhand des URL-Pfades
+  # auf die Sub-Functions (`delete-self-account/`, ...). Erreichbar nur
+  # via Kong (`/functions/v1/<name>`).
+  # ═══════════════════════════════════════════════════════════════
+  functions:
+    image: supabase/edge-runtime:v1.67.4
+    container_name: matrix-supabase-functions
+    restart: unless-stopped
+    depends_on:
+      auth:
+        condition: service_started
+      rest:
+        condition: service_started
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      SUPABASE_DB_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-postgres}
+      VERIFY_JWT: "false" # Wir verifizieren selber in `_shared/auth.ts` — der Runtime-Verifier kennt unsere AAL2-Pruefung nicht.
+    volumes:
+      - ./functions:/home/deno/functions:Z,ro
+    command:
+      - start
+      - --main-service
+      - /home/deno/functions/main
+    deploy:
+      resources:
+        limits:
+          memory: 200M
+
+  # ═══════════════════════════════════════════════════════════════
   # Studio (Admin-UI, optional — nur via profile=admin starten)
   # Aufruf:  docker compose --profile admin up -d studio
   # Zugriff: SSH-Tunnel (ssh -L 3002:127.0.0.1:3002 vps) → localhost:3002
