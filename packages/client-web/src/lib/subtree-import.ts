@@ -317,6 +317,133 @@ async function insertBatch(table: string, rows: Record<string, unknown>[]): Prom
   }
 }
 
+// ─── B1-A-006-Restposten — Object-Layer-Block ────────────────────
+// Bereitet Object-Layer-Rows aus dem Payload fuer den Import vor:
+// vergibt neue UUIDs, remappt parent_id (self-FK), home_ref_id (poly-
+// FK auf row/col/kb_col/node), object_tags-FKs und group-Member-FKs.
+//
+// Erwartet, dass remapMap bereits node/cell/row/col/kb_col-IDs trägt
+// (Pre-Pass im Aufrufer). objects + groups bekommen hier ihren Pre-
+// Pass; das ergibt die deterministische Reihenfolge:
+//   1. Caller: remap fuer nodes/rows/cols/cells/kb_cols.
+//   2. Hier:   remap fuer objects/groups; FK-Auflösung gegen Pre-Pass.
+//   3. Caller: applyObjectIdMap auf nodes/rows/cols/kb_cols.
+//
+// home_ref_kind='standalone' bleibt FK-frei (home_ref_id ist Null).
+// Fuer 'row'/'col'/'kb_col'/'node' lesen wir aus remapMap; falls die
+// referenzierte Row nicht im Payload ist, wird home_ref_id auf NULL +
+// home_ref_kind auf 'standalone' gesetzt — defensiver Fallback.
+type ObjectLayerOut = {
+  objectsOut: Record<string, unknown>[];
+  objectTagsOut: Record<string, unknown>[];
+  groupsOut: Record<string, unknown>[];
+  groupMembersOut: Record<string, unknown>[];
+  insertedObjectIds: string[];
+  insertedGroupIds: string[];
+};
+
+function buildObjectLayerOut(
+  payload: WorkspaceExport,
+  workspaceId: string,
+  remapMap: RemapMap,
+): ObjectLayerOut {
+  const sourceObjects = (payload.objects ?? []) as Array<Record<string, unknown>>;
+  const sourceObjectTags = (payload.object_tags ?? []) as Array<Record<string, unknown>>;
+  const sourceGroups = (payload.groups ?? []) as Array<Record<string, unknown>>;
+  const sourceGroupMembers = (payload.group_members ?? []) as Array<Record<string, unknown>>;
+
+  // Pre-Pass: alle Object- + Group-IDs in remapMap eintragen.
+  for (const o of sourceObjects) remap((o as { id: string }).id, remapMap);
+  for (const g of sourceGroups) remap((g as { id: string }).id, remapMap);
+
+  const objectsOut = sourceObjects.map((o) => {
+    const raw = o as {
+      id: string;
+      parent_id?: string | null;
+      home_ref_kind?: string | null;
+      home_ref_id?: string | null;
+    };
+    // home_ref_id-Remap: nur wenn target im Payload (remapMap hat den Eintrag).
+    // Sonst graceful auf 'standalone' faellen — kein FK-Bruch im Ziel.
+    let newHomeRefKind: string | null = raw.home_ref_kind ?? null;
+    let newHomeRefId: string | null = null;
+    if (raw.home_ref_id && raw.home_ref_kind && raw.home_ref_kind !== 'standalone') {
+      const mapped = remapMap.get(raw.home_ref_id);
+      if (mapped) {
+        newHomeRefId = mapped;
+      } else {
+        newHomeRefKind = 'standalone';
+      }
+    }
+    // parent_id (self-FK): wenn parent im Payload → remap, sonst NULL
+    // (kein FK-Bruch — Object wird zum neuen Top-Level im Ziel).
+    const newParentId = raw.parent_id ? (remapMap.get(raw.parent_id) ?? null) : null;
+    return {
+      ...o,
+      id: mustRemap(raw.id, remapMap),
+      workspace_id: workspaceId,
+      parent_id: newParentId,
+      home_ref_kind: newHomeRefKind,
+      home_ref_id: newHomeRefId,
+    };
+  });
+
+  // object_tags: object_id + tag_object_id sind beide objects.id-Refs.
+  // Nur uebernehmen, wenn beide IDs remapbar sind (sonst dangling FK).
+  const objectTagsOut: Record<string, unknown>[] = [];
+  for (const t of sourceObjectTags) {
+    const raw = t as { object_id: string; tag_object_id: string };
+    const objId = remapMap.get(raw.object_id);
+    const tagId = remapMap.get(raw.tag_object_id);
+    if (!objId || !tagId) continue;
+    objectTagsOut.push({
+      ...t,
+      object_id: objId,
+      tag_object_id: tagId,
+      workspace_id: workspaceId,
+    });
+  }
+
+  const groupsOut = sourceGroups.map((g) => ({
+    ...g,
+    id: mustRemap((g as { id: string }).id, remapMap),
+    workspace_id: workspaceId,
+  }));
+
+  // group_members: group_id + object_id beide remap-pflichtig.
+  const groupMembersOut: Record<string, unknown>[] = [];
+  for (const gm of sourceGroupMembers) {
+    const raw = gm as { group_id: string; object_id: string };
+    const gid = remapMap.get(raw.group_id);
+    const oid = remapMap.get(raw.object_id);
+    if (!gid || !oid) continue;
+    groupMembersOut.push({
+      ...gm,
+      group_id: gid,
+      object_id: oid,
+      workspace_id: workspaceId,
+    });
+  }
+
+  return {
+    objectsOut,
+    objectTagsOut,
+    groupsOut,
+    groupMembersOut,
+    insertedObjectIds: objectsOut.map((o) => o.id as string),
+    insertedGroupIds: groupsOut.map((g) => g.id as string),
+  };
+}
+
+// Helper: auf einer Row mit `object_id`-Feld den FK durch remapMap
+// ersetzen (NULL bleibt NULL; nicht-gemappte IDs faellen auch auf NULL).
+function applyObjectIdMap<T extends Record<string, unknown>>(row: T, remapMap: RemapMap): T {
+  const cur = (row as { object_id?: unknown }).object_id;
+  if (typeof cur !== 'string' || !cur) return row;
+  const mapped = remapMap.get(cur);
+  return { ...row, object_id: mapped ?? null } as T;
+}
+
 // ─── Phase 4 T.1.D Helpers: Legacy-Payload → Task-Layer ────────
 // Import-Payloads tragen weiterhin die kb_cards / checklist_items
 // Form aus historischen Exporten. Diese Helper transformieren sie in
@@ -484,6 +611,11 @@ type WorkspaceGlobalsCleanup = {
   // auf auth.users — kein Cascade von nodes/templates. Bei Failure
   // separater Delete.
   atomMarkerIds?: string[];
+  // B1-A-006-Restposten: Object-Layer-Inserts. objects + groups sind
+  // workspace-scoped, kein Cascade von nodes — direkter Delete bei
+  // Failure. object_tags + group_members cascaden ueber objects/groups.
+  objectIds?: string[];
+  groupIds?: string[];
 };
 
 async function cleanupPartialImport(
@@ -552,6 +684,25 @@ async function cleanupPartialImport(
         .from('saved_filters')
         .delete()
         .in('id', workspaceGlobals.savedFilterIds as string[]);
+    }
+    if ((workspaceGlobals.groupIds ?? []).length > 0) {
+      // group_members hat FK-CASCADE auf groups + objects — beim
+      // groups-Delete wird das Member-JOIN automatisch geraeumt.
+      await supabase
+        .from('groups')
+        .delete()
+        .in('id', workspaceGlobals.groupIds as string[]);
+    }
+    if ((workspaceGlobals.objectIds ?? []).length > 0) {
+      // object_tags hat FK-CASCADE auf objects.id (beidseitig) —
+      // beim objects-Delete wird das Tags-JOIN automatisch geraeumt.
+      // nodes/rows/cols/kb_cols.object_id wird per ON DELETE SET NULL
+      // entkoppelt (Migration 080+) — wir haben die Subtree-Tabellen
+      // ohnehin schon ueber nodes-Cascade entfernt.
+      await supabase
+        .from('objects')
+        .delete()
+        .in('id', workspaceGlobals.objectIds as string[]);
     }
     if ((workspaceGlobals.featureTemplateIds ?? []).length > 0) {
       // FK-CASCADE entfernt template_sections + template_widgets
@@ -1021,6 +1172,12 @@ export async function executeSubtreeImportIntoCell(args: {
   for (const it of payload.checklist_items) remap((it as { id: string }).id, remapMap);
   for (const l of payload.links) remap((l as { id: string }).id, remapMap);
 
+  // B1-A-006-Restposten — Object-Layer-Block. objects/groups bekommen
+  // hier ihren Pre-Pass + FK-Auflösung (home_ref_id, parent_id, tags,
+  // group_members). Muss NACH den Subtree-Pre-Passes laufen, weil
+  // objects.home_ref_id auf row/col/kb_col/node remap-pflichtig ist.
+  const objectLayer = buildObjectLayerOut(payload, workspaceId, remapMap);
+
   // Rows mappen + FKs auf neue IDs umbiegen + workspace_id setzen.
   // Wichtig: nodes.parent_cell_id wird IM INSERT auf NULL gesetzt,
   // weil die gezielten cells erst in einer spaeteren Phase existieren
@@ -1034,17 +1191,20 @@ export async function executeSubtreeImportIntoCell(args: {
     // nicht dem urspruenglichen Ersteller eines fremden Workspaces.
     const { created_by: _imported, ...rest } = n;
     void _imported;
-    return applyAliasMap(
-      {
-        ...rest,
-        id: mustRemap(id, remapMap),
-        workspace_id: workspaceId,
-        // Im Insert zunaechst NULL. Root-Node und alle Sub-Nodes
-        // bekommen ihren parent_cell_id erst im UPDATE-Schritt
-        // (siehe Phase D unten).
-        parent_cell_id: null,
-      },
-      aliasMap,
+    return applyObjectIdMap(
+      applyAliasMap(
+        {
+          ...rest,
+          id: mustRemap(id, remapMap),
+          workspace_id: workspaceId,
+          // Im Insert zunaechst NULL. Root-Node und alle Sub-Nodes
+          // bekommen ihren parent_cell_id erst im UPDATE-Schritt
+          // (siehe Phase D unten).
+          parent_cell_id: null,
+        },
+        aliasMap,
+      ),
+      remapMap,
     );
   });
   // Mapping Old-Node-ID -> gewuenschter finaler parent_cell_id
@@ -1062,19 +1222,29 @@ export async function executeSubtreeImportIntoCell(args: {
     }
   }
 
-  const rowsOut = (payload.rows as Array<Record<string, unknown>>).map((r) => ({
-    ...r,
-    id: mustRemap((r as { id: string }).id, remapMap),
-    workspace_id: workspaceId,
-    matrix_id: remap((r as { matrix_id: string }).matrix_id, remapMap),
-  }));
+  const rowsOut = (payload.rows as Array<Record<string, unknown>>).map((r) =>
+    applyObjectIdMap(
+      {
+        ...r,
+        id: mustRemap((r as { id: string }).id, remapMap),
+        workspace_id: workspaceId,
+        matrix_id: remap((r as { matrix_id: string }).matrix_id, remapMap),
+      },
+      remapMap,
+    ),
+  );
 
-  const colsOut = (payload.cols as Array<Record<string, unknown>>).map((c) => ({
-    ...c,
-    id: mustRemap((c as { id: string }).id, remapMap),
-    workspace_id: workspaceId,
-    matrix_id: remap((c as { matrix_id: string }).matrix_id, remapMap),
-  }));
+  const colsOut = (payload.cols as Array<Record<string, unknown>>).map((c) =>
+    applyObjectIdMap(
+      {
+        ...c,
+        id: mustRemap((c as { id: string }).id, remapMap),
+        workspace_id: workspaceId,
+        matrix_id: remap((c as { matrix_id: string }).matrix_id, remapMap),
+      },
+      remapMap,
+    ),
+  );
 
   const cellsOut = (payload.cells as Array<Record<string, unknown>>).map((c) => {
     const raw = c as {
@@ -1100,12 +1270,17 @@ export async function executeSubtreeImportIntoCell(args: {
     );
   });
 
-  const kbColsOut = (payload.kb_cols as Array<Record<string, unknown>>).map((k) => ({
-    ...k,
-    id: mustRemap((k as { id: string }).id, remapMap),
-    workspace_id: workspaceId,
-    board_id: remap((k as { board_id: string }).board_id, remapMap),
-  }));
+  const kbColsOut = (payload.kb_cols as Array<Record<string, unknown>>).map((k) =>
+    applyObjectIdMap(
+      {
+        ...k,
+        id: mustRemap((k as { id: string }).id, remapMap),
+        workspace_id: workspaceId,
+        board_id: remap((k as { board_id: string }).board_id, remapMap),
+      },
+      remapMap,
+    ),
+  );
 
   const kbCardsOut = (payload.kb_cards as Array<Record<string, unknown>>).map((k) => {
     const raw = k as {
@@ -1436,6 +1611,26 @@ export async function executeSubtreeImportIntoCell(args: {
   const insertedDocIds = docsOut.map((d) => (d as { id: string }).id);
   const insertedInfoFieldIdsCell = infoFieldsOutCell.map((f) => (f as { id: string }).id);
   try {
+    // B1-A-006-Restposten: Objects + Groups VOR nodes/rows/cols/kb_cols,
+    // weil diese 4 Tabellen einen object_id-FK halten. object_tags +
+    // group_members nach den jeweiligen Parent-Tabellen (object_tags →
+    // objects existieren; group_members → groups + objects existieren).
+    if (objectLayer.objectsOut.length > 0) {
+      step('Objects einfuegen…');
+      await insertBatch('objects', objectLayer.objectsOut);
+    }
+    if (objectLayer.groupsOut.length > 0) {
+      step('Groups einfuegen…');
+      await insertBatch('groups', objectLayer.groupsOut);
+    }
+    if (objectLayer.objectTagsOut.length > 0) {
+      step('Object-Tags einfuegen…');
+      await insertBatch('object_tags', objectLayer.objectTagsOut);
+    }
+    if (objectLayer.groupMembersOut.length > 0) {
+      step('Group-Members einfuegen…');
+      await insertBatch('group_members', objectLayer.groupMembersOut);
+    }
     step('Nodes einfuegen…');
     await insertBatch('nodes', nodesOut);
     step('Zeilen einfuegen…');
@@ -1496,7 +1691,12 @@ export async function executeSubtreeImportIntoCell(args: {
       await insertBatch('atom_tags', atomTagsOut);
     }
   } catch (err) {
-    await cleanupPartialImport(insertedNodeIds, insertedDocIds, insertedInfoFieldIdsCell);
+    await cleanupPartialImport(insertedNodeIds, insertedDocIds, insertedInfoFieldIdsCell, {
+      // B1-A-006-Restposten: Object-Layer-Inserts geraeumt damit Failure
+      // mitten in der Pipeline keine Subtree-fremden Objects hinterlaesst.
+      objectIds: objectLayer.insertedObjectIds,
+      groupIds: objectLayer.insertedGroupIds,
+    });
     throw err;
   }
   step('Ziel-Zelle anpassen…');
@@ -1590,7 +1790,10 @@ export async function executeSubtreeImportIntoCell(args: {
     // Ziel-Zelle-Patch hat geworfen — Nodes + Docs + info_fields
     // wurden schon eingefuegt. Cleanup nachziehen, damit der Workspace
     // nicht mit freischwebenden Inserts zurueckbleibt.
-    await cleanupPartialImport(insertedNodeIds, insertedDocIds, insertedInfoFieldIdsCell);
+    await cleanupPartialImport(insertedNodeIds, insertedDocIds, insertedInfoFieldIdsCell, {
+      objectIds: objectLayer.insertedObjectIds,
+      groupIds: objectLayer.insertedGroupIds,
+    });
     throw patchErr;
   }
 
