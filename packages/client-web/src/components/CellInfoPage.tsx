@@ -32,9 +32,12 @@ import { translateDbError } from '../lib/errors';
 import { fetchInfoManifestationsForCell } from '../lib/info-field-manifestations';
 import { addInfoFieldForCell, deleteInfoField } from '../lib/info-fields';
 import type { ContextMaps } from '../lib/label-template';
+import { fetchLinkManifestationsForCell } from '../lib/link-manifestations';
 import {
+  addCellAtomLink,
   addCellInfoField,
   addCellLink,
+  delBoardLink,
   delCellInfoField,
   delCellLink,
   moveCellInfoField,
@@ -53,6 +56,7 @@ import { useViewerActive } from '../lib/workspace-role';
 import AliasText from './AliasText';
 import CellDocsSection from './CellDocsSection';
 import InfoFieldAtomCard from './InfoFieldAtomCard';
+import LinkAtomCard from './LinkAtomCard';
 import PresenceMini from './PresenceMini';
 
 type Props = {
@@ -75,6 +79,10 @@ type Props = {
   // info_fields per Realtime auftauchen. Triggert Refetch der neuen
   // Section. Cross-Tab-Konsistenz fuer info_field-Atome.
   realtimeInfoVersion?: number;
+  // Welle B Stub §13.3 V2.H — Bumps wenn atom_manifestations(kind=
+  // 'pinned', atom_type='link', container_kind='cell') oder links per
+  // Realtime auftauchen. Triggert Refetch der Atom-Links-Section.
+  realtimeLinkVersion?: number;
 };
 
 const CellInfoPage: Component<Props> = (p) => {
@@ -166,6 +174,78 @@ const CellInfoPage: Component<Props> = (p) => {
   }
   // Silence unused-import warning until B.S.4 hooks Delete-Affordance.
   void refetchAtomFields;
+
+  // Welle B Stub §13.3 V2.H — Atom-Links-Section. Resource liest
+  // atom_manifestations(kind='pinned', atom_type='link', container_
+  // kind='cell') + joined links. Refetch-Trigger: Cell/Workspace-
+  // Wechsel, lokale Mutationen, Realtime-Bumps (realtimeLinkVersion).
+  const [atomLinksRefetchKey, setAtomLinksRefetchKey] = createSignal(0);
+  const [atomLinks, { refetch: refetchAtomLinks }] = createResource(
+    () => [p.workspaceId, p.cell.id, p.realtimeLinkVersion ?? 0, atomLinksRefetchKey()] as const,
+    async ([wsId, cellId]) => fetchLinkManifestationsForCell(wsId, cellId),
+  );
+
+  async function onAddAtomLink() {
+    if (viewerActive()) {
+      showToast('Read-only: Atom-Link-Anlage ist als Viewer nicht moeglich.', 'info');
+      return;
+    }
+    const url = await showPrompt({
+      title: 'Atom-Link anlegen',
+      message: 'URL:',
+      initialValue: 'https://',
+    });
+    if (url == null) return;
+    const clean = sanitizeUrl(url);
+    if (!clean) {
+      showToast('URL ungueltig.', 'error');
+      return;
+    }
+    const label =
+      (await showPrompt({
+        title: 'Bezeichnung',
+        message: 'Bezeichnung (optional):',
+      })) ?? '';
+    setBusy(true);
+    try {
+      await addCellAtomLink({
+        workspaceId: p.workspaceId,
+        cellId: p.cell.id,
+        provider: 'url',
+        label,
+        url: clean,
+      });
+      setAtomLinksRefetchKey((v) => v + 1);
+      showToast('Atom-Link angelegt.', 'success');
+    } catch (err) {
+      console.error('CellInfoPage.onAddAtomLink:', err);
+      showToast(translateDbError(err), 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDeleteAtomLink(linkId: string, label: string) {
+    const ok = await showConfirm({
+      title: 'Atom-Link loeschen?',
+      message: `Atom-Link "${label || '(ohne Label)'}" loeschen? Das Atom wird workspace-weit entfernt.`,
+      variant: 'danger',
+      confirmLabel: 'Loeschen',
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await delBoardLink(linkId);
+      setAtomLinksRefetchKey((v) => v + 1);
+      showToast('Atom-Link geloescht.', 'success');
+    } catch (err) {
+      console.error('CellInfoPage.onDeleteAtomLink:', err);
+      showToast(translateDbError(err), 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+  void refetchAtomLinks;
 
   async function wrap<T>(fn: () => Promise<T>, successMsg?: string) {
     if (busy()) return;
@@ -365,6 +445,82 @@ const CellInfoPage: Component<Props> = (p) => {
                       disabled={busy()}
                       title="Atom-Feld loeschen (workspace-weit)"
                       aria-label="Atom-Feld loeschen"
+                    >
+                      ✕
+                    </button>
+                  </Show>
+                </div>
+              )}
+            </For>
+          </div>
+        </Show>
+      </section>
+
+      {/* Welle B Stub §13.3 V2.H — Atom-Links-Section (link-Atom-
+          Renderer). View-Only V1. Legacy cell.data.links-Block bleibt
+          unangetastet darunter, bis Welle B Step 13 die JSONB-Daten
+          migriert. Schliesst die letzte atom_markers-CHECK-Sicht. */}
+      <section class="ifa-section" aria-label="Atom-Links (Welle B Vorschau)">
+        <div class="ifa-section-head">
+          <span class="ifa-section-title">Atom-Links</span>
+          <span class="ifa-section-hint">Welle B Vorschau — View-Only</span>
+          <Show when={editMode() && p.selfUserId}>
+            <button
+              type="button"
+              class="btn-subtle"
+              onClick={onAddAtomLink}
+              disabled={busy() || viewerActive()}
+              title="Neues link-Atom mit Cell-Manifestation anlegen"
+            >
+              + Atom-Link
+            </button>
+          </Show>
+        </div>
+        <Show
+          when={(atomLinks() ?? []).length > 0}
+          fallback={
+            <p class="ifa-empty">
+              Keine Atom-Links.
+              <Show when={editMode()}> Lege den ersten oben an.</Show>
+            </p>
+          }
+        >
+          <div class="ifa-list">
+            <For each={atomLinks() ?? []}>
+              {(item) => (
+                <div class="ifa-row">
+                  <Show
+                    when={p.selfUserId}
+                    fallback={
+                      <LinkAtomCard
+                        workspaceId={p.workspaceId}
+                        userId=""
+                        atom={item.atom}
+                        manifestation={item.manifestation}
+                        markers={p.wsAtomMarkers ?? []}
+                      />
+                    }
+                  >
+                    {(uid) => (
+                      <LinkAtomCard
+                        workspaceId={p.workspaceId}
+                        userId={uid()}
+                        atom={item.atom}
+                        manifestation={item.manifestation}
+                        markers={p.wsAtomMarkers ?? []}
+                      />
+                    )}
+                  </Show>
+                  <Show when={editMode() && !viewerActive()}>
+                    <button
+                      type="button"
+                      class="btn-subtle ifa-del"
+                      onClick={() =>
+                        onDeleteAtomLink(item.atom.id, item.atom.label ?? item.atom.url)
+                      }
+                      disabled={busy()}
+                      title="Atom-Link loeschen (workspace-weit)"
+                      aria-label="Atom-Link loeschen"
                     >
                       ✕
                     </button>

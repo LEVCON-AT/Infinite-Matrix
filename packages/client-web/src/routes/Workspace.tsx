@@ -493,6 +493,12 @@ const Workspace: Component = () => {
   // Konsistenz fuer die Atom-Felder-Section.
   const [rtInfoFields, setRtInfoFields] = createSignal(0);
 
+  // Welle B Stub §13.3 V2.H — Realtime-Version-Counter fuer link-Atom-
+  // Renderer in CellInfoPage. Bumps wenn atom_manifestations(kind=
+  // 'pinned', atom_type='link') oder links per Realtime-Subscriber
+  // feuern. Cross-Tab-Konsistenz fuer die Atom-Links-Section.
+  const [rtLinkAtoms, setRtLinkAtoms] = createSignal(0);
+
   // Welle D.7b: Flache Picker-Entry-Liste fuer AtomPickerModal — Tasks +
   // Links + Docs + Checklists in einem einheitlichen Format. Der Modal
   // bleibt source-agnostisch.
@@ -1242,6 +1248,10 @@ const Workspace: Component = () => {
       links: () => {
         void refetchBoard();
         scheduleAliasRefresh(wid);
+        // Welle B Stub §13.3 V2.H — Mutationen an links (label/url/
+        // provider/symbol_override) triggern Refetch der Atom-Links-
+        // Section. Cross-Tab-Konsistenz.
+        setRtLinkAtoms((v) => v + 1);
       },
       docs: () => {
         setRtDocs((v) => v + 1);
@@ -1282,6 +1292,9 @@ const Workspace: Component = () => {
         // Welle B Stub §13.3 V2.G — info-kind-Manifestations triggern
         // den Atom-Felder-Section-Refetch in CellInfoPage (Cross-Tab).
         setRtInfoFields((v) => v + 1);
+        // Welle B Stub §13.3 V2.H — pinned-link-Manifestations triggern
+        // den Atom-Links-Section-Refetch in CellInfoPage (Cross-Tab).
+        setRtLinkAtoms((v) => v + 1);
       },
       // Welle B Stub §13.3 V2.G — info_fields-Mutationen (label/value/
       // value_type/symbol_override-Aenderungen) triggern Refetch der
@@ -1940,6 +1953,7 @@ const Workspace: Component = () => {
                         resolverMaps={resolverMaps}
                         wsAtomMarkers={wsAtomMarkers() ?? []}
                         realtimeInfoVersion={rtInfoFields()}
+                        realtimeLinkVersion={rtLinkAtoms()}
                         onChanged={() => {
                           void refetchCells();
                         }}
