@@ -29,6 +29,7 @@
 //     auf dieselbe position+1 landen. Realtime-Refetch beim ersten
 //     Online-Sync normalisiert die Reihenfolge.
 
+import { addAtomManifestation, nextAtomManifestationPosition } from './atom-manifestations';
 import { currentUserIdSync } from './auth';
 import { isNetworkError } from './mutation-queue';
 import { getById, getByWorkspace } from './offline-cache';
@@ -2130,24 +2131,26 @@ export async function addCellAtomLink(args: {
 
   // Manifestation: cell-pinned. Caller (UI) uebergibt cellId als
   // Container — Sortierung + Reorder erfolgen via atom-manifestations.
-  // Position = max+1 in der Cell.
+  // Position = max+1 in der Cell. P.1 (2026-05-13): in runOptimistic-
+  // Insert gewrappt (Architektur §4.1.1 — direkter supabase.from()-
+  // Insert ohne Wrapper bricht den Offline-Pfad). Fehler werden hier
+  // weiterhin geswallowed (best-effort), damit ein FK-Edge-Case nicht
+  // den primary link-Insert blockiert — der Caller hat den LinkRow
+  // schon erhalten; die Cell-Manifestation kann notfalls re-applied
+  // werden via UI-Refetch.
   try {
-    const { error } = await supabase.from('atom_manifestations').insert({
-      atom_type: 'link',
-      atom_id: link.id,
-      workspace_id: args.workspaceId,
+    const position = await nextAtomManifestationPosition(args.cellId, 'pinned');
+    await addAtomManifestation({
+      workspaceId: args.workspaceId,
+      atomType: 'link',
+      atomId: link.id,
       kind: 'pinned',
-      container_id: args.cellId,
-      container_kind: 'cell',
-      position: 1,
-      level: null,
-      display_meta: {},
+      containerId: args.cellId,
+      containerKind: 'cell',
+      position,
     });
-    if (error) {
-      console.warn('addCellLink: manifestation insert failed:', error);
-    }
   } catch (err) {
-    console.warn('addCellLink: manifestation skipped:', err);
+    console.warn('addCellAtomLink: manifestation skipped:', err);
   }
 
   return link;
