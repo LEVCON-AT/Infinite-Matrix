@@ -821,8 +821,15 @@ const NewCellWizard: Component<Props> = (p) => {
                 type="button"
                 class="btn-subtle new-cell-wizard-ai-btn"
                 onClick={() => {
+                  // A.6 — parentLabel ist Breadcrumb-Form "Zeile × Spalte".
+                  // Bisher stand hier "Cell abc12345" (Id-Slice) — semantisch
+                  // wertlos fuer den AI-Kontext. Row+Col-Labels sind im
+                  // Props-Bundle vorhanden, alias-Fallback wenn label leer
+                  // (Konsistenz mit CellChecklistsPage breadcrumb()).
                   const cellId = p.cell?.id ?? null;
-                  const parentLabel = p.cell ? `Cell ${cellId?.slice(0, 8)}` : 'Workspace-Root';
+                  const rowLabel = p.row.label || '(Zeile)';
+                  const colLabel = p.col.label || '(Spalte)';
+                  const parentLabel = `${rowLabel} × ${colLabel}`;
                   openCellSuggest({
                     workspaceId: p.workspaceId,
                     parentCellId: cellId,
