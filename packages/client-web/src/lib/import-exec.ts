@@ -11,6 +11,15 @@
 //
 // Fehler im Insert brechen ab und werfen — Teil-Importe bleiben. User bekommt
 // Toast, kann Workspace manuell bereinigen oder neu importieren.
+//
+// Konformitaets-Notiz — dokumentierte Bulk-Ausnahme (`architektur.md §4.1`):
+// `supabase.from(table).insert(chunk)` in `insertBatch` ist Online-only und
+// laeuft bewusst ohne `runOptimistic*`-Wrapper. Begruendung: Importe sind
+// User-initiiert + UI-blocking (Progress-Dialog), Offline-Replay einer 8-
+// stufigen FK-geordneten Pipeline mit hunderten Rows pro Stufe waere weder
+// User-erwartbar noch verlustfrei rekonstruierbar (Queue-FIFO verliert die
+// Stufen-Reihenfolge sobald ein einzelner Step network-failed). Hard-fail
+// per ImportExecError + Toast ist das definierte Vertragsverhalten.
 
 import type { ImportPlan } from './import-types';
 import { supabase } from './supabase';

@@ -28,7 +28,7 @@
 // T.3 / T.4 / T.2 — diese Datei legt nur Layer 0 + 1.
 
 import { isNetworkError } from './mutation-queue';
-import { type CacheTable, getById, getByWorkspace, mergeRows, putOne } from './offline-cache';
+import { type CacheTable, getById, getByWorkspace, mergeRows } from './offline-cache';
 import { markCacheFallback, markLiveSuccess } from './offline-state';
 import { runOptimisticDelete, runOptimisticInsert, runOptimisticUpdate } from './safe-mutation';
 import { supabase } from './supabase';
@@ -367,49 +367,65 @@ export async function deleteTask(taskId: string): Promise<TaskSnapshot | null> {
 
 // Restore: legt task wieder mit identischer ID an, dann Manifestations.
 // Aufrufer bekommt das via showUndoToast(label, () => restoreTask(snap)).
+//
+// Beide Inserts laufen durch runOptimisticInsert (architektur.md §4.1) —
+// Offline-Klick auf Undo queued die Inserts in der Mutation-Queue und
+// patcht den IDB-Cache, statt silent zu brechen wie der pre-§4.1-Pfad
+// (direktes supabase.from().insert(), Manifestation-Fehler nur console.error).
+// Pattern-Parallele zu restoreCard in mutations.ts.
 export async function restoreTask(snap: TaskSnapshot): Promise<TaskRow> {
   const t = snap.task;
-  const { data, error } = await supabase
-    .from('tasks')
-    .insert({
-      id: t.id,
-      workspace_id: t.workspace_id,
-      label: t.label,
-      note: t.note,
-      status: t.status,
-      deadline: t.deadline,
-      who: t.who,
-      recur: t.recur,
-      done_occurrences: t.done_occurrences,
-      attrs: t.attrs,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  const restored = data as TaskRow;
-  void putOne('tasks' satisfies CacheTable, restored).catch(() => {});
+  const restored = await runOptimisticInsert<TaskRow>({
+    table: 'tasks',
+    workspaceId: t.workspace_id,
+    label: 'Aufgabe wiederherstellen',
+    run: async () => {
+      const payload = {
+        id: t.id,
+        workspace_id: t.workspace_id,
+        label: t.label,
+        note: t.note,
+        status: t.status,
+        deadline: t.deadline,
+        who: t.who,
+        recur: t.recur,
+        done_occurrences: t.done_occurrences,
+        attrs: t.attrs,
+      };
+      const { data, error } = await supabase.from('tasks').insert(payload).select().single();
+      if (error) throw error;
+      return data as TaskRow;
+    },
+    buildOffline: () => t,
+  });
 
   for (const m of snap.manifestations) {
-    const { data: mData, error: mErr } = await supabase
-      .from('atom_manifestations')
-      .insert({
-        id: m.id,
-        atom_type: 'task',
-        atom_id: m.atom_id,
-        workspace_id: m.workspace_id,
-        kind: m.kind,
-        container_id: m.container_id,
-        position: m.position,
-        level: m.level,
-        display_meta: m.display_meta,
-      })
-      .select()
-      .single();
-    if (mErr) {
-      console.error('[tasks] restoreTask manifestation insert failed', mErr);
-      continue;
-    }
-    void putOne(MANIF_TABLE, mData as TaskManifestationRow).catch(() => {});
+    await runOptimisticInsert<TaskManifestationRow>({
+      table: MANIF_TABLE,
+      workspaceId: m.workspace_id,
+      label: 'Aufgabe wiederherstellen',
+      run: async () => {
+        const payload = {
+          id: m.id,
+          atom_type: 'task' as const,
+          atom_id: m.atom_id,
+          workspace_id: m.workspace_id,
+          kind: m.kind,
+          container_id: m.container_id,
+          position: m.position,
+          level: m.level,
+          display_meta: m.display_meta,
+        };
+        const { data, error } = await supabase
+          .from('atom_manifestations')
+          .insert(payload)
+          .select()
+          .single();
+        if (error) throw error;
+        return data as TaskManifestationRow;
+      },
+      buildOffline: () => m,
+    });
   }
   return restored;
 }

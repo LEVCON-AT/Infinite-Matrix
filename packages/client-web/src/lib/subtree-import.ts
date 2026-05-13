@@ -3,6 +3,16 @@
 // aus lib/import.ts — das ist der HTML-Client-Round-Trip) und fuegt
 // den Inhalt in einen bestehenden Workspace ein.
 //
+// Konformitaets-Notiz — dokumentierte Bulk-Ausnahme (`architektur.md §4.1`):
+// Die zahlreichen direkten `supabase.from(...).insert/update/delete()`-Aufrufe
+// in dieser Datei laufen bewusst ohne `runOptimistic*`-Wrapper. Begruendung
+// analog `import-exec.ts`: Import + delete-Subtree sind User-initiierte,
+// UI-blocking Bulk-Pipelines mit FK-geordneten Steps; Offline-Replay einer
+// solchen Pipeline waere weder verlustfrei rekonstruierbar (Queue-FIFO
+// haelt die Step-Reihenfolge nicht) noch User-erwartbar. Hard-fail per
+// ImportError + Toast ist das definierte Vertragsverhalten — der User
+// kann den Workspace manuell bereinigen oder den Import neu starten.
+//
 // Target-Arten:
 //   - 'matrix'           payloadType muss 'subtree' sein; Subtree wird
 //                        als NEUE Zelle in der Target-Matrix angehaengt
