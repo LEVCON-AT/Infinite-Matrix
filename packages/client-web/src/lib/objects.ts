@@ -7,10 +7,19 @@
 //     Autocomplete-Dropdown in O.2b)
 //   - fetchObjects: direkte Read mit IDB-Cache-Fallback
 //
-// Die Mutations sind sync-online ohne safe-mutation-Wrapper —
-// Pattern wie ai-providers.ts. Auto-Object-Anlage bei Row-Insert
-// ist kein User-Mutation-Pfad mit pushUndo, sondern Hintergrund-
-// Hilfsmechanik.
+// Wrapper-Konformitaet (`architektur.md` §4.1 + §4.1.1):
+//   - `restoreObject` ist ein User-Undo-Pfad (ObjectDetail.tsx
+//     showUndoToast-Restore nach Delete) und laeuft durch
+//     `runOptimisticInsert` — Offline-Klick auf Undo queued den
+//     Insert in der Mutation-Queue + IDB-Cache wird gepatcht.
+//   - Alle anderen Mutations in dieser Datei sind RPC-basiert
+//     (mcp_create_object, mcp_delete_object, mcp_update_object,
+//     mcp_add_object_tag etc.) und heute sync-online ohne
+//     `runOptimistic*`-Wrapper. §4.1.1 dokumentiert das als drift —
+//     Welle D hatte denselben Stand fuer 7 von 11 Atom-Pin/Tag-RPCs
+//     und hat per Welle D.X.O nachgezogen. Sobald Object-Mutations
+//     Offline-relevant werden (Mobil-Pfad mit ad-hoc Object-Anlage),
+//     ist diese Datei der naechste Refit-Kandidat.
 //
 // Kommt mit O.2b: Autocomplete-Dropdown + UI-Integration in
 // MatrixView/BoardView Row/Col/Kb_col-Edit.
@@ -26,6 +35,7 @@ import {
 } from './mutations';
 import { getById, getByWorkspace, mergeRows } from './offline-cache';
 import { markCacheFallback, markLiveSuccess } from './offline-state';
+import { runOptimisticInsert } from './safe-mutation';
 import { supabase } from './supabase';
 import type {
   ColRow,
@@ -700,23 +710,32 @@ export async function deleteGroup(groupId: string): Promise<void> {
 // delete auf NULL gesetzt — die kann der Restore nicht automatisch
 // rekonstruieren. Caller muss im Toast-Hinweis kommunizieren.
 export async function restoreObject(snap: ObjectRow, tags: string[] = []): Promise<ObjectRow> {
-  const { data, error } = await supabase
-    .from('objects')
-    .insert({
-      id: snap.id,
-      workspace_id: snap.workspace_id,
-      label: snap.label,
-      alias: snap.alias,
-      type_label: snap.type_label,
-      parent_id: snap.parent_id,
-      attrs: snap.attrs,
-      home_ref_kind: snap.home_ref_kind,
-      home_ref_id: snap.home_ref_id,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  // Tags optional re-attachen.
+  const restored = await runOptimisticInsert<ObjectRow>({
+    table: 'objects',
+    workspaceId: snap.workspace_id,
+    label: 'Object wiederherstellen',
+    run: async () => {
+      const payload = {
+        id: snap.id,
+        workspace_id: snap.workspace_id,
+        label: snap.label,
+        alias: snap.alias,
+        type_label: snap.type_label,
+        parent_id: snap.parent_id,
+        attrs: snap.attrs,
+        home_ref_kind: snap.home_ref_kind,
+        home_ref_id: snap.home_ref_id,
+      };
+      const { data, error } = await supabase.from('objects').insert(payload).select().single();
+      if (error) throw error;
+      return data as ObjectRow;
+    },
+    buildOffline: () => snap,
+  });
+  // Tags optional re-attachen. `addObjectTag` ist ein RPC-Pfad (siehe
+  // File-Header §4.1.1-Drift) — schlaegt offline durch, deshalb der
+  // try/catch. Bei Offline-Restore bleiben die Tags weg; der User sieht
+  // einen Warn-Log und muss die Tags manuell re-attachen.
   for (const t of tags) {
     try {
       await addObjectTag(snap.id, t);
@@ -724,7 +743,7 @@ export async function restoreObject(snap: ObjectRow, tags: string[] = []): Promi
       console.warn('restoreObject tag re-attach failed:', err);
     }
   }
-  return data as ObjectRow;
+  return restored;
 }
 
 // Soft-Gruppe: ephemere Multi-Select-Auswahl. Wird vom BulkAddModal
