@@ -8776,6 +8776,15 @@ dialog.overlay-modal .overlay-card {
   color: var(--text2);
 }
 
+/* F.3 — Workspace-Logo-Mini im Switcher (Anchor + Liste). */
+.ws-switcher-logo {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
 /* Welle F.4 — Default-Invite-Role Dropdown im WorkspaceGeneral. */
 .settings-default-role-select {
   padding: var(--space-xs) var(--space-sm);

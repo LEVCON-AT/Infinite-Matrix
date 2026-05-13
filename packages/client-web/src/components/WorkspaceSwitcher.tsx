@@ -122,6 +122,18 @@ const WorkspaceSwitcher: Component<Props> = (props) => {
           aria-expanded={open()}
           onClick={toggle}
         >
+          {/* F.3 — Logo-Mini (16x16) im Anchor; Fallback: kein Element
+              (Anchor bleibt kompakt wenn kein Logo). */}
+          <Show when={current()?.logo_url}>
+            <img
+              src={current()?.logo_url ?? ''}
+              alt=""
+              class="ws-switcher-logo"
+              width={16}
+              height={16}
+              aria-hidden="true"
+            />
+          </Show>
           <span class="ws-name">{current()?.name ?? 'Auswaehlen'}</span>
           <Show when={current()}>{(c) => <span class="ws-role">{roleLabel[c().role]}</span>}</Show>
           <Icon name={open() ? 'chevron-up' : 'chevron-down'} size={14} class="ws-switcher-chev" />
@@ -153,6 +165,17 @@ const WorkspaceSwitcher: Component<Props> = (props) => {
                         classList={{ active: ws.id === props.currentWorkspaceId }}
                         onClick={() => pick(ws.id)}
                       >
+                        {/* F.3 — Logo-Mini links in der Liste. */}
+                        <Show when={ws.logo_url}>
+                          <img
+                            src={ws.logo_url ?? ''}
+                            alt=""
+                            class="ws-switcher-logo"
+                            width={16}
+                            height={16}
+                            aria-hidden="true"
+                          />
+                        </Show>
                         <span class="ws-name">{ws.name}</span>
                         <span class="ws-role">{roleLabel[ws.role]}</span>
                         <Show when={ws.role !== 'owner' && ws.owner_email}>
