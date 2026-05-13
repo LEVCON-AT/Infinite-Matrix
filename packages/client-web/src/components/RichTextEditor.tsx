@@ -13,7 +13,7 @@
 // Keymap:
 //   Cmd/Ctrl+B  → bold
 //   Cmd/Ctrl+I  → italic
-//   Cmd/Ctrl+K  → link prompt (window.prompt — V1 simple)
+//   Cmd/Ctrl+K  → link prompt (showPrompt-Dialog — keine native window.prompt)
 //   Cmd/Ctrl+Z  → undo
 //   Cmd/Ctrl+Shift+Z bzw. Cmd/Ctrl+Y → redo
 //   Enter im List-Item → split listItem (PM list-commands)
@@ -41,6 +41,7 @@ import { addListNodes, liftListItem, sinkListItem, splitListItem } from 'prosemi
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { type Component, createEffect, onCleanup, onMount } from 'solid-js';
+import { showPrompt } from '../lib/dialog';
 import {
   type MentionRefKind,
   type MentionTrigger,
@@ -142,17 +143,27 @@ function buildListKeymap() {
 }
 
 function buildLinkKeymap() {
-  // Mod-K: Link-Prompt. V1 ist window.prompt — V2 ein eigener Modal.
+  // Mod-K: Link-Prompt via showPrompt-Dialog. Da showPrompt async ist,
+  // claimt der Handler den Keystroke synchron (return true) und dispatcht
+  // die Mark-Transaction asynchron — die Selection-Bounds (from/to) werden
+  // synchron capturet, beim Apply lesen wir view.state damit eine
+  // zwischenzeitliche Editor-Mutation nicht verloren geht.
   return keymap({
-    'Mod-k': (state, dispatch) => {
-      if (!dispatch) return false;
+    'Mod-k': (state, dispatch, view) => {
+      if (!dispatch || !view) return false;
       const link = editorSchema.marks.link;
       const { from, to } = state.selection;
       if (from === to) return false;
-      const url = window.prompt('URL eingeben:', '');
-      if (!url) return false;
-      const tx = state.tr.addMark(from, to, link.create({ href: url }));
-      dispatch(tx);
+      void (async () => {
+        const url = await showPrompt({
+          title: 'Link einfuegen',
+          message: 'URL fuer die Auswahl:',
+          placeholder: 'https://…',
+        });
+        if (!url) return;
+        const tx = view.state.tr.addMark(from, to, link.create({ href: url }));
+        view.dispatch(tx);
+      })();
       return true;
     },
   });

@@ -21,6 +21,7 @@ import { A, useNavigate, useParams } from '@solidjs/router';
 import { For, Show, createMemo, createResource, createSignal, onCleanup } from 'solid-js';
 import Icon, { type IconName } from '../components/Icon';
 import IconPicker from '../components/IconPicker';
+import { showConfirm } from '../lib/dialog';
 import { translateDbError } from '../lib/errors';
 import {
   type AddTemplateSectionInput,
@@ -199,9 +200,13 @@ const TemplateDesigner = () => {
   }
 
   async function handleDeleteSection(section: TemplateSectionRow): Promise<void> {
-    if (!window.confirm(`Sektion „${section.title ?? 'ohne Titel'}" mit allen Widgets loeschen?`)) {
-      return;
-    }
+    const ok = await showConfirm({
+      title: 'Sektion loeschen?',
+      message: `Sektion „${section.title ?? 'ohne Titel'}" mit allen Widgets loeschen?`,
+      variant: 'danger',
+      confirmLabel: 'Loeschen',
+    });
+    if (!ok) return;
     await withBusy(async () => {
       try {
         await deleteTemplateSection(section.id);
@@ -231,7 +236,13 @@ const TemplateDesigner = () => {
   }
 
   async function handleDeleteWidget(widget: TemplateWidgetRow): Promise<void> {
-    if (!window.confirm('Widget loeschen? Cell-Overrides gehen via Cascade verloren.')) return;
+    const ok = await showConfirm({
+      title: 'Widget loeschen?',
+      message: 'Widget loeschen? Cell-Overrides gehen via Cascade verloren.',
+      variant: 'danger',
+      confirmLabel: 'Loeschen',
+    });
+    if (!ok) return;
     await withBusy(async () => {
       try {
         await deleteTemplateWidget(widget.id);

@@ -9,6 +9,7 @@
 // User kann eigenen User-Override.
 
 import { type Component, For, Show, createSignal, onCleanup, onMount } from 'solid-js';
+import { showConfirm } from '../../lib/dialog';
 import { translateDbError } from '../../lib/errors';
 import {
   clearUserHotkeySlot,
@@ -78,9 +79,12 @@ const HotkeySlotPickerModal: Component<HotkeySlotPickerModalProps> = (p) => {
     if (busy()) return;
     const occupant = templateAtSlot(slot);
     if (occupant && occupant.id !== p.template.id) {
-      const confirmed = window.confirm(
-        `Slot ${slot} ist belegt mit „${occupant.name}". Mit „${p.template.name}" ueberschreiben?`,
-      );
+      const confirmed = await showConfirm({
+        title: 'Slot ueberschreiben?',
+        message: `Slot ${slot} ist belegt mit „${occupant.name}". Mit „${p.template.name}" ueberschreiben?`,
+        variant: 'warning',
+        confirmLabel: 'Ueberschreiben',
+      });
       if (!confirmed) return;
     }
     setBusy(true);
