@@ -8,7 +8,7 @@
 // schon — wir setzen nur den Anker beim Navigate.
 
 import { useNavigate } from '@solidjs/router';
-import { type Component, createMemo } from 'solid-js';
+import { type Component, Show, createMemo } from 'solid-js';
 import type { WorkspaceMember } from '../lib/members';
 import { avatarColorFor } from '../lib/presence';
 
@@ -57,7 +57,17 @@ const TreeAvatar: Component<Props> = (props) => {
       onClick={onClick}
       disabled={!props.member}
     >
-      {initial()}
+      {/* D.2-V2 — Avatar-Bild wenn user_profiles.avatar_url gesetzt,
+          sonst die initial-Letter (Color-via-CSS-Var bleibt fuer den
+          Background-Ring auch beim Bild-Avatar). */}
+      <Show when={props.member?.avatar_url} fallback={initial()}>
+        <img
+          src={props.member?.avatar_url ?? ''}
+          alt=""
+          class="tree-avatar-img"
+          aria-hidden="true"
+        />
+      </Show>
     </button>
   );
 };

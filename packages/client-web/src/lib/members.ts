@@ -23,6 +23,10 @@ export type WorkspaceMember = {
   user_id: string;
   email: string | null;
   display_name: string | null;
+  // D.2-V2: Avatar-URL aus user_profiles (LEFT JOIN, Migration 088).
+  // NULL = User hat keinen Avatar gesetzt → Caller faellt auf
+  // email/name-Initialen oder Default-Icon zurueck.
+  avatar_url: string | null;
   role: WorkspaceRole;
   joined_at: string;
   deactivated_at: string | null;

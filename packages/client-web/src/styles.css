@@ -1194,6 +1194,16 @@ button[type="submit"]:hover:not(:disabled) {
   letter-spacing: -0.3px;
   text-transform: uppercase;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* D.2-V2 — wenn ein avatar_url vorhanden ist, rendert das Img den
+   Hintergrund. Das Bild fuellt den runden Container komplett. */
+.tree-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .tree-avatar-presence {
