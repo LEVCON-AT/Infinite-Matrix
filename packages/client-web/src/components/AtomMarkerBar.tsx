@@ -93,6 +93,7 @@ const AtomMarkerBar: Component<Props> = (p) => {
       label: string;
       initial: string;
       colorVar: string;
+      avatarUrl: string | null;
       isSelf: boolean;
     }>
   >(() => {
@@ -110,6 +111,7 @@ const AtomMarkerBar: Component<Props> = (p) => {
         label: row.user_id === p.userId ? `${label} (Du)` : label,
         initial,
         colorVar,
+        avatarUrl: member?.avatar_url ?? null,
         isSelf: row.user_id === p.userId,
       };
     });
@@ -180,7 +182,9 @@ const AtomMarkerBar: Component<Props> = (p) => {
                       style={{ '--avatar-color': `var(${u.colorVar})` }}
                       aria-hidden="true"
                     >
-                      {u.initial}
+                      <Show when={u.avatarUrl} fallback={u.initial}>
+                        <img src={u.avatarUrl ?? ''} alt="" class="tree-avatar-img" />
+                      </Show>
                     </span>
                     <span class="atom-marker-tooltip-label">{u.label}</span>
                   </li>

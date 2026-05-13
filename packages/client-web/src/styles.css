@@ -6000,6 +6000,9 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   font-size: 10px;
   font-weight: 600;
   flex-shrink: 0;
+  /* D.2-V2: overflow:hidden damit <img>-Avatar nicht ueber den runden
+     Rand hinausschiesst. */
+  overflow: hidden;
 }
 .atom-marker-tooltip-label {
   overflow: hidden;
