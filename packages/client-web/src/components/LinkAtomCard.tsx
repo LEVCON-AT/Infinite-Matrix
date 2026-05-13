@@ -16,6 +16,7 @@
 
 import { type Component, Show, createMemo } from 'solid-js';
 import type { AtomManifestationRow } from '../lib/atom-manifestations';
+import { incrementLinkClickCount } from '../lib/link-clicks';
 import { resolveLinkSymbol } from '../lib/symbol-resolution';
 import type { AtomMarkerRow, LinkRow } from '../lib/types';
 import { sanitizeUrl } from '../lib/url';
@@ -53,7 +54,13 @@ const LinkAtomCard: Component<Props> = (p) => {
       <span class="ifa-value">
         <Show when={safeHref()} fallback={<span class="ifa-value-text">{p.atom.url}</span>}>
           {(href) => (
-            <a class="ifa-value-link" href={href()} target="_blank" rel="noopener noreferrer">
+            <a
+              class="ifa-value-link"
+              href={href()}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => incrementLinkClickCount(p.atom.id)}
+            >
               {p.atom.url}
             </a>
           )}
