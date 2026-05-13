@@ -113,6 +113,20 @@ export function starCountForAtom(
     .length;
 }
 
+// §13.3 V2-Polish (2026-05-13) — Star-Marker pro Atom, sortiert nach
+// created_at ASC fuer die Hover-Tooltip-Liste „Wer hat gestartet?".
+// Caller filtert auf workspace_members fuer Display-Info.
+export function starMarkersForAtom(
+  rows: ReadonlyArray<AtomMarkerRow>,
+  atomType: AtomMarkerRow['atom_type'],
+  atomId: string,
+): AtomMarkerRow[] {
+  return rows
+    .filter((r) => r.kind === 'star' && r.atom_type === atomType && r.atom_id === atomId)
+    .slice()
+    .sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? ''));
+}
+
 export function selfStarMarker(
   rows: ReadonlyArray<AtomMarkerRow>,
   userId: string,

@@ -5910,6 +5910,77 @@ body.vis-moveArrows-always .mx-editable .mx-move-btn:not(:disabled) {
   line-height: 1;
 }
 
+/* §13.3 V2-Polish (2026-05-13) — Hover-Tooltip "Wer hat gestartet?".
+   Star-Wrap ist relative-Anker; Tooltip absolut darueber. Erscheint
+   nur wenn starCount > 0 + wsMembers verfuegbar (Caller threadet
+   workspaceMembers-Resource). Stand-Plain (kein Backdrop, kein
+   click-outside) — pure mouseenter/focus-driven. */
+.atom-marker-star-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.atom-marker-tooltip {
+  position: absolute;
+  inset-block-end: calc(100% + var(--space-xs));
+  inset-inline-end: 0;
+  z-index: var(--z-popover, 60);
+  min-inline-size: 10rem;
+  max-inline-size: 18rem;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--fs-small);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  pointer-events: none;
+}
+.atom-marker-tooltip-title {
+  font-weight: 600;
+  color: var(--text2);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.atom-marker-tooltip-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.atom-marker-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.atom-marker-tooltip-row.is-self .atom-marker-tooltip-label {
+  font-weight: 500;
+  color: var(--accent);
+}
+.atom-marker-tooltip-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  border-radius: 999px;
+  background: var(--avatar-color, var(--text3));
+  color: var(--surface);
+  font-size: 10px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.atom-marker-tooltip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Karten-Edit-Bar */
 .kb-card-edit-bar {
   display: flex;
