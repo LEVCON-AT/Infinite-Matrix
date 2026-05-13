@@ -2232,11 +2232,13 @@ async function restoreRow(
   const { created_at: _ca, updated_at: _ua, ...clean } = row;
   const wsId = (clean.workspace_id as string) ?? '';
   if (!wsId) {
-    // Snapshot ohne workspace_id (sollte nicht vorkommen) — direkt
-    // einreichen, ohne Queue-Scope koennen wir nicht arbeiten.
-    const { error } = await supabase.from(table).insert(clean);
-    if (error) throw error;
-    return;
+    // P.4 (2026-05-13): Fail-loud statt Silent-Drift. Bisher: direkter
+    // supabase.from(table).insert() ohne runOptimistic-Wrapper —
+    // bricht den Offline-Pfad + bei Network-Loss verschwindet das
+    // Restore stillschweigend. Snapshot ohne workspace_id ist ein
+    // Bug der Snapshot-Erzeugung; den blockieren wir laut statt das
+    // Undo-/Restore-Versprechen zu brechen (architektur.md §4.1.1).
+    throw new Error(`restoreRow(${table}): Snapshot ohne workspace_id — Caller-Bug`);
   }
   await runOptimisticInsert({
     table,
