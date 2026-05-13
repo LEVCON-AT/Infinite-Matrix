@@ -25,11 +25,13 @@ import {
 import { translateDbError } from '../../lib/errors';
 import { fetchMembers } from '../../lib/members';
 import { fetchMyWorkspaces } from '../../lib/queries';
+import { deleteWorkspaceLogo, uploadWorkspaceLogo } from '../../lib/storage';
 import { showToast } from '../../lib/toasts';
 import {
   renameWorkspace,
   setWorkspaceDefaultInviteRole,
   setWorkspaceDescription,
+  setWorkspaceLogoUrl,
 } from '../../lib/workspaces';
 
 const WorkspaceGeneral = () => {
@@ -144,6 +146,40 @@ const WorkspaceGeneral = () => {
     }
   }
 
+  // ─── F.3 Workspace-Logo Upload/Delete ──────────────────────────
+  const [logoUploading, setLogoUploading] = createSignal(false);
+  let logoFileInput: HTMLInputElement | undefined;
+  async function onLogoFile(file: File | null) {
+    if (!file) return;
+    setLogoUploading(true);
+    try {
+      const { publicUrl } = await uploadWorkspaceLogo(params.workspaceId, file);
+      await setWorkspaceLogoUrl(params.workspaceId, publicUrl);
+      await refetchWorkspaces();
+      showToast('Logo gespeichert.', 'success');
+    } catch (err) {
+      console.error('uploadWorkspaceLogo:', err);
+      showToast(translateDbError(err, 'Logo-Upload fehlgeschlagen.'), 'error');
+    } finally {
+      setLogoUploading(false);
+      if (logoFileInput) logoFileInput.value = '';
+    }
+  }
+  async function onLogoDelete() {
+    setLogoUploading(true);
+    try {
+      await deleteWorkspaceLogo(params.workspaceId);
+      await setWorkspaceLogoUrl(params.workspaceId, null);
+      await refetchWorkspaces();
+      showToast('Logo entfernt.', 'success');
+    } catch (err) {
+      console.error('deleteWorkspaceLogo:', err);
+      showToast(translateDbError(err, 'Logo konnte nicht entfernt werden.'), 'error');
+    } finally {
+      setLogoUploading(false);
+    }
+  }
+
   // ─── F.4 Default-Invite-Role (Dropdown) ────────────────────────
   const [roleSaving, setRoleSaving] = createSignal(false);
   async function onDefaultRoleChange(value: string) {
@@ -241,6 +277,58 @@ const WorkspaceGeneral = () => {
                     </button>
                   </form>
                 </Show>
+              </dd>
+              <dt>Logo</dt>
+              <dd>
+                <div class="account-avatar-row">
+                  <Show
+                    when={ws().logo_url}
+                    fallback={
+                      <div class="account-avatar-placeholder" aria-hidden="true">
+                        <Icon name="squares-2x2" size={28} />
+                      </div>
+                    }
+                  >
+                    <img
+                      src={ws().logo_url ?? ''}
+                      alt={`Logo ${ws().name}`}
+                      class="account-avatar-img"
+                      width={64}
+                      height={64}
+                    />
+                  </Show>
+                  <Show
+                    when={canEditName()}
+                    fallback={<span class="hint">Nur Owner/Admin koennen das Logo aendern.</span>}
+                  >
+                    <div class="account-avatar-actions">
+                      <input
+                        ref={(el) => {
+                          logoFileInput = el;
+                        }}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                        class="account-avatar-input"
+                        onChange={(e) => {
+                          const f = e.currentTarget.files?.[0] ?? null;
+                          void onLogoFile(f);
+                        }}
+                        disabled={logoUploading()}
+                      />
+                      <Show when={ws().logo_url}>
+                        <button
+                          type="button"
+                          class="btn-subtle"
+                          onClick={onLogoDelete}
+                          disabled={logoUploading()}
+                        >
+                          Entfernen
+                        </button>
+                      </Show>
+                      <span class="hint">JPG / PNG / WebP / SVG, max. 2 MB.</span>
+                    </div>
+                  </Show>
+                </div>
               </dd>
               <dt>Beschreibung</dt>
               <dd>

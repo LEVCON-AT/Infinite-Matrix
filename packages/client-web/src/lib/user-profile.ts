@@ -14,6 +14,10 @@ export type UserProfileRow = {
   bio: string | null;
   timezone: string | null;
   language: string | null;
+  // Welle D.2 — Public Storage-URL aus bucket 'avatars'. NULL = kein
+  // Avatar gesetzt; Render-Stellen fallen auf den email/name-basierten
+  // Initial-Avatar zurueck.
+  avatar_url: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -33,6 +37,7 @@ export type UserProfilePatch = {
   bio?: string | null;
   timezone?: string | null;
   language?: string | null;
+  avatar_url?: string | null;
 };
 
 // Upsert-Update. Leer-Strings werden auf NULL normalisiert.
@@ -54,6 +59,11 @@ export async function setUserProfile(userId: string, patch: UserProfilePatch): P
       throw new Error('Sprach-Code ungueltig (z.B. de, en, de-DE).');
     }
     payload.language = v;
+  }
+  if ('avatar_url' in patch) {
+    const v = patch.avatar_url?.trim() || null;
+    if (v && v.length > 1024) throw new Error('Avatar-URL zu lang.');
+    payload.avatar_url = v;
   }
   const { error } = await supabase.from('user_profiles').upsert(payload, { onConflict: 'user_id' });
   if (error) throw error;

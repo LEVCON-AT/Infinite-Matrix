@@ -79,6 +79,22 @@ export async function setWorkspaceDefaultInviteRole(
   if (error) throw error;
 }
 
+// ─── F.3 Workspace-Logo ──────────────────────────────────────────
+// Wird vom UI nach erfolgreichem Storage-Upload aufgerufen — wir
+// speichern die Public-URL in workspaces.logo_url, damit Render-
+// Stellen sie ohne weiteren API-Call lesen koennen. NULL setzt das
+// Logo zurueck auf Default (Initial-Fallback).
+export async function setWorkspaceLogoUrl(
+  workspaceId: string,
+  logoUrl: string | null,
+): Promise<void> {
+  const { error } = await supabase
+    .from('workspaces')
+    .update({ logo_url: logoUrl })
+    .eq('id', workspaceId);
+  if (error) throw error;
+}
+
 // ─── Ownership-Transfer ──────────────────────────────────────────
 export type TransferOwnershipResult = {
   workspace_id: string;

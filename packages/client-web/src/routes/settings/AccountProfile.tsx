@@ -18,6 +18,7 @@ import Icon from '../../components/Icon';
 import { changeEmail, setDisplayName } from '../../lib/account';
 import { useSession } from '../../lib/auth';
 import { translateDbError } from '../../lib/errors';
+import { deleteAvatar, uploadAvatar } from '../../lib/storage';
 import { supabase } from '../../lib/supabase';
 import { showToast } from '../../lib/toasts';
 import { fetchMyUserProfile, setUserProfile } from '../../lib/user-profile';
@@ -100,6 +101,45 @@ const AccountProfile = () => {
   const bio = () => profile()?.bio ?? null;
   const timezone = () => profile()?.timezone ?? null;
   const language = () => profile()?.language ?? null;
+  const avatarUrl = () => profile()?.avatar_url ?? null;
+
+  // D.2 Avatar Upload/Delete.
+  const [avatarUploading, setAvatarUploading] = createSignal(false);
+  let avatarFileInput: HTMLInputElement | undefined;
+  async function onAvatarFile(file: File | null) {
+    if (!file) return;
+    const uid = user()?.id;
+    if (!uid) return;
+    setAvatarUploading(true);
+    try {
+      const { publicUrl } = await uploadAvatar(uid, file);
+      await setUserProfile(uid, { avatar_url: publicUrl });
+      await refetchProfile();
+      showToast('Avatar gespeichert.', 'success');
+    } catch (err) {
+      console.error('uploadAvatar:', err);
+      showToast(translateDbError(err, 'Avatar-Upload fehlgeschlagen.'), 'error');
+    } finally {
+      setAvatarUploading(false);
+      if (avatarFileInput) avatarFileInput.value = '';
+    }
+  }
+  async function onAvatarDelete() {
+    const uid = user()?.id;
+    if (!uid) return;
+    setAvatarUploading(true);
+    try {
+      await deleteAvatar(uid, avatarUrl());
+      await setUserProfile(uid, { avatar_url: null });
+      await refetchProfile();
+      showToast('Avatar entfernt.', 'success');
+    } catch (err) {
+      console.error('deleteAvatar:', err);
+      showToast(translateDbError(err, 'Avatar konnte nicht entfernt werden.'), 'error');
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
 
   // Bio inline-edit.
   const [bioEditing, setBioEditing] = createSignal(false);
@@ -254,6 +294,53 @@ const AccountProfile = () => {
       <Show when={user()} fallback={<p class="settings-empty">Nicht eingeloggt.</p>}>
         {(u) => (
           <dl class="settings-form-grid">
+            <dt>Avatar</dt>
+            <dd>
+              <div class="account-avatar-row">
+                <Show
+                  when={avatarUrl()}
+                  fallback={
+                    <div class="account-avatar-placeholder" aria-hidden="true">
+                      <Icon name="user" size={28} />
+                    </div>
+                  }
+                >
+                  <img
+                    src={avatarUrl() ?? ''}
+                    alt="Avatar"
+                    class="account-avatar-img"
+                    width={64}
+                    height={64}
+                  />
+                </Show>
+                <div class="account-avatar-actions">
+                  <input
+                    ref={(el) => {
+                      avatarFileInput = el;
+                    }}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    class="account-avatar-input"
+                    onChange={(e) => {
+                      const f = e.currentTarget.files?.[0] ?? null;
+                      void onAvatarFile(f);
+                    }}
+                    disabled={avatarUploading()}
+                  />
+                  <Show when={avatarUrl()}>
+                    <button
+                      type="button"
+                      class="btn-subtle"
+                      onClick={onAvatarDelete}
+                      disabled={avatarUploading()}
+                    >
+                      Entfernen
+                    </button>
+                  </Show>
+                  <span class="hint">JPG / PNG / WebP / GIF, max. 2 MB.</span>
+                </div>
+              </div>
+            </dd>
             <dt>E-Mail</dt>
             <dd>
               <Show

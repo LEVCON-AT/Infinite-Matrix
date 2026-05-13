@@ -8744,6 +8744,38 @@ dialog.overlay-modal .overlay-card {
   color: var(--ambertxt);
 }
 
+/* Welle D.2 + F.3 — Avatar/Logo-Row mit Preview + File-Input + Aktions-
+   Buttons. Gleiches Layout fuer User-Avatar und Workspace-Logo. */
+.account-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+.account-avatar-img,
+.account-avatar-placeholder {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 50%;
+  background: var(--surface-hover);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text3);
+  object-fit: cover;
+  border: 0.5px solid var(--border2);
+}
+.account-avatar-actions {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xs);
+}
+.account-avatar-input {
+  font-size: 0.85rem;
+  color: var(--text2);
+}
+
 /* Welle F.4 — Default-Invite-Role Dropdown im WorkspaceGeneral. */
 .settings-default-role-select {
   padding: var(--space-xs) var(--space-sm);

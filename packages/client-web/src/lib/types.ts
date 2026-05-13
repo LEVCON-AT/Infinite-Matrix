@@ -8,6 +8,9 @@ export type Workspace = {
   description: string | null;
   // Welle F.4 — Default-Rolle fuer neue Einladungen. Migration 084.
   default_invite_role: 'editor' | 'viewer';
+  // Welle F.3 — Public Storage-URL des Logo (bucket workspace-logos).
+  // Migration 087. NULL = kein Logo (Render-Stellen Initial-Fallback).
+  logo_url: string | null;
   owner_id: string;
   created_at: string;
   updated_at: string;
