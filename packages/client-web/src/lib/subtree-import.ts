@@ -2356,6 +2356,10 @@ export async function executeSubtreeImportIntoMatrix(args: {
     remap(f.id, remapMap);
   }
 
+  // B1-A-006-Restposten: Object-Layer-Pre-Pass + Out-Build (siehe Cell-
+  // Pfad fuer ausfuehrliche Begruendung).
+  const objectLayer = buildObjectLayerOut(payload, workspaceId, remapMap);
+
   // Nodes ohne Root einfuegen, parent_cell_id=NULL (Phase D setzt um).
   // NT.2: created_by aus dem Payload entfernen — importierte Knoten
   // gehoeren dem importierenden User (Default auth.uid() greift), nicht
@@ -2365,14 +2369,17 @@ export async function executeSubtreeImportIntoMatrix(args: {
     .map((n) => {
       const { created_by: _imported, ...rest } = n;
       void _imported;
-      return applyAliasMap(
-        {
-          ...rest,
-          id: mustRemap((n as { id: string }).id, remapMap),
-          workspace_id: workspaceId,
-          parent_cell_id: null,
-        },
-        aliasMap,
+      return applyObjectIdMap(
+        applyAliasMap(
+          {
+            ...rest,
+            id: mustRemap((n as { id: string }).id, remapMap),
+            workspace_id: workspaceId,
+            parent_cell_id: null,
+          },
+          aliasMap,
+        ),
+        remapMap,
       );
     });
 
@@ -2397,23 +2404,29 @@ export async function executeSubtreeImportIntoMatrix(args: {
   // position als relative Reihenfolge beibehalten (fallback idx).
   const rowsOut = (payload.rows as Array<Record<string, unknown>>).map((r, idx) => {
     const raw = r as { id: string; position?: number };
-    return {
-      ...r,
-      id: mustRemap(raw.id, remapMap),
-      workspace_id: workspaceId,
-      matrix_id: targetMatrixId,
-      position: rowOffset + (raw.position ?? idx),
-    };
+    return applyObjectIdMap(
+      {
+        ...r,
+        id: mustRemap(raw.id, remapMap),
+        workspace_id: workspaceId,
+        matrix_id: targetMatrixId,
+        position: rowOffset + (raw.position ?? idx),
+      },
+      remapMap,
+    );
   });
   const colsOut = (payload.cols as Array<Record<string, unknown>>).map((c, idx) => {
     const raw = c as { id: string; position?: number };
-    return {
-      ...c,
-      id: mustRemap(raw.id, remapMap),
-      workspace_id: workspaceId,
-      matrix_id: targetMatrixId,
-      position: colOffset + (raw.position ?? idx),
-    };
+    return applyObjectIdMap(
+      {
+        ...c,
+        id: mustRemap(raw.id, remapMap),
+        workspace_id: workspaceId,
+        matrix_id: targetMatrixId,
+        position: colOffset + (raw.position ?? idx),
+      },
+      remapMap,
+    );
   });
 
   const cellsOut = (payload.cells as Array<Record<string, unknown>>).map((c) => {
@@ -2440,12 +2453,17 @@ export async function executeSubtreeImportIntoMatrix(args: {
     );
   });
 
-  const kbColsOut = (payload.kb_cols as Array<Record<string, unknown>>).map((k) => ({
-    ...k,
-    id: mustRemap((k as { id: string }).id, remapMap),
-    workspace_id: workspaceId,
-    board_id: remap((k as { board_id: string }).board_id, remapMap),
-  }));
+  const kbColsOut = (payload.kb_cols as Array<Record<string, unknown>>).map((k) =>
+    applyObjectIdMap(
+      {
+        ...k,
+        id: mustRemap((k as { id: string }).id, remapMap),
+        workspace_id: workspaceId,
+        board_id: remap((k as { board_id: string }).board_id, remapMap),
+      },
+      remapMap,
+    ),
+  );
   const kbCardsOut = (payload.kb_cards as Array<Record<string, unknown>>).map((k) => {
     const raw = k as {
       id: string;
@@ -2929,8 +2947,30 @@ export async function executeSubtreeImportIntoMatrix(args: {
     savedFilterIds: insertedSavedFilterIds,
     widgetExternalChannelIds: insertedWidgetChannelIds,
     atomMarkerIds: insertedAtomMarkerIds,
+    // B1-A-006-Restposten: Object-Layer-Cleanup-Refs.
+    objectIds: objectLayer.insertedObjectIds,
+    groupIds: objectLayer.insertedGroupIds,
   };
   try {
+    // B1-A-006-Restposten: Objects + Groups VOR nodes/rows/cols/kb_cols
+    // (object_id-FK), object_tags + group_members nach den jeweiligen
+    // Parent-Tabellen.
+    if (objectLayer.objectsOut.length > 0) {
+      step('Objects einfuegen…');
+      await insertBatch('objects', objectLayer.objectsOut);
+    }
+    if (objectLayer.groupsOut.length > 0) {
+      step('Groups einfuegen…');
+      await insertBatch('groups', objectLayer.groupsOut);
+    }
+    if (objectLayer.objectTagsOut.length > 0) {
+      step('Object-Tags einfuegen…');
+      await insertBatch('object_tags', objectLayer.objectTagsOut);
+    }
+    if (objectLayer.groupMembersOut.length > 0) {
+      step('Group-Members einfuegen…');
+      await insertBatch('group_members', objectLayer.groupMembersOut);
+    }
     step('Nodes einfuegen…');
     await insertBatch('nodes', nodesOut);
     step('Zeilen einfuegen…');
@@ -3236,13 +3276,24 @@ export async function executeSubtreeImportIntoBoard(args: {
   for (const it of itemsSrc) remap(it.id, remapMap);
   for (const l of linksSrc) remap(l.id, remapMap);
 
-  const kbColsOut = kbColsSrc.map((k, idx) => ({
-    ...(k as unknown as Record<string, unknown>),
-    id: mustRemap(k.id, remapMap),
-    workspace_id: workspaceId,
-    board_id: targetBoardId,
-    position: colOffset + (k.position ?? idx),
-  }));
+  // B1-A-006-Restposten: Object-Layer-Pre-Pass. Im Board-Pfad sind nur
+  // kb_cols.object_id-FKs relevant (nodes/rows/cols werden hier nicht
+  // importiert). home_ref_id-Refs auf nicht-importierte Tabellen werden
+  // graceful auf 'standalone' faellen lassen (siehe buildObjectLayerOut).
+  const objectLayer = buildObjectLayerOut(payload, workspaceId, remapMap);
+
+  const kbColsOut = kbColsSrc.map((k, idx) =>
+    applyObjectIdMap(
+      {
+        ...(k as unknown as Record<string, unknown>),
+        id: mustRemap(k.id, remapMap),
+        workspace_id: workspaceId,
+        board_id: targetBoardId,
+        position: colOffset + (k.position ?? idx),
+      },
+      remapMap,
+    ),
+  );
   const kbCardsOut = kbCardsSrc.map((k) =>
     applyAliasMap(
       {
@@ -3296,6 +3347,30 @@ export async function executeSubtreeImportIntoBoard(args: {
 
   // Insert-Reihenfolge: kb_cols zuerst (kb_cards FK), dann cards,
   // dann checklists (items FK), dann items, dann links.
+  //
+  // B1-A-006-Restposten: Objects/Groups VOR kb_cols (object_id-FK).
+  // object_tags + group_members nach den jeweiligen Parents. Im Board-
+  // Pfad gibt es keinen umgebenden try/catch mit cleanupPartialImport-
+  // Aufraeumlogik wie in Cell/Matrix — der Caller schluckt Failures
+  // direkt ueber den UI-Toast. Objects bleiben bei Failure als
+  // verwaiste Workspace-Eintraege; nicht ideal, aber Konsistenz mit
+  // dem existing Board-Insert-Pfad.
+  if (objectLayer.objectsOut.length > 0) {
+    step('Objects einfuegen…');
+    await insertBatch('objects', objectLayer.objectsOut);
+  }
+  if (objectLayer.groupsOut.length > 0) {
+    step('Groups einfuegen…');
+    await insertBatch('groups', objectLayer.groupsOut);
+  }
+  if (objectLayer.objectTagsOut.length > 0) {
+    step('Object-Tags einfuegen…');
+    await insertBatch('object_tags', objectLayer.objectTagsOut);
+  }
+  if (objectLayer.groupMembersOut.length > 0) {
+    step('Group-Members einfuegen…');
+    await insertBatch('group_members', objectLayer.groupMembersOut);
+  }
   step('Kanban-Spalten einfuegen…');
   await insertBatch('kb_cols', kbColsOut);
   step('Karten einfuegen…');
