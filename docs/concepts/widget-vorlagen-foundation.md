@@ -1981,7 +1981,7 @@ V1-Provider (final 2026-05-07): OneDrive, Google Drive, Dropbox, **Nextcloud** (
 **V1-Scope:** Click-Toggle (Star setzen/entfernen, Eye setzen/entfernen) + Counter (nur Star) + 1.5s-Throttle. **Alle sechs atom_markers-CHECK-Werte live (§13.3 abgeschlossen 2026-05-13):** `task` / `imported_event` / `checklist` / `doc` (V2.A-F) + `info_field` (V2.G — InfoFieldAtomCard-Renderer in CellInfoPage "Atom-Felder"-Section) + `link` (V2.H — LinkAtomCard-Renderer in CellInfoPage "Atom-Links"-Section, addCellAtomLink-Pfad mit atom_manifestations(kind='pinned', container_kind='cell')). View-Only V1 fuer beide Stub-Renderer; Legacy `cell.data.infoFields` + `cell.data.links` bleiben parallel bis Welle B Step 13 (Backfill).
 
 **V2-deferred:**
-- Filter-Builder-Conditions `has_marker(kind=star, by_user=me, count>=N)` — siehe §5.2.6 Filter-DSL.
+- Filter-Builder-Conditions `has_marker(kind=star, count>=N)` — count-Variante. Drei haeufige V1-Queries (`has_marker(kind=star)`, `has_marker(kind=star, by_user=me)`, `has_marker(kind=eye, by_user=me)`) sind 2026-05-13 als boolean-Felder (`marker_starred` / `marker_my_star` / `marker_my_eye`) in `COMMON_ATTRS` exposed; Evaluator-Wiring kommt mit dem Rest des Filter-Pipelines (heute noch evaluator-less). Count-N-Variante braucht einen eigenen fieldType + Match-Block + Evaluator.
 - Smart-Summary-Default-Widget „Beobachtet von dir" → `task-list` mit Filter `has_marker(kind=eye, by_user=me)`.
 
 **V2-Polish vorgezogen (2026-05-13):**
@@ -1989,6 +1989,7 @@ V1-Provider (final 2026-05-07): OneDrive, Google Drive, Dropbox, **Nextcloud** (
 - AtomMarkerBar in ChecklistPanel-Items: live pro Item (atom_type='task'), zusaetzlich zum existing Header-Marker (atom_type='checklist').
 - Hover-Tooltip „Wer hat gestartet" auf dem Star-Icon: live. Zeigt Avatar+Name jedes Users der den Atom markiert hat, Self-User mit „(Du)"-Suffix. Caller threadet `wsMembers` aus der workspaceMembers-Resource; Renderer ohne wsMembers (z.B. Calendar-Route) zeigen weiterhin nur den native title-Fallback.
 - Vorlagen-Toggle `markers.workspace_star` / `markers.private_eye` V1-expose: `markersToggles(toggles)`-Helper in `TemplateWidgetRenderer.tsx` (Defaults beide `true`) + `data-markers-star` / `data-markers-eye`-Attribute am Wrapper, analog zum `data-edit-in-view`-Pattern aus §13.5. Sub-Renderer-Wiring (BoardView / ChecklistPanel / CardOverlay / DocsPopup / TaskDetail / ImportedEventDetail lesen das Flag und gaten die `AtomMarkerBar`) kommt mit Welle C, wenn die Cell-Features durch den Template-Renderer laufen statt direkt am Cell zu haengen.
+- Filter-Builder `has_marker`-V1 als drei boolean COMMON_ATTRS: `marker_starred` (gesternt von irgendwem), `marker_my_star` (von mir gesternt), `marker_my_eye` (von mir beobachtet). Source `computed` mit Resolver-Keys `marker-star-any` / `marker-star-me` / `marker-eye-me` — Resolver-Implementation kommt mit dem Evaluator-Pipeline. Reuse von `fieldType='boolean'` heisst: FilterBuilderModal rendert die Felder ohne UI-Aenderung. Count-N-Variante (`has_marker(count>=N)`) bleibt V2-deferred.
 
 Marker leben in einer eigenen Tabelle `atom_markers` (siehe §15) — analog Layer-4-Pattern aus `architektur.md` §1.5. Zwei Kinds in V1:
 

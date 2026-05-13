@@ -141,8 +141,8 @@ export function defaultOperatorsFor(t: FilterFieldType): FilterOperator[] {
 
 // ─── Attribute-Tables ──────────────────────────────────────────
 
-// Querschnitt — alle Atoms haben Tags + Created-At. Wird in jede
-// Atom-Liste gemerged statt 5x dupliziert.
+// Querschnitt — alle Atoms haben Tags + Created-At + Marker. Wird in jede
+// Atom-Liste gemerged statt 6x dupliziert.
 const COMMON_ATTRS: ReadonlyArray<AtomFilterAttribute> = [
   {
     key: 'tags',
@@ -157,6 +157,38 @@ const COMMON_ATTRS: ReadonlyArray<AtomFilterAttribute> = [
     fieldType: 'datetime',
     source: { kind: 'column', column: 'created_at' },
     operators: defaultOperatorsFor('datetime'),
+  },
+  // §13.3 V2-Polish — atom_markers-Querschnitt als boolean-Filter V1.
+  // Konzept §13.3 listet `has_marker(kind=star, by_user=me, count>=N)`.
+  // V1 deckt die drei haeufigsten Queries als reines boolean (eq true/false)
+  // ab; die count>=N-Variante bleibt V2-deferred (eigener fieldType +
+  // FilterBuilderModal-Match-Block + Evaluator-Wiring). Source ist computed,
+  // weil Resolver pro Atom in atom_markers join muss (atom_type+atom_id).
+  // by_user-Scope:
+  //   - marker_starred  → workspace-shared: alle Stars (irgendwer)
+  //   - marker_my_star  → self-scoped: user_id=auth.uid()
+  //   - marker_my_eye   → self-scoped (RLS filtert ohnehin)
+  {
+    key: 'marker_starred',
+    label: 'Gesternt',
+    fieldType: 'boolean',
+    source: { kind: 'computed', key: 'marker-star-any' },
+    operators: ['eq'],
+    hint: 'true = mind. ein Workspace-User hat gesternt',
+  },
+  {
+    key: 'marker_my_star',
+    label: 'Von mir gesternt',
+    fieldType: 'boolean',
+    source: { kind: 'computed', key: 'marker-star-me' },
+    operators: ['eq'],
+  },
+  {
+    key: 'marker_my_eye',
+    label: 'Von mir beobachtet',
+    fieldType: 'boolean',
+    source: { kind: 'computed', key: 'marker-eye-me' },
+    operators: ['eq'],
   },
 ];
 
