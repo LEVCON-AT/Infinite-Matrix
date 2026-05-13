@@ -121,6 +121,7 @@ const WorkspaceSwitcher: Component<Props> = (props) => {
           aria-haspopup="listbox"
           aria-expanded={open()}
           onClick={toggle}
+          title={current()?.description ?? undefined}
         >
           {/* F.3 — Logo-Mini (16x16) im Anchor; Fallback: kein Element
               (Anchor bleibt kompakt wenn kein Logo). */}
@@ -164,6 +165,7 @@ const WorkspaceSwitcher: Component<Props> = (props) => {
                         aria-selected={ws.id === props.currentWorkspaceId}
                         classList={{ active: ws.id === props.currentWorkspaceId }}
                         onClick={() => pick(ws.id)}
+                        title={ws.description ?? undefined}
                       >
                         {/* F.3 — Logo-Mini links in der Liste. */}
                         <Show when={ws.logo_url}>
