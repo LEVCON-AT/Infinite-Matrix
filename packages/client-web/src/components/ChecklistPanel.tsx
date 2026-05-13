@@ -680,6 +680,23 @@ const ChecklistPanel: Component<Props> = (p) => {
                 >
                   ✕
                 </button>
+                {/* §13.3 V2-deferred (M.3 2026-05-13) — AtomMarkerBar
+                    pro Item. Item ist ein task-Atom (item.id = task.id).
+                    Pattern analog cl-head (atom_type='checklist') in
+                    Z.559-571. */}
+                <Show when={p.selfUserId}>
+                  {(uid) => (
+                    <AtomMarkerBar
+                      workspaceId={p.workspaceId}
+                      userId={uid()}
+                      atomType="task"
+                      atomId={it.id}
+                      markers={(p.wsAtomMarkers ?? []).filter(
+                        (m) => m.atom_type === 'task' && m.atom_id === it.id,
+                      )}
+                    />
+                  )}
+                </Show>
               </li>
             );
           }}
