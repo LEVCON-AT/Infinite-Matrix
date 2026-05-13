@@ -17,6 +17,7 @@
 import { type Component, Show, createMemo } from 'solid-js';
 import type { AtomManifestationRow } from '../lib/atom-manifestations';
 import { incrementLinkClickCount } from '../lib/link-clicks';
+import type { WorkspaceMember } from '../lib/members';
 import { resolveLinkSymbol } from '../lib/symbol-resolution';
 import type { AtomMarkerRow, LinkRow } from '../lib/types';
 import { sanitizeUrl } from '../lib/url';
@@ -31,6 +32,8 @@ type Props = {
   // Workspace-skopierte Markers — AtomMarkerBar filtert intern auf
   // (atom_type, atom_id). Caller liefert die Resource-Liste direkt.
   markers: ReadonlyArray<AtomMarkerRow>;
+  // §13.3 V2-Polish (2026-05-13) — Member-Lookup fuer Star-Hover-Tooltip.
+  wsMembers?: ReadonlyArray<WorkspaceMember>;
 };
 
 const LinkAtomCard: Component<Props> = (p) => {
@@ -73,6 +76,7 @@ const LinkAtomCard: Component<Props> = (p) => {
           atomType="link"
           atomId={p.atom.id}
           markers={p.markers}
+          wsMembers={p.wsMembers}
         />
       </Show>
     </article>

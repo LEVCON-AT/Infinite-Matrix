@@ -18,6 +18,7 @@
 import { type Component, Match, Show, Switch, createMemo } from 'solid-js';
 import type { AtomManifestationRow } from '../lib/atom-manifestations';
 import { formatDateDE } from '../lib/dates';
+import type { WorkspaceMember } from '../lib/members';
 import { resolveInfoFieldSymbol } from '../lib/symbol-resolution';
 import type { AtomMarkerRow, InfoFieldRow, InfoFieldValueType } from '../lib/types';
 import { sanitizeUrl } from '../lib/url';
@@ -32,6 +33,8 @@ type Props = {
   // Workspace-skopierte Markers — AtomMarkerBar filtert intern auf
   // (atom_type, atom_id). Caller liefert die Resource-Liste direkt.
   markers: ReadonlyArray<AtomMarkerRow>;
+  // §13.3 V2-Polish (2026-05-13) — Member-Lookup fuer Star-Hover-Tooltip.
+  wsMembers?: ReadonlyArray<WorkspaceMember>;
 };
 
 // V1-Tradeoff: currency hardcoded EUR — Welle B liest value_meta.currency.
@@ -123,6 +126,7 @@ const InfoFieldAtomCard: Component<Props> = (p) => {
           atomType="info_field"
           atomId={p.atom.id}
           markers={p.markers}
+          wsMembers={p.wsMembers}
         />
       </Show>
     </article>

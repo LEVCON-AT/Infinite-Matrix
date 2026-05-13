@@ -33,6 +33,7 @@ import { fetchInfoManifestationsForCell } from '../lib/info-field-manifestations
 import { addInfoFieldForCell, deleteInfoField } from '../lib/info-fields';
 import type { ContextMaps } from '../lib/label-template';
 import { fetchLinkManifestationsForCell } from '../lib/link-manifestations';
+import type { WorkspaceMember } from '../lib/members';
 import {
   addCellAtomLink,
   addCellInfoField,
@@ -83,6 +84,9 @@ type Props = {
   // 'pinned', atom_type='link', container_kind='cell') oder links per
   // Realtime auftauchen. Triggert Refetch der Atom-Links-Section.
   realtimeLinkVersion?: number;
+  // §13.3 V2-Polish (2026-05-13) — Workspace-Member-Lookup fuer den
+  // Star-Hover-Tooltip in den Atom-Card-Renderern.
+  wsMembers?: ReadonlyArray<WorkspaceMember>;
 };
 
 const CellInfoPage: Component<Props> = (p) => {
@@ -424,6 +428,7 @@ const CellInfoPage: Component<Props> = (p) => {
                         atom={item.atom}
                         manifestation={item.manifestation}
                         markers={p.wsAtomMarkers ?? []}
+                        wsMembers={p.wsMembers}
                       />
                     }
                   >
@@ -434,6 +439,7 @@ const CellInfoPage: Component<Props> = (p) => {
                         atom={item.atom}
                         manifestation={item.manifestation}
                         markers={p.wsAtomMarkers ?? []}
+                        wsMembers={p.wsMembers}
                       />
                     )}
                   </Show>
@@ -498,6 +504,7 @@ const CellInfoPage: Component<Props> = (p) => {
                         atom={item.atom}
                         manifestation={item.manifestation}
                         markers={p.wsAtomMarkers ?? []}
+                        wsMembers={p.wsMembers}
                       />
                     }
                   >
@@ -508,6 +515,7 @@ const CellInfoPage: Component<Props> = (p) => {
                         atom={item.atom}
                         manifestation={item.manifestation}
                         markers={p.wsAtomMarkers ?? []}
+                        wsMembers={p.wsMembers}
                       />
                     )}
                   </Show>

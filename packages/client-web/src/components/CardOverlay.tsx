@@ -7,6 +7,7 @@ import { openDokuForContext, shouldIgnoreDKey } from '../lib/docs-open';
 import { openDocsPopup } from '../lib/docs-ui';
 import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
+import type { WorkspaceMember } from '../lib/members';
 import {
   addCardInlineItem,
   addChecklistItem,
@@ -86,6 +87,8 @@ type Props = {
   // atom_id=card.id) clientseitig gefiltert. selfUserId fuer Self-Toggle-
   // Detection (Eye user-privat, Star self-Status fuer Active-Color).
   wsAtomMarkers?: AtomMarkerRow[];
+  // §13.3 V2-Polish (2026-05-13) — Member-Lookup fuer Star-Hover-Tooltip.
+  wsMembers?: ReadonlyArray<WorkspaceMember>;
   selfUserId?: string;
 };
 
@@ -669,6 +672,7 @@ const CardOverlay: Component<Props> = (p) => {
                 markers={(p.wsAtomMarkers ?? []).filter(
                   (m) => m.atom_type === 'task' && m.atom_id === p.card.id,
                 )}
+                wsMembers={p.wsMembers}
               />
             )}
           </Show>

@@ -1621,6 +1621,7 @@ const Workspace: Component = () => {
                 cellLabelById={cellLabelById()}
                 tagsRealtimeVersion={rtTags()}
                 wsAtomMarkers={wsAtomMarkers() ?? []}
+                wsMembers={workspaceMembers() ?? []}
                 selfUserId={user()?.id}
               />
             )}
@@ -1939,6 +1940,7 @@ const Workspace: Component = () => {
                         resolverMaps={resolverMaps}
                         wsManifestations={wsManifestations() ?? []}
                         wsAtomMarkers={wsAtomMarkers() ?? []}
+                        wsMembers={workspaceMembers() ?? []}
                       />
                     </Show>
                     <Show when={cellSection() === 'info'}>
@@ -1953,6 +1955,7 @@ const Workspace: Component = () => {
                         onFieldHover={setHoverFieldId}
                         resolverMaps={resolverMaps}
                         wsAtomMarkers={wsAtomMarkers() ?? []}
+                        wsMembers={workspaceMembers() ?? []}
                         realtimeInfoVersion={rtInfoFields()}
                         realtimeLinkVersion={rtLinkAtoms()}
                         onChanged={() => {
@@ -2072,6 +2075,7 @@ const Workspace: Component = () => {
                         wsDocs={wsDocs() ?? []}
                         wsAtomTagsEnriched={wsAtomTagsEnriched()}
                         wsAtomMarkers={wsAtomMarkers() ?? []}
+                        wsMembers={workspaceMembers() ?? []}
                         atomPickerEntries={atomPickerEntries()}
                         wsCells={cells() ?? []}
                         wsNodes={nodes() ?? []}

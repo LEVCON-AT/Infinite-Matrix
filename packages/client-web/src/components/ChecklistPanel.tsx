@@ -25,6 +25,7 @@ import { translateDbError } from '../lib/errors';
 import { flashError } from '../lib/flash';
 import { type ContextMaps, resolveChecklistLabel } from '../lib/label-template';
 import { dropOnChecklist } from '../lib/manifestation-cross-view';
+import type { WorkspaceMember } from '../lib/members';
 import {
   addChecklistItem,
   applyChecklistClose,
@@ -85,6 +86,8 @@ type Props = {
   // §13.3 V2.D: AtomMarkerBar im Checklist-Header (atom_type='checklist').
   // Optional — Caller ohne Workspace-Bundle blendet die Bar aus.
   wsAtomMarkers?: AtomMarkerRow[];
+  // §13.3 V2-Polish (2026-05-13) — Member-Lookup fuer Star-Hover-Tooltip.
+  wsMembers?: ReadonlyArray<WorkspaceMember>;
 };
 
 const ChecklistPanel: Component<Props> = (p) => {
@@ -566,6 +569,7 @@ const ChecklistPanel: Component<Props> = (p) => {
               markers={(p.wsAtomMarkers ?? []).filter(
                 (m) => m.atom_type === 'checklist' && m.atom_id === p.checklist.id,
               )}
+              wsMembers={p.wsMembers}
             />
           )}
         </Show>
@@ -694,6 +698,7 @@ const ChecklistPanel: Component<Props> = (p) => {
                       markers={(p.wsAtomMarkers ?? []).filter(
                         (m) => m.atom_type === 'task' && m.atom_id === it.id,
                       )}
+                      wsMembers={p.wsMembers}
                     />
                   )}
                 </Show>

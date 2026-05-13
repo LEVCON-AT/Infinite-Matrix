@@ -15,6 +15,7 @@ import {
   type ImportedEventModalSnapshot,
   closeImportedEventModal,
 } from '../lib/imported-event-modal-state';
+import type { WorkspaceMember } from '../lib/members';
 import { showToast } from '../lib/toasts';
 import type { AtomMarkerRow, CellRow, DocRow, NodeRow } from '../lib/types';
 import AtomDocsSection from './AtomDocsSection';
@@ -48,6 +49,8 @@ export type ImportedEventDetailModalProps = {
   // Calendar-Route ohne Workspace-Bundle blendet die Bar aus. Workspace.tsx
   // threadet wsAtomMarkers + selfUserId aus dem Workspace-Resource-Bundle.
   wsAtomMarkers?: AtomMarkerRow[];
+  // §13.3 V2-Polish (2026-05-13) — Member-Lookup fuer Star-Hover-Tooltip.
+  wsMembers?: ReadonlyArray<WorkspaceMember>;
   selfUserId?: string;
 };
 
@@ -165,6 +168,7 @@ const ImportedEventDetailModal: Component<ImportedEventDetailModalProps> = (prop
                 markers={(props.wsAtomMarkers ?? []).filter(
                   (m) => m.atom_type === 'imported_event' && m.atom_id === props.eventId,
                 )}
+                wsMembers={props.wsMembers}
               />
             </Show>
             <button type="button" class="overlay-close" onClick={close} aria-label="Schliessen">

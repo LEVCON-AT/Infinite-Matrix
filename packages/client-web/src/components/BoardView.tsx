@@ -25,6 +25,7 @@ import {
 import { translateDbError } from '../lib/errors';
 import { incrementLinkClickCount } from '../lib/link-clicks';
 import { dropOnKanbanCol } from '../lib/manifestation-cross-view';
+import type { WorkspaceMember } from '../lib/members';
 import {
   InvalidUrlError,
   addBoardLink,
@@ -117,6 +118,8 @@ type Props = {
   // Resource. Pro Card wird client-seitig auf (atom_type='task', atom_id=
   // card.atom_id) gefiltert.
   wsAtomMarkers?: AtomMarkerRow[];
+  // §13.3 V2-Polish (2026-05-13) — Member-Lookup fuer Star-Hover-Tooltip.
+  wsMembers?: ReadonlyArray<WorkspaceMember>;
   // Welle D.7c: Bundle der Workspace-Resources fuer den Tag-Editor +
   // Picker-Modals im CardOverlay. Optional durchgeleitet — Caller
   // (Workspace.tsx) reicht alles als atomPickerEntries-Memo + cells/nodes.
@@ -1460,6 +1463,7 @@ const BoardView: Component<Props> = (p) => {
                                             atomType="task"
                                             atomId={card.id}
                                             markers={markersByCard().get(card.id) ?? []}
+                                            wsMembers={p.wsMembers}
                                           />
                                         )}
                                       </Show>
@@ -1601,6 +1605,7 @@ const BoardView: Component<Props> = (p) => {
                           workspaceId={p.workspaceId}
                           wsManifestations={p.wsManifestations ?? []}
                           wsAtomMarkers={p.wsAtomMarkers}
+                          wsMembers={p.wsMembers}
                           selfUserId={p.selfUserId}
                           onChanged={() => p.onChanged?.()}
                         />
@@ -1635,6 +1640,7 @@ const BoardView: Component<Props> = (p) => {
                   wsDocs={p.wsDocs}
                   wsAtomTagsEnriched={p.wsAtomTagsEnriched}
                   wsAtomMarkers={p.wsAtomMarkers}
+                  wsMembers={p.wsMembers}
                   selfUserId={p.selfUserId}
                   workspaceId={p.workspaceId}
                   atomPickerEntries={p.atomPickerEntries}

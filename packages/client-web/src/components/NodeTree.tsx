@@ -575,6 +575,7 @@ const TreeItem: Component<{
                 atomType="doc"
                 atomId={docEntry.docId}
                 markers={p.wsAtomMarkers ?? []}
+                wsMembers={p.members?.() ?? []}
               />
             );
           }}
@@ -591,6 +592,7 @@ const TreeItem: Component<{
                     atomType="link"
                     atomId={id()}
                     markers={p.wsAtomMarkers ?? []}
+                    wsMembers={p.members?.() ?? []}
                   />
                 )}
               </Show>

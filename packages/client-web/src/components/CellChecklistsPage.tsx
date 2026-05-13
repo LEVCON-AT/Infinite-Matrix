@@ -9,6 +9,7 @@ import { openDocsPopup } from '../lib/docs-ui';
 import { useEditMode } from '../lib/edit-mode';
 import { translateDbError } from '../lib/errors';
 import type { ContextMaps } from '../lib/label-template';
+import type { WorkspaceMember } from '../lib/members';
 import { addCellChecklist } from '../lib/mutations';
 import type { PresenceUser } from '../lib/presence';
 import { fetchCellChecklists } from '../lib/queries';
@@ -40,6 +41,8 @@ type Props = {
   // §13.3 V2.D: Atom-Markers (Star+Eye) fuer den Checklist-Header.
   // Optional — Caller ohne Bundle blendet die Bar aus.
   wsAtomMarkers?: AtomMarkerRow[];
+  // §13.3 V2-Polish (2026-05-13) — Member-Lookup fuer Star-Hover-Tooltip.
+  wsMembers?: ReadonlyArray<WorkspaceMember>;
 };
 
 const CellChecklistsPage: Component<Props> = (p) => {
@@ -172,6 +175,7 @@ const CellChecklistsPage: Component<Props> = (p) => {
                     resolverMaps={p.resolverMaps}
                     wsManifestations={p.wsManifestations ?? []}
                     wsAtomMarkers={p.wsAtomMarkers}
+                    wsMembers={p.wsMembers}
                   />
                 );
               }}
