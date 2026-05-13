@@ -82,11 +82,17 @@ export async function fetchMyWorkspaces(): Promise<WorkspaceWithRole[]> {
         const ws = m.workspace as unknown as {
           id: string;
           name: string;
+          description?: string | null;
           owner_id: string;
           created_at: string;
           updated_at: string;
         };
-        return { ...ws, role: m.role, owner_email: null as string | null };
+        return {
+          ...ws,
+          description: ws.description ?? null,
+          role: m.role,
+          owner_email: null as string | null,
+        };
       });
 
     // Owner-Email per RPC nachladen, nur fuer Workspaces, in denen der

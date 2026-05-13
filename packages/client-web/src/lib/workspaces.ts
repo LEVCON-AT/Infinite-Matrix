@@ -41,6 +41,26 @@ export async function renameWorkspace(workspaceId: string, name: string): Promis
   if (error) throw error;
 }
 
+// ─── F.2 Description ─────────────────────────────────────────────
+// Optionale Workspace-Beschreibung (max 500 chars, Migration 083).
+// Owner + Admin duerfen aendern (RLS analog Rename). Leer-String wird
+// auf NULL normalisiert, damit "leer" und "nicht gesetzt" in der DB
+// identisch sind und der Hint im UI stabil bleibt.
+export async function setWorkspaceDescription(
+  workspaceId: string,
+  description: string | null,
+): Promise<void> {
+  const normalized = description?.trim() || null;
+  if (normalized && normalized.length > 500) {
+    throw new Error('Beschreibung maximal 500 Zeichen.');
+  }
+  const { error } = await supabase
+    .from('workspaces')
+    .update({ description: normalized })
+    .eq('id', workspaceId);
+  if (error) throw error;
+}
+
 // ─── Ownership-Transfer ──────────────────────────────────────────
 export type TransferOwnershipResult = {
   workspace_id: string;

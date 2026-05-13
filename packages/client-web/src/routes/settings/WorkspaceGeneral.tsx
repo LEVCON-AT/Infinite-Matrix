@@ -26,7 +26,7 @@ import { translateDbError } from '../../lib/errors';
 import { fetchMembers } from '../../lib/members';
 import { fetchMyWorkspaces } from '../../lib/queries';
 import { showToast } from '../../lib/toasts';
-import { renameWorkspace } from '../../lib/workspaces';
+import { renameWorkspace, setWorkspaceDescription } from '../../lib/workspaces';
 
 const WorkspaceGeneral = () => {
   const params = useParams<{ workspaceId: string }>();
@@ -106,6 +106,40 @@ const WorkspaceGeneral = () => {
     }
   }
 
+  // ─── F.2 Workspace-Description (inline) ────────────────────────
+  const [descEditing, setDescEditing] = createSignal(false);
+  const [descDraft, setDescDraft] = createSignal('');
+  const [descSaving, setDescSaving] = createSignal(false);
+  function startEditDesc() {
+    setDescDraft(current()?.description ?? '');
+    setDescEditing(true);
+  }
+  function cancelEditDesc() {
+    setDescEditing(false);
+    setDescDraft('');
+  }
+  async function saveEditDesc() {
+    if (descSaving()) return;
+    const next = descDraft().trim();
+    const cur = current()?.description ?? '';
+    if (next === cur) {
+      cancelEditDesc();
+      return;
+    }
+    setDescSaving(true);
+    try {
+      await setWorkspaceDescription(params.workspaceId, next || null);
+      await refetchWorkspaces();
+      showToast(next ? 'Beschreibung gespeichert.' : 'Beschreibung entfernt.', 'success');
+      setDescEditing(false);
+    } catch (err) {
+      console.error('setWorkspaceDescription:', err);
+      showToast(translateDbError(err, 'Speichern fehlgeschlagen.'), 'error');
+    } finally {
+      setDescSaving(false);
+    }
+  }
+
   // Filter fuer das Transfer-Dropdown: aktive Members ohne mich, ohne
   // den aktuellen Owner (= ich, weil Show when={role === 'owner'}).
   // Kandidaten sind alle uebrigen aktiven Mitglieder unabhaengig
@@ -179,6 +213,68 @@ const WorkspaceGeneral = () => {
                     >
                       Abbrechen
                     </button>
+                  </form>
+                </Show>
+              </dd>
+              <dt>Beschreibung</dt>
+              <dd>
+                <Show
+                  when={descEditing()}
+                  fallback={
+                    <span class="settings-name-row">
+                      <Show
+                        when={ws().description}
+                        fallback={<span class="hint">— keine Beschreibung gesetzt —</span>}
+                      >
+                        <span class="settings-readback settings-description-readback">
+                          {ws().description}
+                        </span>
+                      </Show>
+                      <Show when={canEditName()}>
+                        <button
+                          type="button"
+                          class="btn-subtle settings-name-edit-btn"
+                          onClick={startEditDesc}
+                          title="Beschreibung bearbeiten"
+                        >
+                          <Icon name="pencil" size={14} />
+                          <span>{ws().description ? 'Bearbeiten' : 'Hinzufuegen'}</span>
+                        </button>
+                      </Show>
+                    </span>
+                  }
+                >
+                  <form
+                    class="settings-name-edit-form settings-desc-edit-form"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void saveEditDesc();
+                    }}
+                  >
+                    <textarea
+                      class="settings-desc-input"
+                      value={descDraft()}
+                      onInput={(e) => setDescDraft(e.currentTarget.value)}
+                      maxLength={500}
+                      rows={3}
+                      autofocus
+                      disabled={descSaving()}
+                      placeholder="Worum geht es in diesem Workspace?"
+                    />
+                    <div class="settings-desc-edit-actions">
+                      <span class="settings-desc-counter">{descDraft().length}/500</span>
+                      <button type="submit" class="btn btn-p" disabled={descSaving()}>
+                        Speichern
+                      </button>
+                      <button
+                        type="button"
+                        class="btn-subtle"
+                        onClick={cancelEditDesc}
+                        disabled={descSaving()}
+                      >
+                        Abbrechen
+                      </button>
+                    </div>
                   </form>
                 </Show>
               </dd>

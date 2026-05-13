@@ -4,6 +4,8 @@
 export type Workspace = {
   id: string;
   name: string;
+  // Welle F.2 — optionale Beschreibung (max 500 chars). Migration 083.
+  description: string | null;
   owner_id: string;
   created_at: string;
   updated_at: string;
