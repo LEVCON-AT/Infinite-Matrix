@@ -146,6 +146,8 @@
   --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.18);
   --shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
   --shadow-focus: 0 0 0 3px var(--accent-soft, rgb(55 138 221 / 0.25));
+  /* Inverted shadow fuer bottom-fixed Bars (Mobile-BottomNav). */
+  --shadow-up: 0 -4px 12px -2px rgb(0 0 0 / 0.05);
 
   /* Overlays */
   --overlay-soft: rgba(0, 0, 0, 0.28);
@@ -9248,7 +9250,7 @@ dialog.overlay-modal .overlay-card {
   background: var(--surface);
   color: var(--text);
   font-weight: 500;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-xs);
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -12559,7 +12561,7 @@ dialog.overlay-modal .overlay-card {
 }
 
 .ai-provider-hint-close:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--bg3);
 }
 
 @keyframes ai-provider-hint-in {
@@ -16968,7 +16970,7 @@ body[data-viewport="phone"] .ws-main {
   align-items: center;
   background: var(--surface);
   border-top: 0.5px solid var(--border);
-  box-shadow: 0 -4px 12px -2px rgb(0 0 0 / 0.05);
+  box-shadow: var(--shadow-up);
   z-index: var(--z-sticky);
 }
 
