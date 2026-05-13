@@ -109,6 +109,8 @@ const TABLES = [
   // user_oauth_tokens cachen wir NICHT (sensible Daten, sollen nicht
   // in IDB liegen).
   'widget_external_channels',
+  // T.3 — Task-Dependencies (Migration 089, ECS Layer 2).
+  'task_dependencies',
 ] as const;
 
 export type CacheTable = (typeof TABLES)[number];
@@ -151,6 +153,7 @@ interface MatrixCacheSchema extends DBSchema {
   info_fields: StoreDef;
   atom_markers: StoreDef;
   widget_external_channels: StoreDef;
+  task_dependencies: StoreDef;
 }
 
 const DB_NAME = 'matrix-cache';
@@ -190,7 +193,9 @@ const DB_NAME = 'matrix-cache';
 // — typed Cell-Info-Felder + User-Markierungen.
 // V18 (WV.D.1): widget_external_channels (Migration 077) — Widget zu
 // externem Provider-Ref. user_oauth_tokens bleibt OUT-OF-CACHE (sensibel).
-const DB_VERSION = 18;
+// V19 (T.3): task_dependencies (Migration 089) — Vorgaenger-Beziehung
+// Blocker → Blocked zwischen Tasks im gleichen Workspace.
+const DB_VERSION = 19;
 const OBSOLETE_STORES = [
   'kb_cards',
   'checklist_items',

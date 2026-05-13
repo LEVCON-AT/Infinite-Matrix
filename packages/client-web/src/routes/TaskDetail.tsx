@@ -19,12 +19,21 @@ import { useUser } from '../lib/auth';
 import { translateDbError } from '../lib/errors';
 import { installEscReturn } from '../lib/keyboard-nav';
 import { fetchAllChecklists } from '../lib/queries';
-import { fetchManifestationsByTask, fetchTask, setTaskStatus } from '../lib/tasks';
+import {
+  addDependency,
+  fetchDependencies,
+  getBlockedBy,
+  getBlockersOf,
+  removeDependency,
+} from '../lib/task-dependencies';
+import { fetchManifestationsByTask, fetchTask, fetchTasks, setTaskStatus } from '../lib/tasks';
 import { showToast } from '../lib/toasts';
 import type {
   ChecklistRow,
+  TaskDependencyRow,
   TaskManifestationKind,
   TaskManifestationRow,
+  TaskRow,
   TaskStatus,
 } from '../lib/types';
 
@@ -106,6 +115,28 @@ const TaskDetail: Component = () => {
     () => new Map((checklists() ?? []).map((c) => [c.id, c])),
   );
 
+  // T.3 — Task-Dependencies: alle Workspace-Deps + alle Tasks (fuer
+  // Picker-Auswahl). Beide Resources sind workspace-scope und werden
+  // schon aus anderen Pfaden mitgepflegt, hier nur Direkt-Read.
+  const [allTasks] = createResource(
+    () => params.workspaceId,
+    async (wid) => (wid ? await fetchTasks(wid) : []),
+  );
+  const [dependencies, { refetch: refetchDeps }] = createResource(
+    () => params.workspaceId,
+    async (wid) => (wid ? await fetchDependencies(wid) : []),
+  );
+
+  const taskById = createMemo<Map<string, TaskRow>>(
+    () => new Map((allTasks() ?? []).map((t) => [t.id, t])),
+  );
+  const blockers = createMemo<TaskDependencyRow[]>(() =>
+    getBlockersOf(params.taskId, dependencies() ?? []),
+  );
+  const blockedBy = createMemo<TaskDependencyRow[]>(() =>
+    getBlockedBy(params.taskId, dependencies() ?? []),
+  );
+
   // History-aware: navigate(-1) erhaelt den Filter-State der Agenda
   // (inkl. customDate aus Calendar-Drilldown). Wenn der User direkt
   // /task/:taskId aufgerufen hat, faellt Browser-Default auf
@@ -129,6 +160,70 @@ const TaskDetail: Component = () => {
     } finally {
       setBusy(false);
     }
+  }
+
+  const [picker, setPicker] = createSignal<'blocker' | 'blocked' | null>(null);
+  const [pickerQuery, setPickerQuery] = createSignal('');
+
+  // Kandidaten fuer den Picker: alle Workspace-Tasks ausser dieser
+  // selbst und ausser den schon verknuepften (Direction-bezogen, damit
+  // wir nicht versehentlich eine Doublette versuchen).
+  const pickerCandidates = createMemo<TaskRow[]>(() => {
+    const mode = picker();
+    if (!mode) return [];
+    const all = allTasks() ?? [];
+    const linkedIds = new Set<string>();
+    if (mode === 'blocker') {
+      for (const d of blockers()) linkedIds.add(d.blocker_task_id);
+    } else {
+      for (const d of blockedBy()) linkedIds.add(d.blocked_task_id);
+    }
+    const q = pickerQuery().trim().toLowerCase();
+    return all
+      .filter((t) => t.id !== params.taskId && !linkedIds.has(t.id))
+      .filter((t) => (q ? (t.label || '').toLowerCase().includes(q) : true))
+      .slice(0, 25);
+  });
+
+  async function addDep(otherTaskId: string) {
+    const mode = picker();
+    if (!mode || !otherTaskId) return;
+    try {
+      await addDependency({
+        workspace_id: params.workspaceId,
+        blocker_task_id: mode === 'blocker' ? otherTaskId : params.taskId,
+        blocked_task_id: mode === 'blocker' ? params.taskId : otherTaskId,
+      });
+      setPicker(null);
+      setPickerQuery('');
+      void refetchDeps();
+      showToast('Abhaengigkeit hinzugefuegt.', 'success');
+    } catch (err) {
+      // Server-Side-Trigger raisen check_violation bei Zyklus + Workspace-
+      // Mismatch; unique_violation bei Doublette. Pattern via Code-Match.
+      const code = (err as { code?: string }).code;
+      const msg =
+        code === '23505'
+          ? 'Diese Abhaengigkeit existiert bereits.'
+          : code === '23514'
+            ? 'Nicht moeglich: Zyklus oder Selbst-Bezug.'
+            : translateDbError(err, 'Hinzufuegen fehlgeschlagen.');
+      showToast(msg, 'error');
+    }
+  }
+
+  async function removeDep(depId: string) {
+    try {
+      await removeDependency(depId, params.workspaceId);
+      void refetchDeps();
+      showToast('Abhaengigkeit entfernt.', 'success');
+    } catch (err) {
+      showToast(translateDbError(err, 'Entfernen fehlgeschlagen.'), 'error');
+    }
+  }
+
+  function taskLabel(id: string): string {
+    return taskById().get(id)?.label || `(Task ${id.slice(0, 8)}…)`;
   }
 
   function manifContainerLabel(m: TaskManifestationRow): string {
@@ -251,6 +346,143 @@ const TaskDetail: Component = () => {
                 <p class="task-detail-note">{t().note}</p>
               </section>
             </Show>
+
+            <section class="task-detail-section task-detail-deps">
+              <h3>Abhaengigkeiten</h3>
+              <div class="task-deps-grid">
+                <div class="task-deps-col">
+                  <h4>
+                    Wird blockiert von ({blockers().length})
+                    <button
+                      type="button"
+                      class="btn-subtle btn-mini"
+                      onClick={() => {
+                        setPicker('blocker');
+                        setPickerQuery('');
+                      }}
+                      title="Vorgaenger hinzufuegen"
+                    >
+                      <Icon name="plus" size={12} /> Hinzufuegen
+                    </button>
+                  </h4>
+                  <Show
+                    when={blockers().length > 0}
+                    fallback={<p class="hint">Keine Vorgaenger.</p>}
+                  >
+                    <ul class="task-deps-list">
+                      <For each={blockers()}>
+                        {(d) => (
+                          <li class="task-deps-row">
+                            <span class="task-deps-label">{taskLabel(d.blocker_task_id)}</span>
+                            <Show
+                              when={taskById().get(d.blocker_task_id)?.status === 'done'}
+                              fallback={
+                                <span class="badge badge-subtle" title="noch offen">
+                                  offen
+                                </span>
+                              }
+                            >
+                              <span class="badge badge-success" title="erledigt">
+                                fertig
+                              </span>
+                            </Show>
+                            <button
+                              type="button"
+                              class="btn-subtle btn-mini"
+                              onClick={() => void removeDep(d.id)}
+                              title="Abhaengigkeit entfernen"
+                            >
+                              <Icon name="x" size={12} />
+                            </button>
+                          </li>
+                        )}
+                      </For>
+                    </ul>
+                  </Show>
+                </div>
+                <div class="task-deps-col">
+                  <h4>
+                    Blockiert ({blockedBy().length})
+                    <button
+                      type="button"
+                      class="btn-subtle btn-mini"
+                      onClick={() => {
+                        setPicker('blocked');
+                        setPickerQuery('');
+                      }}
+                      title="Nachfolger hinzufuegen"
+                    >
+                      <Icon name="plus" size={12} /> Hinzufuegen
+                    </button>
+                  </h4>
+                  <Show when={blockedBy().length > 0} fallback={<p class="hint">Nichts.</p>}>
+                    <ul class="task-deps-list">
+                      <For each={blockedBy()}>
+                        {(d) => (
+                          <li class="task-deps-row">
+                            <span class="task-deps-label">{taskLabel(d.blocked_task_id)}</span>
+                            <button
+                              type="button"
+                              class="btn-subtle btn-mini"
+                              onClick={() => void removeDep(d.id)}
+                              title="Abhaengigkeit entfernen"
+                            >
+                              <Icon name="x" size={12} />
+                            </button>
+                          </li>
+                        )}
+                      </For>
+                    </ul>
+                  </Show>
+                </div>
+              </div>
+
+              <Show when={picker()}>
+                <div class="task-deps-picker">
+                  <header>
+                    <strong>
+                      {picker() === 'blocker' ? 'Vorgaenger waehlen' : 'Nachfolger waehlen'}
+                    </strong>
+                    <button
+                      type="button"
+                      class="btn-subtle btn-mini"
+                      onClick={() => setPicker(null)}
+                    >
+                      Abbrechen
+                    </button>
+                  </header>
+                  <input
+                    class="input"
+                    type="search"
+                    placeholder="Suchen…"
+                    value={pickerQuery()}
+                    onInput={(e) => setPickerQuery(e.currentTarget.value)}
+                    autofocus
+                  />
+                  <Show
+                    when={pickerCandidates().length > 0}
+                    fallback={<p class="hint">Keine passenden Tasks.</p>}
+                  >
+                    <ul class="task-deps-picker-list">
+                      <For each={pickerCandidates()}>
+                        {(cand) => (
+                          <li>
+                            <button
+                              type="button"
+                              class="task-deps-picker-row"
+                              onClick={() => void addDep(cand.id)}
+                            >
+                              <span>{cand.label || '(ohne Label)'}</span>
+                              <span class="hint">{cand.status}</span>
+                            </button>
+                          </li>
+                        )}
+                      </For>
+                    </ul>
+                  </Show>
+                </div>
+              </Show>
+            </section>
 
             <section class="task-detail-section">
               <h3>Manifestationen ({(manifestations() ?? []).length})</h3>

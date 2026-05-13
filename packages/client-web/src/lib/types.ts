@@ -635,6 +635,24 @@ export type TaskManifestationInput = {
   display_meta?: Record<string, unknown>;
 };
 
+// ─── Welle T.3 — Task-Dependencies (ECS Layer 2) ──────────────
+// Gerichtete „Blocker → Blocked"-Beziehung. Migration 089 erzwingt
+// Workspace-Match + Cycle-Detection + Unique + Non-Self-Loop.
+export type TaskDependencyRow = {
+  id: string;
+  workspace_id: string;
+  blocker_task_id: string;
+  blocked_task_id: string;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type TaskDependencyInput = {
+  workspace_id: string;
+  blocker_task_id: string;
+  blocked_task_id: string;
+};
+
 // ─── Welle I — Calendar Inbound ────────────────────────────────
 // Externe Kalender (Gmail/Outlook/Apple/Nextcloud/CalDAV-Subscribe +
 // optional OAuth) werden in das Matrix-System gespiegelt. Storage-

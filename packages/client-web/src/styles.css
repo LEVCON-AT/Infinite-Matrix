@@ -11083,6 +11083,120 @@ dialog.overlay-modal .overlay-card {
   color: var(--text);
 }
 
+/* T.3 Task-Dependencies */
+.task-detail-deps h4 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-body, 13px);
+  font-weight: 600;
+  color: var(--text2);
+}
+
+.task-deps-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+@media (max-width: 40rem) {
+  .task-deps-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.task-deps-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.task-deps-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.task-deps-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1_5) var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+
+.task-deps-label {
+  flex: 1;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-0_5);
+  padding: var(--space-0_5) var(--space-1_5);
+  font-size: var(--text-xs);
+  line-height: 1;
+}
+
+.task-deps-picker {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.task-deps-picker header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.task-deps-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-block-size: 18rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.task-deps-picker-row {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  text-align: start;
+}
+
+.task-deps-picker-row:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+}
+
 .task-status-toggle {
   display: flex;
   flex-wrap: wrap;
