@@ -20,6 +20,10 @@ import Icon from './Icon';
 
 export type InviteFormProps = {
   workspaceId: string;
+  // Welle F.4 — Default-Rolle aus dem Workspace. Caller threadet aus
+  // current()?.default_invite_role; Default 'editor' wenn der Caller
+  // den Wert nicht kennt (Backwards-Compat fuer alte Cache-Treffer).
+  defaultRole?: InviteRole;
   // Caller bekommt Result + fertigen Mail-Link + invitedEmail (kann null sein
   // wenn nur Link erstellt) + ob Mail-Send erfolgreich war (true = SMTP-Pfad
   // lief, false = nur Klartext-Link verfuegbar). InviteSuccessModal zeigt
@@ -35,7 +39,7 @@ export type InviteFormProps = {
 
 const InviteForm: Component<InviteFormProps> = (p) => {
   const [email, setEmail] = createSignal('');
-  const [role, setRole] = createSignal<InviteRole>('editor');
+  const [role, setRole] = createSignal<InviteRole>(p.defaultRole ?? 'editor');
   const [busy, setBusy] = createSignal(false);
 
   const submit = async (e: Event) => {

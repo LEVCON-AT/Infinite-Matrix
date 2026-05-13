@@ -26,7 +26,11 @@ import { translateDbError } from '../../lib/errors';
 import { fetchMembers } from '../../lib/members';
 import { fetchMyWorkspaces } from '../../lib/queries';
 import { showToast } from '../../lib/toasts';
-import { renameWorkspace, setWorkspaceDescription } from '../../lib/workspaces';
+import {
+  renameWorkspace,
+  setWorkspaceDefaultInviteRole,
+  setWorkspaceDescription,
+} from '../../lib/workspaces';
 
 const WorkspaceGeneral = () => {
   const params = useParams<{ workspaceId: string }>();
@@ -137,6 +141,28 @@ const WorkspaceGeneral = () => {
       showToast(translateDbError(err, 'Speichern fehlgeschlagen.'), 'error');
     } finally {
       setDescSaving(false);
+    }
+  }
+
+  // ─── F.4 Default-Invite-Role (Dropdown) ────────────────────────
+  const [roleSaving, setRoleSaving] = createSignal(false);
+  async function onDefaultRoleChange(value: string) {
+    if (roleSaving()) return;
+    if (value !== 'editor' && value !== 'viewer') return;
+    if (value === current()?.default_invite_role) return;
+    setRoleSaving(true);
+    try {
+      await setWorkspaceDefaultInviteRole(params.workspaceId, value);
+      await refetchWorkspaces();
+      showToast(
+        `Default-Rolle fuer Einladungen: ${value === 'editor' ? 'Editor' : 'Viewer'}.`,
+        'success',
+      );
+    } catch (err) {
+      console.error('setWorkspaceDefaultInviteRole:', err);
+      showToast(translateDbError(err, 'Speichern fehlgeschlagen.'), 'error');
+    } finally {
+      setRoleSaving(false);
     }
   }
 
@@ -291,6 +317,28 @@ const WorkspaceGeneral = () => {
               <dt>Deine Rolle</dt>
               <dd>
                 <span class={`settings-role-chip role-${ws().role}`}>{ws().role}</span>
+              </dd>
+              <dt>Einladungs-Default</dt>
+              <dd>
+                <Show
+                  when={canEditName()}
+                  fallback={
+                    <code class="settings-readback">
+                      {ws().default_invite_role === 'viewer' ? 'Viewer' : 'Editor'}
+                    </code>
+                  }
+                >
+                  <select
+                    class="settings-default-role-select"
+                    value={ws().default_invite_role}
+                    disabled={roleSaving()}
+                    onChange={(e) => void onDefaultRoleChange(e.currentTarget.value)}
+                    title="Default-Rolle fuer neue Einladungen"
+                  >
+                    <option value="editor">Editor (Standard, kann editieren)</option>
+                    <option value="viewer">Viewer (nur Lesezugriff)</option>
+                  </select>
+                </Show>
               </dd>
               <dt>Workspace-ID</dt>
               <dd>

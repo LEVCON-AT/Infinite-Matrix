@@ -6,6 +6,8 @@ export type Workspace = {
   name: string;
   // Welle F.2 — optionale Beschreibung (max 500 chars). Migration 083.
   description: string | null;
+  // Welle F.4 — Default-Rolle fuer neue Einladungen. Migration 084.
+  default_invite_role: 'editor' | 'viewer';
   owner_id: string;
   created_at: string;
   updated_at: string;

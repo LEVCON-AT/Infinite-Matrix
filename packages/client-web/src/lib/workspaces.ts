@@ -61,6 +61,24 @@ export async function setWorkspaceDescription(
   if (error) throw error;
 }
 
+// ─── F.4 Default-Invite-Role ─────────────────────────────────────
+// Welche Rolle bekommen neue Einladungen per Default? Owner+Admin
+// koennen das setzen (RLS analog). Erlaubt: 'editor' | 'viewer' —
+// CHECK in Migration 084 ist autoritativ.
+export async function setWorkspaceDefaultInviteRole(
+  workspaceId: string,
+  role: 'editor' | 'viewer',
+): Promise<void> {
+  if (role !== 'editor' && role !== 'viewer') {
+    throw new Error('Ungueltige Default-Rolle.');
+  }
+  const { error } = await supabase
+    .from('workspaces')
+    .update({ default_invite_role: role })
+    .eq('id', workspaceId);
+  if (error) throw error;
+}
+
 // ─── Ownership-Transfer ──────────────────────────────────────────
 export type TransferOwnershipResult = {
   workspace_id: string;

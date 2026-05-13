@@ -30,8 +30,12 @@ const WorkspaceMembers = () => {
     () => session()?.user?.id ?? null,
     () => fetchMyWorkspaces(),
   );
-  const myRole = () => workspaces()?.find((w) => w.id === params.workspaceId)?.role;
+  const currentWorkspace = () => workspaces()?.find((w) => w.id === params.workspaceId);
+  const myRole = () => currentWorkspace()?.role;
   const canInvite = () => myRole() === 'owner' || myRole() === 'admin';
+  // F.4 — Default-Rolle aus dem Workspace. Fallback 'editor' wenn das
+  // Feld vom Cache (alte LS-Eintraege) noch nicht aufgeloest ist.
+  const defaultInviteRole = () => currentWorkspace()?.default_invite_role ?? 'editor';
 
   const [members, { refetch: refetchMembers }] = createResource(
     () => params.workspaceId,
@@ -105,7 +109,11 @@ const WorkspaceMembers = () => {
       <Show when={canInvite()}>
         <section class="settings-form-section">
           <h3 id="invite-form-head">Neue Person einladen</h3>
-          <InviteForm workspaceId={params.workspaceId} onCreated={handleInviteCreated} />
+          <InviteForm
+            workspaceId={params.workspaceId}
+            defaultRole={defaultInviteRole()}
+            onCreated={handleInviteCreated}
+          />
         </section>
       </Show>
 

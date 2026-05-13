@@ -83,6 +83,7 @@ export async function fetchMyWorkspaces(): Promise<WorkspaceWithRole[]> {
           id: string;
           name: string;
           description?: string | null;
+          default_invite_role?: 'editor' | 'viewer';
           owner_id: string;
           created_at: string;
           updated_at: string;
@@ -90,6 +91,7 @@ export async function fetchMyWorkspaces(): Promise<WorkspaceWithRole[]> {
         return {
           ...ws,
           description: ws.description ?? null,
+          default_invite_role: ws.default_invite_role ?? 'editor',
           role: m.role,
           owner_email: null as string | null,
         };
