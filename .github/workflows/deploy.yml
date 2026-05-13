@@ -204,6 +204,37 @@ jobs:
               bash /opt/matrix-repo/infra/scripts/supabase-migrate.sh
           REMOTE
 
+      - name: Deploy edge-functions
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+          # Edge-Functions wohnen im Repo-Mirror unter
+          # /opt/matrix-repo/infra/supabase/functions/ und werden vom
+          # `functions`-Service per Bind-Mount eingelesen. Nach Code-
+          # Aenderungen muss der Container restartet werden, damit der
+          # Deno-Runtime Module frisch resolved (Lazy-Import-Cache wird
+          # beim ersten Hit warm).
+          #
+          # Idempotent: `up -d` startet den Container nur, wenn er noch
+          # nicht laeuft oder compose-yml/Image geaendert hat. `restart`
+          # danach erzwingt einen sauberen Modul-Cache-Reset. Kong-Reload
+          # greift kong.yml-Aenderungen ohne Container-Restart.
+          ssh -i ~/.ssh/id_ed25519 "$USER@$HOST" bash -s <<'REMOTE'
+            set -euo pipefail
+            cd /opt/matrix-repo/infra/supabase
+            sudo docker compose up -d functions
+            sudo docker compose restart functions
+            # Kong: erst `kong reload` versuchen (in-place reload, kein
+            # Connection-Drop). Falls das fehlschlaegt, faellt's auf
+            # restart zurueck. `-T` damit es ohne TTY laeuft.
+            sudo docker compose exec -T kong kong reload \
+              || sudo docker compose restart kong
+            sleep 2
+            sudo docker compose ps functions kong
+          REMOTE
+
       - name: Deploy bridge
         env:
           HOST: ${{ secrets.DEPLOY_HOST }}
