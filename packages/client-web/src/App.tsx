@@ -13,6 +13,7 @@ import { useIsPlatformAdmin } from './lib/admin';
 import { useDrawerHotkey } from './lib/ai-help-state';
 import { bootstrapAuth, useAccountInvalid, useAuthReady, useSession } from './lib/auth';
 import { checkMfaGate } from './lib/auth-mfa-gate';
+import { resetUserDateContext, setUserDateContext } from './lib/dates';
 import { installPointerDragAdapter } from './lib/drag-context';
 import { useEditModeHotkey } from './lib/edit-mode';
 import { checkAndMaybeRedirectToOnboarding, resetOnboardingGate } from './lib/onboarding-gate';
@@ -20,6 +21,7 @@ import { useUserPrefsSync } from './lib/settings';
 import { useThemeBootstrap } from './lib/theme';
 import { showToast } from './lib/toasts';
 import { useViewportClasses } from './lib/use-mobile';
+import { fetchMyUserProfile } from './lib/user-profile';
 import { useWorkingHoursSync } from './lib/working-hours';
 import { PENDING_INVITE_KEY } from './routes/Invite';
 
@@ -82,6 +84,30 @@ const App: ParentComponent = (props): JSX.Element => {
     const s = session();
     if (!s) return;
     void checkMfaGate();
+  });
+
+  // D.3-V2 — User-Profile-Boot fuer Date-Format-Context. Beim Login
+  // laden wir bio/timezone/language aus user_profiles und seeden
+  // lib/dates.ts. Beim Logout reset auf Defaults. Failure ist non-
+  // fatal: dates.ts bleibt auf de-DE + Browser-TZ.
+  createEffect(() => {
+    const s = session();
+    const uid = s?.user?.id ?? null;
+    if (!uid) {
+      resetUserDateContext();
+      return;
+    }
+    void (async () => {
+      try {
+        const profile = await fetchMyUserProfile(uid);
+        setUserDateContext({
+          language: profile?.language ?? null,
+          timezone: profile?.timezone ?? null,
+        });
+      } catch (err) {
+        console.error('userDateContext-bootstrap:', err);
+      }
+    })();
   });
 
   // Route-Guard: ohne Session -> /login (ausser auf public-Routen),

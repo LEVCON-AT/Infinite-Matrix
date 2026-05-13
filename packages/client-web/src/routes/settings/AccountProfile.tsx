@@ -17,6 +17,7 @@ import { Show, createResource, createSignal } from 'solid-js';
 import Icon from '../../components/Icon';
 import { changeEmail, setDisplayName } from '../../lib/account';
 import { useSession } from '../../lib/auth';
+import { setUserDateContext } from '../../lib/dates';
 import { translateDbError } from '../../lib/errors';
 import { deleteAvatar, uploadAvatar } from '../../lib/storage';
 import { supabase } from '../../lib/supabase';
@@ -201,6 +202,12 @@ const AccountProfile = () => {
     try {
       await setUserProfile(uid, { timezone: next || null });
       await refetchProfile();
+      // D.3-V2: lib/dates.ts sofort updaten, sonst zeigen alle Date-
+      // Strings bis zum naechsten Reload noch die alte TZ.
+      setUserDateContext({
+        language: profile()?.language ?? null,
+        timezone: next || null,
+      });
       showToast(next ? 'Zeitzone gespeichert.' : 'Zeitzone entfernt.', 'success');
       setTzEditing(false);
     } catch (err) {
@@ -236,6 +243,11 @@ const AccountProfile = () => {
     try {
       await setUserProfile(uid, { language: next || null });
       await refetchProfile();
+      // D.3-V2: dates.ts sofort updaten (siehe saveEditTz).
+      setUserDateContext({
+        language: next || null,
+        timezone: profile()?.timezone ?? null,
+      });
       showToast(next ? 'Sprache gespeichert.' : 'Sprache entfernt.', 'success');
       setLangEditing(false);
     } catch (err) {
