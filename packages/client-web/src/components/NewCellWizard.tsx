@@ -873,111 +873,113 @@ const NewCellWizard: Component<Props> = (p) => {
           </footer>
         </Show>
 
-        {/* ─── Step 2..N: Naming ────────────────────────── */}
-        <Show when={step().kind === 'name' && currentNameDef()}>
-          {(_) => {
-            const def = currentNameDef();
-            if (!def) return null;
-            const isTopLevel = !p.matrixId;
-            // Phase 3 O.8.M.6: stepIdx + total muessen reaktiv aus den
-            // Signalen gelesen werden — als const wuerden sie beim
-            // ersten Render eingefroren (Bug-Report 2026-04-29 „Schritt
-            // 1/3 bleibt statisch").
-            return (
-              <div class="new-cell-wizard-body new-cell-wizard-name-body">
-                <p class="new-cell-wizard-step-counter">
-                  Schritt {(step() as { kind: 'name'; idx: number }).idx + 1}/
-                  {nameableSelected().length}: {currentNameDef()?.label ?? def.label}{' '}
-                  {originalKeys.includes(currentNameDef()?.key ?? '') ? 'umbenennen' : 'benennen'}
-                </p>
-                <input
-                  // ref + queueMicrotask: Pos 1 voll-markieren beim Mount
-                  // (sofort ueberschreibbar); bei Cycle-Wechseln spaeter
-                  // uebernimmt cycle() das Setzen.
-                  ref={(el: HTMLInputElement) => {
-                    nameInputRef = el;
-                    // Phase 3 O.8.M.5: nur beim ersten Mount fuer
-                    // diesen Sub-Step fokussieren + selektieren.
-                    // Spaeter werden Selection-Aenderungen explizit
-                    // aus cycle() gesetzt (Cycle-Wechsel). User-
-                    // Eingabe waehrend des Tippens darf nicht durch
-                    // erneuten select() ueberschrieben werden.
-                    if (nameInputInitialized.has(def.key)) return;
-                    nameInputInitialized.add(def.key);
-                    queueMicrotask(() => {
-                      el.focus();
-                      const pos = cyclePos().get(def.key) ?? 1;
-                      if (pos === 1) el.select();
-                      else el.setSelectionRange(0, 0);
-                    });
-                  }}
-                  type="text"
-                  class="new-cell-wizard-name-input"
-                  value={currentDraft()}
-                  onInput={(e) => setCurrentDraft(e.currentTarget.value)}
+        {/* ─── Step 2..N: Naming ──────────────────────────
+            B1-D-011: Body + Footer durch eine einzige `<Show>`-Klammer
+            mit typed-callback-Form gated; spart die doppelte
+            kind-Bedingung + den `as { kind:'name'; idx:number }`-Cast
+            an drei Stellen. `currentNameDef()`-Check bleibt fuer den
+            Body-Render (kann waehrend Lade-Resourcen kurz null sein),
+            der Footer rendert auch ohne def. */}
+        <Show when={step().kind === 'name' ? (step() as { kind: 'name'; idx: number }) : null}>
+          {(nameStep) => (
+            <>
+              <Show when={currentNameDef()}>
+                {(defAcc) => {
+                  const def = defAcc();
+                  const isTopLevel = !p.matrixId;
+                  // Phase 3 O.8.M.6: stepIdx + total muessen reaktiv aus den
+                  // Signalen gelesen werden — als const wuerden sie beim
+                  // ersten Render eingefroren (Bug-Report 2026-04-29 „Schritt
+                  // 1/3 bleibt statisch").
+                  return (
+                    <div class="new-cell-wizard-body new-cell-wizard-name-body">
+                      <p class="new-cell-wizard-step-counter">
+                        Schritt {nameStep().idx + 1}/{nameableSelected().length}:{' '}
+                        {currentNameDef()?.label ?? def.label}{' '}
+                        {originalKeys.includes(currentNameDef()?.key ?? '')
+                          ? 'umbenennen'
+                          : 'benennen'}
+                      </p>
+                      <input
+                        ref={(el: HTMLInputElement) => {
+                          nameInputRef = el;
+                          // Phase 3 O.8.M.5: nur beim ersten Mount fuer
+                          // diesen Sub-Step fokussieren + selektieren.
+                          // Spaeter werden Selection-Aenderungen explizit
+                          // aus cycle() gesetzt (Cycle-Wechsel). User-
+                          // Eingabe waehrend des Tippens darf nicht durch
+                          // erneuten select() ueberschrieben werden.
+                          if (nameInputInitialized.has(def.key)) return;
+                          nameInputInitialized.add(def.key);
+                          queueMicrotask(() => {
+                            el.focus();
+                            const pos = cyclePos().get(def.key) ?? 1;
+                            if (pos === 1) el.select();
+                            else el.setSelectionRange(0, 0);
+                          });
+                        }}
+                        type="text"
+                        class="new-cell-wizard-name-input"
+                        value={currentDraft()}
+                        onInput={(e) => setCurrentDraft(e.currentTarget.value)}
+                        disabled={busy()}
+                      />
+                      <Show when={!isTopLevel}>
+                        <div class="new-cell-wizard-cycle">
+                          <span class="new-cell-wizard-cycle-label">Vorlage</span>
+                          <For each={[1, 2, 3, 4, 5] as CyclePosition[]}>
+                            {(pos) => (
+                              <span
+                                class="new-cell-wizard-cycle-dot"
+                                classList={{ active: currentPos() === pos }}
+                                aria-label={`Position ${pos}`}
+                              />
+                            )}
+                          </For>
+                          <span class="new-cell-wizard-cycle-modus">{modusHint(currentPos())}</span>
+                        </div>
+                      </Show>
+                      <p class="new-cell-wizard-preview">
+                        Vorschau: <strong>{previewLabel(currentDraft())}</strong>
+                      </p>
+                    </div>
+                  );
+                }}
+              </Show>
+              <footer class="overlay-foot new-cell-wizard-foot">
+                <span class="new-cell-wizard-tip">
+                  <Show
+                    when={!!p.matrixId}
+                    fallback={
+                      <>
+                        <kbd>↩</kbd> weiter · <kbd>Esc</kbd>
+                      </>
+                    }
+                  >
+                    <kbd>Strg</kbd>+<kbd>↑↓</kbd> Vorlage · <kbd>↩</kbd> weiter · <kbd>Esc</kbd>
+                  </Show>
+                </span>
+                <button
+                  type="button"
+                  class="btn-subtle"
+                  onClick={() => backNameStep()}
                   disabled={busy()}
-                />
-                <Show when={!isTopLevel}>
-                  <div class="new-cell-wizard-cycle">
-                    <span class="new-cell-wizard-cycle-label">Vorlage</span>
-                    <For each={[1, 2, 3, 4, 5] as CyclePosition[]}>
-                      {(pos) => (
-                        <span
-                          class="new-cell-wizard-cycle-dot"
-                          classList={{ active: currentPos() === pos }}
-                          aria-label={`Position ${pos}`}
-                        />
-                      )}
-                    </For>
-                    <span class="new-cell-wizard-cycle-modus">{modusHint(currentPos())}</span>
-                  </div>
-                </Show>
-                <p class="new-cell-wizard-preview">
-                  Vorschau: <strong>{previewLabel(currentDraft())}</strong>
-                </p>
-              </div>
-            );
-          }}
-        </Show>
-        <Show when={step().kind === 'name'}>
-          <footer class="overlay-foot new-cell-wizard-foot">
-            <span class="new-cell-wizard-tip">
-              <Show
-                when={!!p.matrixId}
-                fallback={
-                  <>
-                    <kbd>↩</kbd> weiter · <kbd>Esc</kbd>
-                  </>
-                }
-              >
-                <kbd>Strg</kbd>+<kbd>↑↓</kbd> Vorlage · <kbd>↩</kbd> weiter · <kbd>Esc</kbd>
-              </Show>
-            </span>
-            <button
-              type="button"
-              class="btn-subtle"
-              onClick={() => backNameStep()}
-              disabled={busy()}
-            >
-              Zurueck
-            </button>
-            <button
-              type="button"
-              class="btn btn-p"
-              onClick={() => advanceNameStep()}
-              disabled={busy()}
-            >
-              <Show
-                when={
-                  step().kind === 'name' &&
-                  (step() as { kind: 'name'; idx: number }).idx === nameableSelected().length - 1
-                }
-                fallback="Weiter"
-              >
-                Anlegen
-              </Show>
-            </button>
-          </footer>
+                >
+                  Zurueck
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-p"
+                  onClick={() => advanceNameStep()}
+                  disabled={busy()}
+                >
+                  <Show when={nameStep().idx === nameableSelected().length - 1} fallback="Weiter">
+                    Anlegen
+                  </Show>
+                </button>
+              </footer>
+            </>
+          )}
         </Show>
 
         {/* ─── Step Final: Commit-Indicator ─────────────── */}
