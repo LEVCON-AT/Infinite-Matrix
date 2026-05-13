@@ -487,6 +487,12 @@ const Workspace: Component = () => {
     async (wid) => (wid ? fetchAtomMarkersForWorkspace(wid) : []),
   );
 
+  // Welle B Stub §13.3 V2.G — Realtime-Version-Counter fuer info_field-
+  // Atom-Renderer in CellInfoPage. Bumps wenn atom_manifestations(kind=
+  // 'info') oder info_fields per Realtime-Subscriber feuern. Cross-Tab-
+  // Konsistenz fuer die Atom-Felder-Section.
+  const [rtInfoFields, setRtInfoFields] = createSignal(0);
+
   // Welle D.7b: Flache Picker-Entry-Liste fuer AtomPickerModal — Tasks +
   // Links + Docs + Checklists in einem einheitlichen Format. Der Modal
   // bleibt source-agnostisch.
@@ -1273,6 +1279,16 @@ const Workspace: Component = () => {
         setRtDocs((v) => v + 1);
         void refetchCellsWithDocs();
         void refetchWsDocs();
+        // Welle B Stub §13.3 V2.G — info-kind-Manifestations triggern
+        // den Atom-Felder-Section-Refetch in CellInfoPage (Cross-Tab).
+        setRtInfoFields((v) => v + 1);
+      },
+      // Welle B Stub §13.3 V2.G — info_fields-Mutationen (label/value/
+      // value_type/symbol_override-Aenderungen) triggern Refetch der
+      // Atom-Felder-Section. Cross-Tab-Konsistenz: User A aendert ein
+      // info_field, User B sieht es ohne Reload.
+      info_fields: () => {
+        setRtInfoFields((v) => v + 1);
       },
       // Phase 3 O.8: Object-Rename → Templates re-resolven. Refetch
       // triggert die Solid-Resource, deren Memo-Konsumenten in
@@ -1922,6 +1938,8 @@ const Workspace: Component = () => {
                         selfUserId={user()?.id}
                         onFieldHover={setHoverFieldId}
                         resolverMaps={resolverMaps}
+                        wsAtomMarkers={wsAtomMarkers() ?? []}
+                        realtimeInfoVersion={rtInfoFields()}
                         onChanged={() => {
                           void refetchCells();
                         }}

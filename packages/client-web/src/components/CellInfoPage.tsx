@@ -14,13 +14,23 @@
 //   - "+ Feld": nur sichtbar im Edit-Mode
 
 import { useNavigate } from '@solidjs/router';
-import { type Component, For, Show, createMemo, createSignal, onCleanup } from 'solid-js';
+import {
+  type Component,
+  For,
+  Show,
+  createMemo,
+  createResource,
+  createSignal,
+  onCleanup,
+} from 'solid-js';
 import { readCellLinksFromCell, readInfoFieldsFromCell } from '../lib/cell-data';
 import { showConfirm, showPrompt } from '../lib/dialog';
 import { openDocsPopup } from '../lib/docs-ui';
 import { bindDragSource } from '../lib/drag-context';
 import { useEditMode } from '../lib/edit-mode';
 import { translateDbError } from '../lib/errors';
+import { fetchInfoManifestationsForCell } from '../lib/info-field-manifestations';
+import { addInfoFieldForCell, deleteInfoField } from '../lib/info-fields';
 import type { ContextMaps } from '../lib/label-template';
 import {
   addCellInfoField,
@@ -36,12 +46,13 @@ import {
 } from '../lib/mutations';
 import type { PresenceUser } from '../lib/presence';
 import { showToast } from '../lib/toasts';
-import type { CellRow, ColRow, InfoField, InfoLink, RowRow } from '../lib/types';
+import type { AtomMarkerRow, CellRow, ColRow, InfoField, InfoLink, RowRow } from '../lib/types';
 import { sanitizeUrl } from '../lib/url';
 import { bindAliasAutocomplete } from '../lib/use-alias-autocomplete';
 import { useViewerActive } from '../lib/workspace-role';
 import AliasText from './AliasText';
 import CellDocsSection from './CellDocsSection';
+import InfoFieldAtomCard from './InfoFieldAtomCard';
 import PresenceMini from './PresenceMini';
 
 type Props = {
@@ -57,6 +68,13 @@ type Props = {
   onFieldHover?: (fieldId: string | undefined) => void;
   // Phase 3 O.8.J: Resolver-Maps fuer doc.title_template Live-Aufloesung.
   resolverMaps?: () => ContextMaps;
+  // Welle B Stub — Workspace-skopierte atom_markers fuer Atom-Felder-
+  // Section. AtomMarkerBar filtert intern auf (atom_type, atom_id).
+  wsAtomMarkers?: ReadonlyArray<AtomMarkerRow>;
+  // Welle B Stub — Bumps wenn atom_manifestations(kind='info') oder
+  // info_fields per Realtime auftauchen. Triggert Refetch der neuen
+  // Section. Cross-Tab-Konsistenz fuer info_field-Atome.
+  realtimeInfoVersion?: number;
 };
 
 const CellInfoPage: Component<Props> = (p) => {
@@ -88,6 +106,66 @@ const CellInfoPage: Component<Props> = (p) => {
 
   const fields = () => readInfoFieldsFromCell(p.cell);
   const links = () => readCellLinksFromCell(p.cell);
+
+  // Welle B Stub — Atom-Felder-Section (info_field-Atom-Renderer).
+  // Resource liest atom_manifestations(kind='info') der Cell + joined
+  // info_fields. Refetch-Trigger: Cell/Workspace-Wechsel, lokale
+  // Mutationen (atomFieldsRefetch), Realtime-Bumps (realtimeInfoVersion).
+  const [atomFieldsRefetchKey, setAtomFieldsRefetchKey] = createSignal(0);
+  const [atomFields, { refetch: refetchAtomFields }] = createResource(
+    () => [p.workspaceId, p.cell.id, p.realtimeInfoVersion ?? 0, atomFieldsRefetchKey()] as const,
+    async ([wsId, cellId]) => fetchInfoManifestationsForCell(wsId, cellId),
+  );
+
+  async function onAddAtomField() {
+    if (viewerActive()) {
+      showToast('Read-only: Atom-Feld-Anlage ist als Viewer nicht moeglich.', 'info');
+      return;
+    }
+    const label = await showPrompt({
+      title: 'Atom-Feld anlegen',
+      message: 'Label:',
+    });
+    if (!label) return;
+    setBusy(true);
+    try {
+      await addInfoFieldForCell({
+        workspaceId: p.workspaceId,
+        cellId: p.cell.id,
+        label: label.trim(),
+      });
+      setAtomFieldsRefetchKey((v) => v + 1);
+      showToast('Atom-Feld angelegt.', 'success');
+    } catch (err) {
+      console.error('CellInfoPage.onAddAtomField:', err);
+      showToast(translateDbError(err), 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDeleteAtomField(atomId: string, label: string) {
+    const ok = await showConfirm({
+      title: 'Atom-Feld loeschen?',
+      message: `Atom-Feld "${label || '(ohne Label)'}" loeschen? Das Atom wird workspace-weit entfernt.`,
+      variant: 'danger',
+      confirmLabel: 'Loeschen',
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await deleteInfoField(atomId);
+      setAtomFieldsRefetchKey((v) => v + 1);
+      showToast('Atom-Feld geloescht.', 'success');
+    } catch (err) {
+      console.error('CellInfoPage.onDeleteAtomField:', err);
+      showToast(translateDbError(err), 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+  // Silence unused-import warning until B.S.4 hooks Delete-Affordance.
+  void refetchAtomFields;
 
   async function wrap<T>(fn: () => Promise<T>, successMsg?: string) {
     if (busy()) return;
@@ -223,6 +301,80 @@ const CellInfoPage: Component<Props> = (p) => {
           + In Doku erfassen
         </button>
       </header>
+
+      {/* Welle B Stub §13.3 V2.G — Atom-Felder-Section (info_field-Atom-
+          Renderer). View-Only V1. Legacy Info-Felder-Section bleibt
+          unangetastet darunter, bis Welle B Step 13 die JSONB-Daten
+          migriert. */}
+      <section class="ifa-section" aria-label="Atom-Felder (Welle B Vorschau)">
+        <div class="ifa-section-head">
+          <span class="ifa-section-title">Atom-Felder</span>
+          <span class="ifa-section-hint">Welle B Vorschau — View-Only</span>
+          <Show when={editMode() && p.selfUserId}>
+            <button
+              type="button"
+              class="btn-subtle"
+              onClick={onAddAtomField}
+              disabled={busy() || viewerActive()}
+              title="Neues info_field-Atom mit Cell-Manifestation anlegen"
+            >
+              + Atom-Feld
+            </button>
+          </Show>
+        </div>
+        <Show
+          when={(atomFields() ?? []).length > 0}
+          fallback={
+            <p class="ifa-empty">
+              Keine Atom-Felder.
+              <Show when={editMode()}> Lege das erste oben an.</Show>
+            </p>
+          }
+        >
+          <div class="ifa-list">
+            <For each={atomFields() ?? []}>
+              {(item) => (
+                <div class="ifa-row">
+                  <Show
+                    when={p.selfUserId}
+                    fallback={
+                      <InfoFieldAtomCard
+                        workspaceId={p.workspaceId}
+                        userId=""
+                        atom={item.atom}
+                        manifestation={item.manifestation}
+                        markers={p.wsAtomMarkers ?? []}
+                      />
+                    }
+                  >
+                    {(uid) => (
+                      <InfoFieldAtomCard
+                        workspaceId={p.workspaceId}
+                        userId={uid()}
+                        atom={item.atom}
+                        manifestation={item.manifestation}
+                        markers={p.wsAtomMarkers ?? []}
+                      />
+                    )}
+                  </Show>
+                  <Show when={editMode() && !viewerActive()}>
+                    <button
+                      type="button"
+                      class="btn-subtle ifa-del"
+                      onClick={() => onDeleteAtomField(item.atom.id, item.atom.label)}
+                      disabled={busy()}
+                      title="Atom-Feld loeschen (workspace-weit)"
+                      aria-label="Atom-Feld loeschen"
+                    >
+                      ✕
+                    </button>
+                  </Show>
+                </div>
+              )}
+            </For>
+          </div>
+        </Show>
+      </section>
 
       <Show
         when={fields().length > 0}
