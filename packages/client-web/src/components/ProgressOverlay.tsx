@@ -30,7 +30,7 @@ const ProgressOverlay: Component = () => {
               <div class="progress-title">{state().title}</div>
               <div class="progress-phase">{state().phase}</div>
               <div class="progress-bar" aria-hidden="true">
-                <div class="progress-bar-fill" style={{ width: `${pct()}%` }} />
+                <div class="progress-bar-fill" style={{ '--progress-pct': `${pct()}%` }} />
               </div>
               <div class="progress-meta">
                 Schritt {state().current} von {state().total} · {pct()}%

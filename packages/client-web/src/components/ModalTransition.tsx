@@ -63,7 +63,7 @@ export function ModalTransition(props: { when: boolean; children: JSX.Element })
 
   return (
     <Show when={present()}>
-      <div ref={containerRef} class="modal-transition-host" style={{ display: 'contents' }}>
+      <div ref={containerRef} class="modal-transition-host">
         {props.children}
       </div>
     </Show>

@@ -115,7 +115,7 @@ const StepApplying: Component = () => {
                 <div
                   class="wizard-progress-fill"
                   style={{
-                    width:
+                    '--wizard-progress-pct':
                       progress().total === 0
                         ? '0%'
                         : `${Math.min(100, (progress().current / progress().total) * 100)}%`,

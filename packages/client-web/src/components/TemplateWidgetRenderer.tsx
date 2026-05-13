@@ -51,8 +51,8 @@ const TemplateWidgetRenderer: Component<TemplateWidgetRendererProps> = (p) => {
         'template-widget-edit-in-view': editInViewToggle(p.widget.toggles, p.widget.type),
       }}
       style={{
-        'grid-column': `span ${p.widget.size_cols}`,
-        'grid-row': `span ${p.widget.size_rows}`,
+        '--widget-size-cols': p.widget.size_cols,
+        '--widget-size-rows': p.widget.size_rows,
       }}
       data-widget-type={p.widget.type}
       data-edit-in-view={editInViewToggle(p.widget.toggles, p.widget.type) ? 'true' : 'false'}

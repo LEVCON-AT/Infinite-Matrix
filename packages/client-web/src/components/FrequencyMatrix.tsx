@@ -15,11 +15,9 @@ import { cellTarget } from '../lib/alias-dispatch';
 import type { CellRow, KbCardRow } from '../lib/types';
 import Icon from './Icon';
 
-// Hierarchische Indentation: Base-Padding + zusaetzliche Tiefe pro Level.
-// Werte aus dem HTML-Vorbild (renderFrequencyMatrix) uebernommen.
-const FREQ_INDENT_BASE = 9;
-const FREQ_INDENT_PER_LEVEL = 14;
-
+// Hierarchische Indentation: berechnet in CSS via `--freq-depth`-Custom-
+// Property (style.md §4). Inline-Style sets nur das raw depth-Integer;
+// padding-left-calc lebt in .freq-row-hd.
 type Props = {
   workspaceId: string;
   aggregates: AggregateCell[];
@@ -164,9 +162,7 @@ const FrequencyMatrix: Component<Props> = (p) => {
                   <tr>
                     <th
                       class="freq-row-hd"
-                      style={{
-                        'padding-left': `${FREQ_INDENT_BASE + agg.depth * FREQ_INDENT_PER_LEVEL}px`,
-                      }}
+                      style={{ '--freq-depth': agg.depth }}
                       onClick={() => navigateToCell(agg)}
                       // biome-ignore lint/a11y/useSemanticElements: th wirkt hier als Row-Header + Klick-Anker — <a> unter th wuerde Tabellen-Semantik (rowheader) zerstoeren. Tastatur-Bedienung via tabIndex + onKeyDown vorhanden.
                       // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: bewusster Klick-Anker auf row-header; siehe Kommentar oberhalb.

@@ -289,7 +289,7 @@ const ImportDialog: Component<Props> = (p) => {
                 <div
                   class="import-progress-fill"
                   style={{
-                    width:
+                    '--import-progress-pct':
                       progressTotal() === 0
                         ? '0%'
                         : `${Math.min(100, (progressCur() / progressTotal()) * 100)}%`,

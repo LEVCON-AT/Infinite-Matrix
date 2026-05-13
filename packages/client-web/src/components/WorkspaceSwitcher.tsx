@@ -137,9 +137,9 @@ const WorkspaceSwitcher: Component<Props> = (props) => {
                 ref={menuEl}
                 tabIndex={-1}
                 style={{
-                  left: `${menuPos().left}px`,
-                  top: `${menuPos().top}px`,
-                  'min-width': `${menuPos().width}px`,
+                  '--ws-menu-x': `${menuPos().left}px`,
+                  '--ws-menu-y': `${menuPos().top}px`,
+                  '--ws-menu-min-w': `${menuPos().width}px`,
                 }}
               >
                 <For each={props.workspaces}>

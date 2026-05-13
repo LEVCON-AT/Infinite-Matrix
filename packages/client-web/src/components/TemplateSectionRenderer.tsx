@@ -46,10 +46,7 @@ const TemplateSectionRenderer: Component<TemplateSectionRendererProps> = (p) => 
           </header>
         </Show>
         <Show when={!collapsed()}>
-          <div
-            class="template-section-grid"
-            style={{ 'grid-template-columns': `repeat(${TEMPLATE_GRID_COLS}, minmax(0, 1fr))` }}
-          >
+          <div class="template-section-grid" style={{ '--template-grid-cols': TEMPLATE_GRID_COLS }}>
             <For each={p.section.widgets}>
               {(widget) => (
                 <TemplateWidgetRenderer
