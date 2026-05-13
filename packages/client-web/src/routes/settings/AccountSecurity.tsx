@@ -7,7 +7,9 @@
 
 import { useNavigate } from '@solidjs/router';
 import { type Component, For, Show, createResource, createSignal } from 'solid-js';
-import { signOut, signOutAllSessions, signOutOtherSessions } from '../../lib/auth';
+import { deleteOwnAccount } from '../../lib/account';
+import { signOut, signOutAllSessions, signOutOtherSessions, useUser } from '../../lib/auth';
+import { requireFreshAal2 } from '../../lib/auth-step-up';
 import {
   type BackupCodesStatus,
   generateBackupCodes,
@@ -28,6 +30,43 @@ import { showToast } from '../../lib/toasts';
 
 const AccountSecurity: Component = () => {
   const navigate = useNavigate();
+  const user = useUser();
+  const [deleteConfirm, setDeleteConfirm] = createSignal('');
+  const [deleteBusy, setDeleteBusy] = createSignal(false);
+
+  const currentEmail = () => user()?.email ?? '';
+  const deleteEnabled = () =>
+    !!currentEmail() &&
+    deleteConfirm().trim().toLowerCase() === currentEmail().toLowerCase() &&
+    !deleteBusy();
+
+  async function handleDelete() {
+    const email = currentEmail();
+    if (!email) return;
+    const ok = await showConfirm({
+      title: 'Konto endgueltig loeschen?',
+      message:
+        'Dieser Schritt entfernt deinen Account, alle persoenlichen Daten sowie deine Mitgliedschaften unwiderruflich. Workspaces in denen du alleiniger Owner mit weiteren Mitgliedern bist, muessen vorher uebertragen oder geloescht werden.',
+      confirmLabel: 'Konto loeschen',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    const fresh = await requireFreshAal2({ reason: 'Konto-Loeschung' });
+    if (!fresh) {
+      showToast('Step-Up abgebrochen.', 'info');
+      return;
+    }
+    setDeleteBusy(true);
+    try {
+      await deleteOwnAccount(email);
+      showToast('Konto geloescht. Bis bald.', 'success');
+      navigate('/login', { replace: true });
+    } catch (err) {
+      showToast(translateDbError(err, 'Konto-Loeschung fehlgeschlagen.'), 'error');
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
 
   const [factors, { refetch }] = createResource(async () => {
     try {
@@ -267,6 +306,42 @@ const AccountSecurity: Component = () => {
             }}
           >
             Alle Sessions abmelden
+          </button>
+        </div>
+      </section>
+
+      <section class="settings-form-section settings-danger-zone">
+        <h3>Konto loeschen</h3>
+        <p class="hint">
+          Endgueltige Loeschung deines Accounts inklusive Profil, Mitgliedschaften,
+          Atom-Markierungen und Workspace-Eintraegen (kaskadierend). Workspaces in denen du
+          alleiniger Owner mit weiteren Mitgliedern bist, muessen vorher uebertragen oder geloescht
+          werden — sonst verlieren andere Mitglieder den Zugriff.
+        </p>
+        <p class="hint">
+          Zur Bestaetigung tippe deine aktuelle E-Mail-Adresse ein. Beim Klick auf "Konto loeschen"
+          wird zusaetzlich ein Authenticator-Code abgefragt.
+        </p>
+        <label class="login-field">
+          <span>E-Mail bestaetigen</span>
+          <input
+            class="input"
+            type="email"
+            autocomplete="off"
+            placeholder={currentEmail()}
+            value={deleteConfirm()}
+            onInput={(e) => setDeleteConfirm(e.currentTarget.value)}
+            disabled={deleteBusy()}
+          />
+        </label>
+        <div class="settings-foot">
+          <button
+            type="button"
+            class="btn btn-danger"
+            onClick={() => void handleDelete()}
+            disabled={!deleteEnabled()}
+          >
+            Konto loeschen
           </button>
         </div>
       </section>

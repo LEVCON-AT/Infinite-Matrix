@@ -14,6 +14,7 @@
 // security-kritisch (feedback_saas_security_no_offline.md).
 
 import { logAccountEvent } from './account-audit';
+import { callEdgeFunction } from './edge-functions';
 import { supabase } from './supabase';
 
 export async function setDisplayName(name: string): Promise<void> {
@@ -48,4 +49,33 @@ export async function changeEmail(newEmail: string): Promise<void> {
   const atIdx = trimmed.lastIndexOf('@');
   const domain = atIdx > -1 ? trimmed.slice(atIdx + 1) : null;
   void logAccountEvent('email_change_requested', { new_domain: domain });
+}
+
+// D.4 — Self-Service-Account-Loeschung.
+//
+// Server-Pfad: Edge-Function `delete-self-account` prueft Auth +
+// Fresh-AAL2 + Sole-Owner-Status, schreibt Audit, ruft dann
+// `auth.admin.deleteUser`. Wir leiten danach noch `signOut()` an,
+// damit die lokale Session sauber verschwindet (Supabase invalidiert
+// das JWT serverseitig auch ohne, aber das Frontend wuerde sonst
+// kurz "ghost-logged-in" wirken).
+export async function deleteOwnAccount(confirmEmail: string): Promise<void> {
+  const { error } = await callEdgeFunction<
+    { confirmEmail: string },
+    { deleted: true; user_id: string }
+  >('delete-self-account', { confirmEmail });
+  if (error) {
+    const msg =
+      error.status === 422
+        ? error.message
+        : error.status === 401
+          ? 'Erneute Bestaetigung mit Authenticator erforderlich.'
+          : 'Konto-Loeschung fehlgeschlagen.';
+    throw new Error(msg);
+  }
+  try {
+    await supabase.auth.signOut({ scope: 'local' });
+  } catch {
+    // Egal — User ist serverseitig schon weg.
+  }
 }
