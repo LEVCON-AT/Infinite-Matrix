@@ -8719,6 +8719,31 @@ dialog.overlay-modal .overlay-card {
   font-variant-numeric: tabular-nums;
 }
 
+/* Welle F.5 — Email-Verification-Status. Pending = warning-Akzent,
+   Verified = teal/success-Akzent. F.6 Resend-Button rechts daneben. */
+.account-email-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+.account-email-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-sm);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.account-email-badge-verified {
+  background: var(--tealbg);
+  color: var(--tealtxt);
+}
+.account-email-badge-pending {
+  background: var(--amberbg);
+  color: var(--ambertxt);
+}
+
 .settings-empty {
   color: var(--text3);
   font-style: italic;
