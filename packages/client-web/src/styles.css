@@ -11083,6 +11083,141 @@ dialog.overlay-modal .overlay-card {
   color: var(--text);
 }
 
+/* Welle E.1 — Wiki */
+.wiki-page {
+  display: flex;
+  flex-direction: column;
+  block-size: 100%;
+  padding: var(--space-3);
+  gap: var(--space-3);
+}
+
+.wiki-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(14rem, 18rem) 1fr;
+  gap: var(--space-4);
+  min-block-size: 0;
+}
+
+@media (max-width: 48rem) {
+  .wiki-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.wiki-sidebar {
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow-y: auto;
+}
+
+.wiki-sidebar h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text2);
+}
+
+.wiki-page-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.wiki-page-link {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-0_5);
+  padding: var(--space-2);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: start;
+  color: var(--text);
+}
+
+.wiki-page-link:hover {
+  background: var(--surface-hover);
+  border-color: var(--border);
+}
+
+.wiki-page-link.is-active {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+}
+
+.wiki-page-title {
+  font-weight: 500;
+  font-size: var(--text-sm);
+}
+
+.wiki-main {
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow-y: auto;
+}
+
+.wiki-empty-hint {
+  text-align: center;
+  margin-block-start: var(--space-8);
+}
+
+.wiki-editor,
+.wiki-reader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.wiki-reader-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.wiki-reader-head h2 {
+  margin: 0;
+  font-size: var(--fs-title, 18px);
+}
+
+.wiki-content {
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.wiki-content-raw {
+  white-space: pre-wrap;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  background: var(--bg2);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.wiki-content-input {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  resize: vertical;
+  min-block-size: 16rem;
+}
+
+.wiki-reader-foot {
+  margin-block-start: var(--space-2);
+}
+
 /* T.3 Task-Dependencies */
 .task-detail-deps h4 {
   display: flex;

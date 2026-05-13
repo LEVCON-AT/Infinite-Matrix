@@ -1862,6 +1862,19 @@ const Workspace: Component = () => {
               >
                 <Icon name="tag" size={18} />
               </button>
+              <button
+                type="button"
+                class="theme-toggle-btn"
+                onClick={() => {
+                  const wsId = params.workspaceId;
+                  if (wsId) navigate(`/w/${wsId}/wiki`);
+                }}
+                title="Wiki"
+                aria-label="Wiki"
+                disabled={!params.workspaceId}
+              >
+                <Icon name="document-text" size={18} />
+              </button>
               <NotificationBell workspaceId={params.workspaceId ?? ''} />
               <button
                 type="button"

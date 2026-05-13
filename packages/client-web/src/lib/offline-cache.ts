@@ -111,6 +111,9 @@ const TABLES = [
   'widget_external_channels',
   // T.3 — Task-Dependencies (Migration 089, ECS Layer 2).
   'task_dependencies',
+  // Welle E.1 — Wiki/Doku-Seiten (Migration 090). Plattform-Pages
+  // werden mit workspace_id='' im Cache abgelegt (Sonderwert).
+  'wiki_pages',
 ] as const;
 
 export type CacheTable = (typeof TABLES)[number];
@@ -154,6 +157,7 @@ interface MatrixCacheSchema extends DBSchema {
   atom_markers: StoreDef;
   widget_external_channels: StoreDef;
   task_dependencies: StoreDef;
+  wiki_pages: StoreDef;
 }
 
 const DB_NAME = 'matrix-cache';
@@ -195,7 +199,9 @@ const DB_NAME = 'matrix-cache';
 // externem Provider-Ref. user_oauth_tokens bleibt OUT-OF-CACHE (sensibel).
 // V19 (T.3): task_dependencies (Migration 089) — Vorgaenger-Beziehung
 // Blocker → Blocked zwischen Tasks im gleichen Workspace.
-const DB_VERSION = 19;
+// V20 (E.1): wiki_pages (Migration 090) — hierarchische Doku-Seiten,
+// Plattform + Workspace-scoped.
+const DB_VERSION = 20;
 const OBSOLETE_STORES = [
   'kb_cards',
   'checklist_items',

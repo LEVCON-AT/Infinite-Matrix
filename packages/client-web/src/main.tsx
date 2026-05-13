@@ -18,6 +18,7 @@ import TaskDetail from './routes/TaskDetail';
 import TemplateDesigner from './routes/TemplateDesigner';
 import Templates from './routes/Templates';
 import Workspace from './routes/Workspace';
+import WorkspaceWiki from './routes/WorkspaceWiki';
 import AccountAi from './routes/settings/AccountAi';
 import AccountCalendars from './routes/settings/AccountCalendars';
 import AccountChannels from './routes/settings/AccountChannels';
@@ -76,6 +77,7 @@ render(
       <Route path="/w/:workspaceId/calendar" component={Calendar} />
       <Route path="/w/:workspaceId/task/:taskId" component={TaskDetail} />
       <Route path="/w/:workspaceId/templates" component={Templates} />
+      <Route path="/w/:workspaceId/wiki" component={WorkspaceWiki} />
       <Route path="/w/:workspaceId/templates/edit/:templateId" component={TemplateDesigner} />
       <Route path="/w/:workspaceId/settings" component={Settings}>
         <Route path="/" component={AccountProfile} />

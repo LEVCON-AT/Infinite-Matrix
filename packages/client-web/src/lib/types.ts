@@ -635,6 +635,29 @@ export type TaskManifestationInput = {
   display_meta?: Record<string, unknown>;
 };
 
+// ─── Welle E.1 — Wiki/Doku ────────────────────────────────────
+export type WikiPageRow = {
+  id: string;
+  workspace_id: string | null; // NULL = Plattform-Page
+  parent_id: string | null;
+  title: string;
+  slug: string;
+  content_md: string;
+  position: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WikiPageInput = {
+  workspace_id: string | null;
+  parent_id: string | null;
+  title: string;
+  slug: string;
+  content_md?: string;
+  position?: number;
+};
+
 // ─── Welle T.3 — Task-Dependencies (ECS Layer 2) ──────────────
 // Gerichtete „Blocker → Blocked"-Beziehung. Migration 089 erzwingt
 // Workspace-Match + Cycle-Detection + Unique + Non-Self-Loop.
