@@ -102,39 +102,58 @@ export function formatDateTimeWithSecsDE(iso: string | null | undefined): string
   );
 }
 
-// Lange relative Zeitangabe: heute / vor 1 Tag / vor X Tagen / vor 1
-// Monat / vor X Monaten / vor 1 Jahr / vor X Jahren. Fuer „letzte
-// Aktivitaet"-Indikatoren in Listen wo das exakte Datum weniger
-// wichtig als das Alter ist.
+// D.3-V3 (2026-05-13): Relative-Strings via Intl.RelativeTimeFormat —
+// browser-native, plurale + locale-Auswahl ohne eigene String-Tabelle.
+// numeric: 'auto' liefert „heute / gestern / vor 2 Tagen" idiomatisch
+// pro Locale; numeric: 'always' wuerde „vor 0 Tagen" sagen, das wollen
+// wir nicht.
+//
+// Funktionsnamen behalten den „De"-Suffix aus History-Gruenden — die
+// Aufrufer-API bleibt stabil, intern ist's lokalisiert.
+
+let cachedRelLocale = '';
+let cachedRelAuto: Intl.RelativeTimeFormat | null = null;
+let cachedRelAlways: Intl.RelativeTimeFormat | null = null;
+
+function relAuto(): Intl.RelativeTimeFormat {
+  if (cachedRelAuto && cachedRelLocale === activeLocale) return cachedRelAuto;
+  cachedRelLocale = activeLocale;
+  cachedRelAuto = new Intl.RelativeTimeFormat(activeLocale, { numeric: 'auto' });
+  cachedRelAlways = new Intl.RelativeTimeFormat(activeLocale, { numeric: 'always' });
+  return cachedRelAuto;
+}
+
+function relAlways(): Intl.RelativeTimeFormat {
+  if (cachedRelAlways && cachedRelLocale === activeLocale) return cachedRelAlways;
+  relAuto(); // setzt beide
+  return cachedRelAlways as Intl.RelativeTimeFormat;
+}
+
+// Lange relative Zeitangabe: heute / gestern / vor X Tagen / vor X
+// Monaten / vor X Jahren — pro user_profiles.language lokalisiert.
 export function formatRelativeDeLong(iso: string | null | undefined): string {
   if (!iso) return '—';
   const d = new Date(iso);
   if (!isValidDate(d)) return iso;
-  const ms = Date.now() - d.getTime();
-  const days = Math.floor(ms / 86_400_000);
-  if (days <= 0) return 'heute';
-  if (days === 1) return 'vor 1 Tag';
-  if (days < 30) return `vor ${days} Tagen`;
-  const months = Math.floor(days / 30);
-  if (months === 1) return 'vor 1 Monat';
-  if (months < 12) return `vor ${months} Monaten`;
-  const years = Math.floor(months / 12);
-  return years === 1 ? 'vor 1 Jahr' : `vor ${years} Jahren`;
+  const diffMs = d.getTime() - Date.now();
+  const days = Math.round(diffMs / 86_400_000);
+  if (Math.abs(days) <= 1) return relAuto().format(days, 'day');
+  if (Math.abs(days) < 30) return relAlways().format(days, 'day');
+  const months = Math.round(days / 30);
+  if (Math.abs(months) < 12) return relAlways().format(months, 'month');
+  const years = Math.round(months / 12);
+  return relAlways().format(years, 'year');
 }
 
 // Kurze relative Zeitangabe mit Datum-Fallback: heute / gestern /
 // vor X Tagen (< 7) / Lokal-Datum. Fuer Cards/Cells wo aelteres
 // Material das exakte Datum braucht (Vorlagen-Liste, Aktivitaet-Stream).
-//
-// D.3-V2: i18n der relative-Strings (heute/gestern/Tagen) bleibt
-// V3 — der reine Date-Fallback nutzt aber bereits activeShortLocale.
 export function formatRelativeDeShort(iso: string | null | undefined): string {
   if (!iso) return '—';
   const d = new Date(iso);
   if (!isValidDate(d)) return iso;
-  const days = Math.floor((Date.now() - d.getTime()) / 86_400_000);
-  if (days <= 0) return 'heute';
-  if (days === 1) return 'gestern';
-  if (days < 7) return `vor ${days} Tagen`;
+  const days = Math.round((d.getTime() - Date.now()) / 86_400_000);
+  if (Math.abs(days) <= 1) return relAuto().format(days, 'day');
+  if (Math.abs(days) < 7) return relAlways().format(days, 'day');
   return d.toLocaleDateString(activeShortLocale, withTz({}));
 }
