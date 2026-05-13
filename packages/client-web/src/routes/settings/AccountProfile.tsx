@@ -1,4 +1,4 @@
-// Settings → Konto → Profil. Phase 1 (P1.A) Skeleton + Welle F.5/F.6 + D.1.
+// Settings → Konto → Profil. Phase 1 (P1.A) Skeleton + Welle F.5/F.6 + D.1 + D.3.
 //
 // Welle F.5 — Email-Verification-Status-Badge: `email_confirmed_at`
 // aus dem auth.user-Objekt entscheidet zwischen „verifiziert" und
@@ -9,14 +9,18 @@
 // analog F.1 Workspace-Rename. Email-Change triggert Supabase-Verify-
 // Mail auf die neue Adresse — bis zur Bestaetigung bleibt die alte
 // Email aktiv (Supabase-Default, schuetzt vor Tippfehler-Lock).
+// Welle D.3 — Bio + Timezone + Language aus user_profiles (Migration
+// 085, Lazy-Upsert). V1 nur Storage + UI; Wiring in Date-Formatter
+// (Recur-TZ-Aware-Refactor) folgt in D.3-V2.
 
-import { Show, createSignal } from 'solid-js';
+import { Show, createResource, createSignal } from 'solid-js';
 import Icon from '../../components/Icon';
 import { changeEmail, setDisplayName } from '../../lib/account';
 import { useSession } from '../../lib/auth';
 import { translateDbError } from '../../lib/errors';
 import { supabase } from '../../lib/supabase';
 import { showToast } from '../../lib/toasts';
+import { fetchMyUserProfile, setUserProfile } from '../../lib/user-profile';
 
 const AccountProfile = () => {
   const session = useSession();
@@ -77,6 +81,128 @@ const AccountProfile = () => {
       showToast(translateDbError(err, 'Speichern fehlgeschlagen.'), 'error');
     } finally {
       setNameSaving(false);
+    }
+  }
+
+  // ─── D.3 User-Profile (Bio + Timezone + Language) ──────────────
+  const [profile, { refetch: refetchProfile }] = createResource(
+    () => user()?.id ?? null,
+    async (uid) => {
+      if (!uid) return null;
+      try {
+        return await fetchMyUserProfile(uid);
+      } catch (err) {
+        console.error('fetchMyUserProfile:', err);
+        return null;
+      }
+    },
+  );
+  const bio = () => profile()?.bio ?? null;
+  const timezone = () => profile()?.timezone ?? null;
+  const language = () => profile()?.language ?? null;
+
+  // Bio inline-edit.
+  const [bioEditing, setBioEditing] = createSignal(false);
+  const [bioDraft, setBioDraft] = createSignal('');
+  const [bioSaving, setBioSaving] = createSignal(false);
+  function startEditBio() {
+    setBioDraft(bio() ?? '');
+    setBioEditing(true);
+  }
+  function cancelEditBio() {
+    setBioEditing(false);
+    setBioDraft('');
+  }
+  async function saveEditBio() {
+    if (bioSaving()) return;
+    const uid = user()?.id;
+    if (!uid) return;
+    const next = bioDraft().trim();
+    if (next === (bio() ?? '')) {
+      cancelEditBio();
+      return;
+    }
+    setBioSaving(true);
+    try {
+      await setUserProfile(uid, { bio: next || null });
+      await refetchProfile();
+      showToast(next ? 'Bio gespeichert.' : 'Bio entfernt.', 'success');
+      setBioEditing(false);
+    } catch (err) {
+      console.error('setUserProfile bio:', err);
+      showToast(translateDbError(err, 'Speichern fehlgeschlagen.'), 'error');
+    } finally {
+      setBioSaving(false);
+    }
+  }
+
+  // Timezone inline-edit.
+  const [tzEditing, setTzEditing] = createSignal(false);
+  const [tzDraft, setTzDraft] = createSignal('');
+  const [tzSaving, setTzSaving] = createSignal(false);
+  function startEditTz() {
+    setTzDraft(timezone() ?? '');
+    setTzEditing(true);
+  }
+  function cancelEditTz() {
+    setTzEditing(false);
+    setTzDraft('');
+  }
+  async function saveEditTz() {
+    if (tzSaving()) return;
+    const uid = user()?.id;
+    if (!uid) return;
+    const next = tzDraft().trim();
+    if (next === (timezone() ?? '')) {
+      cancelEditTz();
+      return;
+    }
+    setTzSaving(true);
+    try {
+      await setUserProfile(uid, { timezone: next || null });
+      await refetchProfile();
+      showToast(next ? 'Zeitzone gespeichert.' : 'Zeitzone entfernt.', 'success');
+      setTzEditing(false);
+    } catch (err) {
+      console.error('setUserProfile timezone:', err);
+      showToast(translateDbError(err, 'Speichern fehlgeschlagen.'), 'error');
+    } finally {
+      setTzSaving(false);
+    }
+  }
+
+  // Language inline-edit.
+  const [langEditing, setLangEditing] = createSignal(false);
+  const [langDraft, setLangDraft] = createSignal('');
+  const [langSaving, setLangSaving] = createSignal(false);
+  function startEditLang() {
+    setLangDraft(language() ?? '');
+    setLangEditing(true);
+  }
+  function cancelEditLang() {
+    setLangEditing(false);
+    setLangDraft('');
+  }
+  async function saveEditLang() {
+    if (langSaving()) return;
+    const uid = user()?.id;
+    if (!uid) return;
+    const next = langDraft().trim();
+    if (next === (language() ?? '')) {
+      cancelEditLang();
+      return;
+    }
+    setLangSaving(true);
+    try {
+      await setUserProfile(uid, { language: next || null });
+      await refetchProfile();
+      showToast(next ? 'Sprache gespeichert.' : 'Sprache entfernt.', 'success');
+      setLangEditing(false);
+    } catch (err) {
+      console.error('setUserProfile language:', err);
+      showToast(translateDbError(err, 'Speichern fehlgeschlagen.'), 'error');
+    } finally {
+      setLangSaving(false);
     }
   }
 
@@ -260,6 +386,168 @@ const AccountProfile = () => {
                     class="btn-subtle"
                     onClick={cancelEditName}
                     disabled={nameSaving()}
+                  >
+                    Abbrechen
+                  </button>
+                </form>
+              </Show>
+            </dd>
+            <dt>Bio</dt>
+            <dd>
+              <Show
+                when={bioEditing()}
+                fallback={
+                  <span class="settings-name-row">
+                    <Show when={bio()} fallback={<span class="hint">noch nicht gesetzt</span>}>
+                      <span class="settings-readback settings-description-readback">{bio()}</span>
+                    </Show>
+                    <button
+                      type="button"
+                      class="btn-subtle settings-name-edit-btn"
+                      onClick={startEditBio}
+                      title="Bio bearbeiten"
+                    >
+                      <Icon name="pencil" size={14} />
+                      <span>{bio() ? 'Bearbeiten' : 'Hinzufuegen'}</span>
+                    </button>
+                  </span>
+                }
+              >
+                <form
+                  class="settings-name-edit-form settings-desc-edit-form"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void saveEditBio();
+                  }}
+                >
+                  <textarea
+                    class="settings-desc-input"
+                    value={bioDraft()}
+                    onInput={(e) => setBioDraft(e.currentTarget.value)}
+                    maxLength={500}
+                    rows={3}
+                    autofocus
+                    disabled={bioSaving()}
+                    placeholder="Wer du bist, was du machst…"
+                  />
+                  <div class="settings-desc-edit-actions">
+                    <span class="settings-desc-counter">{bioDraft().length}/500</span>
+                    <button type="submit" class="btn btn-p" disabled={bioSaving()}>
+                      Speichern
+                    </button>
+                    <button
+                      type="button"
+                      class="btn-subtle"
+                      onClick={cancelEditBio}
+                      disabled={bioSaving()}
+                    >
+                      Abbrechen
+                    </button>
+                  </div>
+                </form>
+              </Show>
+            </dd>
+            <dt>Zeitzone</dt>
+            <dd>
+              <Show
+                when={tzEditing()}
+                fallback={
+                  <span class="settings-name-row">
+                    <Show
+                      when={timezone()}
+                      fallback={<span class="hint">Browser-Default (noch nicht gesetzt)</span>}
+                    >
+                      <code class="settings-readback">{timezone()}</code>
+                    </Show>
+                    <button
+                      type="button"
+                      class="btn-subtle settings-name-edit-btn"
+                      onClick={startEditTz}
+                      title="Zeitzone bearbeiten"
+                    >
+                      <Icon name="pencil" size={14} />
+                      <span>{timezone() ? 'Bearbeiten' : 'Hinzufuegen'}</span>
+                    </button>
+                  </span>
+                }
+              >
+                <form
+                  class="settings-name-edit-form"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void saveEditTz();
+                  }}
+                >
+                  <input
+                    type="text"
+                    class="settings-name-input"
+                    value={tzDraft()}
+                    onInput={(e) => setTzDraft(e.currentTarget.value)}
+                    maxLength={64}
+                    autofocus
+                    disabled={tzSaving()}
+                    placeholder="z.B. Europe/Vienna, America/New_York"
+                  />
+                  <button type="submit" class="btn btn-p" disabled={tzSaving()}>
+                    Speichern
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-subtle"
+                    onClick={cancelEditTz}
+                    disabled={tzSaving()}
+                  >
+                    Abbrechen
+                  </button>
+                </form>
+              </Show>
+            </dd>
+            <dt>Sprache</dt>
+            <dd>
+              <Show
+                when={langEditing()}
+                fallback={
+                  <span class="settings-name-row">
+                    <Show when={language()} fallback={<span class="hint">Default (Deutsch)</span>}>
+                      <code class="settings-readback">{language()}</code>
+                    </Show>
+                    <button
+                      type="button"
+                      class="btn-subtle settings-name-edit-btn"
+                      onClick={startEditLang}
+                      title="Sprache bearbeiten"
+                    >
+                      <Icon name="pencil" size={14} />
+                      <span>{language() ? 'Bearbeiten' : 'Hinzufuegen'}</span>
+                    </button>
+                  </span>
+                }
+              >
+                <form
+                  class="settings-name-edit-form"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void saveEditLang();
+                  }}
+                >
+                  <input
+                    type="text"
+                    class="settings-name-input"
+                    value={langDraft()}
+                    onInput={(e) => setLangDraft(e.currentTarget.value)}
+                    maxLength={12}
+                    autofocus
+                    disabled={langSaving()}
+                    placeholder="de, en, de-DE"
+                  />
+                  <button type="submit" class="btn btn-p" disabled={langSaving()}>
+                    Speichern
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-subtle"
+                    onClick={cancelEditLang}
+                    disabled={langSaving()}
                   >
                     Abbrechen
                   </button>
