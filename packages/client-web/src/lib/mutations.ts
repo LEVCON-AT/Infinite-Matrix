@@ -1514,16 +1514,16 @@ export async function setChecklistRecur(
 //   - recurring:     alle Items auf done=false zuruecksetzen.
 // Wird nach dem saveChecklistSnapshot aus dem ChecklistPanel gerufen.
 //
-// Konformitaets-Notiz zu Arbeitsprinzip 17 (`docs/audit/A1`):
-// Der Online-Pfad ist ein bewusster Bulk-Shortcut ausserhalb von
-// safe-mutation.ts — analog zu `workspace-reset.ts:clearBoardContents`.
-// Begruendung: bei einer Checkliste mit 100 Items waeren 100 einzelne
-// PATCH/DELETE-Requests ein realer Perf-Hit. Sicherheit kommt durch
-// Idempotenz: bricht das Netz waehrend des Bulk-Calls, faellt der
-// catch auf den Item-fuer-Item-Wrapper-Pfad — beim Reconnect-Replay
-// werden bereits durchgefuehrte Operationen erneut ausgefuehrt
-// (`updateItem(id, {done:false})` und `delChecklistItem` sind beide
-// idempotent). Konsistenz kann nicht brechen.
+// Konformitaets-Notiz — dokumentierte Bulk-Ausnahme (`architektur.md §4.1`):
+// Direkt `supabase.from(...).update/delete()` ohne safe-mutation-Wrapper ist
+// hier zulaessig, weil die Funktion in der dort gelisteten Ausnahme-Klasse
+// "Bulk-Operations mit dokumentiertem Catch-Fallback" steht (explizit
+// genannt: `applyChecklistClose`). Begruendung: bei einer Checkliste mit
+// 100 Items waeren 100 einzelne PATCH/DELETE-Requests ein realer Perf-Hit.
+// Sicherheit kommt durch Idempotenz: bricht das Netz waehrend des Bulk-
+// Calls, faellt der catch (isNetworkError) auf den Item-fuer-Item-Wrapper-
+// Pfad (`updateTask`/`deleteTask`) — beide Operationen sind idempotent,
+// ein Reconnect-Replay kann die Konsistenz nicht brechen.
 export async function applyChecklistClose(args: {
   workspaceId: string;
   checklistId: string;
@@ -1626,6 +1626,15 @@ export async function restoreChecklistSnapshot(args: {
 // Phase 4 T.1.D: Wir muessen pro Item Task + Manifestation anlegen.
 // Online machen wir das mit zwei Bulk-Inserts (1 Roundtrip pro Tabelle).
 // Offline laeuft pro-Item ueber addChecklistItem.
+//
+// Konformitaets-Notiz — dokumentierte Bulk-Ausnahme (`architektur.md §4.1`):
+// Direkt `supabase.from(...).insert()` ohne runOptimisticInsert ist hier
+// zulaessig, weil die Funktion unter "Bulk-Operations mit dokumentiertem
+// Catch-Fallback" faellt. Bei Netzwerk-Loss fangen wir isNetworkError ab
+// und schicken jedes Item einzeln durch den gewrappten `addChecklistItem`
+// — der haengt korrekt in der Mutation-Queue und replayt beim Reconnect.
+// Atomicity-Verlust online (Tasks-Insert ok, Manif-Insert schlaegt fehl)
+// ergaebe orphaned Tasks; deshalb der Count-Mismatch-Check als Tripwire.
 export async function bulkAddChecklistItems(args: {
   workspaceId: string;
   checklistId: string;
