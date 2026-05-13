@@ -1978,7 +1978,7 @@ V1-Provider (final 2026-05-07): OneDrive, Google Drive, Dropbox, **Nextcloud** (
 
 `wsAtomMarkers`-Resource in `Workspace.tsx` (`fetchAtomMarkersForWorkspace`) + Realtime-Refetch ueber `atom_markers`-Slot. TaskDetail-Route + Calendar-Route haben eigene `wsAtomMarkers`-Resource (Direct-Open via `/w/<wid>/task/<tid>` resp. `/w/<wid>/calendar` ohne Workspace.tsx-Bundle; Realtime auf diesen Routen V1-not-wired). RLS filtert eye-Marker auf Owner. Konzept-Vorgabe „rechts in der Card-Toolbar" via `margin-left: auto` in `.atom-marker-bar`.
 
-**V1-Scope:** Click-Toggle (Star setzen/entfernen, Eye setzen/entfernen) + Counter (nur Star) + 1.5s-Throttle. Fuenf der sechs atom_markers-CHECK-Werte live: `task` / `imported_event` / `checklist` / `doc` (V2.A-F) + `info_field` (V2.G — Welle-B-Stub 2026-05-13: InfoFieldAtomCard-Renderer in CellInfoPage "Atom-Felder"-Section, View-Only V1, Legacy `cell.data.infoFields` bleibt parallel). Fehlend: `link` (kein Detail-Modal — V2 Atom-Renderer-Foundation Welle B).
+**V1-Scope:** Click-Toggle (Star setzen/entfernen, Eye setzen/entfernen) + Counter (nur Star) + 1.5s-Throttle. **Alle sechs atom_markers-CHECK-Werte live (§13.3 abgeschlossen 2026-05-13):** `task` / `imported_event` / `checklist` / `doc` (V2.A-F) + `info_field` (V2.G — InfoFieldAtomCard-Renderer in CellInfoPage "Atom-Felder"-Section) + `link` (V2.H — LinkAtomCard-Renderer in CellInfoPage "Atom-Links"-Section, addCellAtomLink-Pfad mit atom_manifestations(kind='pinned', container_kind='cell')). View-Only V1 fuer beide Stub-Renderer; Legacy `cell.data.infoFields` + `cell.data.links` bleiben parallel bis Welle B Step 13 (Backfill).
 
 **V2-deferred:**
 - Hover-Tooltip „Wer hat gestartet" (User-Liste mit Avatars).
