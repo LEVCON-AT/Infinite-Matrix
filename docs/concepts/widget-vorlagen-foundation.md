@@ -1981,7 +1981,6 @@ V1-Provider (final 2026-05-07): OneDrive, Google Drive, Dropbox, **Nextcloud** (
 **V1-Scope:** Click-Toggle (Star setzen/entfernen, Eye setzen/entfernen) + Counter (nur Star) + 1.5s-Throttle. **Alle sechs atom_markers-CHECK-Werte live (§13.3 abgeschlossen 2026-05-13):** `task` / `imported_event` / `checklist` / `doc` (V2.A-F) + `info_field` (V2.G — InfoFieldAtomCard-Renderer in CellInfoPage "Atom-Felder"-Section) + `link` (V2.H — LinkAtomCard-Renderer in CellInfoPage "Atom-Links"-Section, addCellAtomLink-Pfad mit atom_manifestations(kind='pinned', container_kind='cell')). View-Only V1 fuer beide Stub-Renderer; Legacy `cell.data.infoFields` + `cell.data.links` bleiben parallel bis Welle B Step 13 (Backfill).
 
 **V2-deferred:**
-- Hover-Tooltip „Wer hat gestartet" (User-Liste mit Avatars).
 - Filter-Builder-Conditions `has_marker(kind=star, by_user=me, count>=N)` — siehe §5.2.6 Filter-DSL.
 - Vorlagen-Toggle `markers.workspace_star` / `markers.private_eye` (heute immer sichtbar; Toggle abschaltbar nur wenn Vorlage es deaktiviert).
 - Smart-Summary-Default-Widget „Beobachtet von dir" → `task-list` mit Filter `has_marker(kind=eye, by_user=me)`.
@@ -1989,6 +1988,7 @@ V1-Provider (final 2026-05-07): OneDrive, Google Drive, Dropbox, **Nextcloud** (
 **V2-Polish vorgezogen (2026-05-13):**
 - AtomMarkerBar in NodeTree-Atom-Rows: live fuer Doc + Link-Atome (Link nur fuer `link-board-`-Prefix, legacy `link-info-` JSONB-Entries ohne Atom-ID werden uebergangen).
 - AtomMarkerBar in ChecklistPanel-Items: live pro Item (atom_type='task'), zusaetzlich zum existing Header-Marker (atom_type='checklist').
+- Hover-Tooltip „Wer hat gestartet" auf dem Star-Icon: live. Zeigt Avatar+Name jedes Users der den Atom markiert hat, Self-User mit „(Du)"-Suffix. Caller threadet `wsMembers` aus der workspaceMembers-Resource; Renderer ohne wsMembers (z.B. Calendar-Route) zeigen weiterhin nur den native title-Fallback.
 
 Marker leben in einer eigenen Tabelle `atom_markers` (siehe §15) — analog Layer-4-Pattern aus `architektur.md` §1.5. Zwei Kinds in V1:
 
