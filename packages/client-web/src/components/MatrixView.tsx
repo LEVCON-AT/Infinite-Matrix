@@ -19,7 +19,7 @@ import {
   unregisterMatrix,
 } from '../lib/cell-selection';
 import { showChoice, showConfirm } from '../lib/dialog';
-import { openDokuForContext } from '../lib/docs-open';
+import { openDokuForContext, shouldIgnoreDKey } from '../lib/docs-open';
 import { useEditMode } from '../lib/edit-mode';
 import { translateDbError } from '../lib/errors';
 import { findFeatureByHotkey } from '../lib/features';
@@ -640,8 +640,13 @@ const MatrixView: Component<Props> = (p) => {
       // "d" — Doku-Popup fuer diese Zelle oeffnen. Welle D: zentraler
       // Handler ueber openDokuForContext({kind:'cell',...}) — der setzt
       // sourceAlias + attachedCellId, beim Save laeuft pin_doc_with_create
-      // (atomar Doc + atom_pins-Eintrag).
+      // (atomar Doc + atom_pins-Eintrag). shouldIgnoreDKey-Guard zusaetzlich
+      // zur activeElement-Pruefung in Z.602: docs-open.ts Header verlangt
+      // den Guard pro Caller (Defense-in-Depth gegen Edge-Cases wo Cell-
+      // Focus parallel zu Input-Focus haengt, z.B. Row/Col-Header-Rename
+      // mit Click auf das Cell-Body waehrend Header-Input aktiv).
       if ((e.key === 'd' || e.key === 'D') && !e.shiftKey) {
+        if (shouldIgnoreDKey(e.target)) return;
         const cell = cellMap().get(`${rowId}::${colId}`);
         if (!cell) return;
         e.preventDefault();
