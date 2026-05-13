@@ -13720,11 +13720,13 @@ dialog.overlay-modal .overlay-card {
 .new-cell-wizard-foot {
   padding: var(--space-sm) var(--space-md);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-sm);
   justify-content: flex-end;
   border-top: 1px solid var(--border);
   margin-top: var(--space-sm);
+  min-width: 0;
 }
 
 .new-cell-wizard-clear-btn {
@@ -13737,10 +13739,12 @@ dialog.overlay-modal .overlay-card {
 }
 
 .new-cell-wizard-tip {
-  flex: 1 1 auto;
+  flex: 1 1 12rem;
+  min-width: 0;
   font-size: 11px;
   color: var(--text3);
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   align-items: center;
 }
