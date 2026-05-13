@@ -15,6 +15,7 @@
 // Step-Up (B.3): listMfaFactors → ausserhalb von 5min seit AAL2 →
 // challengeAndVerify erneut. siehe lib/auth-step-up.ts.
 
+import { logAccountEvent } from './account-audit';
 import { supabase } from './supabase';
 
 export type MfaFactor = {
@@ -55,6 +56,8 @@ export async function verifyTotpEnrollment(factorId: string, code: string): Prom
     code,
   });
   if (verify.error) throw verify.error;
+  // B.4 Audit. Factor-ID als Tracker; Code natuerlich nie loggen.
+  void logAccountEvent('mfa_enrolled', { factor_id: factorId });
 }
 
 export async function listMfaFactors(): Promise<MfaFactor[]> {
@@ -86,6 +89,9 @@ export async function unenrollMfa(factorId: string): Promise<void> {
   }
   const { error } = await supabase.auth.mfa.unenroll({ factorId });
   if (error) throw error;
+  // B.4 Audit. Auch fuer pending-Faktoren loggen — wichtig fuer
+  // Forensik (Boswillige enrollen + canceln in Loop).
+  void logAccountEvent('mfa_unenrolled', { factor_id: factorId });
 }
 
 // Login-Challenge: nach erfolgreicher Email/Pass-Anmeldung mit

@@ -1,5 +1,6 @@
 import type { Session, User } from '@supabase/supabase-js';
 import { createSignal, onCleanup } from 'solid-js';
+import { logAccountEvent } from './account-audit';
 import { clearProviderCredentialCache } from './ai-assist/credential';
 import { resetAiProvidersCache } from './ai-providers';
 import { clearAllAliasIndex } from './alias-index';
@@ -295,6 +296,8 @@ export async function requestPasswordReset(email: string): Promise<void> {
 export async function updatePassword(newPassword: string): Promise<void> {
   const { error } = await supabase.auth.updateUser({ password: newPassword });
   if (error) throw error;
+  // B.4 Audit. Passwort selbst nie loggen.
+  void logAccountEvent('password_changed', {});
 }
 
 export async function signOut(): Promise<void> {

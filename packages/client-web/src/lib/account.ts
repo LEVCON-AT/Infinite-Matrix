@@ -1,4 +1,4 @@
-// Account-Self-Service — D.1 (Display-Name + Email-Aenderung).
+// Account-Self-Service — D.1 (Display-Name + Email-Aenderung) + B.4 Audit.
 //
 // Beide Mutations laufen ueber `supabase.auth.updateUser()`. Display-
 // Name landet in `raw_user_meta_data.display_name`, lesbar via
@@ -7,9 +7,13 @@
 // Bestaetigung bleibt die alte Email aktiv (Supabase-Default-Verhalten,
 // schuetzt vor Account-Lock bei Tippfehlern).
 //
+// B.4 Audit-Coverage: nach erfolgreicher Auth-Mutation schreiben wir
+// einen Eintrag in system_audit_log via log_account_event-RPC.
+//
 // Sync-online, kein safe-mutation-Wrapper — Auth/Identity ist
 // security-kritisch (feedback_saas_security_no_offline.md).
 
+import { logAccountEvent } from './account-audit';
 import { supabase } from './supabase';
 
 export async function setDisplayName(name: string): Promise<void> {
@@ -23,6 +27,9 @@ export async function setDisplayName(name: string): Promise<void> {
     data: { display_name: value },
   });
   if (error) throw error;
+  // B.4 Audit. Payload nicht der konkrete Name (PII-frei halten), nur
+  // ob gesetzt oder entfernt.
+  void logAccountEvent('display_name_changed', { cleared: value === null });
 }
 
 export async function changeEmail(newEmail: string): Promise<void> {
@@ -37,4 +44,8 @@ export async function changeEmail(newEmail: string): Promise<void> {
   }
   const { error } = await supabase.auth.updateUser({ email: trimmed });
   if (error) throw error;
+  // B.4 Audit. Email-Domain (nicht Volltext) als Forensik-Bruchstueck.
+  const atIdx = trimmed.lastIndexOf('@');
+  const domain = atIdx > -1 ? trimmed.slice(atIdx + 1) : null;
+  void logAccountEvent('email_change_requested', { new_domain: domain });
 }
