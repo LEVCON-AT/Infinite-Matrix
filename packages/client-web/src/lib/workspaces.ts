@@ -1,9 +1,15 @@
-// Workspace-Lifecycle — Phase 1 (P1.B.4 + P1.B.5).
+// Workspace-Lifecycle — Phase 1 (P1.B.4 + P1.B.5) + Welle F.1 (Rename).
 //
 // Sensible Mutations am Workspace selbst: Ownership-Transfer und
 // Hard-Delete. Beide werden synchron-online ausgefuehrt, KEIN
 // safe-mutation-Wrapper (Memory feedback_saas_security_no_offline:
 // Security-Mutations duerfen kein Offline-Replay haben).
+//
+// Welle F.1 — `renameWorkspace`: Workspace-Stammdaten-Edit ist
+// nicht security-kritisch wie Ownership/Delete, laeuft aber konsistent
+// zu den anderen Workspace-Mutations ebenfalls sync-online (keine
+// Offline-Pfade fuer Workspace-Metadaten — bei Konflikten zwischen
+// Mehrgeraet-Workflows ist „Last Writer Wins online" sauber).
 //
 // Toast-Strategie (Memory feedback_user_facing_toasts):
 // - Aufrufer setzt console.error('<funktionsname>:', err) vor dem
@@ -12,6 +18,28 @@
 
 import { requireFreshAal2 } from './auth-step-up';
 import { supabase } from './supabase';
+
+// ─── F.1 Rename ──────────────────────────────────────────────────
+// Owner + Admin duerfen umbenennen (RLS). Editor/Viewer haben kein
+// UPDATE-Recht — Server-Side-Reject ist autoritativ.
+//
+// Validierung clientseitig nur Mindest-Stoperei (leer/Maxlaenge) —
+// die `workspaces.name`-CHECK-Constraint in der DB (Migration 001)
+// ist autoritativ.
+export async function renameWorkspace(workspaceId: string, name: string): Promise<void> {
+  const trimmed = name.trim();
+  if (!trimmed) {
+    throw new Error('Workspace-Name darf nicht leer sein.');
+  }
+  if (trimmed.length > 80) {
+    throw new Error('Workspace-Name maximal 80 Zeichen.');
+  }
+  const { error } = await supabase
+    .from('workspaces')
+    .update({ name: trimmed })
+    .eq('id', workspaceId);
+  if (error) throw error;
+}
 
 // ─── Ownership-Transfer ──────────────────────────────────────────
 export type TransferOwnershipResult = {

@@ -1,11 +1,13 @@
 // Settings → Workspace → Allgemein. Phase 1 (P1.A) Skeleton, P1.A.4-Polish,
-// P1.B.4+B.5 Lifecycle-Aktionen.
+// P1.B.4+B.5 Lifecycle-Aktionen, Welle F.1 Workspace-Rename.
 //
 // Zeigt Workspace-Stammdaten + Owner + Mitglieder-Zaehler. Owner-only-
 // Bottom-Sektion "Gefahren-Zone" mit Eigentums-Uebertragung und
 // Workspace-Loeschen. Beide Aktionen mit Type-To-Confirm-Modals.
 //
-// Edit-Pfad fuer Name/Slug bleibt offen (eigener Sprint).
+// Welle F.1 — Owner+Admin koennen den Workspace-Namen inline editieren
+// (Edit-Mode-Toggle am Namen-Feld). RLS gilt server-autoritativ; das
+// Edit-UI ist nur fuer role in {owner, admin} sichtbar.
 
 import { useNavigate, useParams } from '@solidjs/router';
 import { Show, createResource, createSignal } from 'solid-js';
@@ -24,6 +26,7 @@ import { translateDbError } from '../../lib/errors';
 import { fetchMembers } from '../../lib/members';
 import { fetchMyWorkspaces } from '../../lib/queries';
 import { showToast } from '../../lib/toasts';
+import { renameWorkspace } from '../../lib/workspaces';
 
 const WorkspaceGeneral = () => {
   const params = useParams<{ workspaceId: string }>();
@@ -62,6 +65,47 @@ const WorkspaceGeneral = () => {
   const [transferOpen, setTransferOpen] = createSignal(false);
   const [deleteOpen, setDeleteOpen] = createSignal(false);
 
+  // ─── F.1 Workspace-Rename (inline) ─────────────────────────────
+  const [nameEditing, setNameEditing] = createSignal(false);
+  const [nameDraft, setNameDraft] = createSignal('');
+  const [nameSaving, setNameSaving] = createSignal(false);
+  const canEditName = () => {
+    const role = current()?.role;
+    return role === 'owner' || role === 'admin';
+  };
+  function startEditName() {
+    setNameDraft(current()?.name ?? '');
+    setNameEditing(true);
+  }
+  function cancelEditName() {
+    setNameEditing(false);
+    setNameDraft('');
+  }
+  async function saveEditName() {
+    if (nameSaving()) return;
+    const next = nameDraft().trim();
+    if (!next) {
+      showToast('Workspace-Name darf nicht leer sein.', 'error');
+      return;
+    }
+    if (next === current()?.name) {
+      cancelEditName();
+      return;
+    }
+    setNameSaving(true);
+    try {
+      await renameWorkspace(params.workspaceId, next);
+      await refetchWorkspaces();
+      showToast('Workspace umbenannt.', 'success');
+      setNameEditing(false);
+    } catch (err) {
+      console.error('renameWorkspace:', err);
+      showToast(translateDbError(err, 'Umbenennen fehlgeschlagen.'), 'error');
+    } finally {
+      setNameSaving(false);
+    }
+  }
+
   // Filter fuer das Transfer-Dropdown: aktive Members ohne mich, ohne
   // den aktuellen Owner (= ich, weil Show when={role === 'owner'}).
   // Kandidaten sind alle uebrigen aktiven Mitglieder unabhaengig
@@ -73,9 +117,7 @@ const WorkspaceGeneral = () => {
     <article class="settings-pane">
       <header class="settings-pane-head">
         <h2>Allgemein</h2>
-        <p class="hint">
-          Workspace-Stammdaten. Edit fuer Name/Slug kommt in einer kuenftigen Phase.
-        </p>
+        <p class="hint">Workspace-Stammdaten. Name editierbar (Owner / Admin).</p>
       </header>
       <Show
         when={current()}
@@ -86,7 +128,59 @@ const WorkspaceGeneral = () => {
             <dl class="settings-form-grid">
               <dt>Name</dt>
               <dd>
-                <code class="settings-readback">{ws().name}</code>
+                <Show
+                  when={nameEditing()}
+                  fallback={
+                    <span class="settings-name-row">
+                      <code class="settings-readback">{ws().name}</code>
+                      <Show when={canEditName()}>
+                        <button
+                          type="button"
+                          class="btn-subtle settings-name-edit-btn"
+                          onClick={startEditName}
+                          title="Workspace umbenennen"
+                        >
+                          <Icon name="pencil" size={14} />
+                          <span>Umbenennen</span>
+                        </button>
+                      </Show>
+                    </span>
+                  }
+                >
+                  <form
+                    class="settings-name-edit-form"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void saveEditName();
+                    }}
+                  >
+                    <input
+                      type="text"
+                      class="settings-name-input"
+                      value={nameDraft()}
+                      onInput={(e) => setNameDraft(e.currentTarget.value)}
+                      maxLength={80}
+                      autofocus
+                      disabled={nameSaving()}
+                      placeholder="Workspace-Name"
+                    />
+                    <button
+                      type="submit"
+                      class="btn btn-p"
+                      disabled={nameSaving() || !nameDraft().trim()}
+                    >
+                      Speichern
+                    </button>
+                    <button
+                      type="button"
+                      class="btn-subtle"
+                      onClick={cancelEditName}
+                      disabled={nameSaving()}
+                    >
+                      Abbrechen
+                    </button>
+                  </form>
+                </Show>
               </dd>
               <dt>Owner</dt>
               <dd>

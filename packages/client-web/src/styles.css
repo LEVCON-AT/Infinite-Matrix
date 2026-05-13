@@ -8650,6 +8650,38 @@ dialog.overlay-modal .overlay-card {
   color: var(--text2);
 }
 
+/* Welle F.1 — Workspace-Rename Inline-Edit. Read-Mode rendert Name +
+   Edit-Button; Edit-Mode tauscht zu Form mit Input + Save/Cancel. */
+.settings-name-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+.settings-name-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.settings-name-edit-form {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+.settings-name-input {
+  min-width: 16rem;
+  padding: var(--space-xs) var(--space-sm);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--rs);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.95rem;
+}
+.settings-name-input:focus-visible {
+  border-color: var(--accent);
+}
+
 .settings-empty {
   color: var(--text3);
   font-style: italic;
