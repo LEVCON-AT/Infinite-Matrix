@@ -1985,7 +1985,10 @@ V1-Provider (final 2026-05-07): OneDrive, Google Drive, Dropbox, **Nextcloud** (
 - Filter-Builder-Conditions `has_marker(kind=star, by_user=me, count>=N)` — siehe §5.2.6 Filter-DSL.
 - Vorlagen-Toggle `markers.workspace_star` / `markers.private_eye` (heute immer sichtbar; Toggle abschaltbar nur wenn Vorlage es deaktiviert).
 - Smart-Summary-Default-Widget „Beobachtet von dir" → `task-list` mit Filter `has_marker(kind=eye, by_user=me)`.
-- AtomMarkerBar in NodeTree-Atom-Rows + ChecklistPanel-Items.
+
+**V2-Polish vorgezogen (2026-05-13):**
+- AtomMarkerBar in NodeTree-Atom-Rows: live fuer Doc + Link-Atome (Link nur fuer `link-board-`-Prefix, legacy `link-info-` JSONB-Entries ohne Atom-ID werden uebergangen).
+- AtomMarkerBar in ChecklistPanel-Items: live pro Item (atom_type='task'), zusaetzlich zum existing Header-Marker (atom_type='checklist').
 
 Marker leben in einer eigenen Tabelle `atom_markers` (siehe §15) — analog Layer-4-Pattern aus `architektur.md` §1.5. Zwei Kinds in V1:
 
